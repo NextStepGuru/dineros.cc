@@ -32,6 +32,12 @@ export default defineEventHandler(async (event) => {
       setResponseStatus(event, 400);
       return { error: "Error generating OTP secret." };
     }
+
+    // Generate backup codes for emergency access
+    const backupCodes = Array.from({ length: 8 }, () =>
+      Math.floor(100000 + Math.random() * 900000).toString()
+    );
+
     const imageUrl = await qrcode.toDataURL(secret.otpauth_url);
 
     await prisma.user.update({
@@ -43,6 +49,7 @@ export default defineEventHandler(async (event) => {
             speakeasy: {
               base32secret: secret.base32,
               isEnabled: true,
+              backupCodes: backupCodes,
             },
           })
         ),
@@ -51,6 +58,7 @@ export default defineEventHandler(async (event) => {
 
     return {
       dataUri: imageUrl,
+      backupCodes: backupCodes,
     };
   } catch (error) {
     handleApiError(error);

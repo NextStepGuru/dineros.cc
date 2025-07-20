@@ -20,12 +20,41 @@ export default defineEventHandler(async (event) => {
       return false;
     }
 
-    const results = speakeasy.totp.verify({
-      secret: user.settings.speakeasy.base32secret,
-      encoding: "base32",
-      token,
-      window: 10,
-    });
+    // Check if the token is a backup code
+    const backupCodes = user.settings.speakeasy.backupCodes || [];
+    const isBackupCode = backupCodes.includes(token);
+
+    let verificationResult = false;
+
+    if (isBackupCode) {
+      // Remove the used backup code
+      const updatedBackupCodes = backupCodes.filter((code) => code !== token);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          settings: JSON.parse(
+            JSON.stringify({
+              ...user.settings,
+              speakeasy: {
+                ...user.settings.speakeasy,
+                backupCodes: updatedBackupCodes,
+              },
+            })
+          ),
+        },
+      });
+
+      verificationResult = true;
+    } else {
+      // Verify TOTP token
+      verificationResult = speakeasy.totp.verify({
+        secret: user.settings.speakeasy.base32secret,
+        encoding: "base32",
+        token,
+        window: 10,
+      });
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -35,7 +64,7 @@ export default defineEventHandler(async (event) => {
             ...user.settings,
             speakeasy: {
               ...user.settings.speakeasy,
-              isVerified: results,
+              isVerified: verificationResult,
             },
           })
         ),

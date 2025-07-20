@@ -36,6 +36,7 @@ export const privateUserSchema = publicProfileSchema.merge(
           isEnabled: z.boolean().default(false),
           isVerified: z.boolean().default(false),
           base32secret: z.string().optional(),
+          backupCodes: z.array(z.string()).optional(),
         })
         .default({ isEnabled: false, isVerified: false }),
       plaid: plaidRootSchema,

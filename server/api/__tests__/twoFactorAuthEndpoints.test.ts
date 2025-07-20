@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -7,11 +7,11 @@ vi.hoisted(() => {
 });
 
 // Mock H3/Nuxt utilities before any imports
-vi.mock('h3', () => ({
+vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
   createError: vi.fn((error) => {
     const statusCode = error.statusCode || 500;
-    const message = error.statusMessage || error.message || 'Unknown error';
+    const message = error.statusMessage || error.message || "Unknown error";
     const fullMessage = `HTTP ${statusCode}: ${message}`;
     const err = new Error(fullMessage) as any;
     err.statusCode = statusCode;
@@ -23,7 +23,7 @@ vi.mock('h3', () => ({
 }));
 
 // Mock server dependencies
-vi.mock('~/server/clients/prismaClient', () => ({
+vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
     user: {
       findUniqueOrThrow: vi.fn(),
@@ -32,15 +32,15 @@ vi.mock('~/server/clients/prismaClient', () => ({
   },
 }));
 
-vi.mock('~/server/lib/getUser', () => ({
+vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn(),
 }));
 
-vi.mock('~/server/lib/handleApiError', () => ({
+vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', () => ({
+vi.mock("~/schema/zod", () => ({
   privateUserSchema: {
     parse: vi.fn(),
   },
@@ -49,7 +49,7 @@ vi.mock('~/schema/zod', () => ({
   },
 }));
 
-vi.mock('speakeasy', () => ({
+vi.mock("speakeasy", () => ({
   default: {
     generateSecret: vi.fn(),
     totp: {
@@ -62,31 +62,31 @@ vi.mock('speakeasy', () => ({
   },
 }));
 
-vi.mock('qrcode', () => ({
+vi.mock("qrcode", () => ({
   default: {
     toDataURL: vi.fn(),
   },
   toDataURL: vi.fn(),
 }));
 
-describe('Two-Factor Authentication API Endpoints', () => {
+describe("Two-Factor Authentication API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('GET /api/two-factor-auth', () => {
+  describe("GET /api/two-factor-auth", () => {
     let twoFactorAuthHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../two-factor-auth');
+      const module = await import("../two-factor-auth");
       twoFactorAuthHandler = module.default;
     });
 
-    it('should generate 2FA setup for user without 2FA enabled', async () => {
+    it("should generate 2FA setup for user without 2FA enabled", async () => {
       const mockEvent = {};
       const mockUser = {
         id: 123,
-        email: 'test@example.com',
+        email: "test@example.com",
         settings: {
           speakeasy: {
             isEnabled: false,
@@ -97,30 +97,33 @@ describe('Two-Factor Authentication API Endpoints', () => {
       };
 
       const mockSecret = {
-        ascii: 'secret-ascii',
-        hex: 'secret-hex',
-        base32: 'secret-base32',
-        otpauth_url: 'otpauth://totp/test@example.com+Dineros.cc?secret=secret-base32&issuer=Dineros.cc',
+        ascii: "secret-ascii",
+        hex: "secret-hex",
+        base32: "secret-base32",
+        otpauth_url:
+          "otpauth://totp/test@example.com+Dineros.cc?secret=secret-base32&issuer=Dineros.cc",
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema } = await import('~/schema/zod');
-      const speakeasy = await import('speakeasy');
-      const qrcode = await import('qrcode');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema } = await import("~/schema/zod");
+      const speakeasy = await import("speakeasy");
+      const qrcode = await import("qrcode");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
       (speakeasy.default.generateSecret as any).mockReturnValue(mockSecret);
-      (qrcode.default.toDataURL as any).mockResolvedValue('data:image/png;base64,qrcode-data');
+      (qrcode.default.toDataURL as any).mockResolvedValue(
+        "data:image/png;base64,qrcode-data"
+      );
       (prisma.user.update as any).mockResolvedValue({
         ...mockUser,
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: false,
-            base32secret: 'secret-base32',
+            base32secret: "secret-base32",
           },
         },
       });
@@ -133,44 +136,48 @@ describe('Two-Factor Authentication API Endpoints', () => {
       });
       expect(speakeasy.default.generateSecret).toHaveBeenCalledWith({
         length: 512,
-        name: 'test@example.com+Dineros.cc',
-        issuer: 'Dineros.cc',
+        name: "test@example.com+Dineros.cc",
+        issuer: "Dineros.cc",
       });
-      expect(qrcode.default.toDataURL).toHaveBeenCalledWith(mockSecret.otpauth_url);
+      expect(qrcode.default.toDataURL).toHaveBeenCalledWith(
+        mockSecret.otpauth_url
+      );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
         data: {
           settings: expect.objectContaining({
-            speakeasy: {
+            speakeasy: expect.objectContaining({
               isEnabled: true,
-              base32secret: 'secret-base32',
-            },
+              base32secret: "secret-base32",
+              backupCodes: expect.any(Array),
+            }),
           }),
         },
       });
       expect(result).toEqual({
-        dataUri: 'data:image/png;base64,qrcode-data',
+        dataUri: "data:image/png;base64,qrcode-data",
+        backupCodes: expect.any(Array),
       });
     });
 
-    it('should throw error if 2FA is already enabled and verified', async () => {
+    it("should throw error if 2FA is already enabled and verified", async () => {
       const mockEvent = {};
       const mockUser = {
         id: 123,
-        email: 'test@example.com',
+        email: "test@example.com",
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: true,
-            base32secret: 'existing-secret',
+            base32secret: "existing-secret",
           },
         },
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema } = await import('~/schema/zod');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema } = await import("~/schema/zod");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
@@ -180,19 +187,19 @@ describe('Two-Factor Authentication API Endpoints', () => {
       });
 
       await expect(twoFactorAuthHandler(mockEvent)).rejects.toThrow(
-        'Two-factor authentication is already enabled.'
+        "Two-factor authentication is already enabled."
       );
 
       expect(handleApiError).toHaveBeenCalled();
     });
 
-    it('should handle database errors gracefully', async () => {
+    it("should handle database errors gracefully", async () => {
       const mockEvent = {};
-      const dbError = new Error('Database connection failed');
+      const dbError = new Error("Database connection failed");
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockRejectedValue(dbError);
@@ -200,51 +207,55 @@ describe('Two-Factor Authentication API Endpoints', () => {
         throw error;
       });
 
-      await expect(twoFactorAuthHandler(mockEvent)).rejects.toThrow('Database connection failed');
+      await expect(twoFactorAuthHandler(mockEvent)).rejects.toThrow(
+        "Database connection failed"
+      );
       expect(handleApiError).toHaveBeenCalledWith(dbError);
     });
   });
 
-  describe('POST /api/disable-two-factor-auth', () => {
+  describe("POST /api/disable-two-factor-auth", () => {
     let disableTwoFactorAuthHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../disable-two-factor-auth.post');
+      const module = await import("../disable-two-factor-auth.post");
       disableTwoFactorAuthHandler = module.default;
     });
 
-    it('should successfully disable two-factor authentication', async () => {
+    it("should successfully disable two-factor authentication", async () => {
       const mockEvent = {};
       const mockUser = {
         id: 123,
-        email: 'test@example.com',
+        email: "test@example.com",
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: true,
-            base32secret: 'secret-base32',
+            base32secret: "secret-base32",
           },
-          otherSetting: 'preserved',
+          otherSetting: "preserved",
         },
       };
 
       const mockUpdatedUser = {
         id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        email: "test@example.com",
+        firstName: "Test",
+        lastName: "User",
       };
 
       const mockParsedUser = {
         id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        email: "test@example.com",
+        firstName: "Test",
+        lastName: "User",
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema, publicProfileSchema } = await import('~/schema/zod');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema, publicProfileSchema } = await import(
+        "~/schema/zod"
+      );
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
@@ -262,7 +273,7 @@ describe('Two-Factor Authentication API Endpoints', () => {
         where: { id: 123 },
         data: {
           settings: {
-            otherSetting: 'preserved',
+            otherSetting: "preserved",
             speakeasy: { isEnabled: false, isVerified: false },
           },
         },
@@ -270,12 +281,12 @@ describe('Two-Factor Authentication API Endpoints', () => {
       expect(result).toEqual(mockParsedUser);
     });
 
-    it('should handle authentication errors', async () => {
+    it("should handle authentication errors", async () => {
       const mockEvent = {};
-      const authError = new Error('User not authenticated');
+      const authError = new Error("User not authenticated");
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockImplementation(() => {
         throw authError;
@@ -284,11 +295,13 @@ describe('Two-Factor Authentication API Endpoints', () => {
         throw error;
       });
 
-      await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow('User not authenticated');
+      await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow(
+        "User not authenticated"
+      );
       expect(handleApiError).toHaveBeenCalledWith(authError);
     });
 
-    it('should handle database update errors', async () => {
+    it("should handle database update errors", async () => {
       const mockEvent = {};
       const mockUser = {
         id: 123,
@@ -299,12 +312,12 @@ describe('Two-Factor Authentication API Endpoints', () => {
           },
         },
       };
-      const updateError = new Error('Failed to update user');
+      const updateError = new Error("Failed to update user");
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema } = await import('~/schema/zod');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema } = await import("~/schema/zod");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
@@ -314,52 +327,56 @@ describe('Two-Factor Authentication API Endpoints', () => {
         throw error;
       });
 
-      await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow('Failed to update user');
+      await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow(
+        "Failed to update user"
+      );
       expect(handleApiError).toHaveBeenCalledWith(updateError);
     });
   });
 
-  describe('POST /api/verify-two-factor-auth', () => {
+  describe("POST /api/verify-two-factor-auth", () => {
     let verifyTwoFactorAuthHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../verify-two-factor-auth.post');
+      const module = await import("../verify-two-factor-auth.post");
       verifyTwoFactorAuthHandler = module.default;
     });
 
-    it('should successfully verify valid 2FA token', async () => {
+    it("should successfully verify valid 2FA token", async () => {
       const mockEvent = {};
-      const mockBody = { token: '123456' };
+      const mockBody = { token: "123456" };
       const mockUser = {
         id: 123,
-        email: 'test@example.com',
+        email: "test@example.com",
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: false,
-            base32secret: 'secret-base32',
+            base32secret: "secret-base32",
           },
         },
       };
 
       const mockUpdatedUser = {
         id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        email: "test@example.com",
+        firstName: "Test",
+        lastName: "User",
       };
 
       const mockParsedUser = {
         id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        email: "test@example.com",
+        firstName: "Test",
+        lastName: "User",
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema, publicProfileSchema } = await import('~/schema/zod');
-      const speakeasy = await import('speakeasy');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema, publicProfileSchema } = await import(
+        "~/schema/zod"
+      );
+      const speakeasy = await import("speakeasy");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -373,9 +390,9 @@ describe('Two-Factor Authentication API Endpoints', () => {
 
       expect((globalThis as any).readBody).toHaveBeenCalledWith(mockEvent);
       expect(speakeasy.default.totp.verify).toHaveBeenCalledWith({
-        secret: 'secret-base32',
-        encoding: 'base32',
-        token: '123456',
+        secret: "secret-base32",
+        encoding: "base32",
+        token: "123456",
         window: 10,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
@@ -385,7 +402,7 @@ describe('Two-Factor Authentication API Endpoints', () => {
             speakeasy: {
               isEnabled: true,
               isVerified: true,
-              base32secret: 'secret-base32',
+              base32secret: "secret-base32",
             },
           },
         },
@@ -393,23 +410,25 @@ describe('Two-Factor Authentication API Endpoints', () => {
       expect(result).toEqual(mockParsedUser);
     });
 
-    it('should return false for invalid 2FA token', async () => {
+    it("should return false for invalid 2FA token", async () => {
       const mockEvent = {};
-      const mockBody = { token: '123456' };
+      const mockBody = { token: "123456" };
       const mockUser = {
         id: 123,
         settings: {
           speakeasy: {
-            base32secret: 'secret-base32',
+            base32secret: "secret-base32",
           },
         },
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema, publicProfileSchema } = await import('~/schema/zod');
-      const speakeasy = await import('speakeasy');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema, publicProfileSchema } = await import(
+        "~/schema/zod"
+      );
+      const speakeasy = await import("speakeasy");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -422,9 +441,9 @@ describe('Two-Factor Authentication API Endpoints', () => {
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
       expect(speakeasy.default.totp.verify).toHaveBeenCalledWith({
-        secret: 'secret-base32',
-        encoding: 'base32',
-        token: '123456',
+        secret: "secret-base32",
+        encoding: "base32",
+        token: "123456",
         window: 10,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
@@ -432,7 +451,7 @@ describe('Two-Factor Authentication API Endpoints', () => {
         data: {
           settings: {
             speakeasy: {
-              base32secret: 'secret-base32',
+              base32secret: "secret-base32",
               isVerified: false,
             },
           },
@@ -440,9 +459,9 @@ describe('Two-Factor Authentication API Endpoints', () => {
       });
     });
 
-    it('should return false if user has no 2FA secret', async () => {
+    it("should return false if user has no 2FA secret", async () => {
       const mockEvent = {};
-      const mockBody = { token: '123456' };
+      const mockBody = { token: "123456" };
       const mockUser = {
         id: 123,
         settings: {
@@ -452,10 +471,10 @@ describe('Two-Factor Authentication API Endpoints', () => {
         },
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { privateUserSchema } = await import('~/schema/zod');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -467,7 +486,7 @@ describe('Two-Factor Authentication API Endpoints', () => {
       expect(result).toBe(false);
     });
 
-    it('should handle invalid request body', async () => {
+    it("should handle invalid request body", async () => {
       const mockEvent = {};
       const mockBody = {}; // Missing token
 
@@ -477,23 +496,25 @@ describe('Two-Factor Authentication API Endpoints', () => {
     });
   });
 
-  describe('Cross-endpoint Integration', () => {
-    it('should use consistent error handling across all 2FA endpoints', async () => {
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+  describe("Cross-endpoint Integration", () => {
+    it("should use consistent error handling across all 2FA endpoints", async () => {
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       expect(handleApiError).toBeDefined();
-      expect(typeof handleApiError).toBe('function');
+      expect(typeof handleApiError).toBe("function");
     });
 
-    it('should use consistent user authentication', async () => {
-      const { getUser } = await import('~/server/lib/getUser');
+    it("should use consistent user authentication", async () => {
+      const { getUser } = await import("~/server/lib/getUser");
 
       expect(getUser).toBeDefined();
-      expect(typeof getUser).toBe('function');
+      expect(typeof getUser).toBe("function");
     });
 
-    it('should use consistent schema validation', async () => {
-      const { privateUserSchema, publicProfileSchema } = await import('~/schema/zod');
+    it("should use consistent schema validation", async () => {
+      const { privateUserSchema, publicProfileSchema } = await import(
+        "~/schema/zod"
+      );
 
       expect(privateUserSchema).toBeDefined();
       expect(publicProfileSchema).toBeDefined();

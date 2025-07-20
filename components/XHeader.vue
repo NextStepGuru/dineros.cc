@@ -167,8 +167,8 @@ UHeader(:toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }"
       v-if="authStore.getIsUserLoggedIn"
       class="cursor-pointer") Logout
     ULink(
-      to="/edit-profile"
-      class="cursor-pointer hover:text-[var(--ui-text-highlighted)] hover:before:bg-[var(--ui-bg-elevated)]/50 transition-colors before:transition-colors"
+      to="/edit-profile/profile"
+      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer transition-colors before:transition-colors text-[var(--ui-text-highlighted)] before:bg-[var(--ui-bg-elevated)]/50' : 'cursor-pointer transition-colors before:transition-colors hover:text-[var(--ui-text-highlighted)] hover:before:bg-[var(--ui-bg-elevated)]/50'"
       v-if="authStore.getIsUserLoggedIn")
       UIcon(name="lucide:user" class="2x")
     UColorModeButton

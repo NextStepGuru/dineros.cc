@@ -62,14 +62,45 @@ async function loginHandler(event: any) {
     user.settings.speakeasy.base32secret &&
     tokenChallenge
   ) {
-    const results = speakeasy.totp.verify({
-      secret: user.settings.speakeasy.base32secret,
-      encoding: "base32",
-      token: tokenChallenge,
-      window: 10,
-    });
+    // Check if the token is a backup code
+    const backupCodes = user.settings.speakeasy.backupCodes || [];
+    const isBackupCode = backupCodes.includes(tokenChallenge);
 
-    if (!results) {
+    let verificationResult = false;
+
+    if (isBackupCode) {
+      // Remove the used backup code
+      const updatedBackupCodes = backupCodes.filter(
+        (code) => code !== tokenChallenge
+      );
+
+      await PrismaDb.user.update({
+        where: { id: user.id },
+        data: {
+          settings: JSON.parse(
+            JSON.stringify({
+              ...user.settings,
+              speakeasy: {
+                ...user.settings.speakeasy,
+                backupCodes: updatedBackupCodes,
+              },
+            })
+          ),
+        },
+      });
+
+      verificationResult = true;
+    } else {
+      // Verify TOTP token
+      verificationResult = speakeasy.totp.verify({
+        secret: user.settings.speakeasy.base32secret,
+        encoding: "base32",
+        token: tokenChallenge,
+        window: 10,
+      });
+    }
+
+    if (!verificationResult) {
       setResponseStatus(event, 401);
       return { errors: "Invalid two-factor authentication token." };
     }
