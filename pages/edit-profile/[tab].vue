@@ -34,18 +34,11 @@ const navigationItems = computed(() => {
 
   // Add hidden tabs for userId = 1
   if (authStore.getUser?.id === 1) {
-    baseItems.push(
-      {
-        label: "Admin Settings",
-        to: "/edit-profile/admin-settings",
-        active: route.path.startsWith("/edit-profile/admin-settings"),
-      },
-      {
-        label: "Debug Tools",
-        to: "/edit-profile/debug-tools",
-        active: route.path.startsWith("/edit-profile/debug-tools"),
-      }
-    );
+    baseItems.push({
+      label: "Admin",
+      to: "/edit-profile/admin-settings",
+      active: route.path.startsWith("/edit-profile/admin-settings"),
+    });
   }
 
   return baseItems;
