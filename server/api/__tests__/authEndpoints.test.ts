@@ -93,6 +93,22 @@ vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
+vi.mock("~/server/lib/withErrorHandler", () => ({
+  withErrorHandler: vi.fn((handler) => {
+    return async (event: any) => {
+      try {
+        return await handler(event);
+      } catch (error) {
+        // Import the mocked handleApiError
+        const { handleApiError } = await import("~/server/lib/handleApiError");
+        handleApiError(error);
+        // Re-throw the error to ensure the promise rejects
+        throw error;
+      }
+    };
+  }),
+}));
+
 vi.mock("~/schema/zod", () => ({
   loginSchema: {
     extend: vi.fn(() => ({

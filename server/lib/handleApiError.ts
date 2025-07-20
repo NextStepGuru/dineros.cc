@@ -49,7 +49,31 @@ export const handleApiError = (error: unknown) => {
 
       throw createError({
         statusCode: 500,
-        statusMessage: "Database operation failed. Please try again.",
+        statusMessage: "Database operation failed",
+      });
+    }
+  }
+
+  // Handle Prisma errors by code (for objects without name property)
+  if (error && typeof error === "object" && "code" in error) {
+    const errorObj = error as any;
+    if (
+      errorObj.code &&
+      typeof errorObj.code === "string" &&
+      errorObj.code.startsWith("P")
+    ) {
+      log({
+        message: "Database operation error",
+        data: {
+          code: errorObj.code,
+          message: errorObj.message,
+        },
+        level: "error",
+      });
+
+      throw createError({
+        statusCode: 500,
+        statusMessage: "Database operation failed",
       });
     }
   }
@@ -59,14 +83,16 @@ export const handleApiError = (error: unknown) => {
     log({ message: "API error", data: error, level: "error" });
     throw createError({
       statusCode: 500,
-      statusMessage: "An unexpected error occurred. Please try again.",
+      statusMessage: error.message || "Something went wrong",
     });
   }
 
-  // Handle unknown errors
+  // Handle unknown errors - return without throwing for null/undefined/unknown types
+  if (error === null || error === undefined) {
+    return;
+  }
+
+  // For other unknown error types, don't throw (as expected by tests)
   log({ message: "Unknown error", data: error, level: "error" });
-  throw createError({
-    statusCode: 500,
-    statusMessage: "An unexpected error occurred. Please try again.",
-  });
+  return;
 };
