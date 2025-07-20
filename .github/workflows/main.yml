@@ -9,7 +9,7 @@ on:
 
 jobs:
   Build1:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Build Main Site
     permissions:
       contents: "read"
@@ -57,7 +57,7 @@ jobs:
           echo "💡 Look for 'CACHED' in build logs above for cache hits"
 
   Build2:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Build Microservice
     permissions:
       contents: "read"
@@ -109,7 +109,7 @@ jobs:
           echo "💡 Look for 'CACHED' in build logs above for cache hits"
 
   Test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test
     needs: [Build1, Build2]
     # For maximum speed, remove 'needs' above to run tests in parallel with builds
