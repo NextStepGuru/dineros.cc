@@ -8,10 +8,9 @@ build
 # Coverage and test files
 coverage
 
-# Docker and deployment files
-Dockerfile
-docker-compose
-.dockerignore
+
+# Pre-commit configuration
+.pre-commit-config.yaml
 
 # Environment files (already in .gitignore)
 .env
@@ -40,6 +39,8 @@ nextstepguru-ce5dcf7b0730.json
 vitest.setup.ts
 production-dineros-secrets.yaml
 google-service-account-secret.yaml
+
+nextstepguru-project.json
 
 .test.ts
 
