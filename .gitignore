@@ -23,7 +23,6 @@ logs
 .env.*
 !.env.example
 
-.env*
 !.env.project
 !.env.vault
 *.csv
@@ -34,3 +33,4 @@ output.txt
 
 # Test coverage reports
 coverage/
+*.json

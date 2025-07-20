@@ -21,11 +21,11 @@ if [[ -z "$CURRENT_DB_ENCRYPTION_KEY" ]]; then
   exit 1
 fi
 
-# Generate a new encryption key using `npx cloak generate` and extract only the key value
-NEW_DB_ENCRYPTION_KEY=$(npx cloak generate | grep "^Key:" | awk '{print $2}')
+# Generate a new encryption key using `npx @47ng/cloak generate` and extract only the key value
+NEW_DB_ENCRYPTION_KEY=$(npx @47ng/cloak generate | grep "^Key:" | awk '{print $2}')
 
 if [[ -z "$NEW_DB_ENCRYPTION_KEY" ]]; then
-  echo "Error: Failed to generate new encryption key with 'npx cloak generate'."
+  echo "Error: Failed to generate new encryption key with 'npx @47ng/cloak generate'."
   exit 1
 fi
 
