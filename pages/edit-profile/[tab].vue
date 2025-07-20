@@ -5,37 +5,58 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 
 // Define available tabs
-const navigationItems = [
-  {
-    label: "Profile",
-    to: "/edit-profile/profile",
-    active: route.path.startsWith("/edit-profile/profile"),
-  },
-  {
-    label: "Password",
-    to: "/edit-profile/password",
-    active: route.path.startsWith("/edit-profile/password"),
-  },
-  {
-    label: "Sync Accounts",
-    to: "/edit-profile/sync-accounts",
-    active: route.path.startsWith("/edit-profile/sync-accounts"),
-  },
-  {
-    label: "2FA",
-    to: "/edit-profile/two-factor-auth",
-    active: route.path.startsWith("/edit-profile/two-factor-auth"),
-  },
-];
+const navigationItems = computed(() => {
+  const baseItems = [
+    {
+      label: "Profile",
+      to: "/edit-profile/profile",
+      active: route.path.startsWith("/edit-profile/profile"),
+    },
+    {
+      label: "Password",
+      to: "/edit-profile/password",
+      active: route.path.startsWith("/edit-profile/password"),
+    },
+    {
+      label: "Sync Accounts",
+      to: "/edit-profile/sync-accounts",
+      active: route.path.startsWith("/edit-profile/sync-accounts"),
+    },
+    {
+      label: "2FA",
+      to: "/edit-profile/two-factor-auth",
+      active: route.path.startsWith("/edit-profile/two-factor-auth"),
+    },
+  ];
+
+  // Add hidden tabs for userId = 1
+  if (authStore.getUser?.id === 1) {
+    baseItems.push(
+      {
+        label: "Admin Settings",
+        to: "/edit-profile/admin-settings",
+        active: route.path.startsWith("/edit-profile/admin-settings"),
+      },
+      {
+        label: "Debug Tools",
+        to: "/edit-profile/debug-tools",
+        active: route.path.startsWith("/edit-profile/debug-tools"),
+      }
+    );
+  }
+
+  return baseItems;
+});
 
 // Set up page head for SSR
 useHead(() => {
   try {
     const currentPath = route.path;
     const tabLabel =
-      navigationItems.find((item) => item.to === currentPath)?.label ||
+      navigationItems.value.find((item) => item.to === currentPath)?.label ||
       "Profile";
     return {
       title: `Edit Profile - ${tabLabel}`,
@@ -84,4 +105,7 @@ div(class="container mx-auto px-4 py-8")
     ProfileChangePasswordTab(v-if="route.path === '/edit-profile/password'")
     ProfileSyncAccountsTab(v-if="route.path === '/edit-profile/sync-accounts'")
     ProfileTwoFactorAuthTab(v-if="route.path === '/edit-profile/two-factor-auth'")
+    // Admin tabs (only visible to userId = 1)
+    ProfileAdminSettingsTab(v-if="route.path === '/edit-profile/admin-settings' && authStore.getUser?.id === 1")
+    ProfileDebugToolsTab(v-if="route.path === '/edit-profile/debug-tools' && authStore.getUser?.id === 1")
 </template>

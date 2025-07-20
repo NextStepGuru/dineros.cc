@@ -1,6 +1,13 @@
 <script setup lang="ts">
 const route = useRoute();
-const isHomepage = computed(() => route.path === "/");
+const isFooterHidden = computed(() => {
+  const path = route.path;
+  return (
+    path.startsWith("/register/") ||
+    path.startsWith("/account-registers") ||
+    path.startsWith("/reoccurrences")
+  );
+});
 
 useHead({
   title: "Dineros",
@@ -10,7 +17,7 @@ useHead({
 onMounted(() => {
   watchEffect(() => {
     if (document.body) {
-      document.body.className = isHomepage.value ? "" : "ui-main";
+      document.body.className = isFooterHidden.value ? "ui-main" : "";
     }
   });
 });
@@ -24,7 +31,7 @@ onMounted(() => {
     UMain(class="max-w-[var(--ui-container)] m-auto")
       NuxtPage
 
-    USeparator(v-if="isHomepage" type="dashed" class="h-px pt-0 px-4")
+    USeparator(v-if="!isFooterHidden" type="dashed" class="h-px pt-0 px-4")
 
-    XFooter(v-if="isHomepage")
+    XFooter(v-if="!isFooterHidden")
 </template>
