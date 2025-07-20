@@ -1,0 +1,38 @@
+import type { Job } from "bullmq";
+import { ForecastEngineFactory } from "../services/forecast";
+import { log } from "~/server/logger";
+import { prisma } from "~/server/clients/prismaClient";
+import moment from "moment";
+
+export type RecalculateJob = { accountId: string };
+const queueName = "recalculate";
+
+const processor = async (job: Job<RecalculateJob>) => {
+  const start = new Date().getTime();
+  log({
+    level: "debug",
+    message: `Start RecalculateJob ${job.id} with data:`,
+    data: job.data,
+  });
+
+  // Use the new ForecastEngine directly
+  const engine = ForecastEngineFactory.create(prisma);
+  const context = {
+    accountId: job.data.accountId,
+    startDate: moment().startOf('month').toDate(),
+    endDate: moment().add(2, 'years').toDate(), // Match original forecast range
+  };
+
+  const result = await engine.recalculate(context);
+
+  if (!result.isSuccess) {
+    throw new Error(`Forecast calculation failed: ${result.errors?.join(', ')}`);
+  }
+
+  log({
+    message: `Completed RecalculateJob ${job.id} in ${new Date().getTime() - start
+      }ms`,
+  });
+};
+
+export default { queueName, processor };

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "nextstepguru",
+  "private_key_id": "ce5dcf7b0730a98514ab416bff774b994fcf2666",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1gtjsUYVa9pHI\n0Lymu5+Wc459srBMnoxZ7zSM/r/VLMpaQ4Os9cBqSQhKLgoljtnJ37qlGT8cDwub\nViE6VgvRKDvoyMfI2TjRk8E9Du7gVSL9+3sFAtz5fCHN/ycWVjlXJ7sav3AnTEWb\ns2RT+Q5EcJylpvgOadZes3Mc0wP5rjnl9mdsYoOeWcVxZdXhhSy4dAcQb+X9Gz4N\nMgEAnyjq8VFH4Hpy8gMK9c+amFgL12XMOT/nN9tyQDxTQd93kwKw1o8AYhhVbDs2\nVc+0I5ogTaft40pRNlGkj9QqIC1vKid6g7ZxzSBx1GglL3k9769zqDrpjHsZl0Ya\nWDhK59IJAgMBAAECggEACUNOr6yvWgeIRA/G+NlNWR+3j1mdnqNetT48V8+uWYIq\nJ3YXk62M7r+gYSy9TtJd8evtefxyWIu6A2jfVDtM6hUcDZKlg232dNeN/oAzF5aw\nrPZ2/jf5r++yR/Fz/LNUxMpdxY0se4zsZng+r/xfSoXWsKt3MEEddALDZp6sLsMr\nyGbjzPTOhIjo+9BAT0WuaZhT+cDHzkdEBe393pALyO9T7PC5HWq/Z5oXFVor7Za/\nWbIThzqIo8vjNkP1/wFGRqTfHPzNPGKdov4tr07DcjGO864ZYF3UP+P39w9s7kUa\nPc8cMdTCTv+PyKYw5LU3xGc3t0cWjNW03/2CZbsOaQKBgQDvkzGgzNAXAiVgEMdf\ni539zZjeKoOEEF4tvGuIMpo4QMMgoNsLxRr6cqOtsuHwtlzPD2/TCuAboNC6f6Bo\nFk16PLYuXep9PFyaAN/KMFeruF686OHb0qnpR+46W948D0dGwA5UqtLp6460cPWh\nG7jr2QxwY38Kubou0CNYvTLa5QKBgQDB9JGNfs2YLPRARmKE6lJeUKQBND8BvkVn\nLXMEOYf+jxNLsKeCVwzRr75Z0xpPUUs2hsp6znvPtsIPCbIOZy7ayFAoxMPnF2Nx\necCF6vFrD3ygmdc2qI4e+l7xQShqkPyE4gEwQhAhzL2V/SyFvgKGZejSttNk0oGa\n99D0R0pUVQKBgQCqTF2Iyk5ZLKNYyFSQ7HQgSBeURXA7Xk8z/64IoL/ToOWTugQ7\nN59XzEnhXTkSnO8YGQcKY76upP/6smJZ2xC0BZgTGZtn7pJ8voZV+Us4u9RMQNbc\nJcG2G/WR8l/lHY8zEa6eLNfEhDdquKlCHqyyqhUXhwJ1o1RfloCpwcP2qQKBgHva\nq1/Jy4wTmN26lIr//x1PLYu/S0TXtgYPFdVqz5cU0mORKUaoQ/1a1pkRn0lrRjZJ\nmN8XICUiNYXY0SU1asw3AkkmbVsSqmP6NaDOyN9vAkykMLQsqqTJiPtSenaioz5P\n/CZO6XJMBfzTsSyui3o7dZOpQBCwBCdrfLmhFKwJAoGBAIM3KLds/5vWihNlnIQq\nCL9lft4rfbRiJTxCvbdGrbhyvC8SiE66VNDa8c875ffCKv77du0B3GqaYNSNdJLQ\nKhzds6FUCD99bCKGN3Gv65XTRD3rB8sWvespGcWdC+oY1nEGcSHqI4/WKJtq/0Ro\nGNsPXa2jQ6JEngCmmo4V2s/m\n-----END PRIVATE KEY-----\n",
+  "client_email": "dineros@nextstepguru.iam.gserviceaccount.com",
+  "client_id": "113799051898955151233",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dineros%40nextstepguru.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

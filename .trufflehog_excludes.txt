@@ -1,0 +1,53 @@
+# Node modules and build artifacts
+node_modules
+.nuxt
+.output
+dist
+build
+
+# Coverage and test files
+coverage
+
+# Docker and deployment files
+Dockerfile
+docker-compose
+.dockerignore
+
+# Environment files (already in .gitignore)
+.env
+!.env.example
+
+# Log files
+output.txt
+
+# Temporary files
+temp
+tmp
+
+# IDE and editor files
+.vscode
+.idea
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git
+
+# Known safe files with false positives
+nextstepguru-ce5dcf7b0730.json
+vitest.setup.ts
+production-dineros-secrets.yaml
+google-service-account-secret.yaml
+
+.test.ts
+
+# Node modules and dependencies
+.pnpm
+
+# Deployment files (removed to allow scanning)
+
+# Backup files with test keys that are not in git
+prisma/backup
+microservice/prisma/backup

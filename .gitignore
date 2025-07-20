@@ -1,0 +1,36 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+.env*
+!.env.project
+!.env.vault
+*.csv
+/temp
+/prisma/backup
+/microservice/prisma/backup
+output.txt
+
+# Test coverage reports
+coverage/

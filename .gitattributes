@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text eol=lf
+backup/linearbudget.sql.gz filter=lfs diff=lfs merge=lfs -text
+mysql_scripts/linearbudget.sql filter=lfs diff=lfs merge=lfs -text
+mysql_scripts/seed.sql filter=lfs diff=lfs merge=lfs -text

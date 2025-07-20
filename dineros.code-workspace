@@ -1,0 +1,70 @@
+{
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../test-nuxt"
+    }
+  ],
+  "settings": {
+    "cSpell.words": [
+      "becomingalpha",
+      "HODL",
+      "nuxi",
+      "nuxthub",
+      "roadmaps",
+      "Tokenomics"
+    ],
+    "eslint.enable": true,
+    "eslint.validate": [
+      "javascript",
+      "javascriptreact",
+      "typescript",
+      "typescriptreact",
+      "vue"
+    ],
+    "eslint.workingDirectories": [
+      {
+        "mode": "auto"
+      }
+    ],
+    "eslint.experimental.useFlatConfig": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "files.associations": {
+      "*.vue": "vue"
+    },
+    "emmet.includeLanguages": {
+      "vue": "html",
+      "pug": "html"
+    },
+    "pug.format.enable": true,
+    "pug.beautify.enable": true,
+    "pug.beautify.useTabs": false,
+    "pug.beautify.tabSize": 2,
+    "pug.beautify.fillTab": false,
+    "pug.beautify.semicolons": false,
+    "pug.beautify.singleQuote": false,
+    "pug.beautify.bracketSpacing": true,
+    "pug.beautify.arrowParens": "avoid",
+    "pug.beautify.printWidth": 80,
+    "pug.beautify.trailingComma": "none",
+    "pug.beautify.bracketSameLine": false,
+    "volar.codeLens.pugTools": true,
+    "volar.takeOverMode.enabled": true
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-typescript-next",
+      "Vue.volar",
+      "Vue.vscode-typescript-vue-plugin",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-json",
+      "ms-vscode.vscode-eslint",
+      "ms-vscode.vscode-pug"
+    ]
+  }
+}

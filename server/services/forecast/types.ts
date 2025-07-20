@@ -1,0 +1,148 @@
+import type {
+  PrismaClient,
+  Reoccurrence,
+  AccountRegister,
+} from "@prisma/client";
+import type { RegisterEntry } from "~/types/types";
+import type {
+  CacheRegisterEntry,
+  CacheAccountRegister,
+} from "./ModernCacheService";
+import moment from "moment";
+
+// Core Domain Types
+export interface ForecastContext {
+  accountId?: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+export interface ForecastResult {
+  registerEntries: RegisterEntry[];
+  accountRegisters: AccountRegister[];
+  isSuccess: boolean;
+  errors?: string[];
+}
+
+// Service Interfaces
+export interface IDataLoaderService {
+  loadAccountData(context: ForecastContext): Promise<AccountData>;
+}
+
+export interface IAccountRegisterService {
+  updateBalance(accountId: number, amount: number): void;
+  getAccount(accountId: number): CacheAccountRegister | null;
+  processInterestCharges(
+    accounts: CacheAccountRegister[],
+    forecastDate?: moment.Moment
+  ): Promise<void>;
+  updateStatementDates(
+    accounts: CacheAccountRegister[],
+    forecastDate?: moment.Moment
+  ): Promise<void>;
+}
+
+export interface IReoccurrenceService {
+  processReoccurrences(
+    reoccurrences: Reoccurrence[],
+    endDate: Date
+  ): Promise<void>;
+  calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null;
+}
+
+export interface IRegisterEntryService {
+  createEntry(params: CreateEntryParams): void;
+  updateEntryStatuses(accountId: number): Promise<void>;
+  calculateRunningBalances(
+    entries: CacheRegisterEntry[],
+    initialBalance: number,
+    accountType: "credit" | "debit"
+  ): CacheRegisterEntry[];
+}
+
+export interface ILoanCalculatorService {
+  calculateInterestCharge(params: InterestCalculationParams): Promise<number>;
+  calculateMinPayment(accountRegister: CacheAccountRegister): number;
+  shouldProcessInterest(
+    accountRegister: CacheAccountRegister,
+    forecastDate?: moment.Moment
+  ): boolean;
+}
+
+export interface ITransferService {
+  transferBetweenAccounts(params: TransferParams): void;
+  processExtraDebtPayments(
+    sourceAccounts: CacheAccountRegister[],
+    targetDate: Date
+  ): Promise<void>;
+}
+
+export interface IDataPersisterService {
+  persistForecastResults(results: CacheRegisterEntry[]): Promise<void>;
+  cleanupProjectedEntries(accountId?: string): Promise<void>;
+  updateAccountRegisterBalances(accountId: string): Promise<void>;
+  updateRegisterEntryBalances(
+    calculatedEntries: CacheRegisterEntry[]
+  ): Promise<void>;
+}
+
+export interface IValidationService {
+  validateAccountData(data: AccountData): ValidationResult;
+  validateForecastResults(results: ForecastResult): ValidationResult;
+}
+
+// Data Structures
+export interface AccountData {
+  accountRegisters: CacheAccountRegister[];
+  registerEntries: CacheRegisterEntry[];
+  reoccurrences: Reoccurrence[];
+  reoccurrenceSkips: any[];
+}
+
+export interface CreateEntryParams {
+  id?: string;
+  accountRegisterId: number;
+  sourceAccountRegisterId?: number;
+  description: string;
+  amount: number;
+  reoccurrence?: Reoccurrence;
+  manualCreatedAt?: Date;
+  forecastDate?: Date; // Explicit forecast date for proper timeline placement
+  isBalanceEntry?: boolean;
+  isManualEntry?: boolean;
+  isPending?: boolean;
+}
+
+export interface TransferParams {
+  targetAccountRegisterId: number;
+  sourceAccountRegisterId: number;
+  amount: number;
+  description: string;
+  reoccurrence?: Reoccurrence;
+  fromDescription?: string;
+}
+
+export interface InterestCalculationParams {
+  typeId: number;
+  apr: number;
+  balance: number;
+  totalYears: number;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+// Configuration
+export interface ForecastConfiguration {
+  maxYears: number;
+  creditTypeIds: number[];
+  defaultInterestCalculationMethod: "simple" | "compound" | "loan";
+}
+
+// Engine Interface
+export interface IForecastEngine {
+  recalculate(context: ForecastContext): Promise<ForecastResult>;
+}

@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator fieldEncryptionMigrations {
+  provider     = "prisma-field-encryption"
+  output       = "reencrypt"
+  // Optionally opt-in to concurrent model migration.
+  // Since this can cause timeouts and performance issues,
+  // it's off by default, and models are updated sequentially.
+  concurrently = true
+}
+
+model Account {
+  id             String    @id @default(uuid())
+  name           String    @db.VarChar(255)
+  isDefault      Boolean   @default(false) @map("is_default")
+  isArchived     Boolean   @default(false) @map("is_archived")
+  lastAccessedAt DateTime? @map("last_accessed_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  userAccounts  UserAccount[]
+  reoccurrences Reoccurrence[]
+  registers     AccountRegister[]
+  budgets       Budget[]
+  categories    Category[]
+
+  @@map("account")
+}
+
+model User {
+  id              Int       @id @default(autoincrement()) @db.UnsignedInt
+  firstName       String?   @map("first_name") @db.VarChar(255)
+  lastName        String?   @map("last_name") @db.VarChar(255)
+  username        String?   @db.VarChar(100)
+  email           String    @unique @db.VarChar(500) /// @encrypted
+  emailHash       String?   @unique @map("email_hash") @db.VarChar(128) /// @encryption:hash(email)?algorithm=sha512
+  password        String?   @db.VarChar(1000) /// @encrypted?algorithm=sha512
+  isArchived      Boolean   @default(false) @map("is_archived")
+  lastAccessedAt  DateTime? @map("last_accessed_at")
+  resetPasswordAt DateTime? @map("reset_password_at")
+  resetCode       String?   @map("reset_code") @db.VarChar(10)
+  jwtKey          String?   @unique @map("jwt_key") @db.VarChar(100)
+  config          Json?
+  settings        Json?
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  budgets  Budget[]
+  social   UserSocial[]
+  accounts UserAccount[]
+
+  @@map("user")
+}
+
+model UserAccount {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  userId    Int      @map("user_id") @db.UnsignedInt
+  accountId String   @map("account_id")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("user_account")
+}
+
+model UserSocial {
+  id          Int      @id @default(autoincrement()) @db.UnsignedInt
+  userId      Int      @map("user_id") @db.UnsignedInt
+  provider    String   @db.VarChar(20)
+  accessToken String   @map("access_token") @db.VarChar(2000)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_social")
+}
+
+model Budget {
+  id         Int     @id @default(autoincrement()) @db.UnsignedInt
+  name       String  @db.VarChar(255)
+  accountId  String  @map("account_id")
+  isArchived Boolean @default(false) @map("is_archived")
+  isDefault  Boolean @default(false) @map("is_default")
+  userId     Int?    @map("user_id") @db.UnsignedInt
+
+  account  Account           @relation(fields: [accountId], references: [id])
+  accounts AccountRegister[]
+  User     User?             @relation(fields: [userId], references: [id])
+
+  @@map("budget")
+}
+
+model AccountRegister {
+  id                      Int       @id @default(autoincrement()) @db.UnsignedInt
+  subAccountRegisterId    Int?      @map("sub_account_register_id") @db.UnsignedInt
+  accountId               String    @map("account_id")
+  typeId                  Int       @map("type_id") @db.UnsignedInt
+  budgetId                Int       @map("budget_id") @db.UnsignedInt
+  name                    String
+  balance                 Float     @default(0)
+  creditLimit             Float?    @map("credit_limit")
+  latestBalance           Float     @default(0) @map("latest_balance")
+  minPayment              Decimal?  @map("min_payment")
+  statementAt             DateTime  @map("statement_at")
+  apr1                    Decimal?  @db.Decimal(7, 5)
+  apr1StartAt             DateTime? @map("apr1_start_at")
+  apr2                    Decimal?  @db.Decimal(7, 5)
+  apr2StartAt             DateTime? @map("apr2_start_at")
+  apr3                    Decimal?  @db.Decimal(7, 5)
+  apr3StartAt             DateTime? @map("apr3_start_at")
+  targetAccountRegisterId Int?      @map("target_account_register_id")
+  loanStartAt             DateTime? @map("loan_start_at")
+  loanPaymentsPerYear     Int?      @map("loan_payments_per_year")
+  loanTotalYears          Int?      @map("loan_total_years")
+  loanOriginalAmount      Int?      @map("loan_original_amount")
+  sortOrder               Int       @default(999) @map("sort_order") @db.UnsignedInt
+  loanPaymentSortOrder    Int       @default(999) @map("loan_payment_sort_order") @db.UnsignedInt
+  savingsGoalSortOrder    Int       @default(999) @map("savings_goal_sort_order") @db.UnsignedInt
+  accountSavingsGoal      Float?    @map("account_savings_goal")
+  minAccountBalance       Decimal   @default(0) @map("min_account_balance")
+  allowExtraPayment       Boolean   @default(false) @map("allow_extra_payment")
+  isArchived              Boolean   @default(false) @map("is_archived")
+  plaidId                 String?   @map("plaid_id") /// @encrypted
+  plaidAccessToken        String?   @map("plaid_access_token") /// @encrypted
+  plaidAccessTokenHash    String?   @map("plaid_access_token_hash") @db.VarChar(128) /// @encryption:hash(plaidAccessToken)?algorithm=sha512
+  plaidIdHash             String?   @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
+  plaidJson               Json?     @map("plaid_json")
+  plaidLastSyncAt         DateTime? @map("plaid_last_sync_at")
+  plaidBalanceLastSyncAt  DateTime? @map("plaid_balance_last_sync_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  budget        Budget            @relation(fields: [budgetId], references: [id])
+  type          AccountType       @relation(fields: [typeId], references: [id])
+  account       Account           @relation(fields: [accountId], references: [id])
+  reoccurrences Reoccurrence[]
+  entries       RegisterEntry[]
+  parent        AccountRegister?  @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+  children      AccountRegister[] @relation("ar_children")
+
+  @@map("account_register")
+}
+
+model AccountRegisterSummary {
+  id                String   @id @default(uuid())
+  accountRegisterId Int      @map("account_register_id") @db.UnsignedInt
+  balance           Float
+  month             Int      @db.UnsignedInt
+  year              Int      @db.UnsignedInt
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("account_register_summary")
+}
+
+model RegisterEntry {
+  id                      String   @id @default(uuid())
+  accountRegisterId       Int      @map("account_register_id") @db.UnsignedInt
+  seq                     Int?     @map("seq") @db.UnsignedInt
+  sourceAccountRegisterId Int?     @map("source_account_register_id")
+  createdAt               DateTime @map("created_at")
+  referenceId             String?
+  checkNo                 String?
+  description             String
+  reoccurrenceId          Int?     @map("reoccurrence_id") @db.UnsignedInt
+  amount                  Float
+  balance                 Float
+  typeId                  Int?     @map("type_id") @db.UnsignedInt
+  isProjected             Boolean  @default(false) @map("is_projected")
+  isReconciled            Boolean  @default(false) @map("is_reconciled")
+  isPending               Boolean  @default(false) @map("is_pending")
+  isCleared               Boolean  @default(false) @map("is_cleared")
+  isBalanceEntry          Boolean  @default(false) @map("is_balance_entry")
+  isManualEntry           Boolean  @default(false) @map("is_manual_entry")
+  hasBalanceReCalc        Boolean  @default(false) @map("has_balance_re_calc")
+  plaidId                 String?  @map("plaid_id") /// @encrypted
+  plaidIdHash             String?  @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
+  plaidJson               Json?    @map("plaid_json")
+  categoryId              String?  @map("category_id")
+  memo                    String?  @db.VarChar(500)
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
+
+  register     AccountRegister    @relation(fields: [accountRegisterId], references: [id])
+  reoccurrence Reoccurrence?      @relation(fields: [reoccurrenceId], references: [id])
+  type         RegisterEntryType? @relation(fields: [typeId], references: [id])
+
+  @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
+  @@map("register_entry")
+}
+
+model RegisterEntryType {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  name      String   @map("name")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  entries RegisterEntry[]
+
+  @@map("register_entry_type")
+}
+
+model Category {
+  id            String   @id @default(uuid())
+  subCategoryId String?  @map("sub_category_id")
+  accountId     String?  @map("account_id")
+  name          String
+  isArchived    Boolean  @default(false) @map("is_archived")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  account           Account?   @relation(fields: [accountId], references: [id])
+  parent            Category?  @relation("cat_children", fields: [subCategoryId], references: [id])
+  children          Category[] @relation("cat_children")
+  accountRegisterId Int?       @db.UnsignedInt
+
+  @@map("category")
+}
+
+model Reoccurrence {
+  id                        Int       @id @default(autoincrement()) @db.UnsignedInt
+  accountId                 String    @map("account_id")
+  accountRegisterId         Int       @map("account_register_id") @db.UnsignedInt
+  intervalId                Int       @map("interval_id") @db.UnsignedInt
+  adjustBeforeIfOnWeekend   Boolean   @default(false) @map("adjust_before_if_on_weekend")
+  transferAccountRegisterId Int?      @map("transfer_account_register_id") @db.UnsignedInt
+  intervalCount             Int       @default(1) @map("interval_count") @db.UnsignedInt
+  lastAt                    DateTime? @map("last_at")
+  endAt                     DateTime? @map("end_at")
+  totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
+  elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
+  amount                    Float
+  description               String
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  account  Account            @relation(fields: [accountId], references: [id])
+  register AccountRegister    @relation(fields: [accountRegisterId], references: [id])
+  interval Interval           @relation(fields: [intervalId], references: [id])
+  entries  RegisterEntry[]
+  skips    ReoccurrenceSkip[]
+
+  @@map("reoccurrence")
+}
+
+model ReoccurrenceSkip {
+  id                Int       @id @default(autoincrement()) @db.UnsignedInt
+  reoccurrenceId    Int       @map("reoccurrence_id") @db.UnsignedInt
+  accountId         String    @map("account_id")
+  accountRegisterId Int       @map("account_register_id") @db.UnsignedInt
+  skippedAt         DateTime? @map("skipped_at")
+
+  reoccurrence Reoccurrence @relation(fields: [reoccurrenceId], references: [id])
+
+  @@map("reoccurrence_skip")
+}
+
+model AccountType {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  type      String
+  name      String
+  isCredit  Boolean  @default(false) @map("is_credit")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  registers AccountRegister[]
+
+  @@map("account_type")
+}
+
+model Interval {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  type      String
+  name      String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  reoccurrences Reoccurrence[]
+
+  @@map("interval")
+}
+
+model Rsa {
+  id         String   @id @default(uuid())
+  isDefault  Boolean  @default(false) @map("is_default")
+  isArchived Boolean  @default(false) @map("is_archived")
+  publicKey  String   @map("public_key") @db.Text
+  privateKey String   @map("private_key") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("rsa")
+}

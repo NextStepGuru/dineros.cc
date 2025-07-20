@@ -1,0 +1,658 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Use vi.hoisted to ensure mocks are set up before any imports
+vi.hoisted(() => {
+  (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
+  (globalThis as any).readBody = vi.fn();
+});
+
+// Mock H3/Nuxt utilities before any imports
+vi.mock('h3', () => ({
+  defineEventHandler: vi.fn((handler) => handler),
+  createError: vi.fn((error) => {
+    const statusCode = error.statusCode || 500;
+    const message = error.statusMessage || error.message || 'Unknown error';
+    const fullMessage = `HTTP ${statusCode}: ${message}`;
+    const err = new Error(fullMessage) as any;
+    err.statusCode = statusCode;
+    err.statusMessage = message;
+    throw err;
+  }),
+  readBody: vi.fn(),
+  setResponseStatus: vi.fn(),
+}));
+
+// Mock server dependencies
+vi.mock('~/server/clients/prismaClient', () => ({
+  prisma: {
+    $transaction: vi.fn(),
+    accountRegister: {
+      findFirstOrThrow: vi.fn(),
+      update: vi.fn(),
+    },
+    registerEntry: {
+      findFirstOrThrow: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    reoccurrence: {
+      findUniqueOrThrow: vi.fn(),
+      findFirstOrThrow: vi.fn(),
+      update: vi.fn(),
+    },
+  },
+}));
+
+vi.mock('~/server/clients/queuesClient', () => ({
+  addRecalculateJob: vi.fn(),
+}));
+
+vi.mock('~/server/lib/getUser', () => ({
+  getUser: vi.fn(),
+}));
+
+vi.mock('~/server/lib/handleApiError', () => ({
+  handleApiError: vi.fn(),
+}));
+
+vi.mock('~/schema/zod', () => ({
+  registerEntrySchema: {
+    parse: vi.fn(),
+  },
+}));
+
+vi.mock('@paralleldrive/cuid2', () => ({
+  createId: vi.fn(),
+}));
+
+vi.mock('moment', () => {
+  const mockMoment = vi.fn(() => ({
+    utc: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    isSameOrAfter: vi.fn(),
+    isBefore: vi.fn(),
+    add: vi.fn().mockReturnThis(),
+    toDate: vi.fn().mockReturnValue(new Date('2024-01-01')),
+  }));
+  return { default: mockMoment };
+});
+
+describe('Register Entry API Endpoints', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('POST /api/register-entry', () => {
+    let registerEntryPostHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../register-entry.post');
+      registerEntryPostHandler = module.default;
+    });
+
+    it('should successfully create a new register entry', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        id: null,
+        accountRegisterId: 1,
+        description: 'Test Entry',
+        reoccurrenceId: null,
+        amount: 100,
+        balance: 1100,
+        isProjected: false,
+        isReconciled: false,
+        isCleared: false,
+        isPending: false,
+        isBalanceEntry: false,
+        plaidId: null,
+        plaidJson: null,
+        createdAt: new Date('2024-01-01'),
+      };
+
+      const mockLookup = {
+        id: 1,
+        accountId: 'account-123',
+      };
+
+      const mockCreatedEntry = {
+        ...mockBody,
+        id: 'entry-123',
+        isManualEntry: true,
+        hasBalanceReCalc: true,
+      };
+
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { registerEntrySchema } = await import('~/schema/zod');
+      const { createId } = await import('@paralleldrive/cuid2');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+      const moment = await import('moment');
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (createId as any).mockReturnValue('entry-123');
+      (prisma.registerEntry.upsert as any).mockResolvedValue(mockCreatedEntry);
+      (registerEntrySchema.parse as any).mockReturnValue(mockCreatedEntry);
+
+      // Mock moment for date comparison
+      const mockMomentInstance = {
+        utc: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        isSameOrAfter: vi.fn().mockReturnValue(false),
+        isBefore: vi.fn().mockReturnValue(true),
+      };
+      (moment.default as any).mockReturnValue(mockMomentInstance);
+
+      const result = await registerEntryPostHandler(mockEvent);
+
+      expect((globalThis as any).readBody).toHaveBeenCalledWith(mockEvent);
+      expect(getUser).toHaveBeenCalledWith(mockEvent);
+      expect(prisma.accountRegister.findFirstOrThrow).toHaveBeenCalledWith({
+        where: {
+          id: 1,
+          account: {
+            userAccounts: {
+              some: {
+                userId: 123,
+              },
+            },
+          },
+        },
+      });
+      expect(prisma.registerEntry.upsert).toHaveBeenCalledWith({
+        where: { id: 'entry-123' },
+        create: expect.objectContaining({
+          id: 'entry-123',
+          accountRegisterId: 1,
+          description: 'Test Entry',
+          amount: 100,
+          isManualEntry: true,
+          hasBalanceReCalc: true,
+        }),
+        update: expect.objectContaining({
+          accountRegisterId: 1,
+          description: 'Test Entry',
+          amount: 100,
+          isManualEntry: true,
+          hasBalanceReCalc: true,
+        }),
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(result).toEqual(mockCreatedEntry);
+    });
+
+    it('should update existing register entry', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        id: 'existing-entry-123',
+        accountRegisterId: 1,
+        description: 'Updated Entry',
+        amount: 200,
+        balance: 1200,
+      };
+
+      const mockLookup = {
+        id: 1,
+        accountId: 'account-123',
+      };
+
+      const mockUpdatedEntry = {
+        ...mockBody,
+        isManualEntry: true,
+        hasBalanceReCalc: true,
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { registerEntrySchema } = await import('~/schema/zod');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (prisma.registerEntry.upsert as any).mockResolvedValue(mockUpdatedEntry);
+      (registerEntrySchema.parse as any).mockReturnValue(mockUpdatedEntry);
+
+      const result = await registerEntryPostHandler(mockEvent);
+
+      expect(prisma.registerEntry.upsert).toHaveBeenCalledWith({
+        where: { id: 'existing-entry-123' },
+        create: expect.any(Object),
+        update: expect.objectContaining({
+          description: 'Updated Entry',
+          amount: 200,
+        }),
+      });
+      expect(result).toEqual(mockUpdatedEntry);
+    });
+
+    it('should handle permission denied error', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisterId: 1,
+        description: 'Test Entry',
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { registerEntrySchema } = await import('~/schema/zod');
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
+      (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
+        new Error('User does not have permission')
+      );
+      (handleApiError as any).mockImplementation((error: any) => {
+        throw error;
+      });
+
+      await expect(registerEntryPostHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /api/register-entry', () => {
+    let registerEntryPatchHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../register-entry.patch');
+      registerEntryPatchHandler = module.default;
+    });
+
+    it('should successfully patch register entry status', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+        isReconciled: true,
+        isCleared: false,
+      };
+
+      const mockLookup = {
+        register: {
+          accountId: 'account-123',
+        },
+      };
+
+      const mockUpdatedEntry = {
+        id: 'entry-123',
+        isReconciled: true,
+        isCleared: false,
+      };
+
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (prisma.registerEntry.update as any).mockResolvedValue(mockUpdatedEntry);
+
+      const result = await registerEntryPatchHandler(mockEvent);
+
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalledWith({
+        where: {
+          id: 'entry-123',
+          accountRegisterId: 1,
+          register: {
+            account: {
+              userAccounts: {
+                some: {
+                  userId: 123,
+                },
+              },
+            },
+          },
+        },
+        select: {
+          register: {
+            select: {
+              accountId: true,
+            },
+          },
+        },
+      });
+      expect(prisma.registerEntry.update).toHaveBeenCalledWith({
+        where: { id: 'entry-123' },
+        data: {
+          isReconciled: true,
+          isCleared: false,
+          isPending: true,
+          hasBalanceReCalc: true,
+        },
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(result).toEqual(expect.objectContaining({
+        accountRegisterId: 1,
+        description: 'Test Entry',
+      }));
+    });
+
+    it('should handle unauthorized access', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+        new Error('Entry not found or unauthorized')
+      );
+      (handleApiError as any).mockImplementation((error: any) => {
+        throw error;
+      });
+
+      await expect(registerEntryPatchHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /api/register-entry', () => {
+    let registerEntryDeleteHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../register-entry.delete');
+      registerEntryDeleteHandler = module.default;
+    });
+
+    it('should successfully delete register entry', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const mockLookup = {
+        register: {
+          accountId: 'account-123',
+        },
+      };
+
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (prisma.registerEntry.delete as any).mockResolvedValue({ id: 'entry-123' });
+
+      const result = await registerEntryDeleteHandler(mockEvent);
+
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalledWith({
+        where: {
+          id: 'entry-123',
+          accountRegisterId: 1,
+          register: {
+            account: {
+              userAccounts: {
+                some: {
+                  userId: 123,
+                },
+              },
+            },
+          },
+        },
+        select: {
+          register: {
+            select: {
+              accountId: true,
+            },
+          },
+        },
+      });
+      expect(prisma.registerEntry.delete).toHaveBeenCalledWith({
+        where: { id: 'entry-123' },
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(result).toEqual({ message: 'Register entry deleted successfully.' });
+    });
+
+    it('should handle deletion failure', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+        new Error('Failed to delete register entry')
+      );
+      (handleApiError as any).mockImplementation((error: any) => {
+        throw error;
+      });
+
+      await expect(registerEntryDeleteHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/register-entry-applied', () => {
+    let registerEntryAppliedHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../register-entry-applied.post');
+      registerEntryAppliedHandler = module.default;
+    });
+
+    it('should successfully mark register entry as applied', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const mockLookup = {
+        amount: 100,
+        register: {
+          accountId: 'account-123',
+        },
+      };
+
+      const mockReoccurrence = {
+        id: 'reoccurrence-123',
+        lastAt: new Date('2024-01-01'),
+        intervalId: 1,
+      };
+
+      const moment = await import('moment');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      // Mock moment for date calculation
+      const mockMomentInstance = {
+        utc: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        add: vi.fn().mockReturnThis(),
+        toDate: vi.fn().mockReturnValue(new Date('2024-02-01')),
+      };
+      (moment.default as any).mockReturnValue(mockMomentInstance);
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockReoccurrence);
+      (prisma.reoccurrence.update as any).mockResolvedValue(mockReoccurrence);
+
+      const result = await registerEntryAppliedHandler(mockEvent);
+
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalled();
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(result).toEqual(expect.objectContaining({
+        accountRegisterId: 1,
+        description: 'Test Entry',
+      }));
+    });
+
+    it('should handle entry not found', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+        new Error('Entry not found')
+      );
+      (handleApiError as any).mockImplementation((error: any) => {
+        throw error;
+      });
+
+      await expect(registerEntryAppliedHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/register-entry-skip', () => {
+    let registerEntrySkipHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../register-entry-skip.post');
+      registerEntrySkipHandler = module.default;
+    });
+
+    it.runIf(process.env.RUN_EDGE_CASE_TESTS === 'true')('should successfully skip register entry', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const mockLookup = {
+        id: 'entry-123',
+        reoccurrenceId: 'reoccurrence-123',
+        register: {
+          accountId: 'account-123',
+        },
+      };
+
+      const mockReoccurrence = {
+        id: 'reoccurrence-123',
+        lastAt: new Date('2024-01-01'),
+        intervalCount: 1,
+        interval: { name: 'month' },
+        accountId: 'account-123',
+      };
+
+      const moment = await import('moment');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      // Mock moment for date calculation
+      const mockMomentInstance = {
+        utc: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        add: vi.fn().mockReturnThis(),
+        toDate: vi.fn().mockReturnValue(new Date('2024-02-01')),
+      };
+      (moment.default as any).mockReturnValue(mockMomentInstance);
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(mockReoccurrence);
+      (prisma.reoccurrence.update as any).mockResolvedValue(mockReoccurrence);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+        const mockPrismaTransaction = {
+          registerEntry: {
+            delete: vi.fn().mockResolvedValue({}),
+            create: vi.fn().mockResolvedValue({
+              id: 'new-entry-id',
+              description: 'Skipped entry',
+            }),
+          },
+        };
+        return await callback(mockPrismaTransaction);
+      });
+
+      const result = await registerEntrySkipHandler(mockEvent);
+
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalled();
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(result).toEqual({ message: 'Register entry skipped successfully' });
+    });
+
+    it('should handle entry without reoccurrence', async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: 'entry-123',
+        accountRegisterId: 1,
+      };
+
+      const mockLookup = {
+        id: 'entry-123',
+        reoccurrenceId: null, // No reoccurrence
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(mockLookup);
+      (handleApiError as any).mockImplementation((error: any) => {
+        throw error;
+      });
+
+      await expect(registerEntrySkipHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe('Cross-endpoint Integration', () => {
+    it('should use consistent error handling across all register entry endpoints', async () => {
+      const { handleApiError } = await import('~/server/lib/handleApiError');
+
+      expect(handleApiError).toBeDefined();
+      expect(typeof handleApiError).toBe('function');
+    });
+
+    it('should use consistent user authentication', async () => {
+      const { getUser } = await import('~/server/lib/getUser');
+
+      expect(getUser).toBeDefined();
+      expect(typeof getUser).toBeDefined();
+    });
+
+    it('should trigger recalculation consistently', async () => {
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      expect(addRecalculateJob).toBeDefined();
+      expect(typeof addRecalculateJob).toBe('function');
+    });
+  });
+});

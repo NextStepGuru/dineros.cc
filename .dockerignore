@@ -1,0 +1,117 @@
+# Build outputs
+.nuxt
+.output
+node_modules
+dist
+build
+
+# Development tools and configs
+.vscode
+.idea
+*.log
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.me
+.env.vault
+.env*
+.flaskenv*
+
+# Keep specific env files if needed
+!.env.project
+!.env.vault
+
+# Test files and directories
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.test.tsx
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.js
+**/*.spec.tsx
+**/*.spec.jsx
+tests/
+e2e/
+coverage/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Documentation
+docs/
+*.md
+README.md
+
+# Scripts and utilities
+*.sh
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# TypeScript
+types/
+*.d.ts
+
+# Development dependencies and configs
+.eslintrc*
+.prettierrc*
+.editorconfig
+tsconfig.json
+vitest.config.*
+jest.config.*
+
+# Temporary and cache files
+.cache/
+.temp/
+tmp/
+temp/
+
+# Microservice specific (if not needed in main image)
+microservice/
+
+# Workspace files
+*.code-workspace
+
+# Additional optimizations for faster builds
+.github/
+.deployment/
+.deploy/
+*.tar.gz
+*.zip
+*.rar
+backup/
+backups/
+logs/
+log/
+*.sqlite
+*.db
+database/
+*.pem
+*.key
+nextstepguru-*.json
+runner.yaml
+linearbudget/

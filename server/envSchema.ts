@@ -1,0 +1,22 @@
+import { z } from "zod";
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "production", "test", "local"]),
+  DEPLOY_ENV: z.enum(["staging", "production", "local"]).default("production"),
+  DB_ENCRYPTION_KEY: z.string(),
+  DB_DECRYPTION_KEYS: z.string().transform((a) => a.split(",")),
+  PLAID_CLIENT_ID: z.string(),
+  PLAID_SECRET: z.string(),
+  POSTMARK_SERVER_TOKEN: z.string(),
+  JWT_SECRET: z.string(),
+  REDIS_HOST: z.string().default("127.0.0.1"),
+  REDIS_PORT: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default("6379"),
+  NATS_URL: z.string().default("nats://localhost:4222"),
+  NUXT_UI_PRO_LICENSE: z.string(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally
+});
+
+export default envSchema;

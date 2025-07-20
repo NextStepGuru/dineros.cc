@@ -1,0 +1,31 @@
+@import "tailwindcss" theme(static);
+@import "@nuxt/ui-pro";
+
+.ui-main {
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Disable browser autocomplete suggestions */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px transparent inset !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+/* Prevent autocomplete dropdown styling */
+input::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+
+/* Disable autocomplete for all inputs */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
