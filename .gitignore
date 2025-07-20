@@ -34,3 +34,4 @@ output.txt
 # Test coverage reports
 coverage/
 *.json
+playwright-report/index.html

@@ -34,6 +34,10 @@
     "test:forecast:integration": "vitest run server/services/forecast/__tests__/forecastEngine.integration.test.ts",
     "test:forecast:all": "npm run test:forecast:unit && npm run test:forecast:integration && npm run test:forecast",
     "test:forecast:watch": "vitest server/services/forecast/__tests__/",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:install": "playwright install",
     "security:scan": "./scripts/trufflehog-enhanced.sh"
   },
   "dependencies": {
@@ -81,6 +85,7 @@
     "@nuxt/ui-pro": "^3.2.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "@pinia/nuxt": "^0.11.1",
+    "@playwright/test": "^1.54.1",
     "@types/archiver": "^6.0.3",
     "@types/dotenv": "^8.2.3",
     "@types/jsonwebtoken": "^9.0.10",
