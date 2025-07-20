@@ -44,6 +44,8 @@ jobs:
           provenance: false
           sbom: false
           outputs: type=docker,dest=/tmp/build-result.json
+          build-args: |
+            NUXT_UI_PRO_LICENSE=${{ secrets.NUXT_UI_PRO_LICENSE }}
         env:
           CI: true
       - name: Check Docker build cache effectiveness
