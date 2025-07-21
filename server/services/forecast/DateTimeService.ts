@@ -8,7 +8,10 @@ export class DateTimeService {
   private static _instance: DateTimeService | null = null;
   private _nowOverride: moment.Moment | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Hardcoded override - set to July 20th at 11:32pm CDT
+    // this._nowOverride = moment("2025-08-21T00:10:00-05:00");
+  }
 
   static getInstance(): DateTimeService {
     if (!DateTimeService._instance) {
