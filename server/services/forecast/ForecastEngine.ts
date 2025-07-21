@@ -13,6 +13,7 @@ import { TransferService } from "./TransferService";
 import { DataPersisterService } from "./DataPersisterService";
 import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "~/consts";
 import { createId } from "@paralleldrive/cuid2";
+import { forecastLogger } from "./logger";
 
 export class ForecastEngine implements IForecastEngine {
   private cache: ModernCacheService;
@@ -48,10 +49,18 @@ export class ForecastEngine implements IForecastEngine {
 
   async recalculate(context: ForecastContext): Promise<ForecastResult> {
     try {
+      // Set up logging configuration
+      if (context.logging) {
+        forecastLogger.setConfig(context.logging);
+      }
+
       // 1. Load data from database into memory cache
       const accountData = await this.dataLoader.loadAccountData(context);
 
-      // 2. Cleanup old projected entries (but NOT pending entries)
+      // 2. Convert old projected entries to pending entries before cleanup
+      await this.dataPersister.convertOldProjectedToPending(context.accountId);
+
+      // 3. Cleanup old projected entries (but NOT pending entries)
       await this.dataPersister.performInitialCleanup(context.accountId);
 
       // Only use non-archived account registers
@@ -59,10 +68,10 @@ export class ForecastEngine implements IForecastEngine {
         (a) => !a.isArchived
       );
 
-      // 3. Create balance entries for all loaded active accounts
+      // 4. Create balance entries for all loaded active accounts
       this.accountService.createBalanceEntries(activeAccountRegisters);
 
-      // 4. Get forecast date range
+      // 5. Get forecast date range
       const minDate = await this.dataLoader.getMinReoccurrenceDate(
         context.accountId
       );
@@ -74,32 +83,27 @@ export class ForecastEngine implements IForecastEngine {
         milliseconds: 0,
       });
 
-      console.log(
-        `[ForecastEngine] Date range: startDate=${startDate.format(
+      forecastLogger.info(
+        `Date range: startDate=${startDate.format(
           "YYYY-MM-DD"
         )}, endDate=${endDate.format("YYYY-MM-DD")}`
       );
-      console.log(
-        `[ForecastEngine] Context endDate: ${moment(context.endDate).format(
-          "YYYY-MM-DD"
-        )}`
+      forecastLogger.info(
+        `Context endDate: ${moment(context.endDate).format("YYYY-MM-DD")}`
       );
 
-      // 5. Load existing manual entries into the timeline
+      // 6. Load existing manual entries into the timeline
       await this.loadExistingEntries(accountData, startDate);
 
-      // 6. Process forecast day by day
+      // 7. Process forecast day by day
       try {
         await this.processForecastTimeline(startDate, endDate);
       } catch (error) {
-        console.error(
-          `[ForecastEngine] Error in processForecastTimeline:`,
-          error
-        );
+        forecastLogger.error(`Error in processForecastTimeline:`, error);
         throw error;
       }
 
-      // 7. Calculate running balances and sort entries
+      // 8. Calculate running balances and sort entries
       let processedResults = await this.processAccountEntries(
         activeAccountRegisters
       );
@@ -107,7 +111,7 @@ export class ForecastEngine implements IForecastEngine {
       // Balance entries are already created by createBalanceEntries method
       // No need to create additional ones here
 
-      // 8. Purge all projected entries before persisting new forecast results
+      // 9. Purge all projected entries before persisting new forecast results
       await this.dataPersister.cleanupProjectedEntries(context.accountId);
 
       // Debug: Check what we're about to persist
@@ -121,33 +125,33 @@ export class ForecastEngine implements IForecastEngine {
         (e) => e.isPending
       );
 
-      // 9. Filter out manual entries and pending entries to prevent duplication - they already exist in database
+      // 10. Filter out manual entries and pending entries to prevent duplication - they already exist in database
       // Pending entries come from Plaid sync and should not be re-inserted
       const entriesToPersist = processedResults.filter(
         (e) => !e.isManualEntry && !e.isPending
       );
 
-      console.log(
-        `[ForecastEngine] Persisting ${entriesToPersist.length} entries (filtered out ${manualEntriesToPersist.length} manual entries and ${pendingEntriesToPersist.length} pending entries to prevent duplication)`
+      forecastLogger.info(
+        `Persisting ${entriesToPersist.length} entries (filtered out ${manualEntriesToPersist.length} manual entries and ${pendingEntriesToPersist.length} pending entries to prevent duplication)`
       );
 
-      // 10. Persist results back to database
+      // 11. Persist results back to database
       await this.dataPersister.persistForecastResults(entriesToPersist);
 
-      // 11. Update balance columns for ALL entries (including isPending, manual, etc.)
+      // 12. Update balance columns for ALL entries (including isPending, manual, etc.)
       await this.dataPersister.updateRegisterEntryBalances(processedResults);
 
-      // 12. Update account register latestBalance fields to reflect current balances
+      // 13. Update account register latestBalance fields to reflect current balances
       if (context.accountId) {
         await this.dataPersister.updateAccountRegisterBalances(
           context.accountId
         );
       }
 
-      // 13. Update entry statuses based on current date
+      // 14. Update entry statuses based on current date
       await this.dataPersister.updateEntryStatuses(context.accountId);
 
-      // 13. Final cleanup
+      // 15. Final cleanup
       await this.dataPersister.performFinalCleanup(context.accountId);
 
       // 14. Convert results to expected format
@@ -162,7 +166,7 @@ export class ForecastEngine implements IForecastEngine {
         isSuccess: true,
       };
     } catch (error) {
-      console.error("Forecast calculation failed:", error);
+      forecastLogger.error("Forecast calculation failed:", error);
       return {
         registerEntries: [],
         accountRegisters: [],
@@ -204,8 +208,8 @@ export class ForecastEngine implements IForecastEngine {
       // We need to include entries that occur on or after startDate if they're real transactions
       const existingEntries = accountData.registerEntries;
 
-      console.log(
-        `[ForecastEngine] Loading ${existingEntries.length} existing entries into forecast calculations`
+      forecastLogger.info(
+        `Loading ${existingEntries.length} existing entries into forecast calculations`
       );
 
       existingEntries.forEach((entry: any) => {
@@ -221,7 +225,7 @@ export class ForecastEngine implements IForecastEngine {
         });
       });
     } catch (error) {
-      console.error(`[ForecastEngine] Error in loadExistingEntries:`, error);
+      forecastLogger.error(`Error in loadExistingEntries:`, error);
       throw error;
     }
   }
@@ -233,8 +237,8 @@ export class ForecastEngine implements IForecastEngine {
     const currentDate = startDate.clone();
     let dayCount = 0;
 
-    console.log(
-      `[ForecastEngine] Starting timeline processing from ${startDate.format(
+    forecastLogger.info(
+      `Starting timeline processing from ${startDate.format(
         "YYYY-MM-DD"
       )} to ${endDate.format("YYYY-MM-DD")}`
     );
@@ -242,8 +246,8 @@ export class ForecastEngine implements IForecastEngine {
     while (currentDate.isBefore(endDate)) {
       dayCount++;
       if (dayCount % 100 === 0) {
-        console.log(
-          `[ForecastEngine] Processed ${dayCount} days, current date: ${currentDate.format(
+        forecastLogger.info(
+          `Processed ${dayCount} days, current date: ${currentDate.format(
             "YYYY-MM-DD"
           )}`
         );
@@ -285,8 +289,8 @@ export class ForecastEngine implements IForecastEngine {
       currentDate.add({ day: 1 });
     }
 
-    console.log(
-      `[ForecastEngine] Completed timeline processing. Total days processed: ${dayCount}`
+    forecastLogger.info(
+      `Completed timeline processing. Total days processed: ${dayCount}`
     );
   }
 

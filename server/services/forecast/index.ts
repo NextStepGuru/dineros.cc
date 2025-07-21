@@ -14,6 +14,7 @@ export { ForecastEngine } from "./ForecastEngine";
 // Factory for creating forecast engine
 import type { PrismaClient } from "@prisma/client";
 import { ForecastEngine } from "./ForecastEngine";
+import { forecastLogger } from "./logger";
 
 export class ForecastEngineFactory {
   static create(db: PrismaClient): ForecastEngine {
@@ -32,3 +33,5 @@ export class ForecastEngineFactory {
     return new ForecastEngine(db);
   }
 }
+
+export { forecastLogger };

@@ -4,6 +4,7 @@ import type { IReoccurrenceService } from "./types";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
+import { forecastLogger } from "./logger";
 
 export class ReoccurrenceService implements IReoccurrenceService {
   constructor(
@@ -13,14 +14,25 @@ export class ReoccurrenceService implements IReoccurrenceService {
     private transferService: TransferService
   ) {}
 
-  async processReoccurrences(reoccurrences: Reoccurrence[], endDate: Date): Promise<void> {
-    console.log(`[ReoccurrenceService] Processing ${reoccurrences.length} reoccurrences up to ${moment(endDate).format('YYYY-MM-DD')}`);
+  async processReoccurrences(
+    reoccurrences: Reoccurrence[],
+    endDate: Date
+  ): Promise<void> {
+    forecastLogger.service(
+      "ReoccurrenceService",
+      `Processing ${reoccurrences.length} reoccurrences up to ${moment(
+        endDate
+      ).format("YYYY-MM-DD")}`
+    );
     for (const reoccurrence of reoccurrences) {
       await this.processReoccurrence(reoccurrence, endDate);
     }
   }
 
-  private async processReoccurrence(reoccurrence: Reoccurrence, endDate: Date): Promise<void> {
+  private async processReoccurrence(
+    reoccurrence: Reoccurrence,
+    endDate: Date
+  ): Promise<void> {
     let lastAt: moment.Moment | null = moment(reoccurrence.lastAt).utc();
     const originalLastAt = lastAt ? lastAt.clone() : null;
     let occurrenceCount = 0;
@@ -29,7 +41,14 @@ export class ReoccurrenceService implements IReoccurrenceService {
       return;
     }
 
-    console.log(`[ReoccurrenceService] Processing reoccurrence ${reoccurrence.id} (${reoccurrence.description}) from ${lastAt.format('YYYY-MM-DD')} to ${moment(endDate).format('YYYY-MM-DD')}`);
+    forecastLogger.serviceDebug(
+      "ReoccurrenceService",
+      `Processing reoccurrence ${reoccurrence.id} (${
+        reoccurrence.description
+      }) from ${lastAt.format("YYYY-MM-DD")} to ${moment(endDate).format(
+        "YYYY-MM-DD"
+      )}`
+    );
 
     // Process all due occurrences up to endDate
     while (lastAt && lastAt.isSameOrBefore(moment(endDate).utc())) {
@@ -49,7 +68,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Create a reoccurrence object with the adjusted date for entry creation
       const reoccurrenceForEntry = {
         ...reoccurrence,
-        lastAt: adjustedLastAt.toDate()
+        lastAt: adjustedLastAt.toDate(),
       };
 
       // Create the entry for this occurrence
@@ -71,12 +90,17 @@ export class ReoccurrenceService implements IReoccurrenceService {
       }
 
       // Advance to next occurrence
-      const nextDate = this.calculateNextOccurrence({ ...reoccurrence, lastAt: lastAt.toDate() });
+      const nextDate = this.calculateNextOccurrence({
+        ...reoccurrence,
+        lastAt: lastAt.toDate(),
+      });
       if (!nextDate) break;
       lastAt = moment(nextDate).utc();
 
       // Update the reoccurrence in cache
-      const cachedReoccurrence = this.cache.reoccurrence.findOne({ id: reoccurrence.id });
+      const cachedReoccurrence = this.cache.reoccurrence.findOne({
+        id: reoccurrence.id,
+      });
       if (cachedReoccurrence) {
         cachedReoccurrence.lastAt = lastAt.toDate();
         this.cache.reoccurrence.update(cachedReoccurrence);
@@ -88,7 +112,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
       reoccurrence.lastAt = lastAt.toDate();
     }
 
-    console.log(`[ReoccurrenceService] Created ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`);
+    forecastLogger.serviceDebug(
+      "ReoccurrenceService",
+      `Created ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`
+    );
   }
 
   calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null {
@@ -99,13 +126,22 @@ export class ReoccurrenceService implements IReoccurrenceService {
         return lastAt.clone().add({ day: reoccurrence.intervalCount }).toDate();
 
       case 2: // week
-        return lastAt.clone().add({ week: reoccurrence.intervalCount }).toDate();
+        return lastAt
+          .clone()
+          .add({ week: reoccurrence.intervalCount })
+          .toDate();
 
       case 3: // month
-        return lastAt.clone().add({ month: reoccurrence.intervalCount }).toDate();
+        return lastAt
+          .clone()
+          .add({ month: reoccurrence.intervalCount })
+          .toDate();
 
       case 4: // year
-        return lastAt.clone().add({ year: reoccurrence.intervalCount }).toDate();
+        return lastAt
+          .clone()
+          .add({ year: reoccurrence.intervalCount })
+          .toDate();
 
       case 5: // once
         return null;
@@ -121,22 +157,24 @@ export class ReoccurrenceService implements IReoccurrenceService {
   private adjustDateIfWeekend(date: moment.Moment): moment.Moment {
     const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
 
-    if (dayOfWeek === 0) { // Sunday
-      return date.clone().subtract(2, 'days'); // Move to Friday
-    } else if (dayOfWeek === 6) { // Saturday
-      return date.clone().subtract(1, 'day'); // Move to Friday
+    if (dayOfWeek === 0) {
+      // Sunday
+      return date.clone().subtract(2, "days"); // Move to Friday
+    } else if (dayOfWeek === 6) {
+      // Saturday
+      return date.clone().subtract(1, "day"); // Move to Friday
     }
 
     return date.clone(); // Weekday, no adjustment needed - but still clone to avoid mutation
   }
 
-
-
   getReoccurrencesDue(maxDate: Date): Reoccurrence[] {
     const dueMoment = moment(maxDate).utc();
 
-    return this.cache.reoccurrence.find((reoccurrence) =>
-      !!reoccurrence.lastAt && moment(reoccurrence.lastAt).isSameOrBefore(dueMoment)
+    return this.cache.reoccurrence.find(
+      (reoccurrence) =>
+        !!reoccurrence.lastAt &&
+        moment(reoccurrence.lastAt).isSameOrBefore(dueMoment)
     );
   }
 
@@ -157,20 +195,29 @@ export class ReoccurrenceService implements IReoccurrenceService {
     return true;
   }
 
-  filterActiveReoccurrences(reoccurrences: Reoccurrence[], currentDate: Date): Reoccurrence[] {
-    return reoccurrences.filter(reoccurrence =>
+  filterActiveReoccurrences(
+    reoccurrences: Reoccurrence[],
+    currentDate: Date
+  ): Reoccurrence[] {
+    return reoccurrences.filter((reoccurrence) =>
       this.isReoccurrenceActive(reoccurrence, currentDate)
     );
   }
 
   getIntervalDescription(intervalId: number): string {
     switch (intervalId) {
-      case 1: return "daily";
-      case 2: return "weekly";
-      case 3: return "monthly";
-      case 4: return "yearly";
-      case 5: return "once";
-      default: return "unknown";
+      case 1:
+        return "daily";
+      case 2:
+        return "weekly";
+      case 3:
+        return "monthly";
+      case 4:
+        return "yearly";
+      case 5:
+        return "once";
+      default:
+        return "unknown";
     }
   }
 }

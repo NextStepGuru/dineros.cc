@@ -202,6 +202,86 @@ export class DataPersisterService implements IDataPersisterService {
     );
   }
 
+  /**
+   * Converts old projected entries to pending entries before cleanup
+   * This ensures that projected entries older than current date are preserved as pending
+   */
+  async convertOldProjectedToPending(accountId?: string): Promise<void> {
+    const now = moment()
+      .utc()
+      .set({
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      })
+      .toDate();
+
+    console.log(
+      `[DataPersisterService] Converting old projected entries to pending for accountId: ${accountId}`
+    );
+    console.log(
+      `[DataPersisterService] Current date for conversion: ${moment(now).format(
+        "YYYY-MM-DD"
+      )}`
+    );
+
+    // First, let's see how many old projected entries exist
+    const oldProjectedCount = await this.db.registerEntry.count({
+      where: {
+        register: { accountId },
+        isCleared: false,
+        isProjected: true,
+        isManualEntry: false,
+        createdAt: { lte: now },
+      },
+    });
+
+    console.log(
+      `[DataPersisterService] Found ${oldProjectedCount} old projected entries to convert`
+    );
+
+    if (oldProjectedCount === 0) {
+      console.log(`[DataPersisterService] No old projected entries to convert`);
+      return;
+    }
+
+    // Convert old projected entries to pending (isProjected=false, isPending=true)
+    const result = await this.db.registerEntry.updateMany({
+      data: {
+        isProjected: false,
+        isPending: true,
+      },
+      where: {
+        register: { accountId },
+        isCleared: false,
+        isProjected: true,
+        isManualEntry: false,
+        createdAt: { lte: now },
+      },
+    });
+
+    console.log(
+      `[DataPersisterService] Successfully converted ${result.count} old projected entries to pending entries`
+    );
+
+    // Verify the conversion worked
+    const pendingCount = await this.db.registerEntry.count({
+      where: {
+        register: { accountId },
+        isCleared: false,
+        isProjected: false,
+        isPending: true,
+        isManualEntry: false,
+        createdAt: { lte: now },
+      },
+    });
+
+    console.log(
+      `[DataPersisterService] Verification: ${pendingCount} pending entries now exist (should be >= ${result.count})`
+    );
+  }
+
   async cleanupProjectedEntries(accountId?: string): Promise<void> {
     await this.db.registerEntry.deleteMany({
       where: {

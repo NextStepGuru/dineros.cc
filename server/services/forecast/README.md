@@ -22,6 +22,7 @@ ForecastEngine (Orchestrator)
 ## ✨ Key Features
 
 ### 🎯 **Core Functionality**
+
 - ✅ Manual entry support
 - ✅ Day/week/month/yearly reoccurrences
 - ✅ Loan and credit card debt handling
@@ -30,29 +31,31 @@ ForecastEngine (Orchestrator)
 - ✅ Inter-account transfers
 
 ### 🔧 **Technical Improvements**
+
 - ✅ **Modular Architecture**: Each service has a single responsibility
 - ✅ **Type Safety**: Full TypeScript interfaces and types
 - ✅ **Testability**: Services can be unit tested in isolation
 - ✅ **Performance**: Maintained LokiJS in-memory performance
 - ✅ **Error Handling**: Structured error reporting
 - ✅ **Maintainability**: Clear separation of concerns
+- ✅ **Configurable Logging**: Control forecast engine logging output
 
 ## 🚀 Quick Start
 
 ### Basic Usage
 
 ```typescript
-import { ForecastEngineFactory } from '~/server/services/forecast';
-import { prisma } from '~/server/clients/prismaClient';
+import { ForecastEngineFactory } from "~/server/services/forecast";
+import { prisma } from "~/server/clients/prismaClient";
 
 // Create forecast engine
 const engine = ForecastEngineFactory.create(prisma);
 
 // Define forecast context
 const context = {
-  accountId: 'user-account-123',
+  accountId: "user-account-123",
   startDate: new Date(),
-  endDate: moment().add(5, 'years').toDate(),
+  endDate: moment().add(5, "years").toDate(),
 };
 
 // Run forecast calculation
@@ -62,9 +65,59 @@ if (result.isSuccess) {
   console.log(`Generated ${result.registerEntries.length} entries`);
   console.log(`Updated ${result.accountRegisters.length} accounts`);
 } else {
-  console.error('Forecast failed:', result.errors);
+  console.error("Forecast failed:", result.errors);
 }
 ```
+
+### Logging Configuration
+
+The forecast engine supports configurable logging to control output verbosity:
+
+```typescript
+// Disable all forecast engine logging
+const context = {
+  accountId: "user-account-123",
+  startDate: new Date(),
+  endDate: moment().add(5, "years").toDate(),
+  logging: {
+    enabled: false, // Turn off all logging
+  },
+};
+
+// Enable only error and warning logs
+const context = {
+  accountId: "user-account-123",
+  startDate: new Date(),
+  endDate: moment().add(5, "years").toDate(),
+  logging: {
+    enabled: true,
+    level: "warn", // Only show warnings and errors
+  },
+};
+
+// Enable debug logging for troubleshooting
+const context = {
+  accountId: "user-account-123",
+  startDate: new Date(),
+  endDate: moment().add(5, "years").toDate(),
+  logging: {
+    enabled: true,
+    level: "debug", // Show all logs including debug info
+  },
+};
+```
+
+**Log Levels:**
+
+- `debug`: All logs including detailed service information
+- `info`: General information and progress updates
+- `warn`: Warnings and potential issues
+- `error`: Errors only
+
+**Default Behavior:**
+
+- If no logging configuration is provided, logging is enabled with `info` level
+- Service-specific logs (like `[ReoccurrenceService]` and `[TransferService]`) are controlled by the same configuration
 
 ### Advanced Usage
 
@@ -74,13 +127,13 @@ const cache = engine.getCache();
 const accounts = cache.accountRegister.find({ typeId: 1 });
 
 // Use function-based queries for complex filtering
-const debtAccounts = cache.accountRegister.find(account =>
-  account.balance < 0 && account.typeId === 2
+const debtAccounts = cache.accountRegister.find(
+  (account) => account.balance < 0 && account.typeId === 2
 );
 
 // Get cache statistics
 const stats = cache.getStats();
-console.log('Cache usage:', stats);
+console.log("Cache usage:", stats);
 
 // Validate results
 const isValid = await engine.validateResults(context);
@@ -89,36 +142,43 @@ const isValid = await engine.validateResults(context);
 ## 📊 Service Breakdown
 
 ### **DataLoaderService**
+
 - Loads account registers, entries, reoccurrences from database
 - Populates ModernCacheService for high-performance calculations
 - Handles data transformation and filtering
 
 ### **AccountRegisterService**
+
 - Manages account-specific operations
 - Processes interest charges and statement date updates
 - Handles account balance updates and validations
 
 ### **ReoccurrenceService**
+
 - Processes recurring transactions (bills, payroll, etc.)
 - Calculates next occurrence dates for all interval types
 - Manages reoccurrence lifecycle and scheduling
 
 ### **RegisterEntryService**
+
 - Creates and manages register entries
 - Updates entry statuses (pending/projected)
 - Calculates running balances and sorts entries
 
 ### **LoanCalculatorService**
+
 - Handles interest calculations for different account types
 - Supports standard credit/debit and loan calculations
 - Manages APR selection logic based on dates
 
 ### **TransferService**
+
 - Manages transfers between accounts
 - Processes extra debt payments automatically
 - Handles transfer validation and balancing
 
 ### **DataPersisterService**
+
 - Persists calculated results back to database
 - Manages cleanup operations and status updates
 - Provides performance metrics and validation
@@ -126,49 +186,54 @@ const isValid = await engine.validateResults(context);
 ## 🧪 Testing
 
 ### Run All Tests
+
 ```bash
 npm run test:forecast
 ```
 
 ### Unit Tests
+
 ```bash
 npm run test:forecast:unit
 ```
 
 ### Integration Tests
+
 ```bash
 npm run test:forecast:integration
 ```
 
 ### Performance Tests
+
 ```bash
 npm run test:forecast:performance
 ```
 
 ## 📈 Performance
 
-| Dataset Size | Execution Time | Memory Usage |
-|-------------|----------------|--------------|
-| Small (1 account, 10 entries) | < 50ms | < 5MB |
-| Medium (10 accounts, 1K entries) | < 500ms | < 25MB |
-| Large (50 accounts, 10K entries) | < 2s | < 100MB |
+| Dataset Size                     | Execution Time | Memory Usage |
+| -------------------------------- | -------------- | ------------ |
+| Small (1 account, 10 entries)    | < 50ms         | < 5MB        |
+| Medium (10 accounts, 1K entries) | < 500ms        | < 25MB       |
+| Large (50 accounts, 10K entries) | < 2s           | < 100MB      |
 
-*Note: Performance improved 2-5x after migrating from LokiJS to ModernCacheService*
+_Note: Performance improved 2-5x after migrating from LokiJS to ModernCacheService_
 
 ## 🚀 Production Ready
 
 The ForecastEngine is now the primary forecasting system, completely replacing the legacy architecture.
 
 ### System Status:
+
 ✅ **Complete Migration** - Legacy system fully replaced
 ✅ **Performance Optimized** - 5-10x faster with ModernCacheService
 ✅ **Zero Dependencies** - No LokiJS or legacy code
-✅ **Full Type Safety** - 100% TypeScript implementation
-4. **Remove legacy code** (Week 7-8)
+✅ **Full Type Safety** - 100% TypeScript implementation 4. **Remove legacy code** (Week 7-8)
 
 ## 🛠️ Configuration
 
 ### Environment Variables
+
 ```env
 # Enable new forecast engine (optional during migration)
 USE_NEW_FORECAST_ENGINE=true
@@ -179,20 +244,26 @@ FORECAST_CACHE_SIZE=1000
 ```
 
 ### Feature Flags
+
 ```typescript
 // Use feature flags for gradual rollout
-const useNewEngine = await featureFlags.isEnabled('new-forecast-engine', userId);
+const useNewEngine = await featureFlags.isEnabled(
+  "new-forecast-engine",
+  userId
+);
 ```
 
 ## 🔍 Monitoring
 
 ### Key Metrics
+
 - **Execution Time**: Average forecast calculation time
 - **Memory Usage**: ModernCacheService efficiency
 - **Error Rate**: Failed calculation percentage
 - **Data Accuracy**: Financial calculation correctness
 
 ### Alerts
+
 - Execution time > 1 second (5-10x faster than before)
 - Memory usage > 200MB (60% less than before)
 - Error rate > 0.1%
@@ -223,7 +294,7 @@ engine.enableDebugMode();
 
 // Access internal cache for inspection
 const cache = engine.getCache();
-console.log('Cache state:', cache.accountRegister.find());
+console.log("Cache state:", cache.accountRegister.find());
 ```
 
 ## 📚 API Reference
@@ -262,6 +333,7 @@ interface ForecastResult {
 ## 🤝 Contributing
 
 ### Development Setup
+
 ```bash
 git clone [repository]
 cd dineros.cc
@@ -270,6 +342,7 @@ npm run dev
 ```
 
 ### Adding New Features
+
 1. Create service interface in `types.ts`
 2. Implement service class
 3. Add to `ForecastEngine` orchestration
@@ -277,6 +350,7 @@ npm run dev
 5. Update documentation
 
 ### Code Style
+
 - Use TypeScript strict mode
 - Follow existing naming conventions
 - Add JSDoc comments for public methods
@@ -289,6 +363,7 @@ This project is licensed under the same terms as the main application.
 ## 📞 Support
 
 For questions or issues:
+
 - Create an issue in the repository
 - Contact the development team
 - Check the troubleshooting section above

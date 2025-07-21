@@ -2,6 +2,7 @@ import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
+import { forecastLogger } from "./logger";
 import moment from "moment";
 
 export class TransferService implements ITransferService {
@@ -82,8 +83,9 @@ export class TransferService implements ITransferService {
       (acc) => acc.allowExtraPayment === true
     );
     if (extraPaymentAccounts.length > 0) {
-      console.log(
-        `[DEBUG] Found ${extraPaymentAccounts.length} accounts with allowExtraPayment=true:`,
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Found ${extraPaymentAccounts.length} accounts with allowExtraPayment=true:`,
         extraPaymentAccounts.map((acc) => ({
           id: acc.id,
           name: acc.name,
@@ -98,8 +100,9 @@ export class TransferService implements ITransferService {
         sourceAccount,
         targetDate
       );
-      console.log(
-        `[DEBUG] Extra debt payment decision for ${sourceAccount.name}:`,
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment decision for ${sourceAccount.name}:`,
         {
           accountId: sourceAccount.id,
           targetDate: targetDate.toISOString(),
@@ -108,8 +111,9 @@ export class TransferService implements ITransferService {
       );
 
       if (shouldProcess) {
-        console.log(
-          `[DEBUG] Calling processExtraDebtPayment for ${sourceAccount.name}`
+        forecastLogger.serviceDebug(
+          "TransferService",
+          `Calling processExtraDebtPayment for ${sourceAccount.name}`
         );
         await this.processExtraDebtPayment({
           minBalance: +sourceAccount.minAccountBalance!,
@@ -146,8 +150,9 @@ export class TransferService implements ITransferService {
     const finalEligible = isEligible && excessAmount > 0;
 
     if (account.allowExtraPayment === true) {
-      console.log(
-        `[DEBUG] Extra debt payment eligibility for ${account.name}:`,
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment eligibility for ${account.name}:`,
         {
           accountId: account.id,
           currentBalance: account.balance,
@@ -236,8 +241,9 @@ export class TransferService implements ITransferService {
     });
 
     if (!sourceAccountRegister) {
-      console.log(
-        `[DEBUG] Extra debt payment: Source account ${sourceAccountId} not found`
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: Source account ${sourceAccountId} not found`
       );
       return false;
     }
@@ -248,14 +254,18 @@ export class TransferService implements ITransferService {
       lastAt
     );
 
-    console.log(`[DEBUG] Extra debt payment projected balance check:`, {
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountName: sourceAccountRegister.name,
-      currentCacheBalance: sourceAccountRegister.balance,
-      projectedBalanceAtDate: projectedBalance,
-      targetDate: lastAt.toISOString().split("T")[0],
-      minBalance,
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Extra debt payment projected balance check:`,
+      {
+        sourceAccountId: sourceAccountRegister.id,
+        sourceAccountName: sourceAccountRegister.name,
+        currentCacheBalance: sourceAccountRegister.balance,
+        projectedBalanceAtDate: projectedBalance,
+        targetDate: lastAt.toISOString().split("T")[0],
+        minBalance,
+      }
+    );
 
     // Find the highest priority debt account (lowest balance, highest sort order)
     const allAccounts = this.cache.accountRegister.find({});
@@ -263,18 +273,25 @@ export class TransferService implements ITransferService {
       (account) => account.balance < 0
     ); // Must be negative (debt)
 
-    console.log(`[DEBUG] Extra debt payment account search:`, {
-      totalAccounts: allAccounts.length,
-      debtAccounts: debtAccounts.length,
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountBalance: sourceAccountRegister.accountId,
-      allAccountBalances: allAccounts
-        .map((a) => ({ id: a.id, name: a.name, balance: a.balance }))
-        .slice(0, 10),
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Extra debt payment account search:`,
+      {
+        totalAccounts: allAccounts.length,
+        debtAccounts: debtAccounts.length,
+        sourceAccountId: sourceAccountRegister.id,
+        sourceAccountBalance: sourceAccountRegister.accountId,
+        allAccountBalances: allAccounts
+          .map((a) => ({ id: a.id, name: a.name, balance: a.balance }))
+          .slice(0, 10),
+      }
+    );
 
     if (debtAccounts.length === 0) {
-      console.log(`[DEBUG] Extra debt payment: No debt accounts found`);
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: No debt accounts found`
+      );
       return false;
     }
 
@@ -291,29 +308,35 @@ export class TransferService implements ITransferService {
     // Calculate available amount above minimum balance using PROJECTED balance
     let remainingAvailableAmount = projectedBalance - minBalance;
 
-    console.log(`[DEBUG] Extra debt payment check:`, {
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountName: sourceAccountRegister.name,
-      currentCacheBalance: sourceAccountRegister.balance,
-      projectedBalance,
-      minBalance,
-      totalAvailableAmount: remainingAvailableAmount,
-      debtAccountsFound: sortedDebtAccounts.length,
-      date: lastAt.toISOString().split("T")[0],
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Extra debt payment check:`,
+      {
+        sourceAccountId: sourceAccountRegister.id,
+        sourceAccountName: sourceAccountRegister.name,
+        currentCacheBalance: sourceAccountRegister.balance,
+        projectedBalance,
+        minBalance,
+        totalAvailableAmount: remainingAvailableAmount,
+        debtAccountsFound: sortedDebtAccounts.length,
+        date: lastAt.toISOString().split("T")[0],
+      }
+    );
 
     // Ensure we don't transfer if it would bring the source account below minimum
     if (remainingAvailableAmount <= 0) {
-      console.log(
-        `[DEBUG] Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`
       );
       return false;
     }
 
     // Additional safety check: ensure projected balance is positive
     if (projectedBalance <= 0) {
-      console.log(
-        `[DEBUG] Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`
       );
       return false;
     }
@@ -339,8 +362,9 @@ export class TransferService implements ITransferService {
         continue;
       }
 
-      console.log(
-        `[DEBUG] Extra debt payment to ${debtAccountRegister.name}:`,
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment to ${debtAccountRegister.name}:`,
         {
           debtAccountId: debtAccountRegister.id,
           debtAccountName: debtAccountRegister.name,
@@ -383,12 +407,16 @@ export class TransferService implements ITransferService {
       paymentsProcessed++;
     }
 
-    console.log(`[DEBUG] Extra debt payment summary:`, {
-      totalPaymentsMade,
-      paymentsProcessed,
-      remainingAvailableAmount,
-      originalAvailableAmount: projectedBalance - minBalance,
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Extra debt payment summary:`,
+      {
+        totalPaymentsMade,
+        paymentsProcessed,
+        remainingAvailableAmount,
+        originalAvailableAmount: projectedBalance - minBalance,
+      }
+    );
 
     return paymentsProcessed > 0;
   }
@@ -411,8 +439,9 @@ export class TransferService implements ITransferService {
     sourceAccounts: CacheAccountRegister[],
     targetDate: Date
   ): Promise<void> {
-    console.log(
-      `[TransferService] Processing savings goals for date: ${
+    forecastLogger.service(
+      "TransferService",
+      `Processing savings goals for date: ${
         targetDate.toISOString().split("T")[0]
       }`
     );
@@ -421,13 +450,17 @@ export class TransferService implements ITransferService {
     const debtAccounts = this.findDebtAccounts();
 
     if (debtAccounts.length > 0) {
-      console.log(
-        `[TransferService] Skipping savings goals - ${debtAccounts.length} debt accounts still have balances`
+      forecastLogger.service(
+        "TransferService",
+        `Skipping savings goals - ${debtAccounts.length} debt accounts still have balances`
       );
       return;
     }
 
-    console.log(`[TransferService] All debt paid! Processing savings goals...`);
+    forecastLogger.service(
+      "TransferService",
+      `All debt paid! Processing savings goals...`
+    );
 
     // Process each source account that allows extra payments
     for (const sourceAccount of sourceAccounts) {
@@ -457,8 +490,9 @@ export class TransferService implements ITransferService {
     });
 
     if (!sourceAccountRegister) {
-      console.log(
-        `[DEBUG] Savings goal: Source account ${sourceAccountId} not found`
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Savings goal: Source account ${sourceAccountId} not found`
       );
       return false;
     }
@@ -469,14 +503,18 @@ export class TransferService implements ITransferService {
       targetDate
     );
 
-    console.log(`[DEBUG] Savings goal projected balance check:`, {
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountName: sourceAccountRegister.name,
-      currentCacheBalance: sourceAccountRegister.balance,
-      projectedBalanceAtDate: projectedBalance,
-      targetDate: targetDate.toISOString().split("T")[0],
-      minBalance: sourceAccountRegister.minAccountBalance,
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Savings goal projected balance check:`,
+      {
+        sourceAccountId: sourceAccountRegister.id,
+        sourceAccountName: sourceAccountRegister.name,
+        currentCacheBalance: sourceAccountRegister.balance,
+        projectedBalanceAtDate: projectedBalance,
+        targetDate: targetDate.toISOString().split("T")[0],
+        minBalance: sourceAccountRegister.minAccountBalance,
+      }
+    );
 
     // Find all savings goal accounts (accounts with accountSavingsGoal set)
     const allAccounts = this.cache.accountRegister.find({});
@@ -484,22 +522,29 @@ export class TransferService implements ITransferService {
       (account) => (account.accountSavingsGoal ?? 0) > 0
     );
 
-    console.log(`[DEBUG] Savings goal account search:`, {
-      totalAccounts: allAccounts.length,
-      savingsGoalAccountsCount: savingsGoalAccounts.length,
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountBalance: sourceAccountRegister.balance,
-      savingsGoalAccounts: savingsGoalAccounts.map((a) => ({
-        id: a.id,
-        name: a.name,
-        balance: a.balance,
-        savingsGoal: a.accountSavingsGoal,
-        sortOrder: a.savingsGoalSortOrder,
-      })),
-    });
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Savings goal account search:`,
+      {
+        totalAccounts: allAccounts.length,
+        savingsGoalAccountsCount: savingsGoalAccounts.length,
+        sourceAccountId: sourceAccountRegister.id,
+        sourceAccountBalance: sourceAccountRegister.balance,
+        savingsGoalAccounts: savingsGoalAccounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          balance: a.balance,
+          savingsGoal: a.accountSavingsGoal,
+          savingsGoalSortOrder: a.savingsGoalSortOrder,
+        })),
+      }
+    );
 
     if (savingsGoalAccounts.length === 0) {
-      console.log(`[DEBUG] Savings goal: No savings goal accounts found`);
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Savings goal: No savings goal accounts found`
+      );
       return false;
     }
 
@@ -620,7 +665,7 @@ export class TransferService implements ITransferService {
       savingsProcessed++;
     }
 
-    console.log(`[DEBUG] Savings goal summary:`, {
+    forecastLogger.serviceDebug("TransferService", `Savings goal summary:`, {
       totalSavingsMade,
       savingsProcessed,
       remainingAvailableAmount,

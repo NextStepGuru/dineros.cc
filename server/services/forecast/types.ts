@@ -15,6 +15,7 @@ export interface ForecastContext {
   accountId?: string;
   startDate: Date;
   endDate: Date;
+  logging?: ForecastLoggingConfig;
 }
 
 export interface ForecastResult {
@@ -50,6 +51,11 @@ export interface IReoccurrenceService {
   calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null;
 }
 
+export interface ForecastLoggingConfig {
+  enabled: boolean;
+  level?: "debug" | "info" | "warn" | "error";
+}
+
 export interface IRegisterEntryService {
   createEntry(params: CreateEntryParams): void;
   updateEntryStatuses(accountId: number): Promise<void>;
@@ -78,6 +84,7 @@ export interface ITransferService {
 }
 
 export interface IDataPersisterService {
+  convertOldProjectedToPending(accountId?: string): Promise<void>;
   persistForecastResults(results: CacheRegisterEntry[]): Promise<void>;
   cleanupProjectedEntries(accountId?: string): Promise<void>;
   updateAccountRegisterBalances(accountId: string): Promise<void>;
