@@ -295,16 +295,11 @@ const columns: TableColumn<RegisterEntry>[] = [
       return h(
         "div",
         {
-          class:
-            !row.original.isBalanceEntry &&
-            !row.original.sourceAccountRegisterId
-              ? "cursor-pointer font-bold dark:text-white"
-              : "italic",
+          class: !row.original.isProjected
+            ? "cursor-pointer font-bold dark:text-white"
+            : "italic",
           onClick: () =>
-            !row.original.isBalanceEntry &&
-            !row.original.sourceAccountRegisterId
-              ? handleTableClick(row.original)
-              : null,
+            !row.original.isProjected ? handleTableClick(row.original) : null,
         },
         row.getValue("description")
       );

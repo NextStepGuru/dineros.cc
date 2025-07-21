@@ -19,8 +19,7 @@ export default defineEventHandler(async (event: H3Event) => {
       }),
     });
 
-    const { registerEntryId, accountRegisterId } =
-      patchSchema.parse(body);
+    const { registerEntryId, accountRegisterId } = patchSchema.parse(body);
 
     // Can the user create or update a register entry for this account?
     const lookup = await PrismaDb.registerEntry
@@ -61,9 +60,12 @@ export default defineEventHandler(async (event: H3Event) => {
       data: {
         balance: {
           increment: lookup.amount,
-        }
-      }
-    })
+        },
+        latestBalance: {
+          increment: lookup.amount,
+        },
+      },
+    });
 
     const registerEntry = await PrismaDb.registerEntry
       .update({
