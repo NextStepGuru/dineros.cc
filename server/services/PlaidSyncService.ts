@@ -16,6 +16,7 @@ import {
 } from "~/server/clients/queuesClient";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
+import { dateTimeService } from "./forecast/DateTimeService";
 
 const DAYS_REQUESTED = 3;
 
@@ -99,7 +100,7 @@ class PlaidSyncService {
           data: {
             balance: latestBalance,
             latestBalance: latestBalance,
-            plaidBalanceLastSyncAt: moment().utc().toDate(),
+            plaidBalanceLastSyncAt: dateTimeService.now().utc().toDate(),
           },
         });
       }
@@ -136,7 +137,7 @@ class PlaidSyncService {
     }
 
     const filename = `plaid-raw-transactions-${
-      new Date().toISOString().split("T")[0]
+      dateTimeService.nowDate().toISOString().split("T")[0]
     }.json`;
     const filepath = join(tempDir, filename);
 
@@ -150,7 +151,7 @@ class PlaidSyncService {
           endDate,
           transactionCount: transactions.data.transactions.length,
           transactions: transactions.data.transactions,
-          syncDate: new Date().toISOString(),
+          syncDate: dateTimeService.nowDate().toISOString(),
         },
         null,
         2
@@ -260,7 +261,7 @@ class PlaidSyncService {
       }
     }
 
-    return newestTransaction || new Date();
+    return newestTransaction || dateTimeService.nowDate();
   }
 
   async getAndSyncPlaidAccounts(
@@ -302,9 +303,9 @@ class PlaidSyncService {
         plaidAccounts[token].push({
           plaidId: accountRegister.plaidId,
           plaidLastSyncAt: resetSyncDates
-            ? moment().subtract(DAYS_REQUESTED, "days").toDate()
+            ? dateTimeService.now().subtract(DAYS_REQUESTED, "days").toDate()
             : accountRegister.plaidLastSyncAt ||
-              moment().subtract(DAYS_REQUESTED, "days").toDate(),
+              dateTimeService.now().subtract(DAYS_REQUESTED, "days").toDate(),
           accountRegisterId: accountRegister.id,
         });
       }
@@ -324,7 +325,8 @@ class PlaidSyncService {
           accessToken,
           plaidAccountIds: plaidAccounts[accessToken].map((a) => a.plaidId),
           startDate: startDate.toISOString().split("T")[0],
-          endDate: moment()
+          endDate: dateTimeService
+            .now()
             .add(DAYS_REQUESTED, "days")
             .toISOString()
             .split("T")[0],

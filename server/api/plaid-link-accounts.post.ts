@@ -4,6 +4,7 @@ import { z } from "zod";
 import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
 import { mapPlaidTypesToAccountTypes } from "~/lib/utils";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -96,7 +97,7 @@ export default defineEventHandler(async (event) => {
             plaidAccessToken,
             name: plaidAccount?.name || "Plaid Account Import",
             balance: 0,
-            statementAt: new Date(),
+            statementAt: dateTimeService.nowDate(),
             budget: {
               connect: {
                 id: lookupBudget.id,

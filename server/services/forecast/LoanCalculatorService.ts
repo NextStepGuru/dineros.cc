@@ -1,16 +1,22 @@
 import { Loan } from "@dazlab-team/loan-calc";
 import moment from "moment";
-import type { ILoanCalculatorService, InterestCalculationParams } from "./types";
+import type {
+  ILoanCalculatorService,
+  InterestCalculationParams,
+} from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
+import { dateTimeService } from "./DateTimeService";
 
 export class LoanCalculatorService implements ILoanCalculatorService {
-
-  async calculateInterestCharge(params: InterestCalculationParams): Promise<number> {
+  async calculateInterestCharge(
+    params: InterestCalculationParams
+  ): Promise<number> {
     const { typeId, apr, balance, totalYears } = params;
 
     switch (typeId) {
       case 99:
-      case 5: { // Loan types
+      case 5: {
+        // Loan types
         const loan = new Loan();
         loan.amount = balance;
         loan.years = totalYears;
@@ -18,7 +24,8 @@ export class LoanCalculatorService implements ILoanCalculatorService {
         return loan.totalInterest;
       }
 
-      default: { // Standard credit/debit interest
+      default: {
+        // Standard credit/debit interest
         return (apr * balance) / 12;
       }
     }
@@ -28,7 +35,9 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     return accountRegister?.minPayment ? +accountRegister.minPayment * -1 : 0;
   }
 
-  async calculateInterestForAccount(accountRegister: CacheAccountRegister): Promise<number> {
+  async calculateInterestForAccount(
+    accountRegister: CacheAccountRegister
+  ): Promise<number> {
     let interest = 0;
 
     // Determine which APR to use based on dates
@@ -39,7 +48,9 @@ export class LoanCalculatorService implements ILoanCalculatorService {
         apr,
         balance: accountRegister.balance,
         typeId: accountRegister.typeId,
-        totalYears: accountRegister?.loanTotalYears ? +accountRegister.loanTotalYears : 0,
+        totalYears: accountRegister?.loanTotalYears
+          ? +accountRegister.loanTotalYears
+          : 0,
       });
     }
 
@@ -69,7 +80,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     return accountRegister.apr1 ? +accountRegister.apr1 : 0;
   }
 
-  calculatePaymentAmount(accountRegister: CacheAccountRegister, interest: number): number {
+  calculatePaymentAmount(
+    accountRegister: CacheAccountRegister,
+    interest: number
+  ): number {
     const minPayment = this.calculateMinPayment(accountRegister);
     let payment = minPayment > interest ? minPayment : interest;
 
@@ -81,13 +95,18 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     return payment;
   }
 
-  shouldProcessInterest(accountRegister: CacheAccountRegister, forecastDate?: moment.Moment): boolean {
-    const checkDate = forecastDate || moment().utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    });
+  shouldProcessInterest(
+    accountRegister: CacheAccountRegister,
+    forecastDate?: moment.Moment
+  ): boolean {
+    const checkDate =
+      forecastDate ||
+      dateTimeService.now().utc().set({
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      });
     const statementDate = moment(accountRegister.statementAt).utc().set({
       hour: 0,
       minute: 0,
@@ -96,11 +115,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     });
 
     // Only process on the EXACT statement date to ensure monthly intervals
-    const result = (
+    const result =
       accountRegister.targetAccountRegisterId !== null &&
       accountRegister.balance !== 0 &&
-      checkDate.isSame(statementDate, 'day') // Changed from isSameOrAfter to isSame
-    );
+      checkDate.isSame(statementDate, "day"); // Changed from isSameOrAfter to isSame
 
     return result;
   }

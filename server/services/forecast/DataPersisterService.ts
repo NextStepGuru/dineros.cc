@@ -4,6 +4,7 @@ import type { IDataPersisterService } from "./types";
 import type { CacheRegisterEntry } from "./ModernCacheService";
 import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
+import { dateTimeService } from "./DateTimeService";
 
 export class DataPersisterService implements IDataPersisterService {
   private rateLimiter: DatabaseRateLimiter;
@@ -207,7 +208,8 @@ export class DataPersisterService implements IDataPersisterService {
    * This ensures that projected entries older than current date are preserved as pending
    */
   async convertOldProjectedToPending(accountId?: string): Promise<void> {
-    const now = moment()
+    const now = dateTimeService
+      .now()
       .utc()
       .set({
         hour: 0,
@@ -302,7 +304,8 @@ export class DataPersisterService implements IDataPersisterService {
   }
 
   async updateEntryStatuses(accountId?: string): Promise<void> {
-    const now = moment()
+    const now = dateTimeService
+      .now()
       .utc()
       .set({
         hour: 0,

@@ -3,9 +3,14 @@ import { log } from "~/server/logger";
 import { addPlaidBalanceSyncJob } from "~/server/clients/queuesClient";
 import { prisma } from "~/prisma/prismaClient";
 import moment from "moment";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineCronHandler("hourly", async () => {
-  const olderThanDate = moment().utc().subtract({ hours: 6 }).toDate();
+  const olderThanDate = dateTimeService
+    .now()
+    .utc()
+    .subtract({ hours: 6 })
+    .toDate();
 
   const accountRegisters = await prisma.accountRegister.groupBy({
     _min: {

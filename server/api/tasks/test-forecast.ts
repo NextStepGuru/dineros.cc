@@ -1,4 +1,7 @@
-import { ForecastEngineFactory } from "~/server/services/forecast";
+import {
+  ForecastEngineFactory,
+  dateTimeService,
+} from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
 import moment from "moment";
 
@@ -10,8 +13,8 @@ export default defineEventHandler(async () => {
     const engine = ForecastEngineFactory.create(prisma);
     const context = {
       accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c", // Use the account ID from the check-balance-entries result
-      startDate: moment().startOf("month").toDate(),
-      endDate: moment().add(2, "years").toDate(),
+      startDate: dateTimeService.now().startOf("month").toDate(),
+      endDate: dateTimeService.now().add(2, "years").toDate(),
       logging: {
         enabled: false, // Disable all forecast engine logging - this prevents the verbose logs you were seeing
         // You can also use:

@@ -10,6 +10,7 @@ import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { IS_CREDIT_TYPE_IDS } from "~/consts";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";
+import { dateTimeService } from "./DateTimeService";
 
 export class RegisterEntryService implements IRegisterEntryService {
   constructor(private db: PrismaClient, private cache: ModernCacheService) {}
@@ -74,7 +75,10 @@ export class RegisterEntryService implements IRegisterEntryService {
 
     // Use passed isPending value if available, otherwise calculate it based on date
     const calculatedIsPending = createdAt.isSameOrBefore(
-      moment().utc().set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
+      dateTimeService
+        .now()
+        .utc()
+        .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
     );
     const entryIsPending =
       isPending !== undefined ? isPending : calculatedIsPending;
@@ -121,7 +125,8 @@ export class RegisterEntryService implements IRegisterEntryService {
   }
 
   async updateEntryStatuses(accountId: number): Promise<void> {
-    const now = moment()
+    const now = dateTimeService
+      .now()
       .utc()
       .set({
         hour: 0,
@@ -280,7 +285,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       amount: accountRegister.latestBalance, // Set amount to the opening balance
       isBalanceEntry: true,
       // Use the latestBalance as the opening balance for this account
-      forecastDate: moment()
+      forecastDate: dateTimeService
+        .now()
         .utc()
         .set({ hour: 23, minute: 59, second: 59, milliseconds: 0 })
         .toDate(),

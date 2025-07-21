@@ -14,6 +14,7 @@ import { DataPersisterService } from "./DataPersisterService";
 import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "~/consts";
 import { createId } from "@paralleldrive/cuid2";
 import { forecastLogger } from "./logger";
+import { dateTimeService } from "./DateTimeService";
 
 export class ForecastEngine implements IForecastEngine {
   private cache: ModernCacheService;
@@ -75,7 +76,9 @@ export class ForecastEngine implements IForecastEngine {
       const minDate = await this.dataLoader.getMinReoccurrenceDate(
         context.accountId
       );
-      const startDate = this.calculateStartDate(minDate || new Date());
+      const startDate = this.calculateStartDate(
+        minDate || dateTimeService.nowDate()
+      );
       const endDate = moment(context.endDate).utc().set({
         hour: 0,
         minute: 0,
@@ -188,7 +191,8 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private calculateEndDate(): moment.Moment {
-    return moment()
+    return dateTimeService
+      .now()
       .utc()
       .set({
         hour: 0,

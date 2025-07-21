@@ -4,6 +4,7 @@ import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
 import moment from "moment";
+import { dateTimeService } from "./DateTimeService";
 
 export class TransferService implements ITransferService {
   constructor(
@@ -386,7 +387,7 @@ export class TransferService implements ITransferService {
           accountId: "",
           accountRegisterId: debtAccountRegister.id,
           description: `Extra debt payment from ${sourceAccountRegister.name}`,
-          lastAt: new Date(), // Use current date for reoccurrence persistence
+          lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
           amount: paymentAmount,
           transferAccountRegisterId:
             debtAccountRegister.targetAccountRegisterId,
@@ -396,7 +397,7 @@ export class TransferService implements ITransferService {
           endAt: null,
           totalIntervals: null,
           elapsedIntervals: null,
-          updatedAt: new Date(),
+          updatedAt: dateTimeService.nowDate(),
           adjustBeforeIfOnWeekend: false,
         },
       });
@@ -644,7 +645,7 @@ export class TransferService implements ITransferService {
           accountId: "",
           accountRegisterId: savingsAccountRegister.id,
           description: `Savings goal contribution from ${sourceAccountRegister.name}`,
-          lastAt: new Date(),
+          lastAt: dateTimeService.nowDate(),
           amount: savingsAmount,
           transferAccountRegisterId:
             savingsAccountRegister.targetAccountRegisterId,
@@ -654,7 +655,7 @@ export class TransferService implements ITransferService {
           endAt: null,
           totalIntervals: null,
           elapsedIntervals: null,
-          updatedAt: new Date(),
+          updatedAt: dateTimeService.nowDate(),
           adjustBeforeIfOnWeekend: false,
         },
       });

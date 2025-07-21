@@ -6,6 +6,7 @@ import { log } from "../logger";
 import { registerSchema } from "~/schema/zod";
 import { postmarkClient } from "../clients/postmarkClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -74,7 +75,7 @@ export default defineEventHandler(async (event) => {
         data: {
           name: "Primary Checking",
           balance: 0,
-          statementAt: new Date(),
+          statementAt: dateTimeService.nowDate(),
           account: {
             connect: { id: defaultAccountId },
           },
@@ -120,7 +121,9 @@ export default defineEventHandler(async (event) => {
       <br>
       <strong>Name:</strong> ${firstName} ${lastName}<br>
       <strong>Email:</strong> ${email}<br>
-      <strong>Registration Date:</strong> ${new Date().toLocaleString()}<br>
+      <strong>Registration Date:</strong> ${dateTimeService
+        .nowDate()
+        .toLocaleString()}<br>
       <br>
       Best regards,<br>
       Dineros Registration System

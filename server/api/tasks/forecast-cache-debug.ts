@@ -1,4 +1,7 @@
-import { ForecastEngineFactory } from "~/server/services/forecast";
+import {
+  ForecastEngineFactory,
+  dateTimeService,
+} from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
 import moment from "moment";
 
@@ -11,8 +14,8 @@ export default defineEventHandler(async (event) => {
   // Use a valid date range for ForecastContext
   const context = {
     accountId,
-    startDate: moment().startOf('month').toDate(),
-    endDate: moment().add(2, 'years').toDate(),
+    startDate: dateTimeService.now().startOf("month").toDate(),
+    endDate: dateTimeService.now().add(2, "years").toDate(),
   };
   await engine.recalculate(context); // This will populate the cache
 
@@ -21,7 +24,9 @@ export default defineEventHandler(async (event) => {
   const registerEntries = cache.registerEntry.find({});
 
   // Filter to active account registers
-  const activeAccountRegisters = accountRegisters.filter((a: any) => !a.isArchived);
+  const activeAccountRegisters = accountRegisters.filter(
+    (a: any) => !a.isArchived
+  );
 
   // Group register entries by accountRegisterId
   const entriesByAccount: Record<number, typeof registerEntries> = {};

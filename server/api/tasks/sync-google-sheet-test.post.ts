@@ -4,15 +4,16 @@ import { google } from "googleapis";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
+import { dateTimeService } from "~/server/services/forecast";
 
 // Google Sheets API configuration
-const GOOGLE_SHEETS_SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const GOOGLE_SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 // Schema for the request body
 const syncGoogleSheetSchema = z.object({
   accountRegisterId: z.coerce.number().min(1),
   spreadsheetId: z.string().min(1),
-      sheetName: z.string().optional().default("Running Budget"),
+  sheetName: z.string().optional().default("Running Budget"),
   googleCredentials: z.object({
     client_id: z.string(),
     client_secret: z.string(),
@@ -42,7 +43,7 @@ export default defineEventHandler(async (event) => {
 
     // For testing, we'll use a hardcoded user ID or get the first user
     const testUser = await PrismaDb.user.findFirst({
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!testUser) {
@@ -92,7 +93,8 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    const balance = accountRegister.latestBalance - (pocketBalances._sum.balance || 0);
+    const balance =
+      accountRegister.latestBalance - (pocketBalances._sum.balance || 0);
 
     // Process entries (same as register endpoint)
     const balanceUpdated = recalculateRunningBalanceAndSort({
@@ -126,7 +128,7 @@ export default defineEventHandler(async (event) => {
     auth.setCredentials(googleToken);
 
     // Update Google Sheets
-    const sheets = google.sheets({ version: 'v4', auth });
+    const sheets = google.sheets({ version: "v4", auth });
 
     try {
       // Clear existing data
@@ -139,10 +141,10 @@ export default defineEventHandler(async (event) => {
       const response = await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: `${sheetName}!A3`, // Start at row 3
-        valueInputOption: 'USER_ENTERED',
+        valueInputOption: "USER_ENTERED",
         requestBody: {
-          values: formattedData
-        }
+          values: formattedData,
+        },
       });
 
       return {
@@ -154,20 +156,18 @@ export default defineEventHandler(async (event) => {
           totalEntries: balanceUpdated.length,
           lowestBalance: entryWithLowestBalance?.balance,
           highestBalance: entryWithHighestBalance?.balance,
-          lastUpdated: new Date().toISOString(),
-        }
+          lastUpdated: dateTimeService.nowDate().toISOString(),
+        },
       };
-
     } catch (sheetsError: any) {
-      console.error('Google Sheets API error:', sheetsError);
+      console.error("Google Sheets API error:", sheetsError);
       setResponseStatus(event, 500);
       return {
         success: false,
-        message: 'Failed to update Google Sheets',
-        error: sheetsError?.message || 'Unknown error',
+        message: "Failed to update Google Sheets",
+        error: sheetsError?.message || "Unknown error",
       };
     }
-
   } catch (error) {
     handleApiError(error);
     throw error;
@@ -186,32 +186,46 @@ function formatDataForSheets(registerData: {
 
   // Header row
   const headers = [
-    'Date',
-    'Description',
-    'Amount',
-    'Balance',
-    'Status',
-    'Type'
+    "Date",
+    "Description",
+    "Amount",
+    "Balance",
+    "Status",
+    "Type",
   ];
 
   // Data rows
-  const rows = entries.map(entry => [
+  const rows = entries.map((entry) => [
     new Date(entry.createdAt).toLocaleDateString(),
     entry.description,
     entry.amount,
     entry.balance,
     getStatus(entry),
-    getEntryType(entry)
+    getEntryType(entry),
   ]);
 
   // Add summary rows
   const summaryRows = [
     [],
-    ['SUMMARY'],
-    ['Lowest Balance:', lowest?.balance || 'N/A', '', lowest?.createdAt ? new Date(lowest.createdAt).toLocaleDateString() : 'N/A'],
-    ['Highest Balance:', highest?.balance || 'N/A', '', highest?.createdAt ? new Date(highest.createdAt).toLocaleDateString() : 'N/A'],
-    ['Total Entries:', entries.length],
-    ['Last Updated:', new Date().toLocaleString()]
+    ["SUMMARY"],
+    [
+      "Lowest Balance:",
+      lowest?.balance || "N/A",
+      "",
+      lowest?.createdAt
+        ? new Date(lowest.createdAt).toLocaleDateString()
+        : "N/A",
+    ],
+    [
+      "Highest Balance:",
+      highest?.balance || "N/A",
+      "",
+      highest?.createdAt
+        ? new Date(highest.createdAt).toLocaleDateString()
+        : "N/A",
+    ],
+    ["Total Entries:", entries.length],
+    ["Last Updated:", dateTimeService.nowDate().toLocaleString()],
   ];
 
   return [headers, ...rows, ...summaryRows];
@@ -221,20 +235,20 @@ function formatDataForSheets(registerData: {
  * Get status string for an entry
  */
 function getStatus(entry: any) {
-  if (entry.isBalanceEntry) return 'Balance Entry';
-  if (entry.isCleared) return 'Cleared';
-  if (entry.isReconciled) return 'Reconciled';
-  if (entry.isProjected) return 'Projected';
-  if (entry.isPending) return 'Pending';
-  return 'Unknown';
+  if (entry.isBalanceEntry) return "Balance Entry";
+  if (entry.isCleared) return "Cleared";
+  if (entry.isReconciled) return "Reconciled";
+  if (entry.isProjected) return "Projected";
+  if (entry.isPending) return "Pending";
+  return "Unknown";
 }
 
 /**
  * Get entry type string
  */
 function getEntryType(entry: any) {
-  if (entry.isBalanceEntry) return 'Balance';
-  if (entry.sourceAccountRegisterId) return 'Transfer';
-  if (entry.reoccurrenceId) return 'Recurring';
-  return 'Manual';
+  if (entry.isBalanceEntry) return "Balance";
+  if (entry.sourceAccountRegisterId) return "Transfer";
+  if (entry.reoccurrenceId) return "Recurring";
+  return "Manual";
 }

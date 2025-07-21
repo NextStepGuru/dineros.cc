@@ -4,6 +4,7 @@ import cuid2 from "@paralleldrive/cuid2";
 import { postmarkClient } from "../clients/postmarkClient";
 import { prisma } from "../clients/prismaClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -32,7 +33,9 @@ export default defineEventHandler(async (event: H3Event) => {
       where: { id: lookupUser.id },
       data: {
         resetCode: token,
-        resetPasswordAt: new Date(Date.now() + 5 * 60 * 1000),
+        resetPasswordAt: new Date(
+          dateTimeService.nowDate().getTime() + 5 * 60 * 1000
+        ),
       },
     });
 

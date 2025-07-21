@@ -6,6 +6,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import moment from "moment";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -102,7 +103,8 @@ export default defineEventHandler(async (event: H3Event) => {
 
     if (registerEntry.isManualEntry) {
       if (
-        moment()
+        dateTimeService
+          .now()
           .utc()
           .set({
             hour: 0,
@@ -122,7 +124,8 @@ export default defineEventHandler(async (event: H3Event) => {
           },
         });
       } else if (
-        moment()
+        dateTimeService
+          .now()
           .utc()
           .set({
             hour: 0,

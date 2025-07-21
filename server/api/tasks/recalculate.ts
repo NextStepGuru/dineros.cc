@@ -1,4 +1,7 @@
-import { ForecastEngineFactory } from "~/server/services/forecast";
+import {
+  ForecastEngineFactory,
+  dateTimeService,
+} from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
 import moment from "moment";
 import { MAX_YEARS } from "~/consts";
@@ -13,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (singleAccountId) {
     // Process single account if specified
     const accountExists = await prisma.accountRegister.findFirst({
-      where: { accountId: singleAccountId, isArchived: false }
+      where: { accountId: singleAccountId, isArchived: false },
     });
 
     if (!accountExists) {
@@ -31,13 +34,14 @@ export default defineEventHandler(async (event) => {
     accountsToProcess = await prisma.accountRegister.findMany({
       where: { isArchived: false, account: { isArchived: false } },
       select: { accountId: true },
-      distinct: ['accountId']
+      distinct: ["accountId"],
     });
 
     if (accountsToProcess.length === 0) {
       return {
         success: false,
-        message: "No accounts found in database. Please create an account first.",
+        message:
+          "No accounts found in database. Please create an account first.",
         entriesCalculated: 0,
         accountRegisters: 0,
       };
@@ -56,17 +60,23 @@ export default defineEventHandler(async (event) => {
 
       const context = {
         accountId: account.accountId,
-        startDate: moment().startOf('month').toDate(),
-        endDate: moment().add(MAX_YEARS, 'years').toDate(),
+        startDate: dateTimeService.now().startOf("month").toDate(),
+        endDate: dateTimeService.now().add(MAX_YEARS, "years").toDate(),
       };
 
       const result = await engine.recalculate(context);
 
       if (result.isSuccess) {
         // Calculate entry breakdowns
-        const entriesProjected = result.registerEntries.filter(entry => entry.isProjected).length;
-        const entriesHistorical = result.registerEntries.filter(entry => !entry.isProjected && !entry.isBalanceEntry).length;
-        const entriesBalance = result.registerEntries.filter(entry => entry.isBalanceEntry).length;
+        const entriesProjected = result.registerEntries.filter(
+          (entry) => entry.isProjected
+        ).length;
+        const entriesHistorical = result.registerEntries.filter(
+          (entry) => !entry.isProjected && !entry.isBalanceEntry
+        ).length;
+        const entriesBalance = result.registerEntries.filter(
+          (entry) => entry.isBalanceEntry
+        ).length;
 
         results.push({
           accountId: account.accountId,
@@ -83,13 +93,13 @@ export default defineEventHandler(async (event) => {
       } else {
         failedAccounts.push({
           accountId: account.accountId,
-          errors: result.errors || ['Unknown error']
+          errors: result.errors || ["Unknown error"],
         });
       }
     } catch (error) {
       failedAccounts.push({
         accountId: account.accountId,
-        errors: [error instanceof Error ? error.message : 'Unknown error']
+        errors: [error instanceof Error ? error.message : "Unknown error"],
       });
     }
   }
@@ -100,6 +110,6 @@ export default defineEventHandler(async (event) => {
     totalEntriesCalculated: totalEntries,
     totalAccountRegisters: totalAccountRegisters,
     failedAccounts: failedAccounts.length > 0 ? failedAccounts : undefined,
-    results: singleAccountId ? results[0] : results
+    results: singleAccountId ? results[0] : results,
   };
 });

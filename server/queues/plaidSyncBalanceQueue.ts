@@ -3,6 +3,7 @@ import moment from "moment";
 import { prisma } from "~/prisma/prismaClient";
 import { log } from "~/server/logger";
 import PlaidSyncService from "~/server/services/PlaidSyncService";
+import { dateTimeService } from "../services/forecast/DateTimeService";
 
 export type PlaidSyncBalanceJob = {
   accountRegisterId: number;
@@ -11,7 +12,7 @@ export type PlaidSyncBalanceJob = {
 export default {
   queueName: "plaid-sync-balance",
   processor: async (job: Job<PlaidSyncBalanceJob>) => {
-    const start = new Date().getTime();
+    const start = dateTimeService.nowDate().getTime();
     log({
       level: "debug",
       message: `Start PlaidSyncBalanceJob job ${job.id} with data:`,
@@ -39,7 +40,11 @@ export default {
       return;
     }
 
-    const olderThanDate = moment().utc().subtract({ hours: 6 }).toDate();
+    const olderThanDate = dateTimeService
+      .now()
+      .utc()
+      .subtract({ hours: 6 })
+      .toDate();
 
     const accountRegisters = await prisma.accountRegister.findMany({
       where: {
@@ -80,7 +85,7 @@ export default {
 
     log({
       message: `Completed PlaidSyncBalanceJob ${job.id} in ${
-        new Date().getTime() - start
+        dateTimeService.nowDate().getTime() - start
       }ms`,
       data: {
         plaidAccounts: accounts.map((a) => ({

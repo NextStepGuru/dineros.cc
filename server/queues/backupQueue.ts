@@ -6,6 +6,7 @@ import archiver from "archiver";
 import { prisma } from "~/server/clients/prismaClient";
 import env from "~/server/env";
 import { log } from "~/server/logger";
+import { dateTimeService } from "../services/forecast/DateTimeService";
 
 export type BackupJob = { name: string };
 const queueName = "daily-backup";
@@ -34,7 +35,7 @@ const processor = async (job: Job<BackupJob>) => {
   }
 
   // Generate the current date string in yyyy-mm-dd format
-  const date = new Date();
+  const date = dateTimeService.nowDate();
   const dateString = date.toISOString().split("T")[0];
   const zipFileName = `${dateString}-${env.DEPLOY_ENV}-backup.zip`;
   const zipFilePath = path.join(backupDir, zipFileName);

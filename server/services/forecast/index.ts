@@ -10,6 +10,7 @@ export { LoanCalculatorService } from "./LoanCalculatorService";
 export { TransferService } from "./TransferService";
 export { DataPersisterService } from "./DataPersisterService";
 export { ForecastEngine } from "./ForecastEngine";
+export { DateTimeService, dateTimeService } from "./DateTimeService";
 
 // Factory for creating forecast engine
 import type { PrismaClient } from "@prisma/client";

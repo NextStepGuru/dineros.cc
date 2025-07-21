@@ -11,6 +11,7 @@ import HashService from "../services/HashService";
 import JwtService from "../services/JwtService";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { withErrorHandler } from "~/server/lib/withErrorHandler";
+import { dateTimeService } from "~/server/services/forecast";
 
 async function loginHandler(event: any) {
   // Read and validate request body
@@ -112,7 +113,7 @@ async function loginHandler(event: any) {
 
   await PrismaDb.user.update({
     where: { id: user.id },
-    data: { lastAccessedAt: new Date() },
+    data: { lastAccessedAt: dateTimeService.nowDate() },
   });
 
   // Set the token as a cookie

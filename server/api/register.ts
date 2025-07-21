@@ -4,6 +4,7 @@ import { getUser } from "../lib/getUser";
 // import moment from "moment";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -13,7 +14,7 @@ export default defineEventHandler(async (event) => {
     const querySchema = z.object({
       accountId: z.string().optional(), // Assuming accountId is a UUID
       accountRegisterId: z.coerce.number().default(0),
-      focusedAt: z.coerce.date().default(new Date()),
+      focusedAt: z.coerce.date().default(() => dateTimeService.nowDate()),
       skip: z.coerce.number().default(0),
       take: z.coerce.number().default(500), // Increased default for better pagination
       direction: z.enum(["future", "past"]).default("future"),
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
                   isPending: false,
                   isProjected: false,
                   isCleared: false,
-                  createdAt: { lte: new Date() },
+                  createdAt: { lte: dateTimeService.nowDate() },
                 },
               ],
             }
@@ -104,7 +105,7 @@ export default defineEventHandler(async (event) => {
                   isPending: false,
                   isProjected: false,
                   isCleared: false,
-                  createdAt: { lte: new Date() },
+                  createdAt: { lte: dateTimeService.nowDate() },
                 },
               ],
             }

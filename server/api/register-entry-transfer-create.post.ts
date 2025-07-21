@@ -7,6 +7,7 @@ import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { createId } from "@paralleldrive/cuid2";
 import moment from "moment";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -107,7 +108,10 @@ export default defineEventHandler(async (event: H3Event) => {
       .utc()
       .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
       .isSameOrBefore(
-        moment().utc().set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
+        dateTimeService
+          .now()
+          .utc()
+          .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
       );
 
     // Start transaction to ensure atomicity

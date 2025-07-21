@@ -4,6 +4,7 @@ import { accountRegisterSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "../clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -61,7 +62,7 @@ export default defineEventHandler(async (event: H3Event) => {
         balance,
         latestBalance,
         minPayment,
-        statementAt: statementAt || new Date(),
+        statementAt: statementAt || dateTimeService.nowDate(),
         apr1,
         apr1StartAt,
         apr2,
@@ -90,7 +91,7 @@ export default defineEventHandler(async (event: H3Event) => {
         balance,
         latestBalance,
         minPayment,
-        statementAt: statementAt || new Date(),
+        statementAt: statementAt || dateTimeService.nowDate(),
         apr1,
         apr1StartAt,
         apr2,

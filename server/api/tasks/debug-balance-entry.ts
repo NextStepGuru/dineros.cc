@@ -1,19 +1,23 @@
-import { ForecastEngineFactory } from "~/server/services/forecast";
+import {
+  ForecastEngineFactory,
+  dateTimeService,
+} from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
 import moment from "moment";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
-  const accountId = query.accountId as string || "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c";
-  const accountRegisterId = query.accountRegisterId as string || "62";
+  const accountId =
+    (query.accountId as string) || "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c";
+  const accountRegisterId = (query.accountRegisterId as string) || "62";
 
   const engine = ForecastEngineFactory.create(prisma);
 
   // Run the forecast to populate the cache
   const context = {
     accountId,
-    startDate: moment().startOf('month').toDate(),
-    endDate: moment().add(2, 'years').toDate(),
+    startDate: dateTimeService.now().startOf("month").toDate(),
+    endDate: dateTimeService.now().add(2, "years").toDate(),
   };
 
   // Get the cache before running forecast
@@ -26,14 +30,22 @@ export default defineEventHandler(async (event) => {
   const cacheAfter = engine.getCache();
 
   // Find balance entries in cache
-  const balanceEntriesBefore = cacheBefore.registerEntry.find({}).filter((e: any) => e.isBalanceEntry);
-  const balanceEntriesAfter = cacheAfter.registerEntry.find({}).filter((e: any) => e.isBalanceEntry);
+  const balanceEntriesBefore = cacheBefore.registerEntry
+    .find({})
+    .filter((e: any) => e.isBalanceEntry);
+  const balanceEntriesAfter = cacheAfter.registerEntry
+    .find({})
+    .filter((e: any) => e.isBalanceEntry);
 
   // Find specific account register
-  const accountRegister = cacheAfter.accountRegister.findOne({ id: parseInt(accountRegisterId) });
+  const accountRegister = cacheAfter.accountRegister.findOne({
+    id: parseInt(accountRegisterId),
+  });
 
   // Find balance entries for specific account
-  const specificBalanceEntries = balanceEntriesAfter.filter((e: any) => e.accountRegisterId === parseInt(accountRegisterId));
+  const specificBalanceEntries = balanceEntriesAfter.filter(
+    (e: any) => e.accountRegisterId === parseInt(accountRegisterId)
+  );
 
   return {
     accountId,

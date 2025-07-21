@@ -1,6 +1,7 @@
 import type { JobsOptions } from "bullmq";
 import { Queue, Worker } from "bullmq";
 import type Redis from "ioredis";
+import { dateTimeService } from "../services/forecast/DateTimeService";
 
 interface QueueConfig {
   name: string;
@@ -16,7 +17,7 @@ class QueueManager {
 
   constructor(private queueConfigs: QueueConfig[], connection: Redis) {
     this.connection = connection;
-    this.isTestMode = process.env.NODE_ENV === 'test';
+    this.isTestMode = process.env.NODE_ENV === "test";
 
     if (!this.isTestMode) {
       this.initializeQueues();
@@ -39,7 +40,7 @@ class QueueManager {
     // In test mode, just return a mock job object
     if (this.isTestMode) {
       return Promise.resolve({
-        id: `test-job-${Date.now()}`,
+        id: `test-job-${dateTimeService.nowDate().getTime()}`,
         name: queueName,
         data,
         opts,

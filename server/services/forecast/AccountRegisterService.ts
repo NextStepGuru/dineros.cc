@@ -6,6 +6,7 @@ import { ModernCacheService } from "./ModernCacheService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
+import { dateTimeService } from "./DateTimeService";
 
 export class AccountRegisterService implements IAccountRegisterService {
   constructor(
@@ -33,11 +34,17 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
   }
 
-  async processInterestCharges(accounts: CacheAccountRegister[], forecastDate?: moment.Moment): Promise<void> {
-    accounts.forEach(account => {
-      const result = this.loanCalculator.shouldProcessInterest(account, forecastDate);
+  async processInterestCharges(
+    accounts: CacheAccountRegister[],
+    forecastDate?: moment.Moment
+  ): Promise<void> {
+    accounts.forEach((account) => {
+      const result = this.loanCalculator.shouldProcessInterest(
+        account,
+        forecastDate
+      );
     });
-    const interestAccounts = accounts.filter(account =>
+    const interestAccounts = accounts.filter((account) =>
       this.loanCalculator.shouldProcessInterest(account, forecastDate)
     );
 
@@ -46,9 +53,17 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
   }
 
-  private async processAccountInterestCharge(accountRegister: CacheAccountRegister, forecastDate?: moment.Moment): Promise<void> {
-    const interest = await this.loanCalculator.calculateInterestForAccount(accountRegister);
-    const payment = this.loanCalculator.calculatePaymentAmount(accountRegister, Math.abs(interest));
+  private async processAccountInterestCharge(
+    accountRegister: CacheAccountRegister,
+    forecastDate?: moment.Moment
+  ): Promise<void> {
+    const interest = await this.loanCalculator.calculateInterestForAccount(
+      accountRegister
+    );
+    const payment = this.loanCalculator.calculatePaymentAmount(
+      accountRegister,
+      Math.abs(interest)
+    );
 
     if (payment > 0) {
       // Create interest charge entry if there's interest
@@ -56,14 +71,15 @@ export class AccountRegisterService implements IAccountRegisterService {
         this.entryService.createEntry({
           accountRegisterId: accountRegister.id,
           description: `Interest Charge`,
-          sourceAccountRegisterId: accountRegister.targetAccountRegisterId || undefined,
+          sourceAccountRegisterId:
+            accountRegister.targetAccountRegisterId || undefined,
           amount: Math.abs(interest),
           forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
             description: accountRegister.name,
-            lastAt: new Date(), // Use current date for reoccurrence persistence
+            lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
             amount: Math.abs(interest),
             transferAccountRegisterId: accountRegister.targetAccountRegisterId,
             intervalId: 3,
@@ -72,13 +88,14 @@ export class AccountRegisterService implements IAccountRegisterService {
             endAt: null,
             totalIntervals: null,
             elapsedIntervals: null,
-            updatedAt: new Date(),
+            updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
           },
         });
 
         // Adjust payment to include latest interest if needed
-        const minPayment = this.loanCalculator.calculateMinPayment(accountRegister);
+        const minPayment =
+          this.loanCalculator.calculateMinPayment(accountRegister);
         if (Math.abs(interest) + payment < Math.abs(minPayment)) {
           // This shouldn't normally happen due to calculatePaymentAmount logic
         }
@@ -92,12 +109,12 @@ export class AccountRegisterService implements IAccountRegisterService {
           sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
           amount: payment,
           description: `Min Payment to ${accountRegister.name}`,
-          forecastDate: forecastDate?.toDate() || new Date(), // Use forecast date for proper timeline placement
+          forecastDate: forecastDate?.toDate() || dateTimeService.nowDate(), // Use forecast date for proper timeline placement
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
             description: `Min Payment to ${accountRegister.name}`,
-            lastAt: new Date(), // Use current date for reoccurrence persistence
+            lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
             amount: payment,
             transferAccountRegisterId: accountRegister.targetAccountRegisterId,
             intervalId: 3,
@@ -106,7 +123,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             endAt: null,
             totalIntervals: null,
             elapsedIntervals: null,
-            updatedAt: new Date(),
+            updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
           },
         });
@@ -125,27 +142,35 @@ export class AccountRegisterService implements IAccountRegisterService {
     await this.updateStatementDate(accountRegister, forecastDate);
   }
 
-  async updateStatementDates(accounts: CacheAccountRegister[], forecastDate?: moment.Moment): Promise<void> {
+  async updateStatementDates(
+    accounts: CacheAccountRegister[],
+    forecastDate?: moment.Moment
+  ): Promise<void> {
     for (const account of accounts) {
       await this.updateStatementDate(account, forecastDate);
     }
   }
 
-  private async updateStatementDate(accountRegister: CacheAccountRegister, forecastDate?: moment.Moment): Promise<void> {
+  private async updateStatementDate(
+    accountRegister: CacheAccountRegister,
+    forecastDate?: moment.Moment
+  ): Promise<void> {
     const statementAt = moment(accountRegister.statementAt).utc();
-    const comparisonDate = forecastDate ? forecastDate.utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    }) : moment().utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    });
+    const comparisonDate = forecastDate
+      ? forecastDate.utc().set({
+          hour: 0,
+          minute: 0,
+          second: 0,
+          milliseconds: 0,
+        })
+      : dateTimeService.now().utc().set({
+          hour: 0,
+          minute: 0,
+          second: 0,
+          milliseconds: 0,
+        });
 
-    const today = moment().utc().set({
+    const today = dateTimeService.now().utc().set({
       hour: 0,
       minute: 0,
       second: 0,
@@ -178,8 +203,9 @@ export class AccountRegisterService implements IAccountRegisterService {
   getInterestBearingAccounts(): CacheAccountRegister[] {
     const allAccounts = this.cache.accountRegister.find({});
 
-    const interestAccounts = this.cache.accountRegister.find((account) =>
-      account.targetAccountRegisterId !== null && account.balance !== 0
+    const interestAccounts = this.cache.accountRegister.find(
+      (account) =>
+        account.targetAccountRegisterId !== null && account.balance !== 0
     );
 
     return interestAccounts;
@@ -195,8 +221,10 @@ export class AccountRegisterService implements IAccountRegisterService {
     return !account.isArchived;
   }
 
-  filterActiveAccounts(accounts: CacheAccountRegister[]): CacheAccountRegister[] {
-    return accounts.filter(account => this.isAccountActive(account));
+  filterActiveAccounts(
+    accounts: CacheAccountRegister[]
+  ): CacheAccountRegister[] {
+    return accounts.filter((account) => this.isAccountActive(account));
   }
 
   createBalanceEntries(accounts: CacheAccountRegister[]): void {
