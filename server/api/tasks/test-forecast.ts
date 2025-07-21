@@ -13,7 +13,10 @@ export default defineEventHandler(async () => {
       startDate: moment().startOf("month").toDate(),
       endDate: moment().add(2, "years").toDate(),
       logging: {
-        enabled: false, // Disable all forecast engine logging
+        enabled: false, // Disable all forecast engine logging - this prevents the verbose logs you were seeing
+        // You can also use:
+        // enabled: true, level: 'warn'  // Only show warnings and errors
+        // enabled: true, level: 'debug' // Show all logs including debug info
       },
     };
 
