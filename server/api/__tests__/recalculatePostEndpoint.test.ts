@@ -47,6 +47,16 @@ vi.mock("~/server/services/forecast", () => ({
   ForecastEngineFactory: {
     create: vi.fn(),
   },
+  dateTimeService: {
+    now: vi.fn(() => ({
+      startOf: vi.fn(() => ({
+        toDate: vi.fn(() => new Date("2024-01-01")),
+      })),
+      add: vi.fn(() => ({
+        toDate: vi.fn(() => new Date("2026-01-01")),
+      })),
+    })),
+  },
 }));
 
 vi.mock("~/server/clients/prismaClient", () => ({

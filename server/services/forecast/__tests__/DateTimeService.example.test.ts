@@ -59,13 +59,13 @@ describe("ForecastEngine with DateTimeService", () => {
   });
 
   it("should work with multiple test scenarios", () => {
-    // Scenario 1: Test on January 1st
-    dateTimeService.setNowOverride(moment("2024-01-01T00:00:00Z"));
+    // Scenario 1: Test on January 1st (use local time to avoid timezone issues)
+    dateTimeService.setNowOverride(moment("2024-01-01"));
     let now1 = dateTimeService.now();
     expect(now1.format("YYYY-MM-DD")).toBe("2024-01-01");
 
-    // Scenario 2: Test on December 31st
-    dateTimeService.setNowOverride(moment("2024-12-31T00:00:00Z"));
+    // Scenario 2: Test on December 31st (use local time to avoid timezone issues)
+    dateTimeService.setNowOverride(moment("2024-12-31"));
     let now2 = dateTimeService.now();
     expect(now2.format("YYYY-MM-DD")).toBe("2024-12-31");
 
