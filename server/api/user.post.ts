@@ -9,7 +9,14 @@ export default defineEventHandler(async (event: H3Event) => {
     const { userId } = getUser(event);
     const body = await readBody(event);
 
-    const { email, firstName, lastName } = publicProfileSchema.parse(body);
+    const {
+      email,
+      firstName,
+      lastName,
+      countryId,
+      timezoneOffset,
+      isDaylightSaving,
+    } = publicProfileSchema.parse(body);
 
     const { id } = await PrismaDb.user.findUniqueOrThrow({
       where: {
@@ -22,6 +29,9 @@ export default defineEventHandler(async (event: H3Event) => {
         email,
         firstName,
         lastName,
+        countryId,
+        timezoneOffset,
+        isDaylightSaving,
       },
       where: { id },
     });

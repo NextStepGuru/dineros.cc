@@ -7,6 +7,9 @@ export const publicProfileSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string(),
+  countryId: z.number().optional(),
+  timezoneOffset: z.number().optional(),
+  isDaylightSaving: z.boolean().optional(),
   settings: z
     .object({
       speakeasy: z

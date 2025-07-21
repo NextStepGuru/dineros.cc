@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `user` ADD COLUMN `is_daylight_saving` BOOLEAN NULL DEFAULT true;

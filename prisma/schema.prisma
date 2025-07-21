@@ -34,25 +34,29 @@ model Account {
 }
 
 model User {
-  id              Int       @id @default(autoincrement()) @db.UnsignedInt
-  firstName       String?   @map("first_name") @db.VarChar(255)
-  lastName        String?   @map("last_name") @db.VarChar(255)
-  username        String?   @db.VarChar(100)
-  email           String    @unique @db.VarChar(500) /// @encrypted
-  emailHash       String?   @unique @map("email_hash") @db.VarChar(128) /// @encryption:hash(email)?algorithm=sha512
-  password        String?   @db.VarChar(1000) /// @encrypted?algorithm=sha512
-  isArchived      Boolean   @default(false) @map("is_archived")
-  lastAccessedAt  DateTime? @map("last_accessed_at")
-  resetPasswordAt DateTime? @map("reset_password_at")
-  resetCode       String?   @map("reset_code") @db.VarChar(10)
-  jwtKey          String?   @unique @map("jwt_key") @db.VarChar(100)
-  config          Json?
-  settings        Json?
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  id               Int       @id @default(autoincrement()) @db.UnsignedInt
+  firstName        String?   @map("first_name") @db.VarChar(255)
+  lastName         String?   @map("last_name") @db.VarChar(255)
+  username         String?   @db.VarChar(100)
+  email            String    @unique @db.VarChar(500) /// @encrypted
+  emailHash        String?   @unique @map("email_hash") @db.VarChar(128) /// @encryption:hash(email)?algorithm=sha512
+  password         String?   @db.VarChar(1000) /// @encrypted?algorithm=sha512
+  isArchived       Boolean   @default(false) @map("is_archived")
+  lastAccessedAt   DateTime? @map("last_accessed_at")
+  resetPasswordAt  DateTime? @map("reset_password_at")
+  resetCode        String?   @map("reset_code") @db.VarChar(10)
+  jwtKey           String?   @unique @map("jwt_key") @db.VarChar(100)
+  countryId        Int?      @default(840) @map("country_id") // Default to United States (ISO 3166-1 numeric: 840)
+  timezoneOffset   Int?      @default(-300) @map("timezone_offset") // Default to EST (UTC-5)
+  isDaylightSaving Boolean?  @default(true) @map("is_daylight_saving") // Whether currently observing DST
+  config           Json?
+  settings         Json?
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budgets  Budget[]
   social   UserSocial[]
   accounts UserAccount[]
+  country  Country?      @relation(fields: [countryId], references: [id])
 
   @@map("user")
 }
@@ -79,6 +83,20 @@ model UserSocial {
   user User @relation(fields: [userId], references: [id])
 
   @@map("user_social")
+}
+
+model Country {
+  id        Int      @id // ISO 3166-1 numeric country code
+  name      String   @db.VarChar(255)
+  code      String   @unique @db.VarChar(2) // ISO 3166-1 alpha-2 code (US, CA, GB, etc.)
+  code3     String   @unique @db.VarChar(3) // ISO 3166-1 alpha-3 code (USA, CAN, GBR, etc.)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("country")
 }
 
 model Budget {
