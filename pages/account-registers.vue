@@ -15,6 +15,13 @@ definePageMeta({
 function handleDragStart(event: DragEvent, index: number) {
   draggedIndex.value = index;
   isDragging.value = true;
+
+  // Check if this parent has pocket accounts
+  const parentAccount = draggableAccountRegisters.value[index];
+  const pocketAccounts = listStore.getAccountRegisters.filter(
+    (f) => f.subAccountRegisterId === parentAccount.id
+  );
+
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
     // Set a custom drag image if needed
@@ -22,6 +29,16 @@ function handleDragStart(event: DragEvent, index: number) {
     if (dragElement) {
       event.dataTransfer.setDragImage(dragElement, 0, 0);
     }
+  }
+
+  // Store pocket accounts info for group dragging
+  if (pocketAccounts.length > 0) {
+    draggedPocketGroup.value = {
+      parentId: parentAccount.id,
+      pocketAccounts: pocketAccounts,
+    };
+  } else {
+    draggedPocketGroup.value = null;
   }
 }
 
@@ -35,6 +52,22 @@ function handleTouchStart(event: TouchEvent, index: number) {
   const touch = event.touches[0];
   touchStartY.value = touch.clientY;
   touchStartIndex.value = index;
+
+  // Check if this parent has pocket accounts
+  const parentAccount = draggableAccountRegisters.value[index];
+  const pocketAccounts = listStore.getAccountRegisters.filter(
+    (f) => f.subAccountRegisterId === parentAccount.id
+  );
+
+  // Store pocket accounts info for group dragging
+  if (pocketAccounts.length > 0) {
+    draggedPocketGroup.value = {
+      parentId: parentAccount.id,
+      pocketAccounts: pocketAccounts,
+    };
+  } else {
+    draggedPocketGroup.value = null;
+  }
 }
 
 function handleTouchMove(event: TouchEvent, index: number) {
@@ -56,7 +89,21 @@ function handleTouchMove(event: TouchEvent, index: number) {
   );
 
   if (newIndex !== dragOverIndex.value) {
-    dragOverIndex.value = newIndex;
+    // Check if we're dragging a parent account
+    const draggedParent = draggableAccountRegisters.value[draggedIndex.value];
+
+    // If dragging a parent, only allow dropping on other parent accounts
+    if (!draggedParent.subAccountRegisterId) {
+      const targetParent = draggableAccountRegisters.value[newIndex];
+
+      // Only show drop zone if target is also a parent account
+      if (!targetParent.subAccountRegisterId) {
+        dragOverIndex.value = newIndex;
+      }
+    } else {
+      // If dragging a pocket account, allow normal pocket-to-pocket dropping
+      dragOverIndex.value = newIndex;
+    }
   }
 }
 
@@ -73,6 +120,190 @@ function handleTouchEnd(event: TouchEvent, index: number) {
   }
 
   // Reset state
+  draggedPocketGroup.value = null;
+  draggedIndex.value = null;
+  isDragging.value = false;
+  dragOverIndex.value = null;
+  touchStartY.value = 0;
+  touchStartIndex.value = 0;
+}
+
+// Pocket account drag and drop functions
+function handlePocketDragStart(
+  event: DragEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  draggedIndex.value = `sub-${subRow.id}`;
+  isDragging.value = true;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    const dragElement = event.target as HTMLElement;
+    if (dragElement) {
+      event.dataTransfer.setDragImage(dragElement, 0, 0);
+    }
+  }
+}
+
+function handlePocketDragOver(
+  event: DragEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  event.preventDefault();
+  if (
+    draggedIndex.value !== null &&
+    draggedIndex.value !== `sub-${subRow.id}`
+  ) {
+    dragOverIndex.value = `sub-${subRow.id}`;
+  }
+}
+
+function handlePocketDragLeave(event: DragEvent) {
+  const target = event.target as HTMLElement;
+  const relatedTarget = event.relatedTarget as HTMLElement;
+
+  if (!target.contains(relatedTarget)) {
+    dragOverIndex.value = null;
+  }
+}
+
+function handlePocketDrop(
+  event: DragEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  if (
+    draggedIndex.value === null ||
+    draggedIndex.value === `sub-${subRow.id}`
+  ) {
+    return;
+  }
+
+  // Extract the dragged pocket account ID
+  const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
+
+  // Get all pocket accounts for this parent
+  const pocketAccounts = listStore.getAccountRegisters
+    .filter((f) => f.subAccountRegisterId === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const draggedPocketIndex = pocketAccounts.findIndex(
+    (p) => p.id === draggedPocketId
+  );
+  const dropPocketIndex = pocketAccounts.findIndex((p) => p.id === subRow.id);
+
+  if (draggedPocketIndex === -1 || dropPocketIndex === -1) return;
+
+  // Reorder pocket accounts
+  const reorderedPockets = [...pocketAccounts];
+  const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
+  reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
+
+  // Update sort orders
+  const updatedPockets = reorderedPockets.map((item, index) => ({
+    ...item,
+    sortOrder: index,
+  }));
+
+  // Call API to update pocket order
+  handlePocketDragEnd(updatedPockets);
+
+  draggedIndex.value = null;
+  isDragging.value = false;
+  dragOverIndex.value = null;
+}
+
+// Pocket touch event handlers
+function handlePocketTouchStart(
+  event: TouchEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  event.preventDefault();
+  draggedIndex.value = `sub-${subRow.id}`;
+  isDragging.value = true;
+
+  const touch = event.touches[0];
+  touchStartY.value = touch.clientY;
+  touchStartIndex.value = subRow.id;
+}
+
+function handlePocketTouchMove(
+  event: TouchEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  if (!isDragging.value || draggedIndex.value === null) return;
+
+  event.preventDefault();
+  const touch = event.touches[0];
+  const currentY = touch.clientY;
+  const deltaY = currentY - touchStartY.value;
+
+  const rowHeight = 60;
+  const pocketAccounts = listStore.getAccountRegisters
+    .filter((f) => f.subAccountRegisterId === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const currentIndex = pocketAccounts.findIndex(
+    (p) => p.id === touchStartIndex.value
+  );
+  const newIndex = Math.max(
+    0,
+    Math.min(
+      pocketAccounts.length - 1,
+      Math.round(deltaY / rowHeight) + currentIndex
+    )
+  );
+
+  if (newIndex !== currentIndex) {
+    dragOverIndex.value = `sub-${pocketAccounts[newIndex]?.id}`;
+  }
+}
+
+function handlePocketTouchEnd(
+  event: TouchEvent,
+  subRow: AccountRegister,
+  parentId: number
+) {
+  if (!isDragging.value || draggedIndex.value === null) return;
+
+  event.preventDefault();
+
+  if (
+    dragOverIndex.value !== null &&
+    draggedIndex.value !== dragOverIndex.value
+  ) {
+    const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
+    const dropPocketId = parseInt(dragOverIndex.value.replace("sub-", ""));
+
+    const pocketAccounts = listStore.getAccountRegisters
+      .filter((f) => f.subAccountRegisterId === parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const draggedPocketIndex = pocketAccounts.findIndex(
+      (p) => p.id === draggedPocketId
+    );
+    const dropPocketIndex = pocketAccounts.findIndex(
+      (p) => p.id === dropPocketId
+    );
+
+    if (draggedPocketIndex !== -1 && dropPocketIndex !== -1) {
+      const reorderedPockets = [...pocketAccounts];
+      const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
+      reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
+
+      const updatedPockets = reorderedPockets.map((item, index) => ({
+        ...item,
+        sortOrder: index,
+      }));
+
+      handlePocketDragEnd(updatedPockets);
+    }
+  }
+
+  // Reset state
   draggedIndex.value = null;
   isDragging.value = false;
   dragOverIndex.value = null;
@@ -82,8 +313,24 @@ function handleTouchEnd(event: TouchEvent, index: number) {
 
 function handleDragOver(event: DragEvent, index: number) {
   event.preventDefault();
+
+  // Only allow parent-to-parent dropping
   if (draggedIndex.value !== null && draggedIndex.value !== index) {
-    dragOverIndex.value = index;
+    // Check if we're dragging a parent account
+    const draggedParent = draggableAccountRegisters.value[draggedIndex.value];
+
+    // If dragging a parent, only allow dropping on other parent accounts
+    if (!draggedParent.subAccountRegisterId) {
+      const targetParent = draggableAccountRegisters.value[index];
+
+      // Only show drop zone if target is also a parent account
+      if (!targetParent.subAccountRegisterId) {
+        dragOverIndex.value = index;
+      }
+    } else {
+      // If dragging a pocket account, allow normal pocket-to-pocket dropping
+      dragOverIndex.value = index;
+    }
   }
 }
 
@@ -122,6 +369,8 @@ function handleDrop(event: DragEvent, dropIndex: number) {
   // Call the API to persist the change
   handleDragEnd({ oldIndex: draggedIndex.value, newIndex: dropIndex });
 
+  // Reset pocket group state
+  draggedPocketGroup.value = null;
   draggedIndex.value = null;
   isDragging.value = false;
   dragOverIndex.value = null;
@@ -259,6 +508,44 @@ const dragOverIndex = ref<number | null>(null);
 const touchStartY = ref(0);
 const touchStartIndex = ref(0);
 
+// Pocket group dragging state
+const draggedPocketGroup = ref<{
+  parentId: number;
+  pocketAccounts: AccountRegister[];
+} | null>(null);
+
+// Collapsed state for pocket accounts - initialize all parents with pockets as collapsed
+const collapsedParents = ref<Set<number>>(new Set());
+
+// Initialize all parents with pocket accounts as collapsed
+watch(
+  () => listStore.getAccountRegisters,
+  (accountRegisters) => {
+    if (accountRegisters.length > 0) {
+      const parentsWithPockets = accountRegisters
+        .filter((account) => !account.subAccountRegisterId)
+        .filter((parent) =>
+          accountRegisters.some(
+            (pocket) => pocket.subAccountRegisterId === parent.id
+          )
+        )
+        .map((parent) => parent.id);
+
+      collapsedParents.value = new Set(parentsWithPockets);
+    }
+  },
+  { immediate: true }
+);
+
+// Toggle pocket accounts visibility
+function togglePocketAccounts(parentId: number) {
+  if (collapsedParents.value.has(parentId)) {
+    collapsedParents.value.delete(parentId);
+  } else {
+    collapsedParents.value.add(parentId);
+  }
+}
+
 async function handleDragEnd(event: any) {
   // Check if the item was actually moved (not just clicked)
   if (event.oldIndex === event.newIndex) {
@@ -293,6 +580,31 @@ async function handleDragEnd(event: any) {
     toast.add({
       color: "error",
       description: "Failed to update account order.",
+    });
+  }
+}
+
+async function handlePocketDragEnd(updatedPockets: AccountRegister[]) {
+  try {
+    const response = await $api("/api/account-register-sort", {
+      method: "POST",
+      body: {
+        accountRegisters: updatedPockets,
+      },
+    });
+
+    // Update the store with new pocket order
+    listStore.updateAccountRegistersOrder(updatedPockets);
+
+    toast.add({
+      color: "success",
+      description: "Pocket account order updated successfully.",
+    });
+  } catch (error) {
+    console.error("Error updating pocket sort order:", error);
+    toast.add({
+      color: "error",
+      description: "Failed to update pocket account order.",
     });
   }
 }
@@ -376,7 +688,7 @@ const estimatedNetWorth = computed(() => {
           template(v-for="(row, index) in draggableAccountRegisters" :key="`main-${row.id}`")
             // Main account row (draggable)
             tr(
-              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 transition-all duration-200 ease-in-out ${isDragging && draggedIndex === index ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === index && isDragging ? 'border-t-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== index ? 'hover:bg-blue-100 dark:hover:bg-blue-800/30' : ''}`"
+              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 transition-all duration-200 ease-in-out ${isDragging && draggedIndex === index ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-yellow-50 dark:bg-yellow-900/20' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-t-2 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === index && isDragging ? 'border-t-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== index ? 'hover:bg-blue-100 dark:hover:bg-blue-800/30' : ''}`"
               draggable="true"
               @dragstart="handleDragStart($event, index)"
               @dragover="handleDragOver($event, index)"
@@ -394,20 +706,47 @@ const estimatedNetWorth = computed(() => {
                   //- span(class="hidden sm:inline text-xs text-gray-500 ml-1") Drag
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
-                div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold text-white") {{ row.name }}
+                div(class="flex items-center")
+                  div(
+                    v-if="listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length > 0"
+                    @click="togglePocketAccounts(row.id)"
+                    class="cursor-pointer mr-2 transition-transform duration-200 hover:scale-110"
+                    :class="collapsedParents.has(row.id) ? 'rotate-0' : 'rotate-90'"
+                  )
+                    UIcon(name="i-lucide-chevron-right" class="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm")
+                  div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold text-gray-900 dark:text-white") {{ row.name }}
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
                 div(:class="formatCurrencyClass(row.balance)") {{ formatCurrency(row.balance) }}
 
-            // Sub-accounts for this main account (non-draggable)
-            template(v-if="!row.subAccountRegisterId")
+            // Sub-accounts for this main account (draggable pocket accounts)
+            template(v-if="!row.subAccountRegisterId && !collapsedParents.has(row.id)")
               tr(
-                v-for="subRow in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id)"
+                v-for="(subRow, subIndex) in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).sort((a, b) => a.sortOrder - b.sortOrder)"
                 :key="`sub-${subRow.id}`"
-                class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
-                td(class="w-12 sm:w-16") &nbsp;
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") &#x21b3; {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
+                :class="`odd:bg-gray-200 even:bg-gray-150 dark:odd:bg-gray-600 dark:even:bg-gray-500 transition-all duration-200 ease-in-out border-l-2 border-green-200 dark:border-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
+                draggable="true"
+                @dragstart="handlePocketDragStart($event, subRow, row.id)"
+                @dragover="handlePocketDragOver($event, subRow, row.id)"
+                @dragleave="handlePocketDragLeave($event)"
+                @drop="handlePocketDrop($event, subRow, row.id)"
+                @dragenter.prevent
+                @touchstart="handlePocketTouchStart($event, subRow, row.id)"
+                @touchmove="handlePocketTouchMove($event, subRow, row.id)"
+                @touchend="handlePocketTouchEnd($event, subRow, row.id)"
+                style="touch-action: none;")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
+                  a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-green-600 dark:hover:text-green-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                    UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-green-600 dark:hover:text-green-400 text-lg sm:text-base")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+                  div(class="flex items-center")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
+                      UIcon(name="i-lucide-corner-down-right" class="text-xs")
+                    span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
-                  div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold text-white") &#x21b3; {{ subRow.name }}
+                  div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center text-gray-900 dark:text-white")
+                    // div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
+                      UIcon(name="i-corner-down-right" class="text-xs")
+                    span {{ subRow.name }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
                   div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
 </template>
