@@ -70,12 +70,12 @@ export const formatAccountRegisters = (
   accountRegisters
     .filter((r) => !r.subAccountRegisterId)
     .forEach((r) => {
-      items.push(r);
+      items.push({ ...r });
 
       accountRegisters
-        .filter((sr) => sr.subAccountRegisterId === r.id)
-        .forEach((sr) => {
-          items.push({ ...sr, name: ` ↳ ${sr.name}` });
+        .filter((pocket) => pocket.subAccountRegisterId === r.id)
+        .forEach((pocket) => {
+          items.push({ ...pocket, name: ` ↳ ${pocket.name}` });
         });
     });
 

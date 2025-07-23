@@ -283,7 +283,10 @@ watch(
 
 const estimatedNetWorth = computed(() => {
   return listStore.getAccountRegisters.reduce((acc, curr) => {
-    acc += curr.balance;
+    if (curr.typeId !== 15) {
+      acc += curr.balance;
+    }
+
     return acc;
   }, 0);
 });

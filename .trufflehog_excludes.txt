@@ -35,7 +35,6 @@ Thumbs.db
 .git
 
 # Known safe files with false positives
-nextstepguru-ce5dcf7b0730.json
 vitest.setup.ts
 production-dineros-secrets.yaml
 google-service-account-secret.yaml

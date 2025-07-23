@@ -149,11 +149,6 @@ const loadMoreEntries = async () => {
     });
 
     if (data.value && data.value.entries?.length > 0) {
-      console.log("Load more data received:", {
-        entriesCount: data.value.entries?.length,
-        hasMore: data.value.hasMore,
-      });
-
       // Append new entries to existing ones
       tableEntries.value = [...tableEntries.value, ...data.value.entries];
       hasMoreData.value = data.value.hasMore || false;

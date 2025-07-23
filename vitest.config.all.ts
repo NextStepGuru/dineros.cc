@@ -77,9 +77,9 @@ export default defineConfig({
       "~/linearbudget": resolve(__dirname, "linearbudget"),
       "~/microservice": resolve(__dirname, "microservice"),
       "~/coverage": resolve(__dirname, "coverage"),
-      "~/nextstepguru-ce5dcf7b0730.json": resolve(
+      "~/nextstepguru-project.json": resolve(
         __dirname,
-        "nextstepguru-ce5dcf7b0730.json"
+        "nextstepguru-project.json"
       ),
     },
   },
