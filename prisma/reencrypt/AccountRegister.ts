@@ -100,17 +100,21 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "Account",
  *       "isList": false
  *     },
- *     "reoccurrences": {
- *       "modelName": "Reoccurrence",
- *       "isList": true
+ *     "parent": {
+ *       "modelName": "AccountRegister",
+ *       "isList": false
+ *     },
+ *     "interval": {
+ *       "modelName": "Interval",
+ *       "isList": false
  *     },
  *     "entries": {
  *       "modelName": "RegisterEntry",
  *       "isList": true
  *     },
- *     "parent": {
- *       "modelName": "AccountRegister",
- *       "isList": false
+ *     "reoccurrences": {
+ *       "modelName": "Reoccurrence",
+ *       "isList": true
  *     },
  *     "children": {
  *       "modelName": "AccountRegister",

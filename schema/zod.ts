@@ -98,6 +98,7 @@ export const accountRegisterSchema = z.object({
   latestBalance: z.coerce.number().default(0),
   minPayment: z.coerce.number().nullable().default(null),
   statementAt: z.coerce.date().default(new Date()),
+  statementIntervalId: z.coerce.number().nullable().default(null),
   apr1: z.coerce.number().nullable().default(null),
   apr1StartAt: z.coerce.date().nullable().default(null),
   apr2: z.coerce.number().nullable().default(null),

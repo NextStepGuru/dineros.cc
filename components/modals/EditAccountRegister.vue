@@ -237,6 +237,14 @@ UModal(description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full 
           type="date"
           class="w-full")
 
+      UFormField(label="Statement Interval" name="statementIntervalId" v-if="isSelectedAccountTypeCredit")
+        USelect(v-model="formState.statementIntervalId"
+          class="w-full"
+          placeholder="Select a Statement Interval"
+          :items="listStore.getIntervals.map(i => ({ id: i.id, name: i.name }))"
+          valueKey="id"
+          labelKey="name")
+
       UFormField(label="APR (%)" name="apr1" v-if="isSelectedAccountTypeCredit" hint="Annual Percentage Rate (0-100%)")
         div(class="relative")
           UInputNumber(

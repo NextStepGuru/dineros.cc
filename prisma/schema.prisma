@@ -126,6 +126,7 @@ model AccountRegister {
   latestBalance           Float     @default(0) @map("latest_balance")
   minPayment              Decimal?  @map("min_payment")
   statementAt             DateTime  @map("statement_at")
+  statementIntervalId     Int       @default(3) @map("statement_interval_id") @db.UnsignedInt
   apr1                    Decimal?  @db.Decimal(7, 5)
   apr1StartAt             DateTime? @map("apr1_start_at")
   apr2                    Decimal?  @db.Decimal(7, 5)
@@ -153,12 +154,14 @@ model AccountRegister {
   plaidBalanceLastSyncAt  DateTime? @map("plaid_balance_last_sync_at")
   updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  budget        Budget            @relation(fields: [budgetId], references: [id])
-  type          AccountType       @relation(fields: [typeId], references: [id])
-  account       Account           @relation(fields: [accountId], references: [id])
-  reoccurrences Reoccurrence[]
+  budget   Budget           @relation(fields: [budgetId], references: [id])
+  type     AccountType      @relation(fields: [typeId], references: [id])
+  account  Account          @relation(fields: [accountId], references: [id])
+  interval Interval         @relation(fields: [statementIntervalId], references: [id])
+  parent   AccountRegister? @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+
   entries       RegisterEntry[]
-  parent        AccountRegister?  @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+  reoccurrences Reoccurrence[]
   children      AccountRegister[] @relation("ar_children")
 
   @@map("account_register")
@@ -291,7 +294,8 @@ model Interval {
   name      String
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  reoccurrences Reoccurrence[]
+  reoccurrences   Reoccurrence[]
+  AccountRegister AccountRegister[]
 
   @@map("interval")
 }
