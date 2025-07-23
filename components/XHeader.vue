@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* eslint-env node */
 import type { User } from "~/types/types";
+import { formatAccountRegisters } from "~/lib/utils";
 
 const authStore = useAuthStore();
 const listStore = useListStore();
@@ -23,7 +24,7 @@ const items = computed(() => {
         label: "Register",
         to: `/register${
           listStore.getAccountRegisters.length
-            ? "/" + listStore.getAccountRegisters[0].id
+            ? "/" + formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
             : ""
         }`,
         active: route.path.startsWith("/register"),

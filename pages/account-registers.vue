@@ -190,8 +190,6 @@ const isDragging = ref(false);
 const dragOverIndex = ref<number | null>(null);
 
 async function handleDragEnd(event: any) {
-  console.log("Drag end event:", event);
-
   // Check if the item was actually moved (not just clicked)
   if (event.oldIndex === event.newIndex) {
     console.log("No change detected, returning");
@@ -205,16 +203,6 @@ async function handleDragEnd(event: any) {
     })
   );
 
-  console.log("New order to send:", newOrder);
-  console.log(
-    "First few items:",
-    newOrder.slice(0, 3).map((item) => ({
-      id: item.id,
-      sortOrder: item.sortOrder,
-      name: item.name,
-    }))
-  );
-
   try {
     const response = await $api("/api/account-register-sort", {
       method: "POST",
@@ -222,8 +210,6 @@ async function handleDragEnd(event: any) {
         accountRegisters: newOrder,
       },
     });
-
-    console.log("API response:", response);
 
     // Update the store with new order
     listStore.updateAccountRegistersOrder(newOrder);

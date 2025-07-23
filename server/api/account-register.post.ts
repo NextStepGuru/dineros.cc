@@ -74,7 +74,7 @@ export default defineEventHandler(async (event: H3Event) => {
         loanPaymentsPerYear,
         loanTotalYears,
         loanOriginalAmount,
-        sortOrder,
+        sortOrder: sortOrder ? sortOrder : undefined,
         savingsGoalSortOrder,
         accountSavingsGoal,
         minAccountBalance,
@@ -117,6 +117,21 @@ export default defineEventHandler(async (event: H3Event) => {
     });
 
     addRecalculateJob({ accountId });
+
+    // If this is a newly created account register, create a default register entry with isBalanceEntry=true
+    if (!id && accountRegister && accountRegister.id) {
+      // Create a default register entry for the new account register
+      await PrismaDb.registerEntry.create({
+        data: {
+          accountRegisterId: accountRegister.id,
+          amount: accountRegister.balance ?? 0,
+          balance: accountRegister.balance ?? 0,
+          isBalanceEntry: true,
+          description: "Initial Balance",
+          createdAt: accountRegister.statementAt || new Date(),
+        },
+      });
+    }
 
     return accountRegisterSchema.parse(accountRegister);
   } catch (error) {

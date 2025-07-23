@@ -20,7 +20,11 @@ const authStore = useAuthStore();
 
 onBeforeMount(() => {
   if (route.params.id === "") {
-    navigateTo(`/register/${listStore.getAccountRegisters?.[0]?.id}`);
+    navigateTo(
+      `/register/${
+        formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
+      }`
+    );
   }
 });
 
@@ -43,7 +47,11 @@ watch(authStore, () => {
       item.budgetId === authStore.getBudgetId && item.id === +route.params.id
   );
   if (!verify.length) {
-    navigateTo(`/register/${listStore.getAccountRegisters?.[0]?.id}`);
+    navigateTo(
+      `/register/${
+        formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
+      }`
+    );
   }
 });
 

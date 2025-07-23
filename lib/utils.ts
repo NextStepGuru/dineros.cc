@@ -65,21 +65,33 @@ export const handleError = (
 export const formatAccountRegisters = (
   accountRegisters: AccountRegister[]
 ): AccountRegister[] => {
-  const items: AccountRegister[] = [];
+  // Create a map of parent accounts for O(1) lookup
+  const parentMap = new Map<number, AccountRegister>();
+  const children: AccountRegister[] = [];
 
-  accountRegisters
-    .filter((r) => !r.subAccountRegisterId)
-    .forEach((r) => {
-      items.push({ ...r });
+  // Single pass to separate parents and children
+  for (const register of accountRegisters) {
+    if (!register.subAccountRegisterId) {
+      parentMap.set(register.id, register);
+    } else {
+      children.push(register);
+    }
+  }
 
-      accountRegisters
-        .filter((pocket) => pocket.subAccountRegisterId === r.id)
-        .forEach((pocket) => {
-          items.push({ ...pocket, name: ` ↳ ${pocket.name}` });
-        });
-    });
+  // Build result with parents followed by their children
+  const result: AccountRegister[] = [];
+  for (const parent of parentMap.values()) {
+    result.push({ ...parent });
 
-  return items;
+    // Add children for this parent
+    for (const child of children) {
+      if (child.subAccountRegisterId === parent.id) {
+        result.push({ ...child, name: ` ↳ ${child.name}` });
+      }
+    }
+  }
+
+  return result;
 };
 
 export const mapPlaidTypesToAccountTypes = (
