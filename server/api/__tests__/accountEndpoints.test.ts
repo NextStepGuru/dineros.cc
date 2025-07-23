@@ -503,6 +503,7 @@ describe("Account Register API Endpoints", () => {
             budgetId: 1,
           },
         ],
+        sortMode: "visual",
       };
       const mockUser = { userId: 123 };
       const mockAccount = {
@@ -554,6 +555,37 @@ describe("Account Register API Endpoints", () => {
       (getUser as any).mockReturnValue(mockUser);
 
       await expect(accountRegisterSortHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+
+    it("should handle invalid sort mode", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisters: [
+          {
+            id: 1,
+            accountId: "account-123",
+            sortOrder: 0,
+            name: "Account 1",
+            typeId: 1,
+            budgetId: 1,
+          },
+        ],
+        sortMode: "invalid",
+      };
+      const mockUser = { userId: 123 };
+
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (global as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+
+      await expect(accountRegisterSortHandler(mockEvent)).rejects.toThrow(
+        "sortMode must be 'visual', 'loan', or 'savings'"
+      );
       expect(handleApiError).toHaveBeenCalled();
     });
   });
