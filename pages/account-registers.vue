@@ -17,6 +17,11 @@ function handleDragStart(event: DragEvent, index: number) {
   isDragging.value = true;
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
+    // Set a custom drag image if needed
+    const dragElement = event.target as HTMLElement;
+    if (dragElement) {
+      event.dataTransfer.setDragImage(dragElement, 0, 0);
+    }
   }
 }
 
@@ -28,7 +33,13 @@ function handleDragOver(event: DragEvent, index: number) {
 }
 
 function handleDragLeave(event: DragEvent) {
-  dragOverIndex.value = null;
+  // Only clear if we're leaving the drop zone entirely
+  const target = event.target as HTMLElement;
+  const relatedTarget = event.relatedTarget as HTMLElement;
+
+  if (!target.contains(relatedTarget)) {
+    dragOverIndex.value = null;
+  }
 }
 
 function handleDrop(event: DragEvent, dropIndex: number) {
@@ -296,12 +307,17 @@ const estimatedNetWorth = computed(() => {
             th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold") Account Name
             th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-right font-semibold w-1/5") Balance
 
-        tbody(class="w-full")
+        tbody(class="w-full relative")
+          // Drop zone indicator when dragging
+          tr(v-if="isDragging" class="h-2 bg-blue-200 dark:bg-blue-800/50 border-2 border-dashed border-blue-400 dark:border-blue-600 transition-all duration-200")
+            td(colspan="4" class="p-0")
+              div(class="h-2 bg-gradient-to-r from-blue-400 to-blue-600 dark:from-blue-500 dark:to-blue-700 animate-pulse")
+
           // Main accounts with their sub-accounts grouped together
           template(v-for="(row, index) in draggableAccountRegisters" :key="`main-${row.id}`")
             // Main account row (draggable)
             tr(
-              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 ${isDragging && draggedIndex === index ? 'opacity-50' : ''} ${dragOverIndex === index && isDragging ? 'border-t-2 border-blue-500' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-2 border-blue-500' : ''}`"
+              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 transition-all duration-200 ease-in-out ${isDragging && draggedIndex === index ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === index && isDragging ? 'border-t-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== index ? 'hover:bg-blue-100 dark:hover:bg-blue-800/30' : ''}`"
               draggable="true"
               @dragstart="handleDragStart($event, index)"
               @dragover="handleDragOver($event, index)"
@@ -310,8 +326,8 @@ const estimatedNetWorth = computed(() => {
               @dragenter.prevent
             )
               td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-16")
-                a(class="cursor-grab drag-handle")
-                  UIcon(name="i-lucide-grip-vertical")
+                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing")
+                  UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400")
               td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
               td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
                 div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold text-white") {{ row.name }}
