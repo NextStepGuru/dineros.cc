@@ -25,6 +25,61 @@ function handleDragStart(event: DragEvent, index: number) {
   }
 }
 
+// Touch event handlers for mobile
+function handleTouchStart(event: TouchEvent, index: number) {
+  event.preventDefault();
+  draggedIndex.value = index;
+  isDragging.value = true;
+
+  // Store initial touch position
+  const touch = event.touches[0];
+  touchStartY.value = touch.clientY;
+  touchStartIndex.value = index;
+}
+
+function handleTouchMove(event: TouchEvent, index: number) {
+  if (!isDragging.value || draggedIndex.value === null) return;
+
+  event.preventDefault();
+  const touch = event.touches[0];
+  const currentY = touch.clientY;
+  const deltaY = currentY - touchStartY.value;
+
+  // Calculate which row we're hovering over
+  const rowHeight = 60; // Approximate row height
+  const newIndex = Math.max(
+    0,
+    Math.min(
+      draggableAccountRegisters.value.length - 1,
+      Math.round(deltaY / rowHeight) + touchStartIndex.value
+    )
+  );
+
+  if (newIndex !== dragOverIndex.value) {
+    dragOverIndex.value = newIndex;
+  }
+}
+
+function handleTouchEnd(event: TouchEvent, index: number) {
+  if (!isDragging.value || draggedIndex.value === null) return;
+
+  event.preventDefault();
+
+  if (
+    dragOverIndex.value !== null &&
+    draggedIndex.value !== dragOverIndex.value
+  ) {
+    handleDrop(null as any, dragOverIndex.value);
+  }
+
+  // Reset state
+  draggedIndex.value = null;
+  isDragging.value = false;
+  dragOverIndex.value = null;
+  touchStartY.value = 0;
+  touchStartIndex.value = 0;
+}
+
 function handleDragOver(event: DragEvent, index: number) {
   event.preventDefault();
   if (draggedIndex.value !== null && draggedIndex.value !== index) {
@@ -200,6 +255,10 @@ const draggedIndex = ref<number | null>(null);
 const isDragging = ref(false);
 const dragOverIndex = ref<number | null>(null);
 
+// Touch state for mobile
+const touchStartY = ref(0);
+const touchStartIndex = ref(0);
+
 async function handleDragEnd(event: any) {
   // Check if the item was actually moved (not just clicked)
   if (event.oldIndex === event.newIndex) {
@@ -299,13 +358,13 @@ const estimatedNetWorth = computed(() => {
       span Your estimated net worth
       b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
     div(class="relative overflow-auto flex-1 max-h-[calc(100vh-270px)] w-full")
-      table(class="w-full min-w-full")
+      table(class="w-full min-w-full text-xs sm:text-sm")
         thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-[var(--ui-border-accented)] sticky top-0 inset-x-0 bg-[var(--ui-bg)]/75 z-[1] backdrop-blur w-full")
           tr(class="data-[selected=true]:bg-[var(--ui-bg-elevated)]/50 odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
-            th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-16")
-            th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-1/5") Type
-            th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold") Account Name
-            th(class="px-4 py-3.5 text-sm text-[var(--ui-text-highlighted)] text-right font-semibold w-1/5") Balance
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-12 sm:w-16")
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-1/5") Type
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold") Account Name
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-right font-semibold w-1/5") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
@@ -324,14 +383,19 @@ const estimatedNetWorth = computed(() => {
               @dragleave="handleDragLeave($event)"
               @drop="handleDrop($event, index)"
               @dragenter.prevent
+              @touchstart="handleTouchStart($event, index)"
+              @touchmove="handleTouchMove($event, index)"
+              @touchend="handleTouchEnd($event, index)"
+              style="touch-action: none;"
             )
-              td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-16")
-                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing")
-                  UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400")
-              td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
-              td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
+                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                  UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 text-lg sm:text-base")
+                  //- span(class="hidden sm:inline text-xs text-gray-500 ml-1") Drag
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
                 div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold text-white") {{ row.name }}
-              td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
                 div(:class="formatCurrencyClass(row.balance)") {{ formatCurrency(row.balance) }}
 
             // Sub-accounts for this main account (non-draggable)
@@ -340,10 +404,10 @@ const estimatedNetWorth = computed(() => {
                 v-for="subRow in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id)"
                 :key="`sub-${subRow.id}`"
                 class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
-                td(class="w-16") &nbsp;
-                td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") &#x21b3; {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
-                td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
+                td(class="w-12 sm:w-16") &nbsp;
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") &#x21b3; {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
                   div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold text-white") &#x21b3; {{ subRow.name }}
-                td(class="p-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
                   div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
 </template>
