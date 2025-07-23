@@ -110,6 +110,7 @@ export const accountRegisterSchema = z.object({
   loanTotalYears: z.coerce.number().nullable().default(null),
   loanOriginalAmount: z.coerce.number().nullable().default(null),
   sortOrder: z.number().default(0),
+  loanPaymentSortOrder: z.number().default(0),
   savingsGoalSortOrder: z.number().default(0),
   accountSavingsGoal: z.coerce.number().nullable().default(null),
   minAccountBalance: z.coerce.number().default(0),

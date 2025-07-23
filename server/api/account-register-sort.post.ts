@@ -9,10 +9,14 @@ export default defineEventHandler(async (event: H3Event) => {
     const body = await readBody(event);
     const { userId } = getUser(event);
 
-    const { accountRegisters } = body;
+    const { accountRegisters, sortMode } = body;
 
     if (!Array.isArray(accountRegisters)) {
       throw new Error("accountRegisters must be an array");
+    }
+
+    if (!sortMode || !["visual", "loan", "savings"].includes(sortMode)) {
+      throw new Error("sortMode must be 'visual', 'loan', or 'savings'");
     }
 
     console.log(
@@ -24,13 +28,29 @@ export default defineEventHandler(async (event: H3Event) => {
     for (const accountRegister of accountRegisters) {
       console.log("Checking accountRegister:", accountRegister);
 
-      if (
-        !accountRegister.id ||
-        typeof accountRegister.sortOrder !== "number"
-      ) {
+      // Determine which sort field to validate based on sort mode
+      let sortField: string;
+      let sortValue: number;
+
+      switch (sortMode) {
+        case "loan":
+          sortField = "loanPaymentSortOrder";
+          sortValue = accountRegister.loanPaymentSortOrder;
+          break;
+        case "savings":
+          sortField = "savingsGoalSortOrder";
+          sortValue = accountRegister.savingsGoalSortOrder;
+          break;
+        default:
+          sortField = "sortOrder";
+          sortValue = accountRegister.sortOrder;
+          break;
+      }
+
+      if (!accountRegister.id || typeof sortValue !== "number") {
         console.log("Invalid accountRegister:", accountRegister);
         throw new Error(
-          `Each account register must have id and sortOrder. Got: id=${accountRegister.id}, sortOrder=${accountRegister.sortOrder}`
+          `Each account register must have id and ${sortField}. Got: id=${accountRegister.id}, ${sortField}=${sortValue}`
         );
       }
 
@@ -48,12 +68,28 @@ export default defineEventHandler(async (event: H3Event) => {
     }
 
     // Update all account registers with new sort order
-    const updatePromises = accountRegisters.map((accountRegister) =>
-      PrismaDb.accountRegister.update({
+    const updatePromises = accountRegisters.map((accountRegister) => {
+      let updateData: any = {};
+
+      switch (sortMode) {
+        case "loan":
+          updateData.loanPaymentSortOrder =
+            accountRegister.loanPaymentSortOrder;
+          break;
+        case "savings":
+          updateData.savingsGoalSortOrder =
+            accountRegister.savingsGoalSortOrder;
+          break;
+        default:
+          updateData.sortOrder = accountRegister.sortOrder;
+          break;
+      }
+
+      return PrismaDb.accountRegister.update({
         where: { id: accountRegister.id },
-        data: { sortOrder: accountRegister.sortOrder },
-      })
-    );
+        data: updateData,
+      });
+    });
 
     await Promise.all(updatePromises);
 

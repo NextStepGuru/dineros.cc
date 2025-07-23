@@ -200,11 +200,24 @@ function handlePocketDrop(
   const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
   reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
 
-  // Update sort orders
-  const updatedPockets = reorderedPockets.map((item, index) => ({
-    ...item,
-    sortOrder: index,
-  }));
+  // Update sort orders based on active mode
+  const updatedPockets = reorderedPockets.map((item, index) => {
+    const updatedItem = { ...item };
+
+    switch (activeSortMode.value) {
+      case "loan":
+        updatedItem.loanPaymentSortOrder = index;
+        break;
+      case "savings":
+        updatedItem.savingsGoalSortOrder = index;
+        break;
+      default:
+        updatedItem.sortOrder = index;
+        break;
+    }
+
+    return updatedItem;
+  });
 
   // Call API to update pocket order
   handlePocketDragEnd(updatedPockets);
@@ -294,10 +307,23 @@ function handlePocketTouchEnd(
       const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
       reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
 
-      const updatedPockets = reorderedPockets.map((item, index) => ({
-        ...item,
-        sortOrder: index,
-      }));
+      const updatedPockets = reorderedPockets.map((item, index) => {
+        const updatedItem = { ...item };
+
+        switch (activeSortMode.value) {
+          case "loan":
+            updatedItem.loanPaymentSortOrder = index;
+            break;
+          case "savings":
+            updatedItem.savingsGoalSortOrder = index;
+            break;
+          default:
+            updatedItem.sortOrder = index;
+            break;
+        }
+
+        return updatedItem;
+      });
 
       handlePocketDragEnd(updatedPockets);
     }
@@ -517,6 +543,16 @@ const draggedPocketGroup = ref<{
 // Collapsed state for pocket accounts - initialize all parents with pockets as collapsed
 const collapsedParents = ref<Set<number>>(new Set());
 
+// Sort mode state
+const activeSortMode = ref<"visual" | "loan" | "savings">("visual");
+
+// Tab items for sort mode selection
+const tabItems = computed(() => [
+  { key: "visual", label: "Visual Order", icon: "i-lucide-layout-grid" },
+  { key: "loan", label: "Loan Payment", icon: "i-lucide-credit-card" },
+  { key: "savings", label: "Savings Goal", icon: "i-lucide-target" },
+]);
+
 // Initialize all parents with pocket accounts as collapsed
 watch(
   () => listStore.getAccountRegisters,
@@ -546,6 +582,23 @@ function togglePocketAccounts(parentId: number) {
   }
 }
 
+// Get sort field based on active mode
+function getSortField(account: AccountRegister): number {
+  switch (activeSortMode.value) {
+    case "loan":
+      return account.loanPaymentSortOrder;
+    case "savings":
+      return account.savingsGoalSortOrder;
+    default:
+      return account.sortOrder;
+  }
+}
+
+// Sort accounts based on active mode
+function sortAccounts(accounts: AccountRegister[]): AccountRegister[] {
+  return [...accounts].sort((a, b) => getSortField(a) - getSortField(b));
+}
+
 async function handleDragEnd(event: any) {
   // Check if the item was actually moved (not just clicked)
   if (event.oldIndex === event.newIndex) {
@@ -554,10 +607,23 @@ async function handleDragEnd(event: any) {
   }
 
   const newOrder = draggableAccountRegisters.value.map(
-    (item: AccountRegister, index: number) => ({
-      ...item,
-      sortOrder: index,
-    })
+    (item: AccountRegister, index: number) => {
+      const updatedItem = { ...item };
+
+      switch (activeSortMode.value) {
+        case "loan":
+          updatedItem.loanPaymentSortOrder = index;
+          break;
+        case "savings":
+          updatedItem.savingsGoalSortOrder = index;
+          break;
+        default:
+          updatedItem.sortOrder = index;
+          break;
+      }
+
+      return updatedItem;
+    }
   );
 
   try {
@@ -565,6 +631,7 @@ async function handleDragEnd(event: any) {
       method: "POST",
       body: {
         accountRegisters: newOrder,
+        sortMode: activeSortMode.value as "visual" | "loan" | "savings",
       },
     });
 
@@ -590,6 +657,7 @@ async function handlePocketDragEnd(updatedPockets: AccountRegister[]) {
       method: "POST",
       body: {
         accountRegisters: updatedPockets,
+        sortMode: activeSortMode.value as "visual" | "loan" | "savings",
       },
     });
 
@@ -630,11 +698,12 @@ const globalFilter = ref("");
 
 const filteredAccountRegisters = computed(() => {
   const filterText = globalFilter.value.toLowerCase();
-  return listStore.getAccountRegisters.filter((f) => {
+  const filtered = listStore.getAccountRegisters.filter((f) => {
     const matchesFilter =
       !filterText || f.name.toLowerCase().includes(filterText);
     return matchesFilter && !f.subAccountRegisterId;
   });
+  return sortAccounts(filtered);
 });
 
 // Only main accounts for draggable (no sub-accounts)
@@ -662,6 +731,18 @@ const estimatedNetWorth = computed(() => {
 
 <template lang="pug">
   section(class="m-4")
+    // Sort mode tabs
+    div(class="mb-4")
+      div(class="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1")
+        button(
+          v-for="item in tabItems"
+          :key="item.key"
+          @click="activeSortMode = item.key"
+          :class="activeSortMode === item.key ? 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+        )
+          UIcon(:name="item.icon" class="w-4 h-4")
+          span {{ item.label }}
+
     div(class="w-full flex")
       UButton(color="info" size="sm" class="mr-4" @click="handleAddAccountRegister") Add
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search" ref="search")
@@ -721,7 +802,7 @@ const estimatedNetWorth = computed(() => {
             // Sub-accounts for this main account (draggable pocket accounts)
             template(v-if="!row.subAccountRegisterId && !collapsedParents.has(row.id)")
               tr(
-                v-for="(subRow, subIndex) in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).sort((a, b) => a.sortOrder - b.sortOrder)"
+                v-for="(subRow, subIndex) in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).sort((a, b) => getSortField(a) - getSortField(b))"
                 :key="`sub-${subRow.id}`"
                 :class="`odd:bg-gray-200 even:bg-gray-150 dark:odd:bg-gray-600 dark:even:bg-gray-500 transition-all duration-200 ease-in-out border-l-2 border-green-200 dark:border-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
                 draggable="true"
@@ -744,8 +825,8 @@ const estimatedNetWorth = computed(() => {
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
                   div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center text-gray-900 dark:text-white")
-                    // div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
-                      UIcon(name="i-corner-down-right" class="text-xs")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
+                      UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ subRow.name }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
                   div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
