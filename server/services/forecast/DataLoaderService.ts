@@ -50,6 +50,7 @@ export class DataLoaderService implements IDataLoaderService {
         latestBalance: true,
         minPayment: true,
         statementAt: true,
+        statementIntervalId: true,
         apr1: true,
         apr1StartAt: true,
         apr2: true,

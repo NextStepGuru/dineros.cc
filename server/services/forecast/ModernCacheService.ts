@@ -29,6 +29,7 @@ export type CacheAccountRegister = {
   latestBalance: number;
   minPayment: number | null | undefined | Decimal;
   statementAt: Moment;
+  statementIntervalId: number;
   apr1: number | null | undefined | Decimal;
   apr1StartAt: Date | null;
   apr2: number | null | undefined | Decimal;

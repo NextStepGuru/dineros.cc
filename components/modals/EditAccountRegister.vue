@@ -50,6 +50,30 @@ const isSelectedAccountTypeSavings = computed(() => {
   return selectedAccountType.value?.id === 2;
 });
 
+const isSelectedAccountTypeWithInterest = computed(() => {
+  return (
+    isSelectedAccountTypeCredit.value || isSelectedAccountTypeSavings.value
+  );
+});
+
+const interestRateLabel = computed(() => {
+  if (isSelectedAccountTypeSavings.value) {
+    return "Interest Rate (%)";
+  } else if (isSelectedAccountTypeCredit.value) {
+    return "APR (%)";
+  }
+  return "Interest Rate (%)";
+});
+
+const interestRateHint = computed(() => {
+  if (isSelectedAccountTypeSavings.value) {
+    return "Annual Interest Rate earned (0-100%)";
+  } else if (isSelectedAccountTypeCredit.value) {
+    return "Annual Percentage Rate (0-100%)";
+  }
+  return "Annual Interest Rate (0-100%)";
+});
+
 // Convert statementAt Date to string for date input
 const statementAtString = computed({
   get: () => {
@@ -231,13 +255,13 @@ UModal(description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full 
           :step="0.01"
           class="w-full")
 
-      UFormField(label="Statement Date" name="statementAt" v-if="isSelectedAccountTypeCredit")
+      UFormField(label="Statement Date" name="statementAt" v-if="isSelectedAccountTypeWithInterest")
         UInput(
           v-model="statementAtString"
           type="date"
           class="w-full")
 
-      UFormField(label="Statement Interval" name="statementIntervalId" v-if="isSelectedAccountTypeCredit")
+      UFormField(label="Statement Interval" name="statementIntervalId" v-if="isSelectedAccountTypeWithInterest")
         USelect(v-model="formState.statementIntervalId"
           class="w-full"
           placeholder="Select a Statement Interval"
@@ -245,7 +269,7 @@ UModal(description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full 
           valueKey="id"
           labelKey="name")
 
-      UFormField(label="APR (%)" name="apr1" v-if="isSelectedAccountTypeCredit" hint="Annual Percentage Rate (0-100%)")
+      UFormField(:label="interestRateLabel" name="apr1" v-if="isSelectedAccountTypeWithInterest" :hint="interestRateHint")
         div(class="relative")
           UInputNumber(
             v-model="formState.apr1"

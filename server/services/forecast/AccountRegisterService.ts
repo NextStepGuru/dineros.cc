@@ -38,12 +38,6 @@ export class AccountRegisterService implements IAccountRegisterService {
     accounts: CacheAccountRegister[],
     forecastDate?: moment.Moment
   ): Promise<void> {
-    accounts.forEach((account) => {
-      const result = this.loanCalculator.shouldProcessInterest(
-        account,
-        forecastDate
-      );
-    });
     const interestAccounts = accounts.filter((account) =>
       this.loanCalculator.shouldProcessInterest(account, forecastDate)
     );
@@ -57,89 +51,132 @@ export class AccountRegisterService implements IAccountRegisterService {
     accountRegister: CacheAccountRegister,
     forecastDate?: moment.Moment
   ): Promise<void> {
+    // Calculate projected balance at the statement date for more accurate interest calculation
+    const statementDate = forecastDate?.toDate() || dateTimeService.nowDate();
+    const projectedBalance = this.calculateProjectedBalanceAtDate(
+      accountRegister.id,
+      statementDate
+    );
+
     const interest = await this.loanCalculator.calculateInterestForAccount(
-      accountRegister
-    );
-    const payment = this.loanCalculator.calculatePaymentAmount(
       accountRegister,
-      Math.abs(interest)
+      projectedBalance
     );
 
-    if (payment > 0) {
-      // Create interest charge entry if there's interest
-      if (interest < 0) {
-        this.entryService.createEntry({
-          accountRegisterId: accountRegister.id,
-          description: `Interest Charge`,
-          sourceAccountRegisterId:
-            accountRegister.targetAccountRegisterId || undefined,
-          amount: Math.abs(interest),
-          forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
-          reoccurrence: {
-            accountId: "",
-            accountRegisterId: accountRegister.id,
-            description: accountRegister.name,
-            lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-            amount: Math.abs(interest),
-            transferAccountRegisterId: accountRegister.targetAccountRegisterId,
-            intervalId: 3,
-            intervalCount: 1,
-            id: 0,
-            endAt: null,
-            totalIntervals: null,
-            elapsedIntervals: null,
-            updatedAt: dateTimeService.nowDate(),
-            adjustBeforeIfOnWeekend: false,
-          },
-        });
+    // Skip if no interest
+    if (interest === 0) {
+      return;
+    }
 
-        // Adjust payment to include latest interest if needed
-        const minPayment =
-          this.loanCalculator.calculateMinPayment(accountRegister);
-        if (Math.abs(interest) + payment < Math.abs(minPayment)) {
-          // This shouldn't normally happen due to calculatePaymentAmount logic
-        }
-      }
+    const isCreditAccount = this.loanCalculator.isCreditAccount(accountRegister.typeId);
+    const description = isCreditAccount ? "Interest Charge" : "Interest Earned";
+    const intervalId = accountRegister.statementIntervalId;
 
-      // Process payment
-      if (accountRegister.targetAccountRegisterId) {
-        // Transfer from target account to pay this debt
-        this.transferService.transferBetweenAccountsWithDate({
-          targetAccountRegisterId: accountRegister.id,
-          sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
-          amount: payment,
-          description: `Min Payment to ${accountRegister.name}`,
-          forecastDate: forecastDate?.toDate() || dateTimeService.nowDate(), // Use forecast date for proper timeline placement
-          reoccurrence: {
-            accountId: "",
-            accountRegisterId: accountRegister.id,
-            description: `Min Payment to ${accountRegister.name}`,
-            lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
+    // Create interest entry
+    this.entryService.createEntry({
+      accountRegisterId: accountRegister.id,
+      description: description,
+      sourceAccountRegisterId:
+        accountRegister.targetAccountRegisterId || undefined,
+      amount: Math.abs(interest),
+      forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
+      reoccurrence: {
+        accountId: "",
+        accountRegisterId: accountRegister.id,
+        description: accountRegister.name,
+        lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
+        amount: Math.abs(interest),
+        transferAccountRegisterId: accountRegister.targetAccountRegisterId,
+        intervalId: intervalId,
+        intervalCount: 1,
+        id: 0,
+        endAt: null,
+        totalIntervals: null,
+        elapsedIntervals: null,
+        updatedAt: dateTimeService.nowDate(),
+        adjustBeforeIfOnWeekend: false,
+      },
+    });
+
+    // For credit accounts, also process minimum payments
+    if (isCreditAccount) {
+      const payment = this.loanCalculator.calculatePaymentAmount(
+        accountRegister,
+        Math.abs(interest)
+      );
+
+      if (payment > 0) {
+        // Process payment
+        if (accountRegister.targetAccountRegisterId) {
+          // Transfer from target account to pay this debt
+          this.transferService.transferBetweenAccountsWithDate({
+            targetAccountRegisterId: accountRegister.id,
+            sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
             amount: payment,
-            transferAccountRegisterId: accountRegister.targetAccountRegisterId,
-            intervalId: 3,
-            intervalCount: 1,
-            id: 0,
-            endAt: null,
-            totalIntervals: null,
-            elapsedIntervals: null,
-            updatedAt: dateTimeService.nowDate(),
-            adjustBeforeIfOnWeekend: false,
-          },
-        });
-      } else {
-        // Direct payment entry
-        this.entryService.createEntry({
-          accountRegisterId: accountRegister.id,
-          description: `Payment for ${accountRegister.name}`,
-          amount: payment,
-          forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
-        });
+            description: `Min Payment to ${accountRegister.name}`,
+            forecastDate: forecastDate?.toDate() || dateTimeService.nowDate(), // Use forecast date for proper timeline placement
+            reoccurrence: {
+              accountId: "",
+              accountRegisterId: accountRegister.id,
+              description: `Min Payment to ${accountRegister.name}`,
+              lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
+              amount: payment,
+              transferAccountRegisterId: accountRegister.targetAccountRegisterId,
+              intervalId: intervalId,
+              intervalCount: 1,
+              id: 0,
+              endAt: null,
+              totalIntervals: null,
+              elapsedIntervals: null,
+              updatedAt: dateTimeService.nowDate(),
+              adjustBeforeIfOnWeekend: false,
+            },
+          });
+        } else {
+          // Direct payment entry
+          this.entryService.createEntry({
+            accountRegisterId: accountRegister.id,
+            description: `Payment for ${accountRegister.name}`,
+            amount: payment,
+            forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
+          });
+        }
       }
     }
 
     // Update statement date
     await this.updateStatementDate(accountRegister, forecastDate);
+  }
+
+  private calculateProjectedBalanceAtDate(
+    accountId: number,
+    targetDate: Date
+  ): number {
+    // Get the account's initial balance from cache
+    const account = this.cache.accountRegister.findOne({ id: accountId });
+    if (!account) return 0;
+
+    // Get all entries for this account up to the target date
+    const entries = this.cache.registerEntry
+      .find({
+        accountRegisterId: accountId,
+      })
+      .filter((entry) => {
+        // Include entries that occur on or before the target date
+        return entry.createdAt.isSameOrBefore(moment(targetDate));
+      });
+
+    // Start with the initial balance and add all entries up to target date
+    let projectedBalance = account.latestBalance;
+
+    // Add up all entries up to the target date (excluding balance entries)
+    for (const entry of entries) {
+      if (!entry.isBalanceEntry) {
+        projectedBalance += entry.amount;
+      }
+    }
+
+    return projectedBalance;
   }
 
   async updateStatementDates(
@@ -178,7 +215,11 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     if (comparisonDate.isSameOrAfter(statementAt)) {
-      const newStatementAt = moment(statementAt).add({ month: 1 }).toDate();
+      // Calculate next statement date based on interval
+      const newStatementAt = this.calculateNextStatementDate(
+        statementAt,
+        accountRegister.statementIntervalId
+      );
 
       // Always update in-memory cache to continue forecast processing
       accountRegister.statementAt = moment(newStatementAt);
@@ -194,6 +235,26 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
   }
 
+  private calculateNextStatementDate(
+    currentStatementAt: moment.Moment,
+    statementIntervalId: number
+  ): Date {
+    switch (statementIntervalId) {
+      case 1: // Day
+        return currentStatementAt.clone().add(1, 'day').toDate();
+      case 2: // Week
+        return currentStatementAt.clone().add(1, 'week').toDate();
+      case 3: // Month
+        return currentStatementAt.clone().add(1, 'month').toDate();
+      case 4: // Year
+        return currentStatementAt.clone().add(1, 'year').toDate();
+      case 5: // Once (one-time)
+        return currentStatementAt.clone().add(1, 'year').toDate(); // Default to yearly for one-time
+      default:
+        return currentStatementAt.clone().add(1, 'month').toDate(); // Default to monthly
+    }
+  }
+
   getAccountsByType(typeId: number): CacheAccountRegister[] {
     return this.cache.accountRegister.find({
       typeId: typeId,
@@ -203,9 +264,12 @@ export class AccountRegisterService implements IAccountRegisterService {
   getInterestBearingAccounts(): CacheAccountRegister[] {
     const allAccounts = this.cache.accountRegister.find({});
 
+    // Include accounts that either have a target account (for payments)
+    // OR are savings accounts (typeId 2) that can earn interest directly
     const interestAccounts = this.cache.accountRegister.find(
       (account) =>
-        account.targetAccountRegisterId !== null && account.balance !== 0
+        account.balance !== 0 &&
+        (account.targetAccountRegisterId !== null || account.typeId === 2)
     );
 
     return interestAccounts;

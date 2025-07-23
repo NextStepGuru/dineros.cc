@@ -69,10 +69,15 @@ export interface IRegisterEntryService {
 export interface ILoanCalculatorService {
   calculateInterestCharge(params: InterestCalculationParams): Promise<number>;
   calculateMinPayment(accountRegister: CacheAccountRegister): number;
+  calculateInterestForAccount(
+    accountRegister: CacheAccountRegister,
+    projectedBalance?: number
+  ): Promise<number>;
   shouldProcessInterest(
     accountRegister: CacheAccountRegister,
     forecastDate?: moment.Moment
   ): boolean;
+  isCreditAccount(typeId: number): boolean;
 }
 
 export interface ITransferService {

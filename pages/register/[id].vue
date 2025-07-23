@@ -460,10 +460,40 @@ defineShortcuts({
       search.focus();
     }
   },
+  meta_c: () => recalcAccount(),
 });
 
 const globalFilter = ref("");
 const tableRef = ref();
+const isRecalcAccountLoading = ref(false);
+
+async function recalcAccount() {
+  if (isRecalcAccountLoading.value) return; // Prevent multiple simultaneous calls
+
+  isRecalcAccountLoading.value = true;
+  try {
+    const { data } = await useAPI<{
+      success: boolean;
+      entriesCalculated: number;
+      entriesBalance: number;
+      accountRegisters: number;
+    }>(() => "/api/recalculate", {
+      method: "POST",
+      body: {
+        accountId: currentAccountRegister.value?.accountId,
+      },
+    });
+
+    if (data.value?.success) {
+      // Refresh the account entries after recalculation
+      await refreshAccountEntries();
+    }
+  } catch (error) {
+    console.error("Recalculation failed:", error);
+  } finally {
+    isRecalcAccountLoading.value = false;
+  }
+}
 </script>
 
 <template lang="pug">
@@ -472,6 +502,7 @@ const tableRef = ref();
       div(class="w-full flex")
         UButton(color="info" size="sm" class="mr-4" @click="handleAddEntry") Add
         UButton(size="sm" class="mr-4" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
+        UButton(color="error" size="sm" class="mr-4" @click="recalcAccount()" :loading="isRecalcAccountLoading") Recalc
         UInput(v-model="globalFilter" size="sm" class="w-full lg:max-w-48" placeholder="Filter..." id="search")
 
       div(class="ml-auto flex justify-center items-center")

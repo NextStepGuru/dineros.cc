@@ -32,11 +32,15 @@ export class LoanCalculatorService implements ILoanCalculatorService {
   }
 
   calculateMinPayment(accountRegister: CacheAccountRegister): number {
-    return accountRegister?.minPayment ? +accountRegister.minPayment * -1 : 0;
+    // Return positive minimum payment amount for proper comparison
+    return accountRegister?.minPayment
+      ? Math.abs(+accountRegister.minPayment)
+      : 0;
   }
 
   async calculateInterestForAccount(
-    accountRegister: CacheAccountRegister
+    accountRegister: CacheAccountRegister,
+    projectedBalance?: number
   ): Promise<number> {
     let interest = 0;
 
@@ -44,17 +48,91 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     const apr = this.determineCurrentAPR(accountRegister);
 
     if (apr > 0) {
-      interest = await this.calculateInterestCharge({
+      // Use projected balance if provided, otherwise use current balance
+      const balanceToUse = projectedBalance !== undefined ? projectedBalance : accountRegister.balance;
+
+      // Calculate interest based on statement interval
+      interest = this.calculateInterestByInterval(
         apr,
-        balance: accountRegister.balance,
-        typeId: accountRegister.typeId,
-        totalYears: accountRegister?.loanTotalYears
-          ? +accountRegister.loanTotalYears
-          : 0,
-      });
+        balanceToUse,
+        accountRegister.statementIntervalId,
+        accountRegister.typeId
+      );
     }
 
-    return interest * -1; // Make it negative for charges
+    // For credit accounts, make interest negative (charge)
+    // For savings accounts, make interest positive (earned)
+    const isCreditAccount = this.isCreditAccount(accountRegister.typeId);
+    return isCreditAccount ? -Math.abs(interest) : Math.abs(interest);
+  }
+
+  private calculateInterestByInterval(
+    apr: number,
+    balance: number,
+    statementIntervalId: number,
+    typeId: number
+  ): number {
+    const daysInYear = 365;
+    let daysInInterval = 30; // Default to monthly
+
+    // Determine days in interval based on statementIntervalId
+    switch (statementIntervalId) {
+      case 1: // Day
+        daysInInterval = 1;
+        break;
+      case 2: // Week
+        daysInInterval = 7;
+        break;
+      case 3: // Month
+        daysInInterval = 30;
+        break;
+      case 4: // Year
+        daysInInterval = 365;
+        break;
+      case 5: // Once (one-time)
+        daysInInterval = 0;
+        break;
+      default:
+        daysInInterval = 30; // Default to monthly
+    }
+
+    // For loan types (typeId 5) and savings accounts (typeId 2), use compound interest
+    if (typeId === 5 || typeId === 2) {
+      return this.calculateCompoundInterest(apr, balance, daysInInterval);
+    }
+
+    // For other types, use simple interest calculation
+    return (apr * balance * daysInInterval) / daysInYear;
+  }
+
+  private calculateCompoundInterest(
+    apr: number,
+    balance: number,
+    daysInInterval: number
+  ): number {
+    // Calculate compound interest using daily compounding
+    // Formula: P * (1 + r/n)^(nt) - P where n = 365, t = daysInInterval/365
+    const principal = Math.abs(balance);
+    const dailyRate = apr / 365;
+    const compoundFactor = Math.pow(1 + dailyRate, daysInInterval);
+    const interestAmount = principal * (compoundFactor - 1);
+
+    return interestAmount;
+  }
+
+  private calculateLoanInterest(
+    apr: number,
+    balance: number,
+    daysInInterval: number
+  ): number {
+    // For backward compatibility, this method now calls the new compound interest method
+    return this.calculateCompoundInterest(apr, balance, daysInInterval);
+  }
+
+  isCreditAccount(typeId: number): boolean {
+    // Credit account types based on the account types data
+    const creditTypeIds = [3, 4, 5, 6, 7, 12, 13, 17]; // HELOC, Credit Card, Loan, Mortgage, Line of Credit, Student Loan, Auto Loan, Other Credit
+    return creditTypeIds.includes(typeId);
   }
 
   private determineCurrentAPR(accountRegister: CacheAccountRegister): number {
@@ -85,9 +163,12 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     interest: number
   ): number {
     const minPayment = this.calculateMinPayment(accountRegister);
-    let payment = minPayment > interest ? minPayment : interest;
+    const interestCharge = Math.abs(interest); // Get absolute value of interest for comparison
 
-    // Don't pay more than the balance
+    // Use the greater of minimum payment or interest charge
+    let payment = Math.max(minPayment, interestCharge);
+
+    // Don't pay more than the balance owed
     if (payment > Math.abs(accountRegister.balance)) {
       payment = Math.abs(accountRegister.balance);
     }
@@ -114,12 +195,12 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       milliseconds: 0,
     });
 
-    // Only process on the EXACT statement date to ensure monthly intervals
-    const result =
-      accountRegister.targetAccountRegisterId !== null &&
-      accountRegister.balance !== 0 &&
-      checkDate.isSame(statementDate, "day"); // Changed from isSameOrAfter to isSame
+    // Check if account has APR and balance
+    const hasAPR = this.determineCurrentAPR(accountRegister) > 0;
+    const hasBalance = accountRegister.balance !== 0;
+    const isStatementDate = checkDate.isSame(statementDate, "day");
 
-    return result;
+    // Process interest for accounts with APR and balance on statement date
+    return hasAPR && hasBalance && isStatementDate;
   }
 }
