@@ -237,6 +237,16 @@ UModal(description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full 
           type="date"
           class="w-full")
 
+      UFormField(label="APR (%)" name="apr1" v-if="isSelectedAccountTypeCredit" hint="Annual Percentage Rate (0-100%)")
+        div(class="relative")
+          UInputNumber(
+            v-model="formState.apr1"
+            :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+            :step="0.001"
+            :min="0"
+            :max="100"
+            class="w-full")
+
       UFormField(label="Min Account Balance" name="minAccountBalance" v-if="isSelectedAccountTypeChecking" hint="before paying down extra debt")
         UInputNumber(
           v-model="formState.minAccountBalance"
