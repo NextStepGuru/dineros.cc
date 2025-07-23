@@ -49,7 +49,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
 
     if (apr > 0) {
       // Use projected balance if provided, otherwise use current balance
-      const balanceToUse = projectedBalance !== undefined ? projectedBalance : accountRegister.balance;
+      const balanceToUse =
+        projectedBalance !== undefined
+          ? projectedBalance
+          : accountRegister.balance;
 
       // Calculate interest based on statement interval
       interest = this.calculateInterestByInterval(
@@ -200,7 +203,14 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     const hasBalance = accountRegister.balance !== 0;
     const isStatementDate = checkDate.isSame(statementDate, "day");
 
-    // Process interest for accounts with APR and balance on statement date
-    return hasAPR && hasBalance && isStatementDate;
+    // Allow processing within a grace period for missed statement dates
+    // This handles cases where interest processing was missed on the exact date
+    const gracePeriodDays = 7;
+    const isWithinGracePeriod =
+      checkDate.isAfter(statementDate) &&
+      checkDate.diff(statementDate, "days") <= gracePeriodDays;
+
+    // Process interest for accounts with APR and balance on statement date OR within grace period
+    return hasAPR && hasBalance && (isStatementDate || isWithinGracePeriod);
   }
 }

@@ -234,7 +234,10 @@ describe("LoanCalculatorService", () => {
       });
 
       const projectedBalance = 5000; // Much higher projected balance
-      const result = await service.calculateInterestForAccount(account, projectedBalance);
+      const result = await service.calculateInterestForAccount(
+        account,
+        projectedBalance
+      );
 
       // Should calculate interest on projected balance (5000) not current balance (1000)
       // For 5% APR on $5,000 over 30 days with daily compounding: ~$20.59
@@ -267,7 +270,10 @@ describe("LoanCalculatorService", () => {
       });
 
       const projectedBalance = -5000; // Much higher debt projected
-      const result = await service.calculateInterestForAccount(account, projectedBalance);
+      const result = await service.calculateInterestForAccount(
+        account,
+        projectedBalance
+      );
 
       // Should calculate interest on projected balance (-5000) not current balance (-2000)
       // Result should be negative (interest charge)
@@ -353,74 +359,11 @@ describe("LoanCalculatorService", () => {
   });
 
   describe("shouldProcessInterest", () => {
-    it("should return true when all conditions are met", () => {
+    it("should return true when all conditions are met on statement date", () => {
       const account = createMockAccount({
-        targetAccountRegisterId: 2,
-        balance: -1000,
-        statementAt: moment("2024-01-15")
-          .utc()
-          .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 }),
-      });
-      const forecastDate = moment("2024-01-15")
-        .utc()
-        .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 });
-
-      const result = service.shouldProcessInterest(account, forecastDate);
-
-      expect(result).toBe(true);
-    });
-
-    it("should return false when no target account", () => {
-      const account = createMockAccount({
-        targetAccountRegisterId: null,
-        balance: -1000,
-        statementAt: moment("2024-01-15"),
-      });
-      const forecastDate = moment("2024-01-15");
-
-      const result = service.shouldProcessInterest(account, forecastDate);
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false when balance is zero", () => {
-      const account = createMockAccount({
-        targetAccountRegisterId: 2,
-        balance: 0,
-        statementAt: moment("2024-01-15"),
-      });
-      const forecastDate = moment("2024-01-15");
-
-      const result = service.shouldProcessInterest(account, forecastDate);
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false when not on statement date", () => {
-      const account = createMockAccount({
-        targetAccountRegisterId: 2,
-        balance: -1000,
-        statementAt: moment("2024-01-15"),
-      });
-      const forecastDate = moment("2024-01-16"); // Different date
-
-      const result = service.shouldProcessInterest(account, forecastDate);
-
-      expect(result).toBe(false);
-    });
-
-    it("should use current date when forecast date not provided", () => {
-      const today = moment().utc().set({
-        hour: 0,
-        minute: 0,
-        second: 0,
-        milliseconds: 0,
-      });
-
-      const account = createMockAccount({
-        targetAccountRegisterId: 2,
-        balance: -1000,
-        statementAt: today,
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment(),
       });
 
       const result = service.shouldProcessInterest(account);
@@ -428,21 +371,91 @@ describe("LoanCalculatorService", () => {
       expect(result).toBe(true);
     });
 
-    it("should handle positive balance (savings with interest)", () => {
+    it("should return false when APR is zero", () => {
       const account = createMockAccount({
-        targetAccountRegisterId: 2,
-        balance: 1000, // Positive balance
-        statementAt: moment("2024-01-15")
-          .utc()
-          .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 }),
+        apr1: 0,
+        apr2: null, // Override default APR2
+        apr3: null, // Override default APR3
+        balance: 1000,
+        statementAt: moment(),
       });
-      const forecastDate = moment("2024-01-15")
-        .utc()
-        .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 });
 
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(false);
+    });
+
+    it("should return false when balance is zero", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 0,
+        statementAt: moment(),
+      });
+
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(false);
+    });
+
+    it("should return false when not on statement date and outside grace period", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment().subtract(10, "days"), // 10 days ago, outside grace period
+      });
+
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(false);
+    });
+
+    it("should return true when within grace period after missed statement date", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment().subtract(3, "days"), // 3 days ago, within grace period
+      });
+
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(true);
+    });
+
+    it("should return true on exact grace period boundary", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment().subtract(7, "days"), // Exactly 7 days ago
+      });
+
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(true);
+    });
+
+    it("should return false just outside grace period", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment().subtract(8, "days"), // 8 days ago, outside grace period
+      });
+
+      const result = service.shouldProcessInterest(account);
+
+      expect(result).toBe(false);
+    });
+
+    it("should use forecast date when provided", () => {
+      const account = createMockAccount({
+        apr1: 0.05,
+        balance: 1000,
+        statementAt: moment("2024-01-15"),
+      });
+
+      const forecastDate = moment("2024-01-15"); // Same as statement date
       const result = service.shouldProcessInterest(account, forecastDate);
 
-      expect(result).toBe(true); // Should still process interest for savings
+      expect(result).toBe(true);
     });
   });
 });
