@@ -263,13 +263,6 @@ export class LoanCalculatorService implements ILoanCalculatorService {
         dateTimeService.add(1, "day", normalizedStatementDate)
       );
 
-    // For testing purposes, if the statement date is the current date, allow processing
-    // This handles the case where tests use moment() as the statement date
-    const isCurrentDate = dateTimeService.isSameOrAfter(
-      normalizedCheckDate,
-      dateTimeService.now()
-    );
-
-    return hasAPR && hasBalance && (isOnStatementDate || isCurrentDate);
+    return hasAPR && hasBalance && isOnStatementDate;
   }
 }

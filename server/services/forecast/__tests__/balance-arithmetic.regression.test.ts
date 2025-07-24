@@ -147,54 +147,93 @@ describe("Balance Arithmetic Regression Tests", () => {
       const mockReoccurrenceSkips: any[] = [];
 
       // Mock the database responses with proper implementations
-      mockPrisma.accountRegister.findMany.mockImplementation(async (query: any) => {
-        if (query?.where?.accountId) {
-          return mockAccountRegisters.filter(ar => ar.accountId === query.where.accountId);
+      mockPrisma.accountRegister.findMany.mockImplementation(
+        async (query: any) => {
+          console.log("Mock accountRegister.findMany called with:", query);
+          if (query?.where?.accountId) {
+            const filtered = mockAccountRegisters.filter(
+              (ar) => ar.accountId === query.where.accountId
+            );
+            console.log(
+              `Found ${filtered.length} account registers for accountId: ${query.where.accountId}`
+            );
+            return filtered;
+          }
+          console.log(
+            `Returning all ${mockAccountRegisters.length} account registers`
+          );
+          return mockAccountRegisters;
         }
-        return mockAccountRegisters;
-      });
+      );
 
-      mockPrisma.registerEntry.findMany.mockImplementation(async (query: any) => {
-        if (query?.where?.register?.accountId) {
-          return mockRegisterEntries.filter(re => {
-            const accountRegister = mockAccountRegisters.find(ar => ar.id === re.accountRegisterId);
-            return accountRegister && accountRegister.accountId === query.where.register.accountId;
-          });
+      mockPrisma.registerEntry.findMany.mockImplementation(
+        async (query: any) => {
+          if (query?.where?.register?.accountId) {
+            return mockRegisterEntries.filter((re) => {
+              const accountRegister = mockAccountRegisters.find(
+                (ar) => ar.id === re.accountRegisterId
+              );
+              return (
+                accountRegister &&
+                accountRegister.accountId === query.where.register.accountId
+              );
+            });
+          }
+          if (query?.where?.accountRegisterId) {
+            return mockRegisterEntries.filter(
+              (re) => re.accountRegisterId === query.where.accountRegisterId
+            );
+          }
+          return mockRegisterEntries;
         }
-        if (query?.where?.accountRegisterId) {
-          return mockRegisterEntries.filter(re => re.accountRegisterId === query.where.accountRegisterId);
-        }
-        return mockRegisterEntries;
-      });
+      );
 
       mockPrisma.registerEntry.create.mockImplementation(async (data: any) => {
-        const entry = { ...data.data, id: data.data.id || `entry-${Date.now()}` };
+        const entry = {
+          ...data.data,
+          id: data.data.id || `entry-${Date.now()}`,
+        };
         mockRegisterEntries.push(entry);
         return entry;
       });
 
-      mockPrisma.registerEntry.createMany.mockImplementation(async (data: any) => {
-        data.data.forEach((entry: any) => {
-          mockRegisterEntries.push({ ...entry, id: entry.id || `entry-${Date.now()}` });
-        });
-        return { count: data.data.length };
-      });
-
-      mockPrisma.reoccurrence.findMany.mockImplementation(async (query: any) => {
-        if (query?.where?.accountId) {
-          return mockReoccurrences.filter(r => r.accountId === query.where.accountId);
+      mockPrisma.registerEntry.createMany.mockImplementation(
+        async (data: any) => {
+          data.data.forEach((entry: any) => {
+            mockRegisterEntries.push({
+              ...entry,
+              id: entry.id || `entry-${Date.now()}`,
+            });
+          });
+          return { count: data.data.length };
         }
-        return mockReoccurrences;
-      });
+      );
 
-      mockPrisma.reoccurrenceSkip.findMany.mockImplementation(async (query: any) => {
-        if (query?.where?.accountId) {
-          return mockReoccurrenceSkips.filter(rs => rs.accountId === query.where.accountId);
+      mockPrisma.reoccurrence.findMany.mockImplementation(
+        async (query: any) => {
+          if (query?.where?.accountId) {
+            return mockReoccurrences.filter(
+              (r) => r.accountId === query.where.accountId
+            );
+          }
+          return mockReoccurrences;
         }
-        return mockReoccurrenceSkips;
-      });
+      );
 
-      mockPrisma.reoccurrence.aggregate.mockResolvedValue({ _min: { lastAt: new Date() } });
+      mockPrisma.reoccurrenceSkip.findMany.mockImplementation(
+        async (query: any) => {
+          if (query?.where?.accountId) {
+            return mockReoccurrenceSkips.filter(
+              (rs) => rs.accountId === query.where.accountId
+            );
+          }
+          return mockReoccurrenceSkips;
+        }
+      );
+
+      mockPrisma.reoccurrence.aggregate.mockResolvedValue({
+        _min: { lastAt: new Date() },
+      });
       mockPrisma.registerEntry.updateMany.mockResolvedValue({});
 
       // Verify the data was created

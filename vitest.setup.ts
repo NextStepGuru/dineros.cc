@@ -1,20 +1,5 @@
 import { vi } from "vitest";
 
-// Mock console methods to suppress debug output during tests
-const originalConsole = { ...console };
-
-// Suppress console.log, console.debug, and console.info during tests
-// Keep console.error and console.warn for actual test failures
-global.console = {
-  ...originalConsole,
-  log: vi.fn(), // Mock console.log to suppress debug output
-  debug: vi.fn(), // Mock console.debug
-  info: vi.fn(), // Mock console.info
-  // Keep error and warn for test debugging
-  error: originalConsole.error,
-  warn: originalConsole.warn,
-};
-
 // Set environment for tests
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
@@ -103,19 +88,3 @@ vi.mock("crypto", async (importOriginal) => {
     })),
   };
 });
-
-// Optional: Restore console for specific tests if needed
-export const restoreConsole = () => {
-  global.console = originalConsole;
-};
-
-export const mockConsole = () => {
-  global.console = {
-    ...originalConsole,
-    log: vi.fn(),
-    debug: vi.fn(),
-    info: vi.fn(),
-    error: originalConsole.error,
-    warn: originalConsole.warn,
-  };
-};

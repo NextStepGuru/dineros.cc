@@ -188,7 +188,11 @@ export class AccountRegisterService implements IAccountRegisterService {
       .find({
         accountRegisterId: accountId,
       })
-      .filter((entry) => !entry.isBalanceEntry && dateTimeService.isSameOrBefore(entry.createdAt, targetDate))
+      .filter(
+        (entry) =>
+          !entry.isBalanceEntry &&
+          dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
+      )
       .sort((a, b) => dateTimeService.diff(a.createdAt, b.createdAt));
 
     // Start with the account's latest balance
@@ -207,11 +211,15 @@ export class AccountRegisterService implements IAccountRegisterService {
     console.log(
       `[updateStatementDates] Called with ${
         accounts.length
-      } accounts, forecastDate: ${dateTimeService.format("YYYY-MM-DD", forecastDate)}`
+      } accounts, forecastDate: ${dateTimeService.format(
+        "YYYY-MM-DD",
+        forecastDate
+      )}`
     );
     // Add a simple flag to track if method is called
     (global as any).updateStatementDatesCalled = true;
-    (global as any).updateStatementDatesCallCount = ((global as any).updateStatementDatesCallCount || 0) + 1;
+    (global as any).updateStatementDatesCallCount =
+      ((global as any).updateStatementDatesCallCount || 0) + 1;
     for (const account of accounts) {
       await this.updateStatementDate(account, forecastDate);
     }
@@ -222,19 +230,25 @@ export class AccountRegisterService implements IAccountRegisterService {
     forecastDate?: any
   ): Promise<void> {
     // Normalize both dates to UTC and set to start of day for comparison
-    const statementAt = dateTimeService.set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    }, dateTimeService.createUTC(accountRegister.statementAt));
+    const statementAt = dateTimeService.set(
+      {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      dateTimeService.createUTC(accountRegister.statementAt)
+    );
     const comparisonDate = forecastDate
-      ? dateTimeService.set({
-          hour: 0,
-          minute: 0,
-          second: 0,
-          milliseconds: 0,
-        }, dateTimeService.createUTC(forecastDate))
+      ? dateTimeService.set(
+          {
+            hour: 0,
+            minute: 0,
+            second: 0,
+            milliseconds: 0,
+          },
+          dateTimeService.createUTC(forecastDate)
+        )
       : dateTimeService.set({
           hour: 0,
           minute: 0,
@@ -250,10 +264,20 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     console.log(`[updateStatementDate] Account ${accountRegister.id}:`);
-    console.log(`  statementAt: ${dateTimeService.formatDate(statementAt, "YYYY-MM-DD")}`);
-    console.log(`  comparisonDate: ${dateTimeService.formatDate(comparisonDate, "YYYY-MM-DD")}`);
     console.log(
-      `  isSameOrAfter: ${dateTimeService.isSameOrAfter(comparisonDate, statementAt)}`
+      `  statementAt: ${dateTimeService.formatDate(statementAt, "YYYY-MM-DD")}`
+    );
+    console.log(
+      `  comparisonDate: ${dateTimeService.formatDate(
+        comparisonDate,
+        "YYYY-MM-DD"
+      )}`
+    );
+    console.log(
+      `  isSameOrAfter: ${dateTimeService.isSameOrAfter(
+        comparisonDate,
+        statementAt
+      )}`
     );
 
     if (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
@@ -263,8 +287,40 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegister.statementIntervalId
       );
 
+      console.log(`[updateStatementDate] Account ${accountRegister.id}:`);
+      console.log(
+        `  Current statementAt: ${dateTimeService.formatDate(
+          statementAt,
+          "YYYY-MM-DD"
+        )}`
+      );
+      console.log(
+        `  New statementAt: ${dateTimeService.formatDate(
+          newStatementAt,
+          "YYYY-MM-DD"
+        )}`
+      );
+      console.log(`  Interval ID: ${accountRegister.statementIntervalId}`);
+
       // Always update in-memory cache to continue forecast processing
-      accountRegister.statementAt = dateTimeService.create(newStatementAt);
+      console.log(
+        `[updateStatementDate] Before assignment: newStatementAt=${dateTimeService.formatDate(
+          newStatementAt,
+          "YYYY-MM-DD"
+        )}`
+      );
+      // Handle both Date and Moment objects
+      const statementAtMoment =
+        typeof newStatementAt === "object" && newStatementAt._isAMomentObject
+          ? newStatementAt
+          : dateTimeService.create(newStatementAt);
+      accountRegister.statementAt = statementAtMoment;
+      console.log(
+        `[updateStatementDate] After assignment: statementAt=${dateTimeService.formatDate(
+          accountRegister.statementAt,
+          "YYYY-MM-DD"
+        )}`
+      );
       this.cache.accountRegister.update(accountRegister);
 
       // Only persist to database if the comparison date is not in the future
@@ -280,12 +336,20 @@ export class AccountRegisterService implements IAccountRegisterService {
   private calculateNextStatementDate(
     currentStatementAt: any,
     statementIntervalId: number
-  ): Date {
+  ): any {
     switch (statementIntervalId) {
       case 1: // Day
-        return dateTimeService.toDate(dateTimeService.add(1, "day", currentStatementAt));
+        // Use moment's add method directly to avoid any wrapper issues
+        const dailyMoment = dateTimeService.create(currentStatementAt);
+        const dailyNextDay = dailyMoment.add(1, "day");
+
+        return dailyNextDay;
       case 2: // Week
-        return dateTimeService.toDate(dateTimeService.add(1, "week", currentStatementAt));
+        // Use moment's add method directly to avoid any wrapper issues
+        const weeklyMoment = dateTimeService.create(currentStatementAt);
+        const weeklyNextDay = weeklyMoment.add(1, "week");
+
+        return weeklyNextDay;
       case 3: // Month
         // For monthly, manually construct the next month's date
         const currentMoment = dateTimeService.create(currentStatementAt);
@@ -302,12 +366,24 @@ export class AccountRegisterService implements IAccountRegisterService {
         }
 
         // Create the next month's date with the same day
-        const nextMonthMoment = dateTimeService.create().year(nextYear).month(nextMonth).date(currentDay);
+        const nextMonthMoment = dateTimeService
+          .create()
+          .year(nextYear)
+          .month(nextMonth)
+          .date(currentDay);
         return dateTimeService.toDate(nextMonthMoment);
       case 4: // Year
-        return dateTimeService.toDate(dateTimeService.add(1, "year", currentStatementAt));
+        // Use moment's add method directly to avoid any wrapper issues
+        const yearlyMoment = dateTimeService.create(currentStatementAt);
+        const yearlyNextDay = yearlyMoment.add(1, "year");
+
+        return yearlyNextDay;
       case 5: // Once (one-time)
-        return dateTimeService.toDate(dateTimeService.add(1, "year", currentStatementAt)); // Default to yearly for one-time
+        // Use moment's add method directly to avoid any wrapper issues
+        const onceMoment = dateTimeService.create(currentStatementAt);
+        const onceNextDay = onceMoment.add(1, "year"); // Default to yearly for one-time
+
+        return onceNextDay;
       default:
         // For monthly, manually construct the next month's date
         const currentMomentDefault = dateTimeService.create(currentStatementAt);
@@ -324,7 +400,11 @@ export class AccountRegisterService implements IAccountRegisterService {
         }
 
         // Create the next month's date with the same day
-        const nextMonthMomentDefault = dateTimeService.create().year(nextYearDefault).month(nextMonthDefault).date(currentDayDefault);
+        const nextMonthMomentDefault = dateTimeService
+          .create()
+          .year(nextYearDefault)
+          .month(nextMonthDefault)
+          .date(currentDayDefault);
         return dateTimeService.toDate(nextMonthMomentDefault);
     }
   }

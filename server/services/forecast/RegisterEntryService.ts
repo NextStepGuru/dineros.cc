@@ -167,22 +167,11 @@ export class RegisterEntryService implements IRegisterEntryService {
     console.log(`Entries:`, entries);
 
     // Sort entries by date and amount (descending for same date)
-    const sortedEntries = recalculateRunningBalanceAndSort(entries);
-
-    let runningBalance = initialBalance;
-
-    // Calculate running balances
-    for (const entry of sortedEntries) {
-      if (accountType === "credit") {
-        // For credit accounts, positive amounts reduce debt (good)
-        runningBalance = runningBalance - entry.amount;
-      } else {
-        // For debit accounts, positive amounts increase balance (good)
-        runningBalance = runningBalance + entry.amount;
-      }
-
-      entry.balance = runningBalance;
-    }
+    const sortedEntries = recalculateRunningBalanceAndSort({
+      registerEntries: entries,
+      balance: initialBalance,
+      type: accountType,
+    });
 
     return sortedEntries;
   }
