@@ -330,7 +330,14 @@ export class TransferService implements ITransferService {
 
     // Pay debts in priority order until all available funds are used
     for (const debtAccountRegister of sortedDebtAccounts) {
+      console.log(`[DEBUG] Processing debt account ${debtAccountRegister.id}:`, {
+        debtBalance: debtAccountRegister.balance,
+        remainingAvailableAmount,
+        paymentAmount: Math.min(remainingAvailableAmount, Math.abs(debtAccountRegister.balance)),
+      });
+
       if (remainingAvailableAmount <= 0) {
+        console.log(`[DEBUG] No more funds available, breaking`);
         break; // No more funds available
       }
 
@@ -343,6 +350,7 @@ export class TransferService implements ITransferService {
 
       // Skip if no payment needed (debt is already paid off)
       if (paymentAmount <= 0) {
+        console.log(`[DEBUG] No payment needed for debt account ${debtAccountRegister.id}`);
         continue;
       }
 
@@ -389,6 +397,13 @@ export class TransferService implements ITransferService {
       remainingAvailableAmount -= paymentAmount;
       totalPaymentsMade += paymentAmount;
       paymentsProcessed++;
+
+      console.log(`[DEBUG] After payment to ${debtAccountRegister.id}:`, {
+        paymentAmount,
+        remainingAvailableAmount,
+        totalPaymentsMade,
+        paymentsProcessed,
+      });
     }
 
     forecastLogger.serviceDebug(

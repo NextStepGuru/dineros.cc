@@ -473,6 +473,25 @@ describe("TransferService", () => {
 
       expect(result).toBe(1200); // 1000 + 200 (excluding balance entry)
     });
+
+    it("should calculate projected balance correctly for debt payment test", () => {
+      const sourceAccount = createMockAccount({
+        id: 1,
+        balance: 3000,
+        latestBalance: 3000,
+      });
+
+      // Insert account into cache
+      mockCache.accountRegister.insert(sourceAccount);
+
+      const projectedBalance = (service as any).calculateProjectedBalanceAtDate(
+        1,
+        dateTimeService.create("2024-01-01").toDate()
+      );
+
+      console.log("Projected balance:", projectedBalance);
+      expect(projectedBalance).toBe(3000);
+    });
   });
 
   describe("processExtraDebtPayment", () => {
@@ -562,6 +581,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 3000,
+        minAccountBalance: 500, // Ensure this matches the test parameter
       });
 
       const debtAccount1 = createMockAccount({
@@ -573,7 +593,7 @@ describe("TransferService", () => {
       const debtAccount2 = createMockAccount({
         id: 3,
         balance: -1000, // Second debt
-        loanPaymentSortOrder: 1, // Lower priority
+        loanPaymentSortOrder: 2, // Lower priority
       });
 
       // Insert accounts into cache
@@ -581,13 +601,20 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(debtAccount1);
       mockCache.accountRegister.insert(debtAccount2);
 
+      // Debug: Check what accounts are in cache
+      const allAccounts = mockCache.accountRegister.find({});
+      const debtAccounts = mockCache.accountRegister.find((account) => account.balance < 0);
+      console.log("All accounts:", allAccounts.length);
+      console.log("Debt accounts:", debtAccounts.length);
+      console.log("Debt account details:", debtAccounts.map(a => ({ id: a.id, balance: a.balance, sortOrder: a.loanPaymentSortOrder })));
+
       await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
         lastAt: dateTimeService.create("2024-01-01").toDate(),
       });
 
-      // Should pay both debts: $500 to first debt (higher priority), then $2000 to second debt
+      // Should pay both debts: $500 to first debt (higher priority), then $1000 to second debt
       expect(mockEntryService.createEntry).toHaveBeenCalledTimes(4); // 2 entries per transfer (source + target)
 
       // Check first payment (higher priority debt)
@@ -598,7 +625,7 @@ describe("TransferService", () => {
         })
       );
 
-      // Check second payment (lower priority debt) - should receive remaining $2000
+      // Check second payment (lower priority debt) - should receive remaining $1000
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           accountRegisterId: 3,
