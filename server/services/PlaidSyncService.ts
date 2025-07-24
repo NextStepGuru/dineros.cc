@@ -9,7 +9,6 @@ import { PlaidApi } from "plaid";
 import { configuration } from "../lib/getPlaidClient";
 import { createId as cuid } from "@paralleldrive/cuid2";
 import { log } from "~/server/logger";
-import moment from "moment";
 import {
   addPlaidBalanceSyncJob,
   addRecalculateJob,
@@ -98,9 +97,8 @@ class PlaidSyncService {
         await this.db.accountRegister.updateMany({
           where: { plaidId: account.account_id },
           data: {
-            balance: latestBalance,
-            latestBalance: latestBalance,
-            plaidBalanceLastSyncAt: dateTimeService.now().utc().toDate(),
+            latestBalance,
+            plaidBalanceLastSyncAt: dateTimeService.nowDate(),
           },
         });
       }
@@ -122,45 +120,12 @@ class PlaidSyncService {
   }): Promise<Transaction[]> {
     const transactions = await this.client.transactionsGet({
       access_token: accessToken,
-      options: {
-        account_ids: [...plaidAccountIds],
-        days_requested: DAYS_REQUESTED,
-      },
       start_date: startDate,
       end_date: endDate,
+      options: {
+        account_ids: plaidAccountIds,
+      },
     });
-
-    // Write raw transaction data to temp file for debugging
-    const tempDir = join(process.cwd(), "temp");
-    if (!existsSync(tempDir)) {
-      mkdirSync(tempDir, { recursive: true });
-    }
-
-    const filename = `plaid-raw-transactions-${
-      dateTimeService.nowDate().toISOString().split("T")[0]
-    }.json`;
-    const filepath = join(tempDir, filename);
-
-    writeFileSync(
-      filepath,
-      JSON.stringify(
-        {
-          accessToken: accessToken.substring(0, 10) + "...", // Only log first 10 chars for security
-          plaidAccountIds,
-          startDate,
-          endDate,
-          transactionCount: transactions.data.transactions.length,
-          transactions: transactions.data.transactions,
-          syncDate: dateTimeService.nowDate().toISOString(),
-        },
-        null,
-        2
-      )
-    );
-
-    console.log(
-      `Wrote ${transactions.data.transactions.length} raw transactions to ${filepath}`
-    );
 
     return transactions.data.transactions;
   }
@@ -176,92 +141,70 @@ class PlaidSyncService {
     startDate: string;
     endDate: string;
   }): Promise<Date> {
-    const getAllTransactions = await this.getTransactions({
+    const transactions = await this.getTransactions({
       accessToken,
       plaidAccountIds,
       startDate,
       endDate,
     });
 
-    const getAllAccountRegisters: (AccountRegister & {
-      type: {
-        id: number;
-        type: string;
-        name: string;
-        isCredit: boolean;
-        updatedAt: Date;
-      };
-    })[] = [];
-    // had to write it like this b/c prisma doesn't support encrypted where in clauses
-    for (const plaidAccountId of plaidAccountIds) {
-      const accountRegister = await this.db.accountRegister.findFirst({
-        where: { plaidId: plaidAccountId },
-        include: { type: true },
-      });
+    const accountRegisters = await this.db.accountRegister.findMany({
+      where: {
+        plaidId: {
+          in: plaidAccountIds,
+        },
+        plaidAccessToken: accessToken,
+      },
+      include: {
+        type: true,
+      },
+    });
 
-      if (accountRegister) {
-        getAllAccountRegisters.push(accountRegister);
-      }
-    }
+    const accountRegisterMap = new Map(
+      accountRegisters.map((ar) => [ar.plaidId, ar])
+    );
 
-    let newestTransaction: Date | undefined;
+    const transactionData = transactions
+      .map((transaction) => {
+        const accountRegister = accountRegisterMap.get(transaction.account_id);
+        if (!accountRegister) {
+          return null;
+        }
 
-    for (const accountRegister of getAllAccountRegisters) {
-      const transactions = getAllTransactions.filter(
-        (t) => t.account_id === accountRegister.plaidId
-      );
-
-      transactions.forEach(async (transaction) => {
-        const existingEntry = await this.db.registerEntry.findFirst({
-          where: {
-            plaidId: transaction.transaction_id,
-            accountRegisterId: accountRegister.id,
-          },
-        });
-
-        const formattedData = this.formatTransactionData(
+        return this.formatTransactionData(
           transaction,
           accountRegister,
           accountRegister.type
         );
+      })
+      .filter((data): data is NonNullable<typeof data> => data !== null);
 
-        if (!existingEntry) {
-          await this.db.registerEntry.create({
-            data: formattedData,
-          });
-        } else {
-          await this.db.registerEntry.update({
-            data: {
-              plaidId: formattedData.plaidId,
-              plaidJson: formattedData.plaidJson,
-              amount: formattedData.amount,
-              description: formattedData.description,
-            },
-            where: {
-              id: existingEntry.id,
-            },
-          });
-        }
+    if (transactionData.length > 0) {
+      await this.db.registerEntry.createMany({
+        data: transactionData,
+        skipDuplicates: true,
       });
 
-      addRecalculateJob({ accountId: accountRegister.accountId });
+      // Trigger recalculate jobs for affected accounts
+      const uniqueAccountIds = [
+        ...new Set(
+          transactionData.map((data) => data.accountRegisterId)
+        ),
+      ];
 
-      const latestTransaction = new Date(
-        transactions.reduce((prev, curr) =>
-          new Date(prev.date).getTime() > new Date(curr.date).getTime()
-            ? prev
-            : curr
-        ).date
-      );
+      for (const accountRegisterId of uniqueAccountIds) {
+        const accountRegister = await this.db.accountRegister.findUnique({
+          where: { id: accountRegisterId },
+          select: { accountId: true },
+        });
 
-      if (!newestTransaction) {
-        newestTransaction = latestTransaction;
-      } else if (latestTransaction.getTime() > newestTransaction.getTime()) {
-        newestTransaction = latestTransaction;
+        if (accountRegister) {
+          addRecalculateJob({ accountId: accountRegister.accountId });
+        }
       }
     }
 
-    return newestTransaction || dateTimeService.nowDate();
+    return dateTimeService.nowDate();
   }
 
   async getAndSyncPlaidAccounts(
@@ -339,8 +282,8 @@ class PlaidSyncService {
             },
           },
           data: {
-            plaidLastSyncAt: moment(plaidLastSyncAt)
-              .utc()
+            plaidLastSyncAt: dateTimeService
+              .createUTC(plaidLastSyncAt)
               .set({ hours: 0, minutes: 0, seconds: 0, millisecond: 0 })
               .toDate(),
           },

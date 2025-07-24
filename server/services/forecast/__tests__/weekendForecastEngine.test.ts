@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
 import { dateTimeService } from "../DateTimeService";
 import type { ForecastContext } from "../types";
-import moment from "moment";
 
 // Mock the database
 const mockDb = {
@@ -61,7 +60,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: moment().add(1, "month").toDate(),
+        statementAt: dateTimeService.add(1, "month").toDate(),
         apr1: null,
         apr1StartAt: null,
         apr2: null,
@@ -88,9 +87,9 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
         balance: -500,
         latestBalance: -500,
         minPayment: 25,
-        statementAt: moment().add(15, "days").toDate(),
+        statementAt: dateTimeService.add(15, "days").toDate(),
         apr1: 0.18,
-        apr1StartAt: moment().subtract(1, "year").toDate(),
+        apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
         apr2: null,
         apr2StartAt: null,
         apr3: null,
@@ -127,7 +126,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Date Override Testing", () => {
     it("should handle Saturday processing correctly", async () => {
       // Set current date to Saturday, January 27, 2024
-      const saturdayDate = moment("2024-01-27T10:00:00Z"); // Saturday
+      const saturdayDate = dateTimeService.create("2024-01-27T10:00:00Z"); // Saturday
       dateTimeService.setNowOverride(saturdayDate);
 
       // Verify the override is working
@@ -151,7 +150,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle Sunday processing correctly", async () => {
       // Set current date to Sunday, January 28, 2024
-      const sundayDate = moment("2024-01-28T10:00:00Z"); // Sunday
+      const sundayDate = dateTimeService.create("2024-01-28T10:00:00Z"); // Sunday
       dateTimeService.setNowOverride(sundayDate);
 
       // Verify the override is working
@@ -172,7 +171,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle Friday processing correctly", async () => {
       // Set current date to Friday, January 26, 2024
-      const fridayDate = moment("2024-01-26T10:00:00Z"); // Friday
+      const fridayDate = dateTimeService.create("2024-01-26T10:00:00Z"); // Friday
       dateTimeService.setNowOverride(fridayDate);
 
       // Verify the override is working
@@ -193,7 +192,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle Monday processing correctly", async () => {
       // Set current date to Monday, January 29, 2024
-      const mondayDate = moment("2024-01-29T10:00:00Z"); // Monday
+      const mondayDate = dateTimeService.create("2024-01-29T10:00:00Z"); // Monday
       dateTimeService.setNowOverride(mondayDate);
 
       // Verify the override is working
@@ -216,7 +215,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Reoccurrence Testing", () => {
     it("should process reoccurrences correctly on weekends", async () => {
       // Set to Saturday
-      const saturdayDate = moment("2024-01-27T10:00:00Z");
+      const saturdayDate = dateTimeService.create("2024-01-27T10:00:00Z");
       dateTimeService.setNowOverride(saturdayDate);
 
       // Mock reoccurrences that would be processed on this date
@@ -250,7 +249,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle weekend adjustments in reoccurrences", async () => {
       // Set to Sunday
-      const sundayDate = moment("2024-01-28T10:00:00Z");
+      const sundayDate = dateTimeService.create("2024-01-28T10:00:00Z");
       dateTimeService.setNowOverride(sundayDate);
 
       // Mock a reoccurrence that should be adjusted from Sunday to Friday
@@ -286,7 +285,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Statement Date Testing", () => {
     it("should handle statement dates that fall on weekends", async () => {
       // Set to Saturday
-      const saturdayDate = moment("2024-01-27T10:00:00Z");
+      const saturdayDate = dateTimeService.create("2024-01-27T10:00:00Z");
       dateTimeService.setNowOverride(saturdayDate);
 
       // Mock account with statement date on Sunday
@@ -301,7 +300,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
           minPayment: 25,
           statementAt: new Date("2024-01-28"), // Sunday
           apr1: 0.18,
-          apr1StartAt: moment().subtract(1, "year").toDate(),
+          apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
           targetAccountRegisterId: 1,
           isArchived: false,
           typeId: 2,
@@ -324,7 +323,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Interest Calculation Testing", () => {
     it("should calculate interest correctly on weekends", async () => {
       // Set to Sunday
-      const sundayDate = moment("2024-01-28T10:00:00Z");
+      const sundayDate = dateTimeService.create("2024-01-28T10:00:00Z");
       dateTimeService.setNowOverride(sundayDate);
 
       // Mock account with APR that needs interest calculation
@@ -362,7 +361,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Date Range Testing", () => {
     it("should calculate correct date ranges when current date is on weekend", async () => {
       // Set to Saturday
-      const saturdayDate = moment("2024-01-27T10:00:00Z");
+      const saturdayDate = dateTimeService.create("2024-01-27T10:00:00Z");
       dateTimeService.setNowOverride(saturdayDate);
 
       testContext = {
@@ -386,7 +385,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle month boundaries on weekends", async () => {
       // Set to Saturday at month boundary
-      const saturdayMonthEnd = moment("2024-02-03T10:00:00Z"); // First Saturday of February
+      const saturdayMonthEnd = dateTimeService.create("2024-02-03T10:00:00Z"); // First Saturday of February
       dateTimeService.setNowOverride(saturdayMonthEnd);
 
       testContext = {
@@ -412,7 +411,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
   describe("Weekend Override Cleanup", () => {
     it("should properly clear date overrides after testing", () => {
       // Set an override
-      const testDate = moment("2024-01-27T10:00:00Z");
+      const testDate = dateTimeService.create("2024-01-27T10:00:00Z");
       dateTimeService.setNowOverride(testDate);
 
       expect(dateTimeService.hasOverride()).toBe(true);
@@ -423,21 +422,21 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
       expect(dateTimeService.hasOverride()).toBe(false);
       expect(dateTimeService.now().format("YYYY-MM-DD")).toBe(
-        moment().format("YYYY-MM-DD")
+        dateTimeService.format("YYYY-MM-DD", dateTimeService.now())
       );
     });
 
     it("should handle multiple date changes in sequence", () => {
       // Test Saturday
-      dateTimeService.setNowOverride(moment("2024-01-27T10:00:00Z"));
+      dateTimeService.setNowOverride(dateTimeService.create("2024-01-27T10:00:00Z"));
       expect(dateTimeService.now().format("dddd")).toBe("Saturday");
 
       // Test Sunday
-      dateTimeService.setNowOverride(moment("2024-01-28T10:00:00Z"));
+      dateTimeService.setNowOverride(dateTimeService.create("2024-01-28T10:00:00Z"));
       expect(dateTimeService.now().format("dddd")).toBe("Sunday");
 
       // Test Monday
-      dateTimeService.setNowOverride(moment("2024-01-29T10:00:00Z"));
+      dateTimeService.setNowOverride(dateTimeService.create("2024-01-29T10:00:00Z"));
       expect(dateTimeService.now().format("dddd")).toBe("Monday");
 
       // Clear and verify

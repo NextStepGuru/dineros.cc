@@ -1,7 +1,10 @@
-import moment from "moment";
+import { vi, describe, it, expect, beforeEach } from "vitest";
+import { dateTimeService } from "../DateTimeService";
 import { Decimal } from "@prisma/client/runtime/library";
 import { ForecastEngineFactory } from "../index";
-import { vi } from "vitest";
+
+// Dynamic moment import
+let moment: any;
 
 /**
  * Integration Regression Tests
@@ -14,7 +17,8 @@ describe("Integration Regression Tests", () => {
   let mockPrisma: any;
   let engine: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
     // Mock Prisma with realistic database behavior
     mockPrisma = {
       accountRegister: {
@@ -49,7 +53,7 @@ describe("Integration Regression Tests", () => {
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
         latestBalance: new Decimal("-25432.07"),
         minPayment: new Decimal("803.05"), // Decimal min payment
-        statementAt: moment("2025-08-09"), // Statement date that caused issues
+        statementAt: dateTimeService.create("2025-08-09"), // Statement date that caused issues
         statementIntervalId: 3, // Monthly
         apr1: new Decimal("0.05"), // 5% APR
         apr2: null,
@@ -80,7 +84,7 @@ describe("Integration Regression Tests", () => {
         accountId: "checking-main",
         latestBalance: new Decimal("10000"),
         minPayment: null,
-        statementAt: moment("2025-08-01"),
+        statementAt: dateTimeService.create("2025-08-01"),
         statementIntervalId: 3,
         apr1: null,
         apr2: null,
@@ -109,7 +113,7 @@ describe("Integration Regression Tests", () => {
           seq: null,
           accountRegisterId: 8,
           sourceAccountRegisterId: null,
-          createdAt: moment("2025-08-05"),
+          createdAt: dateTimeService.create("2025-08-05"),
           description: "Previous transaction",
           reoccurrenceId: null,
           amount: new Decimal("-50.00"), // Decimal amount
@@ -150,7 +154,7 @@ describe("Integration Regression Tests", () => {
       // Assert: All three bugs should be prevented
 
       // Bug #1: Balance arithmetic should be correct (not concatenated)
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
 
       const gmEntries = allCreatedEntries.filter(
         (entry) => entry.accountRegisterId === 8
@@ -176,12 +180,12 @@ describe("Integration Regression Tests", () => {
 
       // Verify no consecutive day interest processing
       const interestDates = interestEntries
-        .map((entry) => moment(entry.createdAt).format("YYYY-MM-DD"))
+        .map((entry) => dateTimeService.format("YYYY-MM-DD", entry.createdAt))
         .sort();
 
       for (let i = 1; i < interestDates.length; i++) {
-        const current = moment(interestDates[i]);
-        const previous = moment(interestDates[i - 1]);
+        const current = dateTimeService.create(interestDates[i]);
+        const previous = dateTimeService.create(interestDates[i - 1]);
         const daysDiff = current.diff(previous, "days");
         expect(daysDiff).toBeGreaterThan(25); // Should be ~monthly, not consecutive
       }
@@ -210,7 +214,7 @@ describe("Integration Regression Tests", () => {
           accountId: "chase-cc",
           latestBalance: new Decimal("-8500.25"),
           minPayment: new Decimal("425.50"),
-          statementAt: moment("2025-01-15"),
+          statementAt: dateTimeService.create("2025-01-15"),
           statementIntervalId: 3, // Monthly
           apr1: new Decimal("0.1899"), // High APR
           apr2: null,
@@ -241,7 +245,7 @@ describe("Integration Regression Tests", () => {
           accountId: "hy-savings",
           latestBalance: new Decimal("15750.80"),
           minPayment: null,
-          statementAt: moment("2025-01-07"),
+          statementAt: dateTimeService.create("2025-01-07"),
           statementIntervalId: 2, // Weekly
           apr1: new Decimal("0.045"), // 4.5% APR
           apr2: null,
@@ -272,7 +276,7 @@ describe("Integration Regression Tests", () => {
           accountId: "checking",
           latestBalance: new Decimal("5000.00"),
           minPayment: null,
-          statementAt: moment("2025-01-01"),
+          statementAt: dateTimeService.create("2025-01-01"),
           statementIntervalId: 3,
           apr1: null,
           apr2: null,
@@ -303,7 +307,7 @@ describe("Integration Regression Tests", () => {
           accountId: "toyota-loan",
           latestBalance: new Decimal("-18500.99"),
           minPayment: new Decimal("352.17"),
-          statementAt: moment("2025-01-22"),
+          statementAt: dateTimeService.create("2025-01-22"),
           statementIntervalId: 3, // Monthly
           apr1: new Decimal("0.0329"), // 3.29% APR
           apr2: null,
@@ -337,7 +341,7 @@ describe("Integration Regression Tests", () => {
           description: "Monthly Savings Transfer",
           amount: new Decimal("500.00"),
           intervalId: 3, // Monthly
-          nextDate: moment("2025-01-25"),
+          nextDate: dateTimeService.create("2025-01-25"),
           isActive: true,
           userId: "test-user",
         },
@@ -349,7 +353,7 @@ describe("Integration Regression Tests", () => {
         seq: null,
         accountRegisterId: account.id,
         sourceAccountRegisterId: null,
-        createdAt: moment("2024-12-31"),
+        createdAt: dateTimeService.create("2024-12-31"),
         description: "Opening Balance",
         reoccurrenceId: null,
         amount: account.balance,
@@ -385,7 +389,7 @@ describe("Integration Regression Tests", () => {
       // Assert: All bugs prevented across all accounts
 
       // Bug #1: All balance arithmetic should be numeric
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
 
       for (const entry of allCreatedEntries) {
         expect(typeof entry.balance).toBe("number");
@@ -487,7 +491,7 @@ describe("Integration Regression Tests", () => {
           seq: null,
           accountRegisterId: 99,
           sourceAccountRegisterId: null,
-          createdAt: moment("2025-01-15"),
+          createdAt: dateTimeService.create("2025-01-15"),
           description: "Complex Transaction 1",
           reoccurrenceId: null,
           amount: new Decimal("123.456"), // Precise decimal
@@ -504,7 +508,7 @@ describe("Integration Regression Tests", () => {
           seq: null,
           accountRegisterId: 99,
           sourceAccountRegisterId: null,
-          createdAt: moment("2025-01-20"),
+          createdAt: dateTimeService.create("2025-01-20"),
           description: "Complex Transaction 2",
           reoccurrenceId: null,
           amount: new Decimal("-0.01"), // Tiny amount
@@ -538,7 +542,7 @@ describe("Integration Regression Tests", () => {
       });
 
       // Assert: Should handle all edge cases correctly
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(89); // Jan + Feb + Mar
 
       // All calculations should remain numeric despite Decimal inputs
@@ -639,7 +643,7 @@ describe("Integration Regression Tests", () => {
       });
 
       // Assert: Should maintain accuracy over long periods
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(1826); // 5 years (including leap year)
 
       // Find interest entries

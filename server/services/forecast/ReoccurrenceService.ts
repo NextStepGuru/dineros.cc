@@ -1,10 +1,10 @@
-import moment from "moment";
 import type { PrismaClient, Reoccurrence } from "@prisma/client";
 import type { IReoccurrenceService } from "./types";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
 import { forecastLogger } from "./logger";
+import { dateTimeService } from "./DateTimeService";
 
 export class ReoccurrenceService implements IReoccurrenceService {
   constructor(
@@ -20,9 +20,9 @@ export class ReoccurrenceService implements IReoccurrenceService {
   ): Promise<void> {
     forecastLogger.service(
       "ReoccurrenceService",
-      `Processing ${reoccurrences.length} reoccurrences up to ${moment(
-        endDate
-      ).format("YYYY-MM-DD")}`
+      `Processing ${
+        reoccurrences.length
+      } reoccurrences up to ${dateTimeService.format(endDate, "YYYY-MM-DD")}`
     );
     for (const reoccurrence of reoccurrences) {
       await this.processReoccurrence(reoccurrence, endDate);
@@ -33,11 +33,15 @@ export class ReoccurrenceService implements IReoccurrenceService {
     reoccurrence: Reoccurrence,
     endDate: Date
   ): Promise<void> {
-    let lastAt: moment.Moment | null = moment(reoccurrence.lastAt).utc();
-    const originalLastAt = lastAt ? lastAt.clone() : null;
+    let lastAt: any = dateTimeService.createUTC(reoccurrence.lastAt);
+    const originalLastAt = lastAt ? dateTimeService.clone(lastAt) : null;
     let occurrenceCount = 0;
 
-    if (!lastAt || (reoccurrence.endAt && lastAt.isAfter(reoccurrence.endAt))) {
+    if (
+      !lastAt ||
+      (reoccurrence.endAt &&
+        dateTimeService.isAfter(lastAt, reoccurrence.endAt))
+    ) {
       return;
     }
 
@@ -45,22 +49,29 @@ export class ReoccurrenceService implements IReoccurrenceService {
       "ReoccurrenceService",
       `Processing reoccurrence ${reoccurrence.id} (${
         reoccurrence.description
-      }) from ${lastAt.format("YYYY-MM-DD")} to ${moment(endDate).format(
+      }) from ${dateTimeService.format(
+        lastAt,
         "YYYY-MM-DD"
-      )}`
+      )} to ${dateTimeService.format(endDate, "YYYY-MM-DD")}`
     );
 
     // Process all due occurrences up to endDate
-    while (lastAt && lastAt.isSameOrBefore(moment(endDate).utc())) {
+    while (
+      lastAt &&
+      dateTimeService.isSameOrBefore(lastAt, dateTimeService.createUTC(endDate))
+    ) {
       // Only process if not past endAt
-      if (reoccurrence.endAt && lastAt.isAfter(reoccurrence.endAt)) {
+      if (
+        reoccurrence.endAt &&
+        dateTimeService.isAfter(lastAt, reoccurrence.endAt)
+      ) {
         break;
       }
 
       occurrenceCount++;
 
       // Apply weekend adjustment to the current occurrence date if enabled
-      let adjustedLastAt = lastAt.clone();
+      let adjustedLastAt = dateTimeService.clone(lastAt);
       if (reoccurrence.adjustBeforeIfOnWeekend) {
         adjustedLastAt = this.adjustDateIfWeekend(adjustedLastAt);
       }
@@ -68,7 +79,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Create a reoccurrence object with the adjusted date for entry creation
       const reoccurrenceForEntry = {
         ...reoccurrence,
-        lastAt: adjustedLastAt.toDate(),
+        lastAt: dateTimeService.toDate(adjustedLastAt),
       };
 
       // Create the entry for this occurrence
@@ -92,107 +103,101 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Advance to next occurrence
       const nextDate = this.calculateNextOccurrence({
         ...reoccurrence,
-        lastAt: lastAt.toDate(),
+        lastAt: dateTimeService.toDate(lastAt),
       });
       if (!nextDate) break;
-      lastAt = moment(nextDate).utc();
+      lastAt = dateTimeService.createUTC(nextDate);
 
       // Update the reoccurrence in cache
       const cachedReoccurrence = this.cache.reoccurrence.findOne({
         id: reoccurrence.id,
       });
       if (cachedReoccurrence) {
-        cachedReoccurrence.lastAt = lastAt.toDate();
+        cachedReoccurrence.lastAt = dateTimeService.toDate(lastAt);
         this.cache.reoccurrence.update(cachedReoccurrence);
       }
-    }
 
-    // After processing, update the original reoccurrence object's lastAt
-    if (lastAt && originalLastAt && !lastAt.isSame(originalLastAt)) {
-      reoccurrence.lastAt = lastAt.toDate();
+      // Safety check to prevent infinite loops
+      if (occurrenceCount > 1000) {
+        forecastLogger.serviceError(
+          "ReoccurrenceService",
+          `Too many occurrences for reoccurrence ${reoccurrence.id}, stopping`
+        );
+        break;
+      }
     }
 
     forecastLogger.serviceDebug(
       "ReoccurrenceService",
-      `Created ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`
+      `Processed ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`
     );
   }
 
   calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null {
-    const lastAt = moment(reoccurrence.lastAt).utc();
+    const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
 
     switch (reoccurrence.intervalId) {
-      case 1: // day
-        return lastAt.clone().add({ day: reoccurrence.intervalCount }).toDate();
-
-      case 2: // week
-        return lastAt
-          .clone()
-          .add({ week: reoccurrence.intervalCount })
-          .toDate();
-
-      case 3: // month
-        return lastAt
-          .clone()
-          .add({ month: reoccurrence.intervalCount })
-          .toDate();
-
-      case 4: // year
-        return lastAt
-          .clone()
-          .add({ year: reoccurrence.intervalCount })
-          .toDate();
-
-      case 5: // once
-        return null;
-
+      case 1: // Daily
+        return dateTimeService.toDate(
+          dateTimeService.add(reoccurrence.intervalCount, "days", lastAt)
+        );
+      case 2: // Weekly
+        return dateTimeService.toDate(
+          dateTimeService.add(reoccurrence.intervalCount, "weeks", lastAt)
+        );
+      case 3: // Monthly
+        return dateTimeService.toDate(
+          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt)
+        );
+      case 4: // Yearly
+        return dateTimeService.toDate(
+          dateTimeService.add(reoccurrence.intervalCount, "years", lastAt)
+        );
+      case 5: // Once (one-time)
+        return null; // No next occurrence for one-time events
       default:
-        throw new Error(`Invalid intervalId: ${reoccurrence.intervalId}`);
+        return dateTimeService.toDate(
+          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt)
+        );
     }
   }
 
-  /**
-   * Adjusts a date to the previous Friday if it falls on a weekend
-   */
-  private adjustDateIfWeekend(date: moment.Moment): moment.Moment {
+  private adjustDateIfWeekend(date: any): any {
     const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
-
     if (dayOfWeek === 0) {
-      // Sunday
-      return date.clone().subtract(2, "days"); // Move to Friday
+      // Sunday - move to Friday
+      return dateTimeService.subtract(date, 2, "days");
     } else if (dayOfWeek === 6) {
-      // Saturday
-      return date.clone().subtract(1, "day"); // Move to Friday
+      // Saturday - move to Friday
+      return dateTimeService.subtract(date, 1, "days");
     }
-
-    return date.clone(); // Weekday, no adjustment needed - but still clone to avoid mutation
+    return date;
   }
 
   getReoccurrencesDue(maxDate: Date): Reoccurrence[] {
-    const dueMoment = moment(maxDate).utc();
-
-    return this.cache.reoccurrence.find(
-      (reoccurrence) =>
-        !!reoccurrence.lastAt &&
-        moment(reoccurrence.lastAt).isSameOrBefore(dueMoment)
+    const dueMoment = dateTimeService.createUTC(maxDate);
+    return this.cache.reoccurrence.find((reoccurrence) =>
+      dateTimeService.isSameOrBefore(
+        dateTimeService.createUTC(reoccurrence.lastAt),
+        dueMoment
+      )
     );
   }
 
   isReoccurrenceActive(reoccurrence: Reoccurrence, currentDate: Date): boolean {
-    const current = moment(currentDate).utc();
-    const lastAt = moment(reoccurrence.lastAt).utc();
+    const current = dateTimeService.createUTC(currentDate);
+    const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
 
-    // Check if it's time for this reoccurrence
-    if (lastAt.isAfter(current)) {
+    // Check if reoccurrence has ended
+    if (
+      reoccurrence.endAt &&
+      dateTimeService.isAfter(current, reoccurrence.endAt)
+    ) {
       return false;
     }
 
-    // Check if it hasn't ended
-    if (reoccurrence.endAt && current.isAfter(reoccurrence.endAt)) {
-      return false;
-    }
-
-    return true;
+    // Check if reoccurrence has started
+    return dateTimeService.isSameOrAfter(current, lastAt);
   }
 
   filterActiveReoccurrences(
@@ -207,17 +212,17 @@ export class ReoccurrenceService implements IReoccurrenceService {
   getIntervalDescription(intervalId: number): string {
     switch (intervalId) {
       case 1:
-        return "daily";
+        return "Daily";
       case 2:
-        return "weekly";
+        return "Weekly";
       case 3:
-        return "monthly";
+        return "Monthly";
       case 4:
-        return "yearly";
+        return "Yearly";
       case 5:
-        return "once";
+        return "Once";
       default:
-        return "unknown";
+        return "Unknown";
     }
   }
 }

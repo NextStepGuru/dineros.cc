@@ -5,7 +5,6 @@ import { getUser } from "../lib/getUser";
 import { createId } from "@paralleldrive/cuid2";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
-import moment from "moment";
 import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {

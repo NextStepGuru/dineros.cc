@@ -1,62 +1,49 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import moment from "moment";
 import { DataPersisterService } from "../DataPersisterService";
-import type { CacheRegisterEntry } from "../ModernCacheService";
-import { PrismaClient } from "@prisma/client";
+import { ModernCacheService } from "../ModernCacheService";
+import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
+import type { PrismaClient } from "@prisma/client";
+import { forecastLogger } from "../logger";
+import { dateTimeService } from "../DateTimeService";
 
 describe("DataPersisterService", () => {
   let service: DataPersisterService;
-  let mockDb: any;
+  let mockDb: PrismaClient;
+  let mockCache: ModernCacheService;
 
-  beforeEach(() => {
-    // Mock PrismaClient
-    mockDb = {
-      registerEntry: {
-        createMany: vi.fn(),
-        create: vi.fn(),
-        deleteMany: vi.fn(),
-        count: vi.fn(),
-        update: vi.fn(),
-        updateMany: vi.fn(),
-      },
-      accountRegister: {
-        findMany: vi.fn(),
-        update: vi.fn(),
-        updateMany: vi.fn(),
-      },
-    };
+  beforeEach(async () => {
+    mockDb = await createTestDatabase();
+    mockCache = new ModernCacheService();
 
-    service = new DataPersisterService(mockDb);
+    service = new DataPersisterService(mockDb, mockCache);
 
-    // Mock console.log to avoid test output
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    // Mock forecastLogger to avoid test output
+    vi.spyOn(forecastLogger, "service").mockImplementation(() => {});
+    vi.spyOn(forecastLogger, "serviceDebug").mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await cleanupTestDatabase(mockDb);
     vi.restoreAllMocks();
   });
 
-  function createMockEntry(
-    overrides: Partial<CacheRegisterEntry> = {}
-  ): CacheRegisterEntry {
+  function createMockEntry(overrides: any = {}) {
     return {
-      id: "entry-1",
+      id: "test-entry",
       accountRegisterId: 1,
+      sourceAccountRegisterId: null,
       description: "Test Entry",
       amount: 100,
       balance: 1100,
-      createdAt: moment("2024-01-01"),
-      isProjected: true,
-      isPending: false,
-      isCleared: false,
       isBalanceEntry: false,
+      isPending: false,
+      isProjected: false,
       isManualEntry: false,
+      isCleared: false,
       isReconciled: false,
-      sourceAccountRegisterId: null,
-      reoccurrenceId: null,
-      transferAccountRegisterId: null,
+      createdAt: dateTimeService.create("2024-01-01"),
       ...overrides,
-    } as CacheRegisterEntry;
+    };
   }
 
   describe("persistForecastResults", () => {
@@ -66,7 +53,8 @@ describe("DataPersisterService", () => {
         createMockEntry({ id: "entry-2" }),
       ];
 
-      mockDb.registerEntry.createMany.mockResolvedValue({ count: 2 });
+      // Mock createMany to succeed
+      vi.spyOn(mockDb.registerEntry, "createMany").mockResolvedValue({ count: 2 });
 
       await service.persistForecastResults(entries);
 
@@ -87,7 +75,8 @@ describe("DataPersisterService", () => {
         createMockEntry({ id: "regular-1", isBalanceEntry: false }),
       ];
 
-      mockDb.registerEntry.createMany.mockResolvedValue({ count: 2 });
+      // Mock createMany to succeed
+      vi.spyOn(mockDb.registerEntry, "createMany").mockResolvedValue({ count: 2 });
 
       await service.persistForecastResults(entries);
 
@@ -109,18 +98,18 @@ describe("DataPersisterService", () => {
       ];
 
       // Mock createMany to fail
-      mockDb.registerEntry.createMany.mockRejectedValue(
+      vi.spyOn(mockDb.registerEntry, "createMany").mockRejectedValue(
         new Error("Bulk insert failed")
       );
 
       // Mock individual creates to succeed
-      mockDb.registerEntry.create.mockResolvedValue({});
+      vi.spyOn(mockDb.registerEntry, "create").mockResolvedValue({});
 
       await service.persistForecastResults(entries);
 
       expect(mockDb.registerEntry.createMany).toHaveBeenCalled();
       expect(mockDb.registerEntry.create).toHaveBeenCalledTimes(2);
-      expect(console.log).toHaveBeenCalledWith(
+      expect(forecastLogger.service).toHaveBeenCalledWith(
         expect.stringContaining("Using rate-limited fallback for 2 entries")
       );
     });
@@ -129,17 +118,17 @@ describe("DataPersisterService", () => {
       const entries = [createMockEntry({ id: "entry-1" })];
 
       // Mock createMany to fail
-      mockDb.registerEntry.createMany.mockRejectedValue(
+      vi.spyOn(mockDb.registerEntry, "createMany").mockRejectedValue(
         new Error("Bulk insert failed")
       );
 
       // Mock individual create to fail (simulate duplicate key error)
-      mockDb.registerEntry.create.mockRejectedValue(new Error("Duplicate key"));
+      vi.spyOn(mockDb.registerEntry, "create").mockRejectedValue(new Error("Duplicate key"));
 
       await service.persistForecastResults(entries);
 
       expect(mockDb.registerEntry.create).toHaveBeenCalled();
-      expect(console.log).toHaveBeenCalledWith(
+      expect(forecastLogger.service).toHaveBeenCalledWith(
         expect.stringContaining("Skipped duplicate entry")
       );
     });
@@ -148,7 +137,7 @@ describe("DataPersisterService", () => {
   describe("cleanupProjectedEntriesByAccount", () => {
     it("should delete projected entries for specific account", async () => {
       const accountId = 123;
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 5 });
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 5 });
 
       await service.cleanupProjectedEntriesByAccount(accountId);
 
@@ -163,7 +152,7 @@ describe("DataPersisterService", () => {
 
     it("should handle zero deletions", async () => {
       const accountId = 123;
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 0 });
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 0 });
 
       await service.cleanupProjectedEntriesByAccount(accountId);
 
@@ -178,7 +167,7 @@ describe("DataPersisterService", () => {
 
     it("should handle database errors", async () => {
       const accountId = 123;
-      mockDb.registerEntry.deleteMany.mockRejectedValue(
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockRejectedValue(
         new Error("Database error")
       );
 
@@ -193,7 +182,7 @@ describe("DataPersisterService", () => {
       const accountId = "test-account";
 
       // Mock count responses
-      mockDb.registerEntry.count
+      vi.spyOn(mockDb.registerEntry, "count")
         .mockResolvedValueOnce(10) // projected
         .mockResolvedValueOnce(5) // pending
         .mockResolvedValueOnce(3) // manual
@@ -245,7 +234,7 @@ describe("DataPersisterService", () => {
 
     it("should handle undefined accountId", async () => {
       // Mock count responses
-      mockDb.registerEntry.count
+      vi.spyOn(mockDb.registerEntry, "count")
         .mockResolvedValueOnce(8) // projected
         .mockResolvedValueOnce(4) // pending
         .mockResolvedValueOnce(2) // manual
@@ -272,7 +261,7 @@ describe("DataPersisterService", () => {
 
     it("should handle zero counts", async () => {
       // Mock all counts as zero
-      mockDb.registerEntry.count.mockResolvedValue(0);
+      vi.spyOn(mockDb.registerEntry, "count").mockResolvedValue(0);
 
       const result = await service.getResultsCount("empty-account");
 
@@ -285,7 +274,7 @@ describe("DataPersisterService", () => {
     });
 
     it("should handle database errors during count operations", async () => {
-      mockDb.registerEntry.count.mockRejectedValue(
+      vi.spyOn(mockDb.registerEntry, "count").mockRejectedValue(
         new Error("Database connection failed")
       );
 
@@ -303,8 +292,8 @@ describe("DataPersisterService", () => {
         { id: 2, balance: 500, latestBalance: 300 },
       ];
 
-      mockDb.accountRegister.findMany.mockResolvedValue(mockAccountRegisters);
-      mockDb.accountRegister.update.mockResolvedValue({});
+      vi.spyOn(mockDb.accountRegister, "findMany").mockResolvedValue(mockAccountRegisters);
+      vi.spyOn(mockDb.accountRegister, "update").mockResolvedValue({});
 
       await service.updateAccountRegisterBalances(accountId);
 
@@ -360,14 +349,14 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
   describe("updateRegisterEntryBalances - Error Handling", () => {
     it("should handle database update errors gracefully", async () => {
-      const mockEntries: CacheRegisterEntry[] = [
+      const mockEntries: any[] = [
         {
           id: "1",
           accountRegisterId: 1,
           balance: 100,
           amount: 50,
           description: "Test Entry",
-          createdAt: moment(),
+          createdAt: dateTimeService.create("2024-01-01"),
           isBalanceEntry: false,
           isPending: false,
           isCleared: false,
@@ -384,7 +373,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
           balance: 200,
           amount: 100,
           description: "Test Entry 2",
-          createdAt: moment(),
+          createdAt: dateTimeService.create("2024-01-01"),
           isBalanceEntry: false,
           isPending: false,
           isCleared: false,
@@ -398,7 +387,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
       ];
 
       // Mock findMany to return existing entries
-      mockDb.registerEntry.findMany.mockResolvedValue([
+      vi.spyOn(mockDb.registerEntry, "findMany").mockResolvedValue([
         { id: "1" },
         { id: "2" },
       ] as any[]);
@@ -414,7 +403,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
       );
 
       // Mock database update to throw error for specific entry
-      mockDb.registerEntry.update.mockImplementation(
+      vi.spyOn(mockDb.registerEntry, "update").mockImplementation(
         async ({ where, data }: any) => {
           if (where.id === "1") {
             throw new Error("Database connection failed");
@@ -436,14 +425,14 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     });
 
     it("should handle entries with invalid accountRegisterId", async () => {
-      const mockEntries: CacheRegisterEntry[] = [
+      const mockEntries: any[] = [
         {
           id: "1",
           accountRegisterId: 999, // Non-existent account
           balance: 100,
           amount: 50,
           description: "Test Entry",
-          createdAt: moment(),
+          createdAt: dateTimeService.create("2024-01-01"),
           isBalanceEntry: false,
           isPending: false,
           isCleared: false,
@@ -457,9 +446,9 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
       ];
 
       // Mock findMany to return existing entries
-      mockDb.registerEntry.findMany.mockResolvedValue([{ id: "1" }] as any[]);
+      vi.spyOn(mockDb.registerEntry, "findMany").mockResolvedValue([{ id: "1" }] as any[]);
 
-      mockDb.registerEntry.update.mockRejectedValue(
+      vi.spyOn(mockDb.registerEntry, "update").mockRejectedValue(
         new Error("Account not found")
       );
 
@@ -473,12 +462,12 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should clean up balance entries for specific account", async () => {
       const accountId = "test-account-123";
 
-      mockDb.accountRegister.findMany.mockResolvedValue([
+      vi.spyOn(mockDb.accountRegister, "findMany").mockResolvedValue([
         { id: 1 },
         { id: 2 },
       ] as any[]);
 
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 2 } as any);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 2 } as any);
 
       await service.performInitialCleanup(accountId);
 
@@ -498,8 +487,8 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should handle case with no account registers found", async () => {
       const accountId = "test-account-123";
 
-      mockDb.accountRegister.findMany.mockResolvedValue([]);
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 0 } as any);
+      vi.spyOn(mockDb.accountRegister, "findMany").mockResolvedValue([]);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 0 } as any);
 
       await service.performInitialCleanup(accountId);
 
@@ -516,7 +505,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should update projected entries status based on date", async () => {
       const accountId = "test-account-123";
 
-      mockDb.registerEntry.updateMany.mockResolvedValue({ count: 5 } as any);
+      vi.spyOn(mockDb.registerEntry, "updateMany").mockResolvedValue({ count: 5 } as any);
 
       await service.updateEntryStatuses(accountId);
 
@@ -532,7 +521,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     });
 
     it("should handle null accountId", async () => {
-      mockDb.registerEntry.updateMany.mockResolvedValue({ count: 0 } as any);
+      vi.spyOn(mockDb.registerEntry, "updateMany").mockResolvedValue({ count: 0 } as any);
 
       await service.updateEntryStatuses();
 
@@ -544,7 +533,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should clean up projected entries for specific account", async () => {
       const accountId = "test-account-123";
 
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 10 } as any);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 10 } as any);
 
       await service.cleanupProjectedEntries(accountId);
 
@@ -558,7 +547,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     });
 
     it("should handle null accountId", async () => {
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 5 } as any);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 5 } as any);
 
       await service.cleanupProjectedEntries();
 
@@ -576,7 +565,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should clean up projected entries by numeric account ID", async () => {
       const accountId = 123;
 
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 3 } as any);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 3 } as any);
 
       await service.cleanupProjectedEntriesByAccount(accountId);
 
@@ -592,7 +581,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
   describe("cleanupZeroBalanceEntries", () => {
     it("should clean up zero balance entries", async () => {
-      mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 2 } as any);
+      vi.spyOn(mockDb.registerEntry, "deleteMany").mockResolvedValue({ count: 2 } as any);
 
       await service.cleanupZeroBalanceEntries();
 
@@ -609,7 +598,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should return correct counts for account", async () => {
       const accountId = "test-account-123";
 
-      mockDb.registerEntry.count
+      vi.spyOn(mockDb.registerEntry, "count")
         .mockResolvedValueOnce(5)
         .mockResolvedValueOnce(3)
         .mockResolvedValueOnce(2)
@@ -628,7 +617,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     });
 
     it("should handle null accountId", async () => {
-      mockDb.registerEntry.count
+      vi.spyOn(mockDb.registerEntry, "count")
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)

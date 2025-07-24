@@ -1,9 +1,8 @@
-import type { Moment } from "moment";
-import moment from "moment";
+import { dateTimeService } from "~/server/services/forecast";
 
 export type PartialRegisterEntry = {
   seq?: number | null;
-  createdAt: Moment | Date;
+  createdAt: any; // Changed from Moment | Date to any to handle both types
   amount: number | string;
   balance: number | string;
   isBalanceEntry: boolean;
@@ -49,9 +48,9 @@ export const recalculateRunningBalanceAndSort = <
 
   const sortedPendingData = pendingEntries
     .sort((a, b) => {
-      if (moment(b.createdAt).isAfter(a.createdAt)) {
+      if (dateTimeService.isAfter(b.createdAt, a.createdAt)) {
         return -1;
-      } else if (moment(b.createdAt).isBefore(a.createdAt)) {
+      } else if (dateTimeService.isBefore(b.createdAt, a.createdAt)) {
         return 1;
       } else {
         // If createdAt is the same, sort by amount
@@ -71,9 +70,9 @@ export const recalculateRunningBalanceAndSort = <
   runningBalance = startingBalance; // Use the override balance or balance entry's amount for cleared entries too
   const sortedClearedData = clearedEntries
     .sort((a, b) => {
-      if (moment(b.createdAt).isBefore(a.createdAt)) {
+      if (dateTimeService.isBefore(b.createdAt, a.createdAt)) {
         return -1;
-      } else if (moment(b.createdAt).isAfter(a.createdAt)) {
+      } else if (dateTimeService.isAfter(b.createdAt, a.createdAt)) {
         return 1;
       } else {
         // If createdAt is the same, sort by amount

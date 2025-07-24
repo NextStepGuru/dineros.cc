@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DataLoaderService } from '../DataLoaderService';
-import { ModernCacheService } from '../ModernCacheService';
-import type { ForecastContext } from '../types';
-import moment from 'moment';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { DataLoaderService } from "../DataLoaderService";
+import { ModernCacheService } from "../ModernCacheService";
+import type { ForecastContext } from "../types";
+import { dateTimeService } from "../DateTimeService";
 
-describe('DataLoaderService', () => {
+describe("DataLoaderService", () => {
   let dataLoader: DataLoaderService;
   let mockDb: any;
   let mockCache: ModernCacheService;
@@ -32,23 +32,23 @@ describe('DataLoaderService', () => {
     vi.clearAllMocks();
   });
 
-  describe('loadAccountData', () => {
-    it('should load all account data successfully', async () => {
+  describe("loadAccountData", () => {
+    it("should load all account data successfully", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
-        startDate: new Date('2023-01-01'),
-        endDate: new Date('2023-12-31'),
+        accountId: "test-account",
+        startDate: new Date("2023-01-01"),
+        endDate: new Date("2023-12-31"),
       };
 
       // Mock database responses
       const mockAccountRegisters = [
         {
           id: 1,
-          accountId: 'test-account',
-          name: 'Checking',
+          accountId: "test-account",
+          name: "Checking",
           balance: 1000,
           typeId: 1,
-          statementAt: new Date('2023-01-01'),
+          statementAt: new Date("2023-01-01"),
           isArchived: false,
         },
       ];
@@ -57,9 +57,9 @@ describe('DataLoaderService', () => {
         {
           id: 1,
           accountRegisterId: 1,
-          description: 'Test Entry',
+          description: "Test Entry",
           amount: 100,
-          createdAt: new Date('2023-01-01'),
+          createdAt: new Date("2023-01-01"),
           isCleared: false,
           isProjected: false,
         },
@@ -69,10 +69,10 @@ describe('DataLoaderService', () => {
         {
           id: 1,
           accountRegisterId: 1,
-          description: 'Monthly Salary',
+          description: "Monthly Salary",
           amount: 5000,
           intervalId: 1,
-          lastAt: new Date('2023-01-01'),
+          lastAt: new Date("2023-01-01"),
         },
       ];
 
@@ -80,7 +80,7 @@ describe('DataLoaderService', () => {
         {
           id: 1,
           reoccurrenceId: 1,
-          skipAt: new Date('2023-02-01'),
+          skipAt: new Date("2023-02-01"),
         },
       ];
 
@@ -96,46 +96,49 @@ describe('DataLoaderService', () => {
       expect(result.reoccurrences).toHaveLength(1);
       expect(result.reoccurrenceSkips).toHaveLength(1);
 
-      expect(result.accountRegisters[0].name).toBe('Checking');
-      expect(result.registerEntries[0].description).toBe('Test Entry');
-      expect(result.reoccurrences[0].description).toBe('Monthly Salary');
+      expect(result.accountRegisters[0].name).toBe("Checking");
+      expect(result.registerEntries[0].description).toBe("Test Entry");
+      expect(result.reoccurrences[0].description).toBe("Monthly Salary");
     });
 
-    it('should clear cache before loading new data', async () => {
+    it("should clear cache before loading new data", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
 
-             // Add some existing data to cache
-       mockCache.accountRegister.insert({
-         id: 999,
-         budgetId: 1,
-         accountId: 'old-account',
-         name: 'Old Account',
-         balance: 500,
-         latestBalance: 500,
-         minPayment: 0,
-         statementAt: moment(),
-         apr1: null,
-         apr1StartAt: null,
-         apr2: null,
-         apr2StartAt: null,
-         apr3: null,
-         apr3StartAt: null,
-         targetAccountRegisterId: null,
-         loanStartAt: null,
-         loanPaymentsPerYear: null,
-         loanTotalYears: null,
-         loanOriginalAmount: null,
-         loanPaymentSortOrder: 0,
-         minAccountBalance: 0,
-         allowExtraPayment: false,
-         isArchived: false,
-         typeId: 1,
-         plaidId: null,
-       });
+      // Add some existing data to cache
+      mockCache.accountRegister.insert({
+        id: 999,
+        budgetId: 1,
+        accountId: "old-account",
+        name: "Old Account",
+        balance: 500,
+        latestBalance: 500,
+        minPayment: 0,
+        statementAt: dateTimeService.create(),
+        statementIntervalId: 1,
+        apr1: null,
+        apr1StartAt: null,
+        apr2: null,
+        apr2StartAt: null,
+        apr3: null,
+        apr3StartAt: null,
+        targetAccountRegisterId: null,
+        loanStartAt: null,
+        loanPaymentsPerYear: null,
+        loanTotalYears: null,
+        loanOriginalAmount: null,
+        loanPaymentSortOrder: 0,
+        savingsGoalSortOrder: 0,
+        accountSavingsGoal: null,
+        minAccountBalance: 0,
+        allowExtraPayment: false,
+        isArchived: false,
+        typeId: 1,
+        plaidId: null,
+      });
 
       mockDb.accountRegister.findMany.mockResolvedValue([]);
       mockDb.registerEntry.findMany.mockResolvedValue([]);
@@ -149,9 +152,9 @@ describe('DataLoaderService', () => {
       expect(cachedAccounts).toHaveLength(0);
     });
 
-    it('should handle empty database responses', async () => {
+    it("should handle empty database responses", async () => {
       const context: ForecastContext = {
-        accountId: 'empty-account',
+        accountId: "empty-account",
         startDate: new Date(),
         endDate: new Date(),
       };
@@ -169,9 +172,9 @@ describe('DataLoaderService', () => {
       expect(result.reoccurrenceSkips).toEqual([]);
     });
 
-    it('should filter out cleared entries from register entries', async () => {
+    it("should filter out cleared entries from register entries", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
@@ -179,14 +182,14 @@ describe('DataLoaderService', () => {
       const mockRegisterEntries = [
         {
           id: 1,
-          description: 'Pending Entry',
+          description: "Pending Entry",
           isCleared: false,
           isProjected: false,
           createdAt: new Date(),
         },
         {
           id: 2,
-          description: 'Cleared Entry',
+          description: "Cleared Entry",
           isCleared: true,
           isProjected: false,
           createdAt: new Date(),
@@ -203,98 +206,110 @@ describe('DataLoaderService', () => {
       // Should call with filter for cleared entries
       expect(mockDb.registerEntry.findMany).toHaveBeenCalledWith({
         where: {
-          register: { accountId: 'test-account' },
+          register: { accountId: "test-account" },
           isCleared: false,
-          OR: [
-            { isProjected: false },
-          ],
+          OR: [{ isProjected: false }],
         },
         orderBy: [{ createdAt: "asc" }, { amount: "desc" }],
       });
     });
   });
 
-  describe('getMinReoccurrenceDate', () => {
-    it('should return minimum lastAt date from reoccurrences', async () => {
+  describe("getMinReoccurrenceDate", () => {
+    it("should return minimum lastAt date from reoccurrences", async () => {
       const mockAggregateResult = {
         _min: {
-          lastAt: new Date('2023-01-15'),
+          lastAt: new Date("2023-01-15"),
         },
       };
 
       mockDb.reoccurrence.aggregate.mockResolvedValue(mockAggregateResult);
 
-      const result = await dataLoader.getMinReoccurrenceDate('test-account');
+      const result = await dataLoader.getMinReoccurrenceDate("test-account");
 
-      expect(result).toEqual(new Date('2023-01-15'));
+      expect(result).toEqual(new Date("2023-01-15"));
       expect(mockDb.reoccurrence.aggregate).toHaveBeenCalledWith({
-        where: { register: { accountId: 'test-account' } },
+        where: { register: { accountId: "test-account" } },
         _min: { lastAt: true },
       });
     });
 
-    it('should return null when no reoccurrences exist', async () => {
-      mockDb.reoccurrence.aggregate.mockResolvedValue({ _min: { lastAt: null } });
+    it("should return null when no reoccurrences exist", async () => {
+      mockDb.reoccurrence.aggregate.mockResolvedValue({
+        _min: { lastAt: null },
+      });
 
-      const result = await dataLoader.getMinReoccurrenceDate('test-account');
+      const result = await dataLoader.getMinReoccurrenceDate("test-account");
 
       expect(result).toBeNull();
     });
 
-    it('should handle undefined aggregate result', async () => {
+    it("should handle undefined aggregate result", async () => {
       mockDb.reoccurrence.aggregate.mockResolvedValue(null);
 
-      const result = await dataLoader.getMinReoccurrenceDate('test-account');
+      const result = await dataLoader.getMinReoccurrenceDate("test-account");
 
       expect(result).toBeNull();
     });
   });
 
-  describe('Database Error Handling', () => {
-    it('should handle account register loading errors', async () => {
+  describe("Database Error Handling", () => {
+    it("should handle account register loading errors", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
 
-      mockDb.accountRegister.findMany.mockRejectedValue(new Error('Database connection failed'));
+      mockDb.accountRegister.findMany.mockRejectedValue(
+        new Error("Database connection failed")
+      );
 
-      await expect(dataLoader.loadAccountData(context)).rejects.toThrow('Database connection failed');
+      await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
+        "Database connection failed"
+      );
     });
 
-    it('should handle register entry loading errors', async () => {
+    it("should handle register entry loading errors", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
 
       mockDb.accountRegister.findMany.mockResolvedValue([]);
-      mockDb.registerEntry.findMany.mockRejectedValue(new Error('Register entry query failed'));
+      mockDb.registerEntry.findMany.mockRejectedValue(
+        new Error("Register entry query failed")
+      );
 
-      await expect(dataLoader.loadAccountData(context)).rejects.toThrow('Register entry query failed');
+      await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
+        "Register entry query failed"
+      );
     });
 
-    it('should handle reoccurrence loading errors', async () => {
+    it("should handle reoccurrence loading errors", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
 
       mockDb.accountRegister.findMany.mockResolvedValue([]);
       mockDb.registerEntry.findMany.mockResolvedValue([]);
-      mockDb.reoccurrence.findMany.mockRejectedValue(new Error('Reoccurrence query failed'));
+      mockDb.reoccurrence.findMany.mockRejectedValue(
+        new Error("Reoccurrence query failed")
+      );
 
-      await expect(dataLoader.loadAccountData(context)).rejects.toThrow('Reoccurrence query failed');
+      await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
+        "Reoccurrence query failed"
+      );
     });
   });
 
-  describe('Data Transformation', () => {
-    it('should convert dates to moment objects correctly', async () => {
+  describe("Data Transformation", () => {
+    it("should convert dates to moment objects correctly", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
@@ -302,10 +317,10 @@ describe('DataLoaderService', () => {
       const mockAccountRegisters = [
         {
           id: 1,
-          accountId: 'test-account',
-          name: 'Test Account',
+          accountId: "test-account",
+          name: "Test Account",
           balance: 1000,
-          statementAt: new Date('2023-06-15T10:30:00.000Z'),
+          statementAt: new Date("2023-06-15T10:30:00.000Z"),
           typeId: 1,
           isArchived: false,
         },
@@ -319,34 +334,41 @@ describe('DataLoaderService', () => {
       const result = await dataLoader.loadAccountData(context);
 
       // Check that statementAt is converted to moment
-      expect(moment.isMoment(result.accountRegisters[0].statementAt)).toBe(true);
-      expect(result.accountRegisters[0].statementAt.format('YYYY-MM-DD')).toBe('2023-06-15');
+      expect(
+        dateTimeService.isValid(result.accountRegisters[0].statementAt)
+      ).toBe(true);
+      expect(
+        dateTimeService.format(
+          "YYYY-MM-DD",
+          result.accountRegisters[0].statementAt
+        )
+      ).toBe("2023-06-15");
     });
 
-    it('should preserve all account register fields', async () => {
+    it("should preserve all account register fields", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
 
       const mockAccountRegister = {
         id: 1,
-        budgetId: 'budget-123',
-        accountId: 'test-account',
-        name: 'Test Account',
-        balance: 1500.50,
+        budgetId: "budget-123",
+        accountId: "test-account",
+        name: "Test Account",
+        balance: 1500.5,
         latestBalance: 1400.25,
         minPayment: 50,
-        statementAt: new Date('2023-06-15'),
+        statementAt: new Date("2023-06-15"),
         apr1: 0.15,
-        apr1StartAt: new Date('2023-01-01'),
+        apr1StartAt: new Date("2023-01-01"),
         apr2: null,
         apr2StartAt: null,
         apr3: null,
         apr3StartAt: null,
         targetAccountRegisterId: 2,
-        loanStartAt: new Date('2023-01-01'),
+        loanStartAt: new Date("2023-01-01"),
         loanPaymentsPerYear: 12,
         loanTotalYears: 30,
         loanOriginalAmount: 250000,
@@ -355,7 +377,7 @@ describe('DataLoaderService', () => {
         allowExtraPayment: true,
         isArchived: false,
         typeId: 1,
-        plaidId: 'plaid-123',
+        plaidId: "plaid-123",
       };
 
       mockDb.accountRegister.findMany.mockResolvedValue([mockAccountRegister]);
@@ -367,9 +389,9 @@ describe('DataLoaderService', () => {
       const loadedAccount = result.accountRegisters[0];
 
       expect(loadedAccount.id).toBe(1);
-      expect(loadedAccount.budgetId).toBe('budget-123');
-      expect(loadedAccount.name).toBe('Test Account');
-      expect(loadedAccount.balance).toBe(1500.50);
+      expect(loadedAccount.budgetId).toBe("budget-123");
+      expect(loadedAccount.name).toBe("Test Account");
+      expect(loadedAccount.balance).toBe(1500.5);
       expect(loadedAccount.latestBalance).toBe(1400.25);
       expect(loadedAccount.minPayment).toBe(50);
       expect(loadedAccount.apr1).toBe(0.15);
@@ -379,10 +401,10 @@ describe('DataLoaderService', () => {
     });
   });
 
-  describe('Cache Integration', () => {
-    it('should populate cache with loaded data', async () => {
+  describe("Cache Integration", () => {
+    it("should populate cache with loaded data", async () => {
       const context: ForecastContext = {
-        accountId: 'test-account',
+        accountId: "test-account",
         startDate: new Date(),
         endDate: new Date(),
       };
@@ -390,8 +412,8 @@ describe('DataLoaderService', () => {
       const mockAccountRegisters = [
         {
           id: 1,
-          accountId: 'test-account',
-          name: 'Test Account',
+          accountId: "test-account",
+          name: "Test Account",
           balance: 1000,
           typeId: 1,
           statementAt: new Date(),
@@ -403,7 +425,7 @@ describe('DataLoaderService', () => {
         {
           id: 1,
           accountRegisterId: 1,
-          description: 'Test Entry',
+          description: "Test Entry",
           amount: 100,
           createdAt: new Date(),
           isCleared: false,
@@ -424,13 +446,13 @@ describe('DataLoaderService', () => {
 
       expect(cachedAccounts).toHaveLength(1);
       expect(cachedEntries).toHaveLength(1);
-      expect(cachedAccounts[0].name).toBe('Test Account');
-      expect(cachedEntries[0].description).toBe('Test Entry');
+      expect(cachedAccounts[0].name).toBe("Test Account");
+      expect(cachedEntries[0].description).toBe("Test Entry");
     });
 
-    it('should handle large datasets efficiently', async () => {
+    it("should handle large datasets efficiently", async () => {
       const context: ForecastContext = {
-        accountId: 'large-account',
+        accountId: "large-account",
         startDate: new Date(),
         endDate: new Date(),
       };
@@ -438,7 +460,7 @@ describe('DataLoaderService', () => {
       // Generate large dataset
       const manyAccountRegisters = Array.from({ length: 50 }, (_, i) => ({
         id: i + 1,
-        accountId: 'large-account',
+        accountId: "large-account",
         name: `Account ${i + 1}`,
         balance: Math.random() * 10000,
         typeId: 1,

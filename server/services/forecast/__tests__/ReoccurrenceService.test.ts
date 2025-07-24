@@ -1,5 +1,4 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import moment from "moment";
 import { ReoccurrenceService } from "../ReoccurrenceService";
 import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";

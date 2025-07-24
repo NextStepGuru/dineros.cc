@@ -6,7 +6,6 @@ import { z } from "zod";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { createId } from "@paralleldrive/cuid2";
-import moment from "moment";
 import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
@@ -104,8 +103,8 @@ export default defineEventHandler(async (event: H3Event) => {
     const entryDate = new Date(createdAt);
 
     // Determine if entries should be pending based on date
-    const isPending = moment(entryDate)
-      .utc()
+    const isPending = dateTimeService
+      .createUTC(entryDate)
       .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
       .isSameOrBefore(
         dateTimeService

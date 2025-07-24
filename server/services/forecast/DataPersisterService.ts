@@ -1,4 +1,3 @@
-import moment from "moment";
 import type { PrismaClient } from "@prisma/client";
 import type { IDataPersisterService } from "./types";
 import type { CacheRegisterEntry } from "./ModernCacheService";
@@ -18,7 +17,7 @@ export class DataPersisterService implements IDataPersisterService {
     // Generate new IDs for all forecast entries to avoid conflicts, except for balance entries
     const insertData = results.map((item) => ({
       ...item,
-      createdAt: moment(item.createdAt).utc().toISOString(),
+      createdAt: dateTimeService.format(dateTimeService.createUTC(item.createdAt), "YYYY-MM-DDTHH:mm:ss.SSS[Z]"),
       id: item.isBalanceEntry ? item.id : createId(), // Preserve original IDs for balance entries
     }));
 
@@ -98,55 +97,27 @@ export class DataPersisterService implements IDataPersisterService {
     // Only update entries that definitely exist in the database:
     // - isPending entries (from Plaid sync)
     // - isManualEntry entries (user-created)
-    // Do NOT update:
-    // - isProjected entries (they get persisted separately)
-    // - isBalanceEntry entries (they're created fresh each time)
-    const existingEntries = calculatedEntries.filter(
+    // - isProjected entries that have been converted to pending
+    const entriesToUpdate = calculatedEntries.filter(
       (entry) =>
-        (entry.isPending || entry.isManualEntry) && !entry.isBalanceEntry
+        entry.isPending ||
+        entry.isManualEntry ||
+        (entry.isProjected && entry.isCleared === false)
     );
 
     console.log(
-      `[DataPersisterService] Filtered to ${
-        existingEntries.length
-      } existing entries to update (isPending: ${
-        existingEntries.filter((e) => e.isPending).length
-      }, isManualEntry: ${
-        existingEntries.filter((e) => e.isManualEntry).length
-      })`
+      `[DataPersisterService] Found ${entriesToUpdate.length} entries to update balances for`
     );
 
-    if (existingEntries.length === 0) {
-      console.log(`[DataPersisterService] No existing entries to update`);
+    if (entriesToUpdate.length === 0) {
+      console.log(
+        `[DataPersisterService] No entries to update balances for`
+      );
       return;
     }
 
-    // Verify which entries actually exist in the database
-    console.log(
-      `[DataPersisterService] Verifying ${existingEntries.length} entries exist in database...`
-    );
-    const entryIds = existingEntries.map((e) => e.id);
-    const dbEntries = await this.db.registerEntry.findMany({
-      where: { id: { in: entryIds } },
-      select: { id: true },
-    });
-
-    const existingDbIds = new Set(dbEntries.map((e) => e.id));
-    const validEntries = existingEntries.filter((entry) =>
-      existingDbIds.has(entry.id)
-    );
-
-    console.log(
-      `[DataPersisterService] Found ${validEntries.length} entries that actually exist in database (out of ${existingEntries.length} attempted)`
-    );
-
-    if (validEntries.length === 0) {
-      console.log(`[DataPersisterService] No valid entries to update`);
-      return;
-    }
-
-    // Group entries by account register for batch processing
-    const entriesByAccount = validEntries.reduce((acc, entry) => {
+    // Group entries by account register ID for batch processing
+    const entriesByAccount = entriesToUpdate.reduce((acc, entry) => {
       if (!acc[entry.accountRegisterId]) {
         acc[entry.accountRegisterId] = [];
       }
@@ -154,172 +125,118 @@ export class DataPersisterService implements IDataPersisterService {
       return acc;
     }, {} as Record<number, CacheRegisterEntry[]>);
 
-    console.log(
-      `[DataPersisterService] Processing ${
-        Object.keys(entriesByAccount).length
-      } accounts`
-    );
-
     // Process each account's entries
     for (const [accountRegisterId, entries] of Object.entries(
       entriesByAccount
     )) {
       console.log(
-        `[DataPersisterService] Processing ${entries.length} entries for account ${accountRegisterId}`
+        `[DataPersisterService] Updating balances for account register ${accountRegisterId} with ${entries.length} entries`
       );
 
-      const updateOperations = entries.map(
-        (entry) => () =>
-          this.db.registerEntry
-            .update({
-              where: { id: entry.id },
-              data: {
-                balance: entry.balance,
-                hasBalanceReCalc: true,
-              },
-            })
-            .catch((error) => {
-              console.log(
-                `[DataPersisterService] Failed to update balance for entry ${entry.id}:`,
-                error
-              );
-            })
-      );
+      // Sort entries by date and amount for proper balance calculation
+      const sortedEntries = entries.sort((a, b) => {
+        const dateA = dateTimeService.toDate(a.createdAt);
+        const dateB = dateTimeService.toDate(b.createdAt);
+        const timeDiff = dateA.getTime() - dateB.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return b.amount - a.amount; // Descending by amount for same date
+      });
 
-      console.log(
-        `[DataPersisterService] Starting rate-limited updates for account ${accountRegisterId}`
-      );
+      // Calculate running balances
+      let runningBalance = 0;
+      const updateOperations = sortedEntries.map((entry) => {
+        runningBalance += entry.amount;
+        return () =>
+          this.db.registerEntry.update({
+            where: { id: entry.id },
+            data: { balance: runningBalance },
+          });
+      });
+
       await this.rateLimiter.executeWithLimit(updateOperations);
-      console.log(
-        `[DataPersisterService] Completed updates for account ${accountRegisterId}`
-      );
     }
 
     const status = this.rateLimiter.getStatus();
     console.log(
-      `[DataPersisterService] Updated balance columns for ${
-        validEntries.length
-      } entries. Rate limiter status: ${JSON.stringify(status)}`
+      `[DataPersisterService] Updated balances for ${entriesToUpdate.length} entries. Rate limiter status: ${JSON.stringify(
+        status
+      )}`
     );
   }
 
-  /**
-   * Converts old projected entries to pending entries before cleanup
-   * This ensures that projected entries older than current date are preserved as pending
-   */
   async convertOldProjectedToPending(accountId?: string): Promise<void> {
-    const now = dateTimeService
-      .now()
-      .utc()
-      .set({
-        hour: 0,
-        minute: 0,
-        second: 0,
-        milliseconds: 0,
-      })
-      .toDate();
-
+    const now = dateTimeService.nowDate();
     console.log(
-      `[DataPersisterService] Converting old projected entries to pending for accountId: ${accountId}`
-    );
-    console.log(
-      `[DataPersisterService] Current date for conversion: ${moment(now).format(
-        "YYYY-MM-DD"
-      )}`
+      `[DataPersisterService] Current date for conversion: ${dateTimeService.format(now, "YYYY-MM-DD")}`
     );
 
-    // First, let's see how many old projected entries exist
-    const oldProjectedCount = await this.db.registerEntry.count({
+    // Convert old projected entries to pending
+    const updateResult = await this.db.registerEntry.updateMany({
+      data: { isPending: true },
       where: {
-        register: { accountId },
-        isCleared: false,
+        ...(accountId && { register: { accountId } }),
         isProjected: true,
+        isCleared: false,
         isManualEntry: false,
         createdAt: { lte: now },
       },
     });
 
     console.log(
-      `[DataPersisterService] Found ${oldProjectedCount} old projected entries to convert`
+      `[DataPersisterService] Converted ${updateResult.count} projected entries to pending`
     );
 
-    if (oldProjectedCount === 0) {
-      console.log(`[DataPersisterService] No old projected entries to convert`);
-      return;
-    }
-
-    // Convert old projected entries to pending (isProjected=false, isPending=true)
-    const result = await this.db.registerEntry.updateMany({
-      data: {
-        isProjected: false,
-        isPending: true,
-      },
+    // Convert old manual entries to pending
+    const manualUpdateResult = await this.db.registerEntry.updateMany({
+      data: { isPending: true },
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
+        isManualEntry: true,
         isCleared: false,
-        isProjected: true,
-        isManualEntry: false,
         createdAt: { lte: now },
       },
     });
 
     console.log(
-      `[DataPersisterService] Successfully converted ${result.count} old projected entries to pending entries`
-    );
-
-    // Verify the conversion worked
-    const pendingCount = await this.db.registerEntry.count({
-      where: {
-        register: { accountId },
-        isCleared: false,
-        isProjected: false,
-        isPending: true,
-        isManualEntry: false,
-        createdAt: { lte: now },
-      },
-    });
-
-    console.log(
-      `[DataPersisterService] Verification: ${pendingCount} pending entries now exist (should be >= ${result.count})`
+      `[DataPersisterService] Converted ${manualUpdateResult.count} manual entries to pending`
     );
   }
 
   async cleanupProjectedEntries(accountId?: string): Promise<void> {
     await this.db.registerEntry.deleteMany({
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
         isProjected: true,
+        isPending: false,
         isManualEntry: false,
       },
     });
   }
 
-  async cleanupZeroBalanceEntries(): Promise<void> {
+  async cleanupZeroBalanceEntries(accountId?: string): Promise<void> {
     await this.db.registerEntry.deleteMany({
       where: {
+        ...(accountId && { register: { accountId } }),
         description: "Latest Balance",
-        isBalanceEntry: false, // Don't delete actual balance entries
+        amount: 0,
+        isProjected: false,
       },
     });
   }
 
   async updateEntryStatuses(accountId?: string): Promise<void> {
-    const now = dateTimeService
-      .now()
-      .utc()
-      .set({
-        hour: 0,
-        minute: 0,
-        second: 0,
-        milliseconds: 0,
-      })
-      .toDate();
+    const now = dateTimeService.toDate(dateTimeService.set(dateTimeService.now(), {
+      hour: 0,
+      minute: 0,
+      second: 0,
+      milliseconds: 0,
+    }));
 
-    // Only projected entries that are past due should be marked as pending
+    // Update Projected Entries if past current date
     await this.db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
         isCleared: false,
         isProjected: true,
         isManualEntry: false,
@@ -327,11 +244,10 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    // Projected entries that are future should be marked as not pending
     await this.db.registerEntry.updateMany({
       data: { isPending: false },
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
         isCleared: false,
         isProjected: true,
         isManualEntry: false,
@@ -339,22 +255,21 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    // Manual entries that are past due should be marked as pending
+    // Update Manual Entries if past current date to Pending
     await this.db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
         isCleared: false,
         isManualEntry: true,
         createdAt: { lte: now },
       },
     });
 
-    // Manual entries that are future should be marked as not pending
     await this.db.registerEntry.updateMany({
       data: { isPending: false },
       where: {
-        register: { accountId },
+        ...(accountId && { register: { accountId } }),
         isManualEntry: true,
         isCleared: false,
         createdAt: { gt: now },
@@ -367,54 +282,42 @@ export class DataPersisterService implements IDataPersisterService {
       where: {
         accountRegisterId: accountId,
         isProjected: true,
+        isPending: false,
         isManualEntry: false,
       },
     });
   }
 
-  /**
-   * Performs all database cleanup operations before starting new forecast
-   */
   async performInitialCleanup(accountId?: string): Promise<void> {
     console.log(
-      "[DataPersisterService] Starting initial cleanup for accountId:",
-      accountId
+      `[DataPersisterService] Performing initial cleanup for account: ${accountId || "all"}`
     );
 
-    // Clean up balance entries for this specific account only
-    let balanceResult = { count: 0 };
-    if (accountId) {
-      const accountRegisters = await this.db.accountRegister.findMany({
-        where: { accountId },
-        select: { id: true },
-      });
-      const accountRegisterIds = accountRegisters.map((r) => r.id);
+    // Convert old projected entries to pending
+    await this.convertOldProjectedToPending(accountId);
 
-      balanceResult = await this.db.registerEntry.deleteMany({
-        where: {
-          isBalanceEntry: true,
-          accountRegisterId: { in: accountRegisterIds },
-        },
-      });
-    }
+    // Clean up old projected entries that are still pending
+    await this.cleanupProjectedEntries(accountId);
+
+    // Clean up zero balance entries
+    await this.cleanupZeroBalanceEntries(accountId);
+
     console.log(
-      "[DataPersisterService] Cleaned up balance entries:",
-      balanceResult
+      `[DataPersisterService] Initial cleanup completed for account: ${accountId || "all"}`
     );
-
-    await Promise.all([
-      this.cleanupProjectedEntries(accountId),
-      this.cleanupZeroBalanceEntries(),
-    ]);
-
-    console.log("[DataPersisterService] Completed initial cleanup");
   }
 
-  /**
-   * Performs final database operations after forecast completion
-   */
   async performFinalCleanup(accountId?: string): Promise<void> {
-    await Promise.all([this.cleanupZeroBalanceEntries()]);
+    console.log(
+      `[DataPersisterService] Performing final cleanup for account: ${accountId || "all"}`
+    );
+
+    // Update entry statuses based on current date
+    await this.updateEntryStatuses(accountId);
+
+    console.log(
+      `[DataPersisterService] Final cleanup completed for account: ${accountId || "all"}`
+    );
   }
 
   async getResultsCount(accountId?: string): Promise<{
@@ -426,33 +329,38 @@ export class DataPersisterService implements IDataPersisterService {
     const [projected, pending, manual, balance] = await Promise.all([
       this.db.registerEntry.count({
         where: {
-          register: { accountId },
+          ...(accountId && { register: { accountId } }),
           isProjected: true,
-          isCleared: false,
+          isPending: false,
+          isManualEntry: false,
         },
       }),
       this.db.registerEntry.count({
         where: {
-          register: { accountId },
+          ...(accountId && { register: { accountId } }),
           isPending: true,
           isCleared: false,
         },
       }),
       this.db.registerEntry.count({
         where: {
-          register: { accountId },
+          ...(accountId && { register: { accountId } }),
           isManualEntry: true,
-          isCleared: false,
         },
       }),
       this.db.registerEntry.count({
         where: {
-          register: { accountId },
+          ...(accountId && { register: { accountId } }),
           isBalanceEntry: true,
         },
       }),
     ]);
 
-    return { projected, pending, manual, balance };
+    return {
+      projected,
+      pending,
+      manual,
+      balance,
+    };
   }
 }

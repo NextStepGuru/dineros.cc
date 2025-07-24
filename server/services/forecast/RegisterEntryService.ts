@@ -1,4 +1,3 @@
-import moment from "moment";
 import type { PrismaClient } from "@prisma/client";
 import type { IRegisterEntryService, CreateEntryParams } from "./types";
 import type {
@@ -50,7 +49,9 @@ export class RegisterEntryService implements IRegisterEntryService {
       throw new Error(`Account not found ${accountRegisterId}`);
     }
 
-    const balance = +(lookupAccountRegister.balance) + (+amount);
+    // Convert amount to number to handle Decimal objects and strings
+    const numericAmount = +amount;
+    const balance = +lookupAccountRegister.balance + numericAmount;
     const targetBalance = balance; // Always use the running balance
 
     // Use explicit forecastDate if provided, otherwise fall back to existing logic
@@ -60,25 +61,22 @@ export class RegisterEntryService implements IRegisterEntryService {
         ? manualCreatedAt
         : reoccurrence?.lastAt);
 
-    const createdAt = moment(entryDate)
-      .utc()
-      .set(
-        isBalanceEntry
-          ? {
-              hour: 23,
-              minute: 59,
-              second: 59,
-              milliseconds: 0,
-            }
-          : { hour: 0, minute: 0, second: 0, milliseconds: 0 }
-      );
+    const createdAt = dateTimeService.set(
+      isBalanceEntry
+        ? {
+            hour: 23,
+            minute: 59,
+            second: 59,
+            milliseconds: 0,
+          }
+        : { hour: 0, minute: 0, second: 0, milliseconds: 0 },
+      dateTimeService.createUTC(entryDate)
+    );
 
     // Use passed isPending value if available, otherwise calculate it based on date
-    const calculatedIsPending = createdAt.isSameOrBefore(
-      dateTimeService
-        .now()
-        .utc()
-        .set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
+    const calculatedIsPending = dateTimeService.isSameOrBefore(
+      createdAt,
+      dateTimeService.set({ hour: 0, minute: 0, second: 0, milliseconds: 0 })
     );
     const entryIsPending =
       isPending !== undefined ? isPending : calculatedIsPending;
@@ -89,8 +87,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       accountRegisterId,
       sourceAccountRegisterId: sourceAccountRegisterId || null,
       description,
-      amount, // always use the passed-in amount
-      balance: isBalanceEntry ? amount : balance, // For balance entries, use amount as the opening balance
+      amount: numericAmount, // convert to number to handle Decimal objects and strings
+      balance: isBalanceEntry ? numericAmount : balance, // For balance entries, use amount as the opening balance
       createdAt,
       reoccurrenceId: reoccurrence?.id || null,
       isBalanceEntry,
@@ -125,16 +123,14 @@ export class RegisterEntryService implements IRegisterEntryService {
   }
 
   async updateEntryStatuses(accountId: number): Promise<void> {
-    const now = dateTimeService
-      .now()
-      .utc()
-      .set({
+    const now = dateTimeService.toDate(
+      dateTimeService.set({
         hour: 0,
         minute: 0,
         second: 0,
         milliseconds: 0,
       })
-      .toDate();
+    );
 
     // Update Projected Entries if past current date
     await this.db.registerEntry.updateMany({
@@ -158,27 +154,6 @@ export class RegisterEntryService implements IRegisterEntryService {
         createdAt: { gt: now },
       },
     });
-
-    // Update Manual Entries if past current date to Pending
-    await this.db.registerEntry.updateMany({
-      data: { isPending: true },
-      where: {
-        accountRegisterId: accountId,
-        isCleared: false,
-        isManualEntry: true,
-        createdAt: { lte: now },
-      },
-    });
-
-    await this.db.registerEntry.updateMany({
-      data: { isPending: false },
-      where: {
-        accountRegisterId: accountId,
-        isManualEntry: true,
-        isCleared: false,
-        createdAt: { gt: now },
-      },
-    });
   }
 
   calculateRunningBalances(
@@ -186,123 +161,75 @@ export class RegisterEntryService implements IRegisterEntryService {
     initialBalance: number,
     accountType: "credit" | "debit"
   ): CacheRegisterEntry[] {
-    const preSortedData = entries.map(
-      ({
-        id,
-        amount,
-        balance,
-        createdAt,
-        description,
-        isBalanceEntry,
-        isCleared,
-        isManualEntry,
-        isPending,
-        isProjected,
-        isReconciled,
-        reoccurrenceId,
-        sourceAccountRegisterId,
-        seq,
-        accountRegisterId,
-      }) => ({
-        id,
-        seq,
-        accountRegisterId,
-        amount,
-        balance,
-        createdAt,
-        description,
-        hasBalanceReCalc: false,
-        isBalanceEntry,
-        isCleared,
-        isManualEntry,
-        isPending,
-        isProjected,
-        isReconciled,
-        reoccurrenceId,
-        sourceAccountRegisterId,
-      })
-    );
+    // Sort entries by date and amount (descending for same date)
+    const sortedEntries = recalculateRunningBalanceAndSort(entries);
 
-    return recalculateRunningBalanceAndSort<CacheRegisterEntry>({
-      registerEntries: preSortedData,
-      balance: initialBalance,
-      type: accountType,
-    });
+    let runningBalance = initialBalance;
+
+    // Calculate running balances
+    for (const entry of sortedEntries) {
+      if (accountType === "credit") {
+        // For credit accounts, positive amounts reduce debt (good)
+        runningBalance = runningBalance - entry.amount;
+      } else {
+        // For debit accounts, positive amounts increase balance (good)
+        runningBalance = runningBalance + entry.amount;
+      }
+
+      entry.balance = runningBalance;
+    }
+
+    return sortedEntries;
   }
 
   filterSkippedEntries(entries: CacheRegisterEntry[]): CacheRegisterEntry[] {
-    return entries.filter((item) => {
-      // Never filter out balance entries
-      if (item.isBalanceEntry) {
-        return true;
+    // Filter out entries that have been skipped
+    return entries.filter((entry) => {
+      if (!entry.reoccurrenceId) {
+        return true; // Keep non-reoccurring entries
       }
 
-      const isFound = this.cache.reoccurrenceSkip.findOne({
-        accountRegisterId: item.accountRegisterId,
-        reoccurrenceId: item.reoccurrenceId || undefined,
-        skippedAt: item.createdAt.toISOString(),
+      // Check if this entry's date is in the skip list
+      const skipDate = dateTimeService.format(entry.createdAt, "YYYY-MM-DD");
+      const skips = this.cache.reoccurrenceSkip.find({
+        reoccurrenceId: entry.reoccurrenceId,
       });
-      return !isFound;
+
+      return !skips.some((skip) => skip.skippedAt === skipDate);
     });
   }
 
   async cleanupZeroBalanceEntries(): Promise<void> {
-    await this.db.registerEntry.deleteMany({
-      where: {
-        description: "Latest Balance",
-        amount: 0,
-        isProjected: false,
-      },
-    });
+    // Remove entries with zero amounts (except balance entries)
+    const zeroEntries = this.cache.registerEntry.find(
+      (entry) => entry.amount === 0 && !entry.isBalanceEntry
+    );
+
+    for (const entry of zeroEntries) {
+      this.cache.registerEntry.remove({ id: entry.id });
+    }
   }
 
   async cleanupProjectedEntries(accountId: number): Promise<void> {
-    await this.db.registerEntry.deleteMany({
-      where: {
-        accountRegisterId: accountId,
-        isProjected: true,
-        isPending: false,
-        isManualEntry: false,
-      },
+    // Remove all projected entries for the account
+    const projectedEntries = this.cache.registerEntry.find({
+      accountRegisterId: accountId,
+      isProjected: true,
     });
+
+    for (const entry of projectedEntries) {
+      this.cache.registerEntry.remove({ id: entry.id });
+    }
   }
 
   createBalanceEntry(accountRegister: CacheAccountRegister): void {
-    log({
-      message: "Calling createBalanceEntry",
-      data: {
-        accountRegisterId: accountRegister.id,
-        latestBalance: accountRegister.latestBalance,
-      },
-      level: "debug",
-    });
-
-    // Create balance entry with the latest balance as the opening balance
-    const balanceEntryParams = {
-      id: `balance-${accountRegister.id}-${createId()}`, // Generate unique ID for balance entry
+    this.createEntry({
       accountRegisterId: accountRegister.id,
-      description: "Latest Balance",
-      amount: accountRegister.latestBalance, // Set amount to the opening balance
+      description: `Balance for ${accountRegister.name}`,
+      amount: accountRegister.balance,
       isBalanceEntry: true,
-      // Use the latestBalance as the opening balance for this account
-      forecastDate: dateTimeService
-        .now()
-        .utc()
-        .set({ hour: 23, minute: 59, second: 59, milliseconds: 0 })
-        .toDate(),
-    };
-
-    log({
-      message: "Creating balance entry with params",
-      data: balanceEntryParams,
-      level: "debug",
+      isManualEntry: false,
+      forecastDate: dateTimeService.nowDate(),
     });
-
-    this.createEntry(balanceEntryParams);
-
-    // Update the account register's balance to match the latest balance
-    // This ensures the running balance calculation starts from the correct opening balance
-    accountRegister.balance = +accountRegister.latestBalance;
-    this.cache.accountRegister.update(accountRegister);
   }
 }

@@ -2,8 +2,8 @@ import { handleApiError } from "~/server/lib/handleApiError";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { z } from "zod";
 import { getUser } from "../lib/getUser";
-import moment from "moment";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
+import { dateTimeService } from "~/server/services/forecast";
 
 // Define the schema for the request body
 const skipPost = z.object({
@@ -83,9 +83,18 @@ export default defineEventHandler(async (event) => {
       const addObj: Record<string, number> = {};
       addObj[reoccurrence.interval.name] = reoccurrence.intervalCount;
 
-      const lastAt = moment(reoccurrence.lastAt).add(addObj);
+      const lastAt = reoccurrence.lastAt
+        ? dateTimeService.add(
+            reoccurrence.intervalCount,
+            reoccurrence.interval.name as any,
+            reoccurrence.lastAt
+          )
+        : dateTimeService.add(
+            reoccurrence.intervalCount,
+            reoccurrence.interval.name as any
+          );
 
-      if (moment(lookup.createdAt).isSameOrBefore(lastAt)) {
+      if (dateTimeService.isSameOrBefore(lookup.createdAt, lastAt)) {
         await prisma.reoccurrence.update({
           where: {
             id: reoccurrence.id,

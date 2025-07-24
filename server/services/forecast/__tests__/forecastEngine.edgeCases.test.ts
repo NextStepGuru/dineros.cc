@@ -1,14 +1,28 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
-import { PrismaClient } from "@prisma/client";
-import moment from "moment";
+import { ModernCacheService } from "../ModernCacheService";
+import { RegisterEntryService } from "../RegisterEntryService";
+import { ReoccurrenceService } from "../ReoccurrenceService";
+import { TransferService } from "../TransferService";
+import { AccountRegisterService } from "../AccountRegisterService";
+import { LoanCalculatorService } from "../LoanCalculatorService";
+import type { ForecastContext } from "../types";
+
+// Dynamic moment import
+let moment: any;
 
 describe("ForecastEngine - Edge Cases and Error Handling", () => {
   let forecastEngine: ForecastEngine;
-  let mockDb: any;
+  let cache: ModernCacheService;
+  let entryService: RegisterEntryService;
+  let reoccurrenceService: ReoccurrenceService;
+  let transferService: TransferService;
+  let accountRegisterService: AccountRegisterService;
+  let loanCalculator: LoanCalculatorService;
 
-  beforeEach(() => {
-    mockDb = {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
+    const mockDb = {
       accountRegister: {
         findMany: vi.fn(),
         updateMany: vi.fn(),
@@ -58,7 +72,6 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
     it("should calculate end date correctly", () => {
       const result = forecastEngine["calculateEndDate"]();
       const expected = moment()
-        .utc()
         .set({
           hour: 0,
           minute: 0,
@@ -84,7 +97,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
             isManualEntry: true,
             isBalanceEntry: false,
             isPending: false,
-            createdAt: new Date(),
+            createdAt: moment().toDate(),
           },
         ],
       };
@@ -99,7 +112,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).entryService = mockEntryService;
 
       await expect(
-        forecastEngine["loadExistingEntries"](mockAccountData, moment())
+        forecastEngine["loadExistingEntries"](
+          mockAccountData,
+          moment().toDate()
+        )
       ).rejects.toThrow("Entry creation failed");
     });
 
@@ -114,7 +130,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       (forecastEngine as any).entryService = mockEntryService;
 
-      await forecastEngine["loadExistingEntries"](mockAccountData, moment());
+      await forecastEngine["loadExistingEntries"](
+        mockAccountData,
+        moment().toDate()
+      );
 
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
     });
@@ -130,7 +149,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
             isManualEntry: true,
             isBalanceEntry: false,
             isPending: false,
-            createdAt: new Date(),
+            createdAt: moment().toDate(),
           },
         ],
       };
@@ -144,7 +163,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).entryService = mockEntryService;
 
       await expect(
-        forecastEngine["loadExistingEntries"](mockAccountData, moment())
+        forecastEngine["loadExistingEntries"](
+          mockAccountData,
+          moment().toDate()
+        )
       ).rejects.toThrow("Missing required fields");
     });
   });
@@ -237,8 +259,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
     it("should handle empty manual entries result", async () => {
       const testDate = moment("2024-01-15");
 
-      mockDb.registerEntry.findMany.mockResolvedValue([]);
-
+      // Mock the entry service to return an empty array
       const mockEntryService = {
         createEntry: vi.fn(),
       };
@@ -306,7 +327,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
           description: "Test Entry",
           amount: 100,
           balance: 1000,
-          createdAt: moment(),
+          createdAt: moment().toDate(),
           isBalanceEntry: false,
           isPending: false,
           isCleared: false,

@@ -1,11 +1,16 @@
-import moment from "moment";
-import { ModernCacheService } from "../ModernCacheService";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import { AccountRegisterService } from "../AccountRegisterService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { TransferService } from "../TransferService";
 import { ForecastEngine } from "../ForecastEngine";
-import { vi } from "vitest";
+import { ModernCacheService } from "../ModernCacheService";
+import { RegisterEntryService } from "../RegisterEntryService";
+import { ReoccurrenceService } from "../ReoccurrenceService";
+import { TransferService } from "../TransferService";
+import { dateTimeService } from "../DateTimeService";
+import type { CacheAccountRegister } from "../ModernCacheService";
+
+// Dynamic moment import
+let moment: any;
 
 /**
  * Regression tests for Bug #2: Double Interest Calculation
@@ -21,7 +26,8 @@ describe("Double Interest Calculation Regression Tests", () => {
   let transferService: TransferService;
   let mockDb: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
     // Reset cache
     cache = new ModernCacheService();
 
@@ -54,7 +60,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.12,
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-15"),
+        statementAt: dateTimeService.create("2025-01-15"),
         statementIntervalId: 3,
         typeId: 4,
         name: "Test Credit Card",
@@ -81,22 +87,34 @@ describe("Double Interest Calculation Regression Tests", () => {
 
       // Act & Assert: Test exact statement date
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-15"))
+        loanCalculator.shouldProcessInterest(
+          account,
+          dateTimeService.create("2025-01-15")
+        )
       ).toBe(true);
 
       // Should NOT process on the day before
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-14"))
+        loanCalculator.shouldProcessInterest(
+          account,
+          dateTimeService.create("2025-01-14")
+        )
       ).toBe(false);
 
       // Should NOT process on the day after (this was the bug!)
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-16"))
+        loanCalculator.shouldProcessInterest(
+          account,
+          dateTimeService.create("2025-01-16")
+        )
       ).toBe(false);
 
       // Should NOT process within old "grace period"
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-17"))
+        loanCalculator.shouldProcessInterest(
+          account,
+          dateTimeService.create("2025-01-17")
+        )
       ).toBe(false);
       expect(
         loanCalculator.shouldProcessInterest(account, moment("2025-01-18"))
@@ -221,13 +239,38 @@ describe("Double Interest Calculation Regression Tests", () => {
       cache.accountRegister.insert(account);
 
       // Act: Update statement date as if interest was processed
+      console.log(`[TEST] About to call updateStatementDates`);
+      console.log(
+        `[TEST] Account statement date: ${account.statementAt.format(
+          "YYYY-MM-DD"
+        )}`
+      );
+      console.log(
+        `[TEST] Forecast date: ${moment("2025-01-15").format("YYYY-MM-DD")}`
+      );
       await accountService.updateStatementDates(
         [account],
         moment("2025-01-15")
       );
+      console.log(`[TEST] Finished calling updateStatementDates`);
 
       // Assert: Statement date should advance to next month
+      expect((global as any).updateStatementDatesCalled).toBe(true);
+      expect((global as any).updateStatementDatesCallCount).toBe(1);
       const updatedAccount = cache.accountRegister.findOne({ id: 5 });
+      console.log(
+        `[TEST] Updated account statement date: ${updatedAccount?.statementAt.format(
+          "YYYY-MM-DD"
+        )}`
+      );
+      console.log(
+        `[TEST] Original account statement date: ${account.statementAt.format(
+          "YYYY-MM-DD"
+        )}`
+      );
+      console.log(
+        `[TEST] Forecast date: ${moment("2025-01-15").format("YYYY-MM-DD")}`
+      );
       expect(updatedAccount?.statementAt.format("YYYY-MM-DD")).toBe(
         "2025-02-15"
       );

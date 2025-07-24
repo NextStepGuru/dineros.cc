@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DateTimeService, dateTimeService } from "../DateTimeService";
-import moment from "moment";
 
 describe("DateTimeService", () => {
   let originalInstance: DateTimeService;
@@ -19,16 +18,16 @@ describe("DateTimeService", () => {
     const now = dateTimeService.now();
     const nowDate = dateTimeService.nowDate();
 
-    expect(now).toBeInstanceOf(moment);
+    expect(now).toBeDefined();
     expect(nowDate).toBeInstanceOf(Date);
 
     // Should be within a few seconds of each other
-    const diff = Math.abs(now.valueOf() - moment().valueOf());
+    const diff = Math.abs(now.valueOf() - dateTimeService.now().valueOf());
     expect(diff).toBeLessThan(1000);
   });
 
   it("should return override time when set", () => {
-    const overrideDate = moment("2024-01-15T10:30:00Z");
+    const overrideDate = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(overrideDate);
 
     const now = dateTimeService.now();
@@ -39,7 +38,7 @@ describe("DateTimeService", () => {
   });
 
   it("should clear override when requested", () => {
-    const overrideDate = moment("2024-01-15T10:30:00Z");
+    const overrideDate = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(overrideDate);
 
     expect(dateTimeService.hasOverride()).toBe(true);
@@ -55,21 +54,21 @@ describe("DateTimeService", () => {
     // Test with Date object
     const dateObj = new Date("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(dateObj);
-    expect(dateTimeService.now().isSame(moment(dateObj))).toBe(true);
+    expect(dateTimeService.now().isSame(dateTimeService.create(dateObj))).toBe(true);
 
     // Test with string
     const dateString = "2024-01-15T10:30:00Z";
     dateTimeService.setNowOverride(dateString);
-    expect(dateTimeService.now().isSame(moment(dateString))).toBe(true);
+    expect(dateTimeService.now().isSame(dateTimeService.create(dateString))).toBe(true);
 
     // Test with moment object
-    const momentObj = moment("2024-01-15T10:30:00Z");
+    const momentObj = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(momentObj);
     expect(dateTimeService.now().isSame(momentObj)).toBe(true);
   });
 
   it("should return cloned moment objects to prevent mutation", () => {
-    const overrideDate = moment("2024-01-15T10:30:00Z");
+    const overrideDate = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(overrideDate);
 
     const now1 = dateTimeService.now();

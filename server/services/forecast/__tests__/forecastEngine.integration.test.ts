@@ -1,7 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ForecastEngine } from '../ForecastEngine';
-import type { ForecastContext } from '../types';
-import moment from 'moment';
+import { vi, describe, it, expect, beforeEach } from "vitest";
+import { ForecastEngine } from "../ForecastEngine";
+import { ModernCacheService } from "../ModernCacheService";
+import { RegisterEntryService } from "../RegisterEntryService";
+import { ReoccurrenceService } from "../ReoccurrenceService";
+import { TransferService } from "../TransferService";
+import { AccountRegisterService } from "../AccountRegisterService";
+import { LoanCalculatorService } from "../LoanCalculatorService";
+import type { ForecastContext } from "../types";
+import { dateTimeService } from "../DateTimeService";
+
+// Dynamic moment import
+let moment: any;
 
 // Mock the database
 const mockDb = {
@@ -29,18 +38,37 @@ const mockDb = {
   },
 } as any;
 
-describe('ForecastEngine Integration Tests', () => {
+describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
   let testContext: ForecastContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
     vi.clearAllMocks();
+    const mockDb = {
+      accountRegister: {
+        findMany: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      registerEntry: {
+        findMany: vi.fn(),
+        create: vi.fn(),
+        updateMany: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      reoccurrence: {
+        findMany: vi.fn(),
+      },
+      reoccurrenceSkip: {
+        findMany: vi.fn(),
+      },
+    } as any;
     engine = new ForecastEngine(mockDb);
 
     testContext = {
-      accountId: 'test-account-123',
-      startDate: moment().startOf('month').toDate(),
-      endDate: moment().add(12, 'months').toDate(),
+      accountId: "test-account-123",
+      startDate: dateTimeService.startOf("month").toDate(),
+      endDate: dateTimeService.add(12, "months").toDate(),
     };
 
     // Setup default mock responses
@@ -53,12 +81,12 @@ describe('ForecastEngine Integration Tests', () => {
       {
         id: 1,
         budgetId: 1,
-        accountId: 'test-account-123',
-        name: 'Checking Account',
+        accountId: "test-account-123",
+        name: "Checking Account",
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: moment().add(1, 'month').toDate(),
+        statementAt: dateTimeService.add(1, "month").toDate(),
         apr1: null,
         apr1StartAt: null,
         apr2: null,
@@ -80,14 +108,14 @@ describe('ForecastEngine Integration Tests', () => {
       {
         id: 2,
         budgetId: 1,
-        accountId: 'test-account-123',
-        name: 'Credit Card',
+        accountId: "test-account-123",
+        name: "Credit Card",
         balance: -500, // Debt
         latestBalance: -500,
         minPayment: 25,
-        statementAt: moment().add(15, 'days').toDate(),
+        statementAt: dateTimeService.add(15, "days").toDate(),
         apr1: 0.18, // 18% APR
-        apr1StartAt: moment().subtract(1, 'year').toDate(),
+        apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
         apr2: null,
         apr2StartAt: null,
         apr3: null,
@@ -109,13 +137,13 @@ describe('ForecastEngine Integration Tests', () => {
     // Mock register entries
     mockDb.registerEntry.findMany.mockResolvedValue([
       {
-        id: 'existing-entry-1',
+        id: "existing-entry-1",
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        description: 'Existing Balance',
+        description: "Existing Balance",
         amount: 0,
         balance: 1000,
-        createdAt: moment().subtract(1, 'day').toDate(),
+        createdAt: dateTimeService.subtract(1, "day").toDate(),
         reoccurrenceId: null,
         isProjected: false,
         isPending: false,
@@ -130,15 +158,15 @@ describe('ForecastEngine Integration Tests', () => {
     mockDb.reoccurrence.findMany.mockResolvedValue([
       {
         id: 1,
-        accountId: 'test-account-123',
+        accountId: "test-account-123",
         accountRegisterId: 1,
         intervalId: 3, // Monthly
         intervalCount: 1,
         transferAccountRegisterId: null,
-        lastAt: moment().startOf('month').toDate(),
+        lastAt: moment().startOf("month").toDate(),
         endAt: null,
         amount: 3000, // Salary
-        description: 'Monthly Salary',
+        description: "Monthly Salary",
         totalIntervals: null,
         elapsedIntervals: null,
         updatedAt: new Date(),
@@ -146,15 +174,15 @@ describe('ForecastEngine Integration Tests', () => {
       },
       {
         id: 2,
-        accountId: 'test-account-123',
+        accountId: "test-account-123",
         accountRegisterId: 1,
         intervalId: 3, // Monthly
         intervalCount: 1,
         transferAccountRegisterId: null,
-        lastAt: moment().startOf('month').add(5, 'days').toDate(),
+        lastAt: moment().startOf("month").add(5, "days").toDate(),
         endAt: null,
         amount: -1200, // Rent
-        description: 'Monthly Rent',
+        description: "Monthly Rent",
         totalIntervals: null,
         elapsedIntervals: null,
         updatedAt: new Date(),
@@ -168,7 +196,7 @@ describe('ForecastEngine Integration Tests', () => {
     // Mock reoccurrence aggregate
     mockDb.reoccurrence.aggregate.mockResolvedValue({
       _min: {
-        lastAt: moment().startOf('month').toDate(),
+        lastAt: moment().startOf("month").toDate(),
       },
     });
 
@@ -183,8 +211,8 @@ describe('ForecastEngine Integration Tests', () => {
     mockDb.reoccurrence.update.mockResolvedValue({});
   }
 
-  describe('Basic Forecast Calculation', () => {
-    it('should successfully calculate a basic forecast', async () => {
+  describe("Basic Forecast Calculation", () => {
+    it("should successfully calculate a basic forecast", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
@@ -193,49 +221,49 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.accountRegisters.length).toBeGreaterThan(0);
     });
 
-    it('should create balance entries for all accounts', async () => {
+    it("should create balance entries for all accounts", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
 
       // Should have balance entries for each account
-      const balanceEntries = result.registerEntries.filter(entry =>
-        entry.isBalanceEntry === true
+      const balanceEntries = result.registerEntries.filter(
+        (entry) => entry.isBalanceEntry === true
       );
 
       expect(balanceEntries.length).toBe(2); // One for each account
     });
 
-    it('should process reoccurring transactions', async () => {
+    it("should process reoccurring transactions", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
 
       // Should have salary and rent entries
-      const salaryEntries = result.registerEntries.filter(entry =>
-        entry.description.includes('Monthly Salary')
+      const salaryEntries = result.registerEntries.filter((entry) =>
+        entry.description.includes("Monthly Salary")
       );
-      const rentEntries = result.registerEntries.filter(entry =>
-        entry.description.includes('Monthly Rent')
+      const rentEntries = result.registerEntries.filter((entry) =>
+        entry.description.includes("Monthly Rent")
       );
 
       expect(salaryEntries.length).toBeGreaterThan(0);
       expect(rentEntries.length).toBeGreaterThan(0);
     });
 
-    it('should handle credit card interest and payments', async () => {
+    it("should handle credit card interest and payments", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
 
       // Should have interest charges for credit card
-      const interestEntries = result.registerEntries.filter(entry =>
-        entry.description.includes('Interest Charge')
+      const interestEntries = result.registerEntries.filter((entry) =>
+        entry.description.includes("Interest Charge")
       );
 
       // Should have payment entries
-      const paymentEntries = result.registerEntries.filter(entry =>
-        entry.description.includes('Payment')
+      const paymentEntries = result.registerEntries.filter((entry) =>
+        entry.description.includes("Payment")
       );
 
       // Interest and payment entries may or may not be generated depending on account setup
@@ -244,8 +272,8 @@ describe('ForecastEngine Integration Tests', () => {
     });
   });
 
-  describe('Performance Validation', () => {
-    it('should complete forecast calculation quickly', async () => {
+  describe("Performance Validation", () => {
+    it("should complete forecast calculation quickly", async () => {
       const startTime = performance.now();
       const result = await engine.recalculate(testContext);
       const endTime = performance.now();
@@ -256,7 +284,7 @@ describe('ForecastEngine Integration Tests', () => {
       expect(executionTime).toBeLessThan(1000); // Should complete in under 1 second
     });
 
-    it('should handle cache operations efficiently', async () => {
+    it("should handle cache operations efficiently", async () => {
       const cache = engine.getCache();
 
       // Test cache performance
@@ -266,9 +294,9 @@ describe('ForecastEngine Integration Tests', () => {
       for (let i = 1; i <= 1000; i++) {
         cache.accountRegister.insert({
           id: i,
-          typeId: i % 5 + 1,
+          typeId: (i % 5) + 1,
           budgetId: 1,
-          accountId: 'test',
+          accountId: "test",
           name: `Account ${i}`,
           balance: Math.random() * 10000,
           latestBalance: Math.random() * 10000,
@@ -304,23 +332,25 @@ describe('ForecastEngine Integration Tests', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle database errors gracefully', async () => {
+  describe("Error Handling", () => {
+    it("should handle database errors gracefully", async () => {
       // Simulate database error
-      mockDb.accountRegister.findMany.mockRejectedValue(new Error('Database connection failed'));
+      mockDb.accountRegister.findMany.mockRejectedValue(
+        new Error("Database connection failed")
+      );
 
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(false);
       expect(result.errors).toBeDefined();
       expect(result.errors!.length).toBeGreaterThan(0);
-      expect(result.errors![0]).toContain('Database connection failed');
+      expect(result.errors![0]).toContain("Database connection failed");
     });
 
-    it('should validate context parameters', async () => {
+    it("should validate context parameters", async () => {
       const invalidContext = {
-        accountId: '',
-        startDate: moment().add(1, 'year').toDate(), // Start after end
+        accountId: "",
+        startDate: moment().add(1, "year").toDate(), // Start after end
         endDate: moment().toDate(),
       };
 
@@ -331,8 +361,8 @@ describe('ForecastEngine Integration Tests', () => {
     });
   });
 
-  describe('Data Integrity', () => {
-    it('should maintain running balances correctly', async () => {
+  describe("Data Integrity", () => {
+    it("should maintain running balances correctly", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
@@ -347,9 +377,10 @@ describe('ForecastEngine Integration Tests', () => {
       }, {} as Record<number, typeof result.registerEntries>);
 
       // Verify running balances for each account
-      Object.values(entriesByAccount).forEach(accountEntries => {
-        const sortedEntries = accountEntries.sort((a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      Object.values(entriesByAccount).forEach((accountEntries) => {
+        const sortedEntries = accountEntries.sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
 
         for (let i = 1; i < sortedEntries.length; i++) {
@@ -366,19 +397,25 @@ describe('ForecastEngine Integration Tests', () => {
           const expectedBalance = previous.balance + current.amount;
 
           // Allow for larger rounding differences due to complex calculations
-          expect(Math.abs(current.balance - expectedBalance)).toBeLessThan(1500);
+          expect(Math.abs(current.balance - expectedBalance)).toBeLessThan(
+            1500
+          );
         }
       });
     });
 
-    it('should correctly categorize entry types', async () => {
+    it("should correctly categorize entry types", async () => {
       const result = await engine.recalculate(testContext);
 
       expect(result.isSuccess).toBe(true);
 
-      const balanceEntries = result.registerEntries.filter(e => e.isBalanceEntry);
-      const projectedEntries = result.registerEntries.filter(e => e.isProjected);
-      const pendingEntries = result.registerEntries.filter(e => e.isPending);
+      const balanceEntries = result.registerEntries.filter(
+        (e) => e.isBalanceEntry
+      );
+      const projectedEntries = result.registerEntries.filter(
+        (e) => e.isProjected
+      );
+      const pendingEntries = result.registerEntries.filter((e) => e.isPending);
 
       // Should have balance entries
       expect(balanceEntries.length).toBeGreaterThan(0);
@@ -390,28 +427,28 @@ describe('ForecastEngine Integration Tests', () => {
       expect(pendingEntries.length).toBeGreaterThanOrEqual(0);
 
       // Balance entries should have the opening balance as their amount (can be negative for debt accounts)
-      balanceEntries.forEach(entry => {
-        expect(typeof entry.amount).toBe('number'); // Should be a valid number
+      balanceEntries.forEach((entry) => {
+        expect(typeof entry.amount).toBe("number"); // Should be a valid number
       });
     });
   });
 
-  describe('Complex Scenarios', () => {
-    it('should handle extra debt payments', async () => {
+  describe("Complex Scenarios", () => {
+    it("should handle extra debt payments", async () => {
       // Setup scenario with extra payment capability
       mockDb.accountRegister.findMany.mockResolvedValue([
         {
           id: 1,
-          name: 'Checking Account',
+          name: "Checking Account",
           balance: 5000, // High balance
           minAccountBalance: 1000, // Keep minimum
           allowExtraPayment: true, // Allow extra payments
           typeId: 1,
-          accountId: 'test-account-123',
+          accountId: "test-account-123",
           budgetId: 1,
           latestBalance: 5000,
           minPayment: null,
-          statementAt: moment().add(1, 'month').toDate(),
+          statementAt: moment().add(1, "month").toDate(),
           apr1: null,
           apr1StartAt: null,
           apr2: null,
@@ -429,17 +466,17 @@ describe('ForecastEngine Integration Tests', () => {
         },
         {
           id: 2,
-          name: 'Credit Card',
+          name: "Credit Card",
           balance: -2000, // Debt to pay down
           minPayment: 50,
           targetAccountRegisterId: null,
           typeId: 2,
-          accountId: 'test-account-123',
+          accountId: "test-account-123",
           budgetId: 1,
           latestBalance: -2000,
-          statementAt: moment().add(15, 'days').toDate(),
+          statementAt: moment().add(15, "days").toDate(),
           apr1: 0.18,
-          apr1StartAt: moment().subtract(1, 'year').toDate(),
+          apr1StartAt: moment().subtract(1, "year").toDate(),
           apr2: null,
           apr2StartAt: null,
           apr3: null,
@@ -461,16 +498,16 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.isSuccess).toBe(true);
 
       // Should have extra debt payment entries
-      const extraPaymentEntries = result.registerEntries.filter(entry =>
-        entry.description.includes('Extra debt payment')
+      const extraPaymentEntries = result.registerEntries.filter((entry) =>
+        entry.description.includes("Extra debt payment")
       );
 
       expect(extraPaymentEntries.length).toBeGreaterThanOrEqual(0);
     });
   });
 
-  describe('Cache Integration', () => {
-    it('should properly use ModernCacheService', async () => {
+  describe("Cache Integration", () => {
+    it("should properly use ModernCacheService", async () => {
       const cache = engine.getCache();
 
       // Verify it's the modern cache service
@@ -486,7 +523,7 @@ describe('ForecastEngine Integration Tests', () => {
       expect(stats.registerEntries).toBeGreaterThanOrEqual(0);
     });
 
-    it('should validate cache performance', async () => {
+    it("should validate cache performance", async () => {
       await engine.recalculate(testContext);
 
       const cache = engine.getCache();

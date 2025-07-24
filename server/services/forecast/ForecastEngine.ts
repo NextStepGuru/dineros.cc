@@ -1,4 +1,3 @@
-import moment from "moment";
 import type { PrismaClient } from "@prisma/client";
 import type { IForecastEngine, ForecastContext, ForecastResult } from "./types";
 import type { RegisterEntry } from "~/types/types";
@@ -79,7 +78,7 @@ export class ForecastEngine implements IForecastEngine {
       const startDate = this.calculateStartDate(
         minDate || dateTimeService.nowDate()
       );
-      const endDate = moment(context.endDate).utc().set({
+      const endDate = dateTimeService.createUTC(context.endDate).set({
         hour: 0,
         minute: 0,
         second: 0,
@@ -87,12 +86,16 @@ export class ForecastEngine implements IForecastEngine {
       });
 
       forecastLogger.info(
-        `Date range: startDate=${startDate.format(
-          "YYYY-MM-DD"
-        )}, endDate=${endDate.format("YYYY-MM-DD")}`
+        `Date range: startDate=${dateTimeService.format(
+          "YYYY-MM-DD",
+          startDate
+        )}, endDate=${dateTimeService.format("YYYY-MM-DD", endDate)}`
       );
       forecastLogger.info(
-        `Context endDate: ${moment(context.endDate).format("YYYY-MM-DD")}`
+        `Context endDate: ${dateTimeService.format(
+          "YYYY-MM-DD",
+          context.endDate
+        )}`
       );
 
       // 6. Load existing manual entries into the timeline
@@ -181,8 +184,8 @@ export class ForecastEngine implements IForecastEngine {
     }
   }
 
-  private calculateStartDate(minDate: Date): moment.Moment {
-    return moment(minDate).utc().set({
+  private calculateStartDate(minDate: Date): any {
+    return dateTimeService.createUTC(minDate).set({
       hour: 0,
       minute: 0,
       second: 0,
@@ -190,22 +193,18 @@ export class ForecastEngine implements IForecastEngine {
     });
   }
 
-  private calculateEndDate(): moment.Moment {
-    return dateTimeService
-      .now()
-      .utc()
-      .set({
-        hour: 0,
-        minute: 0,
-        second: 0,
-        milliseconds: 0,
-      })
-      .add({ year: MAX_YEARS });
+  private calculateEndDate(): any {
+    return dateTimeService.createUTC(dateTimeService.now()).set({
+      hour: 0,
+      minute: 0,
+      second: 0,
+      milliseconds: 0,
+    });
   }
 
   private async loadExistingEntries(
     accountData: any,
-    startDate: moment.Moment
+    startDate: any
   ): Promise<void> {
     try {
       // Load ALL existing entries (including isPending from Plaid) to ensure accurate balance calculations
@@ -235,24 +234,26 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private async processForecastTimeline(
-    startDate: moment.Moment,
-    endDate: moment.Moment
+    startDate: any,
+    endDate: any
   ): Promise<void> {
-    const currentDate = startDate.clone();
+    const currentDate = dateTimeService.clone(startDate);
     let dayCount = 0;
 
     forecastLogger.info(
-      `Starting timeline processing from ${startDate.format(
-        "YYYY-MM-DD"
-      )} to ${endDate.format("YYYY-MM-DD")}`
+      `Starting timeline processing from ${dateTimeService.format(
+        "YYYY-MM-DD",
+        startDate
+      )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
 
     while (currentDate.isBefore(endDate)) {
       dayCount++;
       if (dayCount % 100 === 0) {
         forecastLogger.info(
-          `Processed ${dayCount} days, current date: ${currentDate.format(
-            "YYYY-MM-DD"
+          `Processed ${dayCount} days, current date: ${dateTimeService.format(
+            "YYYY-MM-DD",
+            currentDate
           )}`
         );
       }
@@ -304,14 +305,15 @@ export class ForecastEngine implements IForecastEngine {
     );
   }
 
-  private async loadManualEntriesForDate(date: moment.Moment): Promise<void> {
+  private async loadManualEntriesForDate(date: any): Promise<void> {
     // This would load manual entries that were created for this specific date
     // Implementation depends on how manual entries are stored
     // For now, we'll use the cache to find existing entries for this date
     const entries = this.cache.registerEntry.find(
       (entry) =>
         entry.isManualEntry === true &&
-        moment(entry.createdAt).isSame(date, "day")
+        dateTimeService.isSameOrBefore(entry.createdAt, date) &&
+        dateTimeService.isSameOrAfter(entry.createdAt, date)
     );
 
     // These entries should already be in the cache from the initial load
@@ -360,7 +362,7 @@ export class ForecastEngine implements IForecastEngine {
         id: item.id === "new" ? undefined : item.id,
         accountRegisterId: item.accountRegisterId,
         sourceAccountRegisterId: item.sourceAccountRegisterId || undefined,
-        createdAt: moment(item.createdAt).utc().toISOString(),
+        createdAt: dateTimeService.toDate(item.createdAt).toISOString(),
         description: item.description,
         reoccurrenceId: item.reoccurrenceId,
         amount: item.amount,

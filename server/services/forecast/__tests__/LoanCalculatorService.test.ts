@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import moment from "moment";
+import { dateTimeService } from "../DateTimeService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { CacheAccountRegister } from "../ModernCacheService";
 
@@ -13,10 +13,14 @@ vi.mock("@dazlab-team/loan-calc", () => ({
   })),
 }));
 
+// Dynamic moment import
+let moment: any;
+
 describe("LoanCalculatorService", () => {
   let service: LoanCalculatorService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
     service = new LoanCalculatorService();
   });
 
@@ -32,7 +36,7 @@ describe("LoanCalculatorService", () => {
       balance: -1000,
       latestBalance: -1000,
       minPayment: 100,
-      statementAt: moment("2024-01-15"),
+      statementAt: dateTimeService.create("2024-01-15"),
       statementIntervalId: 3, // Monthly
       apr1: 0.15,
       apr1StartAt: null,

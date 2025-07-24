@@ -1,5 +1,4 @@
 import type { Job } from "bullmq";
-import moment from "moment";
 import { prisma } from "~/prisma/prismaClient";
 import { log } from "~/server/logger";
 import PlaidSyncService from "~/server/services/PlaidSyncService";

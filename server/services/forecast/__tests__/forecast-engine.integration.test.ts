@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ForecastEngine, ForecastEngineFactory } from '../index';
 import type { ForecastContext } from '../types';
 import { createTestDatabase, cleanupTestDatabase } from './test-utils';
-import moment from 'moment';
+import { dateTimeService } from '../DateTimeService';
+
+// Dynamic moment import
+let moment: any;
 
 describe('ForecastEngine Integration Tests', () => {
   let engine: ForecastEngine;
@@ -10,6 +13,7 @@ describe('ForecastEngine Integration Tests', () => {
   let testAccountId: string;
 
   beforeEach(async () => {
+    moment = (await import("moment")).default;
     // Setup test database with sample data
     testDb = await createTestDatabase();
     engine = ForecastEngineFactory.create(testDb);
@@ -27,8 +31,8 @@ describe('ForecastEngine Integration Tests', () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf('month').toDate(),
-        endDate: moment().add(12, 'months').toDate(),
+        startDate: dateTimeService.startOf('month').toDate(),
+        endDate: dateTimeService.add(12, 'months').toDate(),
       };
 
       // Act: Run forecast calculation
@@ -72,8 +76,8 @@ describe('ForecastEngine Integration Tests', () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf('month').toDate(),
-        endDate: moment().add(24, 'months').toDate(),
+        startDate: dateTimeService.startOf('month').toDate(),
+        endDate: dateTimeService.add(24, 'months').toDate(),
       };
 
       // Act: Run forecast calculation

@@ -8,7 +8,6 @@ import type {
   CacheRegisterEntry,
   CacheAccountRegister,
 } from "./ModernCacheService";
-import moment from "moment";
 
 // Core Domain Types
 export interface ForecastContext {
@@ -35,11 +34,11 @@ export interface IAccountRegisterService {
   getAccount(accountId: number): CacheAccountRegister | null;
   processInterestCharges(
     accounts: CacheAccountRegister[],
-    forecastDate?: moment.Moment
+    forecastDate?: any
   ): Promise<void>;
   updateStatementDates(
     accounts: CacheAccountRegister[],
-    forecastDate?: moment.Moment
+    forecastDate?: any
   ): Promise<void>;
 }
 
@@ -75,7 +74,7 @@ export interface ILoanCalculatorService {
   ): Promise<number>;
   shouldProcessInterest(
     accountRegister: CacheAccountRegister,
-    forecastDate?: moment.Moment
+    forecastDate?: any
   ): boolean;
   isCreditAccount(typeId: number): boolean;
 }

@@ -1,11 +1,11 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import moment from "moment";
 import { AccountRegisterService } from "../AccountRegisterService";
 import { ModernCacheService } from "../ModernCacheService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import type { CacheAccountRegister } from "../ModernCacheService";
+import { dateTimeService } from "../DateTimeService";
 
 describe("AccountRegisterService", () => {
   let service: AccountRegisterService;
@@ -84,7 +84,7 @@ describe("AccountRegisterService", () => {
       balance: 1000,
       latestBalance: 1000,
       minPayment: null,
-      statementAt: moment("2024-01-15"),
+      statementAt: dateTimeService.create("2024-01-15"),
       apr1: 0.15,
       apr1StartAt: null,
       apr2: null,
@@ -179,7 +179,7 @@ describe("AccountRegisterService", () => {
       mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-50); // Negative = interest charge
       mockLoanCalculator.calculatePaymentAmount.mockReturnValue(100);
 
-      const forecastDate = moment("2024-01-01");
+      const forecastDate = dateTimeService.create("2024-01-01");
 
       await service.processInterestCharges(accounts, forecastDate);
 
@@ -249,7 +249,7 @@ describe("AccountRegisterService", () => {
       mockLoanCalculator.calculatePaymentAmount.mockReturnValue(150);
       mockDb.accountRegister.update.mockResolvedValue({});
 
-      const forecastDate = moment("2024-01-01");
+      const forecastDate = dateTimeService.create("2024-01-01");
 
       await (service as any).processAccountInterestCharge(
         account,
@@ -356,7 +356,7 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         },
       ]);
 
@@ -364,7 +364,7 @@ describe("AccountRegisterService", () => {
       mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(15); // Interest on projected balance
       mockDb.accountRegister.update.mockResolvedValue({});
 
-      const forecastDate = moment("2024-01-16");
+      const forecastDate = dateTimeService.create("2024-01-16");
 
       await (service as any).processAccountInterestCharge(
         account,
@@ -394,23 +394,23 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         },
         {
           accountRegisterId: 1,
           amount: -200,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-16"),
+          createdAt: dateTimeService.create("2024-01-16"),
         },
         {
           accountRegisterId: 1,
           amount: 300,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-25"), // After target date
+          createdAt: dateTimeService.create("2024-01-25"), // After target date
         },
       ]);
 
-      const targetDate = new Date("2024-01-20");
+      const targetDate = dateTimeService.create("2024-01-20");
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
         targetDate
@@ -424,7 +424,7 @@ describe("AccountRegisterService", () => {
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         999,
-        new Date()
+        dateTimeService.create()
       );
 
       expect(result).toBe(0);
@@ -442,19 +442,19 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: true, // Should be excluded
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         },
         {
           accountRegisterId: 1,
           amount: 200,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         },
       ]);
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
-        new Date("2024-01-20")
+        dateTimeService.create("2024-01-20")
       );
 
       expect(result).toBe(1200); // 1000 + 200 (excluding balance entry)
@@ -471,7 +471,7 @@ describe("AccountRegisterService", () => {
       const updateSpy = vi
         .spyOn(service as any, "updateStatementDate")
         .mockResolvedValue(undefined);
-      const forecastDate = moment("2024-01-01");
+      const forecastDate = dateTimeService.create("2024-01-01");
 
       await service.updateStatementDates(accounts, forecastDate);
 
@@ -495,11 +495,11 @@ describe("AccountRegisterService", () => {
     it("should update statement date when forecast date is after statement date", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: moment("2024-01-15"),
+        statementAt: dateTimeService.create("2024-01-15"),
       });
 
       mockDb.accountRegister.update.mockResolvedValue({});
-      const forecastDate = moment("2024-01-20"); // After statement date
+      const forecastDate = dateTimeService.create("2024-01-20"); // After statement date
 
       await (service as any).updateStatementDate(account, forecastDate);
 
@@ -517,11 +517,11 @@ describe("AccountRegisterService", () => {
     it("should not update when forecast date is before statement date", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: moment("2024-01-20"),
+        statementAt: dateTimeService.create("2024-01-20"),
       });
 
       const originalStatementAt = account.statementAt.format("YYYY-MM-DD");
-      const forecastDate = moment("2024-01-15"); // Before statement date
+      const forecastDate = dateTimeService.create("2024-01-15"); // Before statement date
 
       await (service as any).updateStatementDate(account, forecastDate);
 
@@ -536,15 +536,15 @@ describe("AccountRegisterService", () => {
     it("should update cache but not database for future dates", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: moment("2024-01-01"),
+        statementAt: dateTimeService.create("2024-01-01"),
       });
 
       // Use vi.spyOn to mock Date instead of moment
-      const mockNow = vi
-        .spyOn(Date, "now")
-        .mockReturnValue(new Date("2024-01-05").getTime());
+              const mockNow = vi
+          .spyOn(Date, "now")
+          .mockReturnValue(dateTimeService.create("2024-01-05").valueOf());
 
-      const forecastDate = moment("2024-01-10"); // Future date
+      const forecastDate = dateTimeService.create("2024-01-10"); // Future date
 
       await (service as any).updateStatementDate(account, forecastDate);
 
@@ -560,7 +560,7 @@ describe("AccountRegisterService", () => {
     it("should handle no forecast date provided", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: moment().subtract(1, "day"), // Yesterday
+        statementAt: dateTimeService.create().subtract(1, "day"), // Yesterday
       });
 
       mockDb.accountRegister.update.mockResolvedValue({});

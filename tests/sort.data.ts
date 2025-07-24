@@ -1,10 +1,10 @@
-import moment from "moment";
+import { dateTimeService } from "~/server/services/forecast";
 
 export const debitRegisterEntries = [
   {
     amount: -200,
     balance: 1200,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -14,7 +14,7 @@ export const debitRegisterEntries = [
   {
     amount: -100,
     balance: 1000,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -24,7 +24,7 @@ export const debitRegisterEntries = [
   {
     amount: 100,
     balance: 900,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -34,7 +34,7 @@ export const debitRegisterEntries = [
   {
     amount: 0,
     balance: 1000,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: true,
     isCleared: true,
     isManualEntry: false,
@@ -44,7 +44,7 @@ export const debitRegisterEntries = [
   {
     amount: -100,
     balance: 900,
-    createdAt: moment("2025-02-02"),
+    createdAt: dateTimeService.create("2025-02-02"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -54,7 +54,7 @@ export const debitRegisterEntries = [
   {
     amount: 300,
     balance: 1200,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -64,7 +64,7 @@ export const debitRegisterEntries = [
   {
     amount: 200,
     balance: 1400,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -74,7 +74,7 @@ export const debitRegisterEntries = [
   {
     amount: -200,
     balance: 1200,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -87,7 +87,7 @@ export const creditRegisterEntries = [
   {
     amount: 200,
     balance: -200,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -97,7 +97,7 @@ export const creditRegisterEntries = [
   {
     amount: 100,
     balance: 0,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -107,7 +107,7 @@ export const creditRegisterEntries = [
   {
     amount: -100,
     balance: 100,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: false,
     isCleared: true,
     isManualEntry: false,
@@ -117,7 +117,7 @@ export const creditRegisterEntries = [
   {
     amount: 0,
     balance: 0,
-    createdAt: moment("2025-01-01"),
+    createdAt: dateTimeService.create("2025-01-01"),
     isBalanceEntry: true,
     isCleared: true,
     isManualEntry: false,
@@ -127,7 +127,7 @@ export const creditRegisterEntries = [
   {
     amount: -100,
     balance: -100,
-    createdAt: moment("2025-02-02"),
+    createdAt: dateTimeService.create("2025-02-02"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -137,7 +137,7 @@ export const creditRegisterEntries = [
   {
     amount: -200,
     balance: -300,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -147,7 +147,7 @@ export const creditRegisterEntries = [
   {
     amount: -100,
     balance: -400,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,
@@ -157,7 +157,7 @@ export const creditRegisterEntries = [
   {
     amount: 400,
     balance: 0,
-    createdAt: moment("2025-02-03"),
+    createdAt: dateTimeService.create("2025-02-03"),
     isBalanceEntry: false,
     isCleared: false,
     isManualEntry: false,

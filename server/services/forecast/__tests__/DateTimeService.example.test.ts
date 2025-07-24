@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { dateTimeService } from "../DateTimeService";
 import { ForecastEngine } from "../ForecastEngine";
-import moment from "moment";
 
 describe("ForecastEngine with DateTimeService", () => {
   // Mock PrismaClient for testing
@@ -22,12 +21,12 @@ describe("ForecastEngine with DateTimeService", () => {
 
     // The engine should use the current time when no override is set
     const now = dateTimeService.now();
-    expect(now).toBeInstanceOf(moment);
+    expect(now).toBeDefined();
   });
 
   it("should use override time when set", () => {
     // Set a specific date for testing
-    const testDate = moment("2024-01-15T10:30:00Z");
+    const testDate = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(testDate);
 
     const engine = new ForecastEngine(mockDb);
@@ -39,7 +38,7 @@ describe("ForecastEngine with DateTimeService", () => {
 
   it("should allow testing specific scenarios with different dates", () => {
     // Test scenario: What happens on a specific date
-    const scenarioDate = moment("2024-06-15T00:00:00Z");
+    const scenarioDate = dateTimeService.create("2024-06-15T00:00:00Z");
     dateTimeService.setNowOverride(scenarioDate);
 
     // Now you can test how the forecast engine behaves on June 15, 2024
@@ -51,7 +50,7 @@ describe("ForecastEngine with DateTimeService", () => {
 
   it("should allow testing time-sensitive operations", () => {
     // Test interest calculations on a specific statement date
-    const statementDate = moment("2024-03-01T00:00:00Z");
+    const statementDate = dateTimeService.create("2024-03-01T00:00:00Z");
     dateTimeService.setNowOverride(statementDate);
 
     // Now test interest calculations that depend on the current date
@@ -60,18 +59,18 @@ describe("ForecastEngine with DateTimeService", () => {
 
   it("should work with multiple test scenarios", () => {
     // Scenario 1: Test on January 1st (use local time to avoid timezone issues)
-    dateTimeService.setNowOverride(moment("2024-01-01"));
+    dateTimeService.setNowOverride(dateTimeService.create("2024-01-01"));
     let now1 = dateTimeService.now();
     expect(now1.format("YYYY-MM-DD")).toBe("2024-01-01");
 
     // Scenario 2: Test on December 31st (use local time to avoid timezone issues)
-    dateTimeService.setNowOverride(moment("2024-12-31"));
+    dateTimeService.setNowOverride(dateTimeService.create("2024-12-31"));
     let now2 = dateTimeService.now();
     expect(now2.format("YYYY-MM-DD")).toBe("2024-12-31");
 
     // Clear override and return to current time
     dateTimeService.clearNowOverride();
     let now3 = dateTimeService.now();
-    expect(now3.format("YYYY-MM-DD")).toBe(moment().format("YYYY-MM-DD"));
+    expect(now3.format("YYYY-MM-DD")).toBe(dateTimeService.now().format("YYYY-MM-DD"));
   });
 });

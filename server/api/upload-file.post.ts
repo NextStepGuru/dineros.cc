@@ -1,11 +1,11 @@
 import { getUser } from "../lib/getUser";
 import type { H3Event } from "h3";
-import moment from "moment";
 import papaparse from "papaparse"; // Import papaparse
 import { z } from "zod";
 import { prisma } from "../clients/prismaClient";
 import { createId as cuid2 } from "@paralleldrive/cuid2";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -42,8 +42,8 @@ export default defineEventHandler(async (event: H3Event) => {
       });
 
       const results = csvData.data.map((item) => {
-        const createdAt = moment(item.Date)
-          .utc()
+        const createdAt = dateTimeService
+          .createUTC(item.Date)
           .set({
             hour: 0,
             minute: 0,
@@ -65,8 +65,8 @@ export default defineEventHandler(async (event: H3Event) => {
             where: {
               amount: item.amount,
               createdAt: {
-                gte: moment(item.createdAt)
-                  .utc()
+                gte: dateTimeService
+                  .createUTC(item.createdAt)
                   .set({
                     hour: 0,
                     minute: 0,
@@ -75,8 +75,8 @@ export default defineEventHandler(async (event: H3Event) => {
                   })
                   .subtract({ day: 2 })
                   .toDate(),
-                lte: moment(item.createdAt)
-                  .utc()
+                lte: dateTimeService
+                  .createUTC(item.createdAt)
                   .set({
                     hour: 0,
                     minute: 0,

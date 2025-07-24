@@ -1,30 +1,37 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import moment from "moment";
 import { TransferService } from "../TransferService";
 import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
-import type {
-  CacheAccountRegister,
-  CacheRegisterEntry,
-} from "../ModernCacheService";
+import { AccountRegisterService } from "../AccountRegisterService";
+import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
+import type { PrismaClient, Reoccurrence } from "@prisma/client";
+import { forecastLogger } from "../logger";
+import { dateTimeService } from "../DateTimeService";
+
+// Dynamic moment import
+let moment: any;
 
 describe("TransferService", () => {
   let service: TransferService;
-  let mockCache: {
-    accountRegister: any;
-    registerEntry: any;
-  };
+  let mockDb: PrismaClient;
+  let mockCache: { accountRegister: any; registerEntry: any };
   let mockEntryService: { createEntry: any };
+  let mockAccountService: { getAccount: any };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
+    mockDb = await createTestDatabase();
+
     // Create mock services
     mockCache = {
       accountRegister: {
         findOne: vi.fn(),
         find: vi.fn(),
+        update: vi.fn(),
       },
       registerEntry: {
         find: vi.fn(),
+        insert: vi.fn(),
       },
     };
 
@@ -32,19 +39,28 @@ describe("TransferService", () => {
       createEntry: vi.fn(),
     };
 
-    service = new TransferService(mockCache as any, mockEntryService as any);
+    mockAccountService = {
+      getAccount: vi.fn(),
+    };
 
-    // Mock console.log to avoid test output
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    service = new TransferService(
+      mockDb,
+      mockCache as any,
+      mockEntryService as any,
+      mockAccountService as any
+    );
+
+    // Mock forecastLogger to avoid test output
+    vi.spyOn(forecastLogger, "service").mockImplementation(() => {});
+    vi.spyOn(forecastLogger, "serviceDebug").mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await cleanupTestDatabase(mockDb);
     vi.restoreAllMocks();
   });
 
-  function createMockAccount(
-    overrides: Partial<CacheAccountRegister> = {}
-  ): CacheAccountRegister {
+  function createMockAccount(overrides: any = {}) {
     return {
       id: 1,
       typeId: 1,
@@ -54,7 +70,7 @@ describe("TransferService", () => {
       balance: 1000,
       latestBalance: 1000,
       minPayment: null,
-      statementAt: moment("2024-01-15"),
+      statementAt: dateTimeService.create("2024-01-15"),
       apr1: 0.15,
       apr1StartAt: null,
       apr2: null,
@@ -67,44 +83,38 @@ describe("TransferService", () => {
       loanTotalYears: null,
       loanOriginalAmount: null,
       loanPaymentSortOrder: 0,
-      savingsGoalSortOrder: 0,
-      accountSavingsGoal: null,
       minAccountBalance: 500,
       allowExtraPayment: false,
       isArchived: false,
       plaidId: null,
       ...overrides,
-    } as CacheAccountRegister;
+    };
   }
 
-  function createMockEntry(
-    overrides: Partial<CacheRegisterEntry> = {}
-  ): CacheRegisterEntry {
+  function createMockEntry(overrides: any = {}) {
     return {
-      id: "entry-1",
+      id: "test-entry",
       accountRegisterId: 1,
+      sourceAccountRegisterId: null,
       description: "Test Entry",
       amount: 100,
       balance: 1100,
-      createdAt: moment("2024-01-01"),
-      isProjected: true,
-      isPending: false,
-      isCleared: false,
       isBalanceEntry: false,
+      isPending: false,
+      isProjected: false,
       isManualEntry: false,
+      isCleared: false,
       isReconciled: false,
-      sourceAccountRegisterId: null,
-      reoccurrenceId: null,
-      transferAccountRegisterId: null,
+      createdAt: dateTimeService.create("2024-01-01"),
       ...overrides,
-    } as CacheRegisterEntry;
+    };
   }
 
   const mockReoccurrence = {
     accountId: "test-account",
     accountRegisterId: 1,
     description: "Test Transfer",
-    lastAt: new Date(),
+    lastAt: dateTimeService.create("2024-01-01"),
     amount: 100,
     transferAccountRegisterId: 2,
     intervalId: 3,
@@ -113,7 +123,7 @@ describe("TransferService", () => {
     endAt: null,
     totalIntervals: null,
     elapsedIntervals: null,
-    updatedAt: new Date(),
+    updatedAt: dateTimeService.create("2024-01-01"),
     adjustBeforeIfOnWeekend: false,
   };
 
@@ -195,7 +205,7 @@ describe("TransferService", () => {
 
   describe("transferBetweenAccountsWithDate", () => {
     it("should create entries with forecast date", () => {
-      const forecastDate = new Date("2024-02-01");
+      const forecastDate = dateTimeService.create("2024-02-01");
       const params = {
         targetAccountRegisterId: 1,
         sourceAccountRegisterId: 2,
@@ -235,12 +245,12 @@ describe("TransferService", () => {
 
       await service.processExtraDebtPayments(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       expect(shouldProcessSpy).toHaveBeenCalledWith(
         sourceAccount,
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       shouldProcessSpy.mockRestore();
@@ -255,7 +265,7 @@ describe("TransferService", () => {
 
       await service.processExtraDebtPayments(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
@@ -270,7 +280,7 @@ describe("TransferService", () => {
 
       await service.processExtraDebtPayments(
         [sourceAccount],
-        new Date("2024-01-15")
+        dateTimeService.create("2024-01-15")
       );
 
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
@@ -361,11 +371,11 @@ describe("TransferService", () => {
           accountRegisterId: 1,
           amount: 1000,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         }),
       ]);
 
-      const targetDate = new Date("2024-01-20");
+      const targetDate = dateTimeService.create("2024-01-20");
       const result = (service as any).shouldProcessExtraDebtPayment(
         account,
         targetDate
@@ -388,23 +398,23 @@ describe("TransferService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         }),
         createMockEntry({
           accountRegisterId: 1,
           amount: -200,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-16"),
+          createdAt: dateTimeService.create("2024-01-16"),
         }),
         createMockEntry({
           accountRegisterId: 1,
           amount: 300,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-25"), // After target date
+          createdAt: dateTimeService.create("2024-01-25"), // After target date
         }),
       ]);
 
-      const targetDate = new Date("2024-01-20");
+      const targetDate = dateTimeService.create("2024-01-20");
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
         targetDate
@@ -418,7 +428,7 @@ describe("TransferService", () => {
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         999,
-        new Date()
+        dateTimeService.create("2024-01-01")
       );
 
       expect(result).toBe(0);
@@ -436,19 +446,19 @@ describe("TransferService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: true, // Should be excluded
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         }),
         createMockEntry({
           accountRegisterId: 1,
           amount: 200,
           isBalanceEntry: false,
-          createdAt: moment("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15"),
         }),
       ]);
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
-        new Date("2024-01-20")
+        dateTimeService.create("2024-01-20")
       );
 
       expect(result).toBe(1200); // 1000 + 200 (excluding balance entry)
@@ -483,7 +493,7 @@ describe("TransferService", () => {
       const result = await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       expect(result).toBe(true);
@@ -496,7 +506,7 @@ describe("TransferService", () => {
       const result = await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 999,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       expect(result).toBe(false);
@@ -519,7 +529,7 @@ describe("TransferService", () => {
       const result = await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       expect(result).toBe(false);
@@ -550,7 +560,7 @@ describe("TransferService", () => {
       await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       // Should transfer only $100 (the debt amount), not the full available $1500
@@ -593,7 +603,7 @@ describe("TransferService", () => {
       await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       // Should pay both debts: $500 to first debt (higher priority), then $2000 to second debt
@@ -644,7 +654,7 @@ describe("TransferService", () => {
       await (service as any).processExtraDebtPayment({
         minBalance: 500,
         sourceAccountId: 1,
-        lastAt: new Date("2024-01-01"),
+        lastAt: dateTimeService.create("2024-01-01"),
       });
 
       // Should pay to debtAccount1 (higher priority - lower loanPaymentSortOrder)
@@ -679,7 +689,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       // Should not create any savings entries since debt still exists
@@ -719,13 +729,13 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       // Should call the private method
       expect(processSavingsGoalForAccountSpy).toHaveBeenCalledWith({
         sourceAccountId: 1,
-        targetDate: new Date("2024-01-01"),
+        targetDate: dateTimeService.create("2024-01-01"),
       });
 
       calculateProjectedBalanceSpy.mockRestore();
@@ -765,13 +775,13 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       // Should call shouldProcessExtraDebtPayment
       expect(shouldProcessSpy).toHaveBeenCalledWith(
         sourceAccount,
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       calculateProjectedBalanceSpy.mockRestore();
@@ -813,7 +823,7 @@ describe("TransferService", () => {
       // Call the private method directly
       const result = await (service as any).processSavingsGoalForAccount({
         sourceAccountId: 1,
-        targetDate: new Date("2024-01-01"),
+        targetDate: dateTimeService.create("2024-01-01"),
       });
 
       // Should return true and create entries (2 entries: source and target)
@@ -854,7 +864,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       // Should not create any entries since goal is already reached
@@ -902,7 +912,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        new Date("2024-01-01")
+        dateTimeService.create("2024-01-01")
       );
 
       calculateProjectedBalanceSpy.mockRestore();

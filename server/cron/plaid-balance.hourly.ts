@@ -2,7 +2,6 @@ import { defineCronHandler } from "#nuxt/cron";
 import { log } from "~/server/logger";
 import { addPlaidBalanceSyncJob } from "~/server/clients/queuesClient";
 import { prisma } from "~/prisma/prismaClient";
-import moment from "moment";
 import { dateTimeService } from "~/server/services/forecast";
 
 export default defineCronHandler("hourly", async () => {

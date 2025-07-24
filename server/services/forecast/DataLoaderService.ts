@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
-import moment from "moment";
 import type { IDataLoaderService, ForecastContext, AccountData } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
+import { dateTimeService } from "./DateTimeService";
 
 export class DataLoaderService implements IDataLoaderService {
   constructor(private db: PrismaClient, private cache: ModernCacheService) {}
@@ -85,7 +85,7 @@ export class DataLoaderService implements IDataLoaderService {
     const lokiAccountRegisters: CacheAccountRegister[] = accountRegisters.map(
       (reg) => ({
         ...reg,
-        statementAt: moment(reg.statementAt).utc(),
+        statementAt: dateTimeService.createUTC(reg.statementAt),
       })
     );
 
@@ -113,7 +113,7 @@ export class DataLoaderService implements IDataLoaderService {
 
     const cacheEntries = registerEntries.map((entry) => ({
       ...entry,
-      createdAt: moment(entry.createdAt).utc(),
+      createdAt: dateTimeService.createUTC(entry.createdAt),
     }));
 
     // Insert into cache (this was missing!)
@@ -150,7 +150,7 @@ export class DataLoaderService implements IDataLoaderService {
     reoccurrenceSkips.forEach((item) => {
       this.cache.reoccurrenceSkip.insert({
         ...item,
-        skippedAt: moment(item.skippedAt).toISOString(),
+        skippedAt: dateTimeService.format(item.skippedAt, "YYYY-MM-DD"),
       });
     });
 

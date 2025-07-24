@@ -1,4 +1,5 @@
-import moment from "moment";
+import { vi, describe, it, expect, beforeEach } from "vitest";
+import { dateTimeService } from "../DateTimeService";
 import { ModernCacheService } from "../ModernCacheService";
 import { ForecastEngine } from "../ForecastEngine";
 import { DataLoaderService } from "../DataLoaderService";
@@ -7,8 +8,9 @@ import { AccountRegisterService } from "../AccountRegisterService";
 import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
-import { dateTimeService } from "../DateTimeService";
-import { vi } from "vitest";
+
+// Dynamic moment import
+let moment: any;
 
 /**
  * Regression tests for Bug #3: Forecast Timeline Continuity
@@ -21,7 +23,8 @@ describe("Forecast Continuity Regression Tests", () => {
   let engine: ForecastEngine;
   let cache: ModernCacheService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    moment = (await import("moment")).default;
     // Mock Prisma client
     mockPrisma = {
       accountRegister: {
@@ -36,16 +39,16 @@ describe("Forecast Continuity Regression Tests", () => {
       },
       reoccurrence: {
         findMany: vi.fn(),
+        aggregate: vi.fn(),
+      },
+      reoccurrenceSkip: {
+        findMany: vi.fn(),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
     };
 
     // Create engine with mocked database
-    engine = new ForecastEngine(
-      mockPrisma,
-      new DataLoaderService(mockPrisma),
-      new DataPersisterService(mockPrisma)
-    );
+    engine = new ForecastEngine(mockPrisma);
 
     cache = new ModernCacheService();
   });
@@ -62,7 +65,7 @@ describe("Forecast Continuity Regression Tests", () => {
         accountId: "gm-financial-test",
         latestBalance: -25432.07,
         minPayment: 803.05,
-        statementAt: moment("2025-08-09"),
+        statementAt: dateTimeService.create("2025-08-09"),
         statementIntervalId: 3, // Monthly
         apr1: 0.05,
         apr2: null,
@@ -93,7 +96,7 @@ describe("Forecast Continuity Regression Tests", () => {
         accountId: "checking-test",
         latestBalance: 5000,
         minPayment: null,
-        statementAt: moment("2025-08-01"),
+        statementAt: dateTimeService.create("2025-08-01"),
         statementIntervalId: 3,
         apr1: null,
         apr2: null,
@@ -122,6 +125,10 @@ describe("Forecast Continuity Regression Tests", () => {
       ]);
       mockPrisma.registerEntry.findMany.mockResolvedValue([]);
       mockPrisma.reoccurrence.findMany.mockResolvedValue([]);
+      mockPrisma.reoccurrenceSkip.findMany.mockResolvedValue([]);
+      mockPrisma.reoccurrence.aggregate.mockResolvedValue({
+        _min: { lastAt: null },
+      });
       mockPrisma.registerEntry.deleteMany.mockResolvedValue({});
       mockPrisma.registerEntry.createMany.mockResolvedValue({});
 
@@ -134,8 +141,11 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should complete successfully without stopping
-      expect(result.success).toBe(true);
-      expect(result.error).toBeUndefined();
+      if (!result.isSuccess) {
+        console.log("Forecast failed with errors:", result.errors);
+      }
+      expect(result.isSuccess).toBe(true);
+      expect(result.errors).toBeUndefined();
 
       // Should have processed multiple statement periods
       expect(result.datesProcessed).toBeGreaterThan(150); // ~6 months of days
@@ -293,7 +303,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should process all accounts continuously
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(90); // 3 months
 
       // Should handle all different interval types without stopping
@@ -393,7 +403,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should handle month-end dates correctly
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(120); // 4 months
 
       // Check that statement dates were updated properly
@@ -452,7 +462,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should handle leap year transition without stopping
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBeGreaterThan(365); // Over a year
     });
   });
@@ -546,7 +556,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should complete full 2-year forecast
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(730); // 2 years
 
       // Verify all balances are numeric, not string concatenations
@@ -619,7 +629,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should process full year
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
 
       // Find all interest entries
       const interestEntries = allCreatedEntries.filter(
@@ -734,7 +744,7 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should complete despite tiny amounts
-      expect(result.success).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.datesProcessed).toBe(181); // 6 months
     });
   });

@@ -3,7 +3,6 @@ import type { CacheAccountRegister } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
-import moment from "moment";
 import { dateTimeService } from "./DateTimeService";
 
 export class TransferService implements ITransferService {
@@ -101,23 +100,10 @@ export class TransferService implements ITransferService {
         sourceAccount,
         targetDate
       );
-      forecastLogger.serviceDebug(
-        "TransferService",
-        `Extra debt payment decision for ${sourceAccount.name}:`,
-        {
-          accountId: sourceAccount.id,
-          targetDate: targetDate.toISOString(),
-          shouldProcess,
-        }
-      );
 
       if (shouldProcess) {
-        forecastLogger.serviceDebug(
-          "TransferService",
-          `Calling processExtraDebtPayment for ${sourceAccount.name}`
-        );
         await this.processExtraDebtPayment({
-          minBalance: +sourceAccount.minAccountBalance!,
+          minBalance: +(sourceAccount.minAccountBalance || 0),
           sourceAccountId: sourceAccount.id,
           lastAt: targetDate,
         });
@@ -210,10 +196,7 @@ export class TransferService implements ITransferService {
       .find({
         accountRegisterId: accountId,
       })
-      .filter((entry) => {
-        // Include entries that occur on or before the target date
-        return entry.createdAt.isSameOrBefore(moment(targetDate));
-      });
+      .filter((entry) => dateTimeService.isSameOrBefore(entry.createdAt, targetDate));
 
     // Start with the initial balance and add all entries up to target date
     let projectedBalance = account.latestBalance;

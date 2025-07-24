@@ -3,7 +3,6 @@ import {
   dateTimeService,
 } from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
-import moment from "moment";
 import { MAX_YEARS } from "~/consts";
 
 export default defineEventHandler(async (event) => {

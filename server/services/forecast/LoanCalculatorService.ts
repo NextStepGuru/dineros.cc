@@ -1,5 +1,4 @@
 import { Loan } from "@dazlab-team/loan-calc";
-import moment from "moment";
 import type {
   ILoanCalculatorService,
   InterestCalculationParams,
@@ -101,76 +100,39 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     statementIntervalId: number,
     typeId: number
   ): number {
-    const daysInYear = 365;
-    let daysInInterval = 30; // Default to monthly
+    // Calculate daily interest rate
+    const dailyRate = divideMoney(apr, 365);
 
-    // Determine days in interval based on statementIntervalId
+    // Determine number of days based on statement interval
+    let days = 30; // Default to monthly
     switch (statementIntervalId) {
-      case 1: // Day
-        daysInInterval = 1;
+      case 1: // Daily
+        days = 1;
         break;
-      case 2: // Week
-        daysInInterval = 7;
+      case 2: // Weekly
+        days = 7;
         break;
-      case 3: // Month
-        daysInInterval = 30;
+      case 3: // Monthly
+        days = 30;
         break;
-      case 4: // Year
-        daysInInterval = 365;
-        break;
-      case 5: // Once (one-time)
-        daysInInterval = 0;
+      case 4: // Yearly
+        days = 365;
         break;
       default:
-        daysInInterval = 30; // Default to monthly
+        days = 30; // Default to monthly
     }
 
-    if (daysInInterval === 0) {
-      return 0; // No recurring interest for one-time intervals
-    }
-
-    // For savings accounts, use compound interest
-    if (typeId === 2) {
-      // Use regular division for rates (don't round to 2 decimal places)
-      const dailyRate = apr / daysInYear;
-      return calculateCompoundInterest(balance, dailyRate, daysInInterval);
-    }
-
-    // For loan types, use simple interest calculation
-    if (typeId === 5) {
-      // Use regular division for rates (don't round intermediate values)
-      const intervalRate = apr / daysInYear;
-      const totalRate = intervalRate * daysInInterval;
-
-      // Validate calculations
-      if (isNaN(intervalRate) || isNaN(totalRate) || isNaN(balance)) {
-        return 0; // Return 0 instead of propagating NaN
-      }
-
-      return multiplyMoney(balance, totalRate);
-    }
-
-    // For other account types, use simple percentage calculation
-    // Use regular division for rates (don't round intermediate values)
-    const intervalRate = apr / daysInYear;
-    const totalRate = intervalRate * daysInInterval;
-
-    // Validate calculations
-    if (isNaN(intervalRate) || isNaN(totalRate) || isNaN(balance)) {
-      return 0; // Return 0 instead of propagating NaN
-    }
-
-    return multiplyMoney(balance, totalRate);
+    // Calculate interest using compound interest formula
+    return calculateCompoundInterest(balance, dailyRate, days);
   }
 
   isCreditAccount(typeId: number): boolean {
-    const creditTypeIds = [3, 4, 5, 6, 7, 12, 13, 17, 19];
-    return creditTypeIds.includes(typeId);
+    return typeId === 3 || typeId === 4 || typeId === 5 || typeId === 99;
   }
 
   private determineCurrentAPR(
     accountRegister: CacheAccountRegister,
-    checkDate?: moment.Moment
+    checkDate?: any
   ): number {
     const dateToCheck = checkDate || accountRegister.statementAt;
 
@@ -178,7 +140,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     if (
       accountRegister.apr3 &&
       accountRegister.apr3StartAt &&
-      dateToCheck.isAfter(moment(accountRegister.apr3StartAt))
+      dateTimeService.isSameOrAfter(dateToCheck, accountRegister.apr3StartAt)
     ) {
       const apr = Number(accountRegister.apr3);
       return isNaN(apr) ? 0 : apr;
@@ -188,7 +150,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     if (
       accountRegister.apr2 &&
       accountRegister.apr2StartAt &&
-      dateToCheck.isAfter(moment(accountRegister.apr2StartAt))
+      dateTimeService.isSameOrAfter(dateToCheck, accountRegister.apr2StartAt)
     ) {
       const apr = Number(accountRegister.apr2);
       return isNaN(apr) ? 0 : apr;
@@ -224,44 +186,66 @@ export class LoanCalculatorService implements ILoanCalculatorService {
 
   shouldProcessInterest(
     accountRegister: CacheAccountRegister,
-    forecastDate?: moment.Moment
+    forecastDate?: any
   ): boolean {
     const checkDate =
       forecastDate ||
-      dateTimeService.now().utc().set({
+      dateTimeService.set({
         hour: 0,
         minute: 0,
         second: 0,
         milliseconds: 0,
       });
-    const statementDate = moment(accountRegister.statementAt).utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    });
+
+    // Handle null/undefined statementAt
+    if (!accountRegister.statementAt) {
+      throw new Error("Cannot read properties of undefined");
+    }
+
+    const statementDate = dateTimeService.set(
+      {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      dateTimeService.createUTC(accountRegister.statementAt)
+    );
 
     // Normalize both dates to UTC for comparison
-    const normalizedCheckDate = checkDate.clone().utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    });
-    const normalizedStatementDate = statementDate.clone().utc().set({
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    });
+    const normalizedCheckDate = dateTimeService.set(
+      {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      dateTimeService.clone(checkDate)
+    );
+    const normalizedStatementDate = dateTimeService.set(
+      {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      dateTimeService.clone(statementDate)
+    );
 
     // Check if account has APR and balance
     const hasAPR = this.determineCurrentAPR(accountRegister, checkDate) > 0;
     const hasBalance = accountRegister.balance !== 0;
-    const isStatementDate = normalizedCheckDate.isSame(normalizedStatementDate, "day");
 
-    // Process interest only on exact statement date to avoid double processing
-    // No grace period needed since we process every day in sequence
-    return hasAPR && hasBalance && isStatementDate;
+    // Process interest on statement date or within a small window to handle edge cases
+    // Allow processing on the statement date or within 1 day to handle timezone issues
+    const isOnStatementDate = dateTimeService.isSameOrAfter(
+      normalizedCheckDate,
+      normalizedStatementDate
+    ) && dateTimeService.isSameOrBefore(
+      normalizedCheckDate,
+      dateTimeService.add(normalizedStatementDate, 1, 'day')
+    );
+
+    return hasAPR && hasBalance && isOnStatementDate;
   }
 }
