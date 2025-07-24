@@ -19,14 +19,8 @@ export default defineEventHandler(async (event: H3Event) => {
       throw new Error("sortMode must be 'visual', 'loan', or 'savings'");
     }
 
-    console.log(
-      "Received accountRegisters:",
-      JSON.stringify(accountRegisters, null, 2)
-    );
-
     // Verify user has access to all account registers
     for (const accountRegister of accountRegisters) {
-      console.log("Checking accountRegister:", accountRegister);
 
       // Determine which sort field to validate based on sort mode
       let sortField: string;
@@ -48,7 +42,6 @@ export default defineEventHandler(async (event: H3Event) => {
       }
 
       if (!accountRegister.id || typeof sortValue !== "number") {
-        console.log("Invalid accountRegister:", accountRegister);
         throw new Error(
           `Each account register must have id and ${sortField}. Got: id=${accountRegister.id}, ${sortField}=${sortValue}`
         );

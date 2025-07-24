@@ -91,8 +91,6 @@ export const recalculateRunningBalanceAndSort = <
     .map((item) => {
       runningBalance += +item.amount * -1;
 
-      console.log("runningBalance", runningBalance);
-
       return { ...item, balance: runningBalance };
     })
     // then reverse again to sort correctly

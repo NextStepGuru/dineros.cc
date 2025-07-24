@@ -8,8 +8,6 @@ export class DataLoaderService implements IDataLoaderService {
   constructor(private db: PrismaClient, private cache: ModernCacheService) {}
 
   async loadAccountData(context: ForecastContext): Promise<AccountData> {
-    console.log(`loadAccountData: Loading data for accountId = ${context.accountId}`);
-
     // Clear existing cache
     this.cache.accountRegister.clear();
     this.cache.registerEntry.clear();
@@ -18,21 +16,17 @@ export class DataLoaderService implements IDataLoaderService {
 
     // Load account registers
     const accountRegisters = await this.loadAccountRegisters(context.accountId);
-    console.log(`loadAccountData: Loaded ${accountRegisters.length} account registers`);
 
     // Load register entries
     const registerEntries = await this.loadRegisterEntries(context.accountId);
-    console.log(`loadAccountData: Loaded ${registerEntries.length} register entries`);
 
     // Load reoccurrences
     const reoccurrences = await this.loadReoccurrences(context.accountId);
-    console.log(`loadAccountData: Loaded ${reoccurrences.length} reoccurrences`);
 
     // Load reoccurrence skips
     const reoccurrenceSkips = await this.loadReoccurrenceSkips(
       context.accountId
     );
-    console.log(`loadAccountData: Loaded ${reoccurrenceSkips.length} reoccurrence skips`);
 
     const result = {
       accountRegisters,
@@ -41,7 +35,6 @@ export class DataLoaderService implements IDataLoaderService {
       reoccurrenceSkips,
     };
 
-    console.log(`loadAccountData: Returning data:`, result);
     return result;
   }
 
@@ -82,15 +75,6 @@ export class DataLoaderService implements IDataLoaderService {
       },
     });
 
-    console.log(
-      `[DataLoaderService] Loaded ${accountRegisters.length} account registers from database`
-    );
-    accountRegisters.forEach((reg) => {
-      console.log(
-        `[DataLoaderService] Account ${reg.id} (${reg.name}): balance=${reg.balance}, typeId=${reg.typeId}, targetAccountRegisterId=${reg.targetAccountRegisterId}`
-      );
-    });
-
     const lokiAccountRegisters: CacheAccountRegister[] = accountRegisters.map(
       (reg) => ({
         ...reg,
@@ -100,9 +84,15 @@ export class DataLoaderService implements IDataLoaderService {
         apr1: reg.apr1 ? Number(reg.apr1) : null,
         apr2: reg.apr2 ? Number(reg.apr2) : null,
         apr3: reg.apr3 ? Number(reg.apr3) : null,
-        loanOriginalAmount: reg.loanOriginalAmount ? Number(reg.loanOriginalAmount) : null,
-        minAccountBalance: reg.minAccountBalance ? Number(reg.minAccountBalance) : null,
-        accountSavingsGoal: reg.accountSavingsGoal ? Number(reg.accountSavingsGoal) : null,
+        loanOriginalAmount: reg.loanOriginalAmount
+          ? Number(reg.loanOriginalAmount)
+          : null,
+        minAccountBalance: reg.minAccountBalance
+          ? Number(reg.minAccountBalance)
+          : null,
+        accountSavingsGoal: reg.accountSavingsGoal
+          ? Number(reg.accountSavingsGoal)
+          : null,
         statementAt: dateTimeService.createUTC(reg.statementAt),
       })
     );

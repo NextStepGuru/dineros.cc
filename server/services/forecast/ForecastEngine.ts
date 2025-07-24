@@ -48,8 +48,6 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   async recalculate(context: ForecastContext): Promise<ForecastResult> {
-    console.log("=== FORECAST ENGINE RECALCULATE START ===");
-    console.log("ForecastEngine.recalculate called with context:", context);
     try {
       // Set up logging configuration
       if (context.logging) {
@@ -57,11 +55,7 @@ export class ForecastEngine implements IForecastEngine {
       }
 
       // 1. Load data from database into memory cache
-      console.log("Loading account data...");
       const accountData = await this.dataLoader.loadAccountData(context);
-      console.log(
-        `Loaded ${accountData.accountRegisters.length} account registers, ${accountData.registerEntries.length} register entries`
-      );
 
       // 2. Convert old projected entries to pending entries before cleanup
       await this.dataPersister.convertOldProjectedToPending(context.accountId);
@@ -70,23 +64,12 @@ export class ForecastEngine implements IForecastEngine {
       await this.dataPersister.performInitialCleanup(context.accountId);
 
       // Only use non-archived account registers
-      console.log(`Found ${accountData.accountRegisters.length} total account registers`);
-      console.log(`Account registers:`, accountData.accountRegisters);
       const activeAccountRegisters = accountData.accountRegisters.filter(
         (a) => !a.isArchived
       );
-      console.log(`Found ${activeAccountRegisters.length} active account registers`);
 
       // 4. Create balance entries for all loaded active accounts
-      console.log(
-        `Creating balance entries for ${activeAccountRegisters.length} accounts`
-      );
       this.accountService.createBalanceEntries(activeAccountRegisters);
-      console.log(
-        `Balance entries created. Cache now has ${
-          this.cache.registerEntry.find({}).length
-        } entries`
-      );
 
       // 5. Get forecast date range
       const minDate = await this.dataLoader.getMinReoccurrenceDate(
@@ -117,9 +100,7 @@ export class ForecastEngine implements IForecastEngine {
       );
 
       // 6. Load existing manual entries into the timeline
-      console.log(`Loading existing entries. accountData.registerEntries length = ${accountData.registerEntries?.length || 0}`);
       await this.loadExistingEntries(accountData, startDate);
-      console.log(`After loading existing entries. Cache has ${this.cache.registerEntry.find({}).length} entries`);
 
       // 7. Process forecast day by day
       let datesProcessed = 0;
@@ -182,7 +163,9 @@ export class ForecastEngine implements IForecastEngine {
       await this.dataPersister.performFinalCleanup(context.accountId);
 
       // 14. Convert results to expected format
-      console.log(`Converting ${processedResults.length} processed results to final format`);
+      console.log(
+        `Converting ${processedResults.length} processed results to final format`
+      );
       const finalResults = this.convertToFinalFormat(processedResults);
       console.log(`Final results: ${finalResults.length} entries`);
       console.log("=== FORECAST ENGINE RECALCULATE SUCCESS ===");
@@ -197,15 +180,7 @@ export class ForecastEngine implements IForecastEngine {
         datesProcessed,
       };
     } catch (error) {
-      console.log("=== FORECAST ENGINE RECALCULATE ERROR ===");
       forecastLogger.error("Forecast calculation failed:", error);
-      console.error("Forecast calculation failed:", error);
-      console.error("Error type:", typeof error);
-      console.error("Error constructor:", error?.constructor?.name);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
       return {
         registerEntries: [],
         accountRegisters: [],
@@ -244,9 +219,6 @@ export class ForecastEngine implements IForecastEngine {
       // Load ALL existing entries (including isPending from Plaid) to ensure accurate balance calculations
       // We need to include entries that occur on or after startDate if they're real transactions
       const existingEntries = accountData.registerEntries;
-
-      console.log(`loadExistingEntries: accountData.registerEntries length = ${existingEntries?.length || 0}`);
-      console.log(`loadExistingEntries: existingEntries =`, existingEntries);
 
       forecastLogger.info(
         `Loading ${existingEntries.length} existing entries into forecast calculations`
@@ -369,12 +341,6 @@ export class ForecastEngine implements IForecastEngine {
       });
       const balanceEntries = accountEntries.filter((e) => e.isBalanceEntry);
 
-      console.log(
-        `Account ${accountRegister.id}: Found ${accountEntries.length} entries, ${balanceEntries.length} balance entries`
-      );
-      console.log(`Cache has ${this.cache.registerEntry.find({}).length} total entries`);
-      console.log(`Account entries:`, accountEntries);
-
       // Filter out skipped entries
       const filteredEntries =
         this.entryService.filterSkippedEntries(accountEntries);
@@ -390,17 +356,12 @@ export class ForecastEngine implements IForecastEngine {
         accountType
       );
 
-      console.log(
-        `Account ${accountRegister.id}: Sorted entries: ${sortedEntries.length}`
-      );
-
       returnRegisterEntries.push(...sortedEntries);
 
       // Update entry statuses for this account
       await this.entryService.updateEntryStatuses(accountRegister.id);
     }
 
-    console.log(`Total entries to return: ${returnRegisterEntries.length}`);
     return returnRegisterEntries;
   }
 

@@ -208,14 +208,6 @@ export class AccountRegisterService implements IAccountRegisterService {
     accounts: CacheAccountRegister[],
     forecastDate?: any
   ): Promise<void> {
-    console.log(
-      `[updateStatementDates] Called with ${
-        accounts.length
-      } accounts, forecastDate: ${dateTimeService.format(
-        "YYYY-MM-DD",
-        forecastDate
-      )}`
-    );
     // Add a simple flag to track if method is called
     (global as any).updateStatementDatesCalled = true;
     (global as any).updateStatementDatesCallCount =
@@ -263,44 +255,12 @@ export class AccountRegisterService implements IAccountRegisterService {
       milliseconds: 0,
     });
 
-    console.log(`[updateStatementDate] Account ${accountRegister.id}:`);
-    console.log(
-      `  statementAt: ${dateTimeService.formatDate(statementAt, "YYYY-MM-DD")}`
-    );
-    console.log(
-      `  comparisonDate: ${dateTimeService.formatDate(
-        comparisonDate,
-        "YYYY-MM-DD"
-      )}`
-    );
-    console.log(
-      `  isSameOrAfter: ${dateTimeService.isSameOrAfter(
-        comparisonDate,
-        statementAt
-      )}`
-    );
-
     if (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
       // Calculate next statement date based on interval
       const newStatementAt = this.calculateNextStatementDate(
         statementAt,
         accountRegister.statementIntervalId
       );
-
-      console.log(`[updateStatementDate] Account ${accountRegister.id}:`);
-      console.log(
-        `  Current statementAt: ${dateTimeService.formatDate(
-          statementAt,
-          "YYYY-MM-DD"
-        )}`
-      );
-      console.log(
-        `  New statementAt: ${dateTimeService.formatDate(
-          newStatementAt,
-          "YYYY-MM-DD"
-        )}`
-      );
-      console.log(`  Interval ID: ${accountRegister.statementIntervalId}`);
 
       // Always update in-memory cache to continue forecast processing
       // Handle both Date and Moment objects
