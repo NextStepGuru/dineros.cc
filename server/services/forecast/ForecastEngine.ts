@@ -70,9 +70,12 @@ export class ForecastEngine implements IForecastEngine {
       await this.dataPersister.performInitialCleanup(context.accountId);
 
       // Only use non-archived account registers
+      console.log(`Found ${accountData.accountRegisters.length} total account registers`);
+      console.log(`Account registers:`, accountData.accountRegisters);
       const activeAccountRegisters = accountData.accountRegisters.filter(
         (a) => !a.isArchived
       );
+      console.log(`Found ${activeAccountRegisters.length} active account registers`);
 
       // 4. Create balance entries for all loaded active accounts
       console.log(

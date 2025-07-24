@@ -16,13 +16,14 @@ describe("Balance Arithmetic Regression Tests", () => {
   });
 
   it("should handle basic balance arithmetic correctly", async () => {
+    // Increase timeout for this test
     console.log("TEST STARTING");
 
     // Capture console output
     const originalConsoleLog = console.log;
     const logs: string[] = [];
     console.log = (...args: any[]) => {
-      logs.push(args.join(' '));
+      logs.push(args.join(" "));
       originalConsoleLog(...args);
     };
 
@@ -30,141 +31,149 @@ describe("Balance Arithmetic Regression Tests", () => {
       console.log("Creating test account register...");
       // Create test account register
       const accountRegister = await db.accountRegister.create({
-      data: {
-        id: 1,
-        typeId: 1,
-        budgetId: 1,
-        accountId: "test-account",
-        name: "Test Account",
-        balance: 1000,
-        latestBalance: 1000,
-        minPayment: null,
-        statementAt: dateTimeService.create(),
-        statementIntervalId: 1,
-        apr1: null,
-        apr1StartAt: null,
-        apr2: null,
-        apr2StartAt: null,
-        apr3: null,
-        apr3StartAt: null,
-        targetAccountRegisterId: null,
-        loanStartAt: null,
-        loanPaymentsPerYear: null,
-        loanTotalYears: null,
-        loanOriginalAmount: null,
-        loanPaymentSortOrder: 0,
-        savingsGoalSortOrder: 0,
-        accountSavingsGoal: null,
-        minAccountBalance: 0,
-        allowExtraPayment: false,
-        isArchived: false,
-        plaidId: null,
-      },
-    });
-
-    // Create test register entries
-    console.log("Creating register entries...");
-
-    // Create entries one by one to ensure they're properly stored
-    const entry1 = await db.registerEntry.create({
-      data: {
-        id: "entry-1",
-        accountRegisterId: 1,
-        description: "Test Entry 1",
-        amount: 500,
-        balance: 500,
-        isBalanceEntry: false,
-        isPending: false,
-        isCleared: true,
-        isProjected: false,
-        isManualEntry: true,
-        isReconciled: false,
-        createdAt: dateTimeService.create(),
-      },
-    });
-    console.log("Entry 1 created:", entry1);
-
-    const entry2 = await db.registerEntry.create({
-      data: {
-        id: "entry-2",
-        accountRegisterId: 1,
-        description: "Deposit",
-        amount: 500,
-        balance: 1500,
-        isBalanceEntry: false,
-        isPending: false,
-        isCleared: true,
-        isProjected: false,
-        isManualEntry: false,
-        isReconciled: false,
-        createdAt: dateTimeService.create(),
-      },
-    });
-    console.log("Entry 2 created:", entry2);
-
-    const entry3 = await db.registerEntry.create({
-      data: {
-        id: "entry-3",
-        accountRegisterId: 1,
-        description: "Withdrawal",
-        amount: -200,
-        balance: 1300,
-        isBalanceEntry: false,
-        isPending: false,
-        isCleared: true,
-        isProjected: false,
-        isManualEntry: false,
-        isReconciled: false,
-        createdAt: dateTimeService.create(),
-      },
-    });
-    console.log("Entry 3 created:", entry3);
-
-  // Verify the data was created
-  const allEntries = await db.registerEntry.findMany();
-  console.log("All register entries in DB:", allEntries);
-
-    // Run forecast
-    console.log("Creating forecast engine...");
-    const engine = ForecastEngineFactory.create(db);
-    console.log("Forecast engine created:", engine);
-    console.log("Calling recalculate...");
-
-    let result;
-    try {
-      result = await engine.recalculate({
-        accountId: "test-account",
-        startDate: dateTimeService.create().toDate(),
-        endDate: dateTimeService.create().add(1, "month").toDate(),
+        data: {
+          id: 1,
+          typeId: 1,
+          budgetId: 1,
+          accountId: "test-account",
+          name: "Test Account",
+          balance: 1000,
+          latestBalance: 1000,
+          minPayment: null,
+          statementAt: dateTimeService.create(),
+          statementIntervalId: 1,
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+          accountSavingsGoal: null,
+          minAccountBalance: 0,
+          allowExtraPayment: false,
+          isArchived: false,
+          plaidId: null,
+        },
       });
-      console.log("Recalculate result:", result);
-    } catch (error) {
-      console.error("Error in recalculate:", error);
-      console.error("Error stack:", error.stack);
-      throw error;
-    }
 
-    expect(result.isSuccess).toBe(true);
-    expect(result.registerEntries.length).toBeGreaterThan(0);
+      // Create test register entries
+      console.log("Creating register entries...");
 
-    // Verify balance calculations
-    const entries = result.registerEntries;
-    const balanceEntries = entries.filter((e) => e.isBalanceEntry);
-    expect(balanceEntries.length).toBeGreaterThan(0);
+      // Create entries one by one to ensure they're properly stored
+      const entry1 = await db.registerEntry.create({
+        data: {
+          id: "entry-1",
+          accountRegisterId: 1,
+          description: "Test Entry 1",
+          amount: 500,
+          balance: 500,
+          isBalanceEntry: false,
+          isPending: false,
+          isCleared: true,
+          isProjected: false,
+          isManualEntry: true,
+          isReconciled: false,
+          createdAt: dateTimeService.create(),
+        },
+      });
+      console.log("Entry 1 created:", entry1);
 
-    // Check that running balances are calculated correctly
-    let runningBalance = 0;
-    for (const entry of entries) {
-      if (entry.isBalanceEntry) {
-        runningBalance = entry.amount;
-      } else {
-        runningBalance += entry.amount;
+      const entry2 = await db.registerEntry.create({
+        data: {
+          id: "entry-2",
+          accountRegisterId: 1,
+          description: "Deposit",
+          amount: 500,
+          balance: 1500,
+          isBalanceEntry: false,
+          isPending: false,
+          isCleared: true,
+          isProjected: false,
+          isManualEntry: false,
+          isReconciled: false,
+          createdAt: dateTimeService.create(),
+        },
+      });
+      console.log("Entry 2 created:", entry2);
+
+      const entry3 = await db.registerEntry.create({
+        data: {
+          id: "entry-3",
+          accountRegisterId: 1,
+          description: "Withdrawal",
+          amount: -200,
+          balance: 1300,
+          isBalanceEntry: false,
+          isPending: false,
+          isCleared: true,
+          isProjected: false,
+          isManualEntry: false,
+          isReconciled: false,
+          createdAt: dateTimeService.create(),
+        },
+      });
+      console.log("Entry 3 created:", entry3);
+
+      // Verify the data was created
+      const allEntries = await db.registerEntry.findMany();
+      console.log("All register entries in DB:", allEntries);
+
+      // Run forecast
+      console.log("Creating forecast engine...");
+      const engine = ForecastEngineFactory.create(db);
+      console.log("Forecast engine created:", engine);
+      console.log("Calling recalculate...");
+
+      let result;
+      try {
+        result = await engine.recalculate({
+          accountId: "test-account",
+          startDate: dateTimeService.create().toDate(),
+          endDate: dateTimeService.create().add(1, "month").toDate(),
+        });
+        console.log("Recalculate result:", result);
+      } catch (error) {
+        console.error("Error in recalculate:", error);
+        console.error("Error stack:", error.stack);
+        throw error;
       }
-      expect(entry.balance).toBe(runningBalance);
-    }
+
+      console.log("Forecast result:", {
+        isSuccess: result.isSuccess,
+        registerEntriesLength: result.registerEntries.length,
+        errors: result.errors,
+        accountRegistersLength: result.accountRegisters?.length,
+        datesProcessed: result.datesProcessed
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.registerEntries.length).toBeGreaterThan(0);
+
+      // Verify balance calculations
+      const entries = result.registerEntries;
+      const balanceEntries = entries.filter((e) => e.isBalanceEntry);
+      expect(balanceEntries.length).toBeGreaterThan(0);
+
+      // Check that running balances are calculated correctly
+      let runningBalance = 0;
+      for (const entry of entries) {
+        if (entry.isBalanceEntry) {
+          runningBalance = entry.amount;
+        } else {
+          runningBalance += entry.amount;
+        }
+        expect(entry.balance).toBe(runningBalance);
+      }
     } finally {
       console.log = originalConsoleLog;
-      console.log('Captured logs:', logs);
+      console.log("Captured logs:", logs);
     }
   });
 

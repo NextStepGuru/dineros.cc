@@ -66,6 +66,13 @@ describe("Simple Forecast Engine Test", () => {
     });
 
     console.log("Recalculate result:", result);
+    console.log("Result details:", {
+      isSuccess: result.isSuccess,
+      registerEntriesLength: result.registerEntries?.length,
+      errors: result.errors,
+      accountRegistersLength: result.accountRegisters?.length,
+      datesProcessed: result.datesProcessed,
+    });
     console.log("=== SIMPLE TEST END ===");
 
     // For now, just expect it to not throw an error
