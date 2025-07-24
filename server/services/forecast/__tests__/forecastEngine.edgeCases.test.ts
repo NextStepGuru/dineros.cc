@@ -195,6 +195,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         getAccountsWithExtraPayments: vi.fn().mockReturnValue([]),
         getInterestBearingAccounts: vi.fn().mockReturnValue([]),
         processInterestCharges: vi.fn(),
+        updateStatementDates: vi.fn(),
       };
 
       const mockReoccurrenceService = {

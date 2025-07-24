@@ -23,7 +23,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     if (account) {
-      account.balance += amount;
+      account.balance = +account.balance + +amount;
       this.cache.accountRegister.update(account);
     }
   }
@@ -68,7 +68,9 @@ export class AccountRegisterService implements IAccountRegisterService {
       return;
     }
 
-    const isCreditAccount = this.loanCalculator.isCreditAccount(accountRegister.typeId);
+    const isCreditAccount = this.loanCalculator.isCreditAccount(
+      accountRegister.typeId
+    );
     const description = isCreditAccount ? "Interest Charge" : "Interest Earned";
     const intervalId = accountRegister.statementIntervalId;
 
@@ -121,7 +123,8 @@ export class AccountRegisterService implements IAccountRegisterService {
               description: `Min Payment to ${accountRegister.name}`,
               lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
               amount: payment,
-              transferAccountRegisterId: accountRegister.targetAccountRegisterId,
+              transferAccountRegisterId:
+                accountRegister.targetAccountRegisterId,
               intervalId: intervalId,
               intervalCount: 1,
               id: 0,
@@ -143,9 +146,6 @@ export class AccountRegisterService implements IAccountRegisterService {
         }
       }
     }
-
-    // Update statement date
-    await this.updateStatementDate(accountRegister, forecastDate);
   }
 
   private calculateProjectedBalanceAtDate(
@@ -172,7 +172,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     // Add up all entries up to the target date (excluding balance entries)
     for (const entry of entries) {
       if (!entry.isBalanceEntry) {
-        projectedBalance += entry.amount;
+        projectedBalance = +projectedBalance + +entry.amount;
       }
     }
 
@@ -241,17 +241,17 @@ export class AccountRegisterService implements IAccountRegisterService {
   ): Date {
     switch (statementIntervalId) {
       case 1: // Day
-        return currentStatementAt.clone().add(1, 'day').toDate();
+        return currentStatementAt.clone().add(1, "day").toDate();
       case 2: // Week
-        return currentStatementAt.clone().add(1, 'week').toDate();
+        return currentStatementAt.clone().add(1, "week").toDate();
       case 3: // Month
-        return currentStatementAt.clone().add(1, 'month').toDate();
+        return currentStatementAt.clone().add(1, "month").toDate();
       case 4: // Year
-        return currentStatementAt.clone().add(1, 'year').toDate();
+        return currentStatementAt.clone().add(1, "year").toDate();
       case 5: // Once (one-time)
-        return currentStatementAt.clone().add(1, 'year').toDate(); // Default to yearly for one-time
+        return currentStatementAt.clone().add(1, "year").toDate(); // Default to yearly for one-time
       default:
-        return currentStatementAt.clone().add(1, 'month').toDate(); // Default to monthly
+        return currentStatementAt.clone().add(1, "month").toDate(); // Default to monthly
     }
   }
 

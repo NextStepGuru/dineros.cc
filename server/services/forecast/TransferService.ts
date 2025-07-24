@@ -221,7 +221,7 @@ export class TransferService implements ITransferService {
     // Add up all entries up to the target date (excluding balance entries)
     for (const entry of entries) {
       if (!entry.isBalanceEntry) {
-        projectedBalance += entry.amount;
+        projectedBalance = +(projectedBalance) + (+entry.amount);
       }
     }
 

@@ -4,8 +4,8 @@ import moment from "moment";
 export type PartialRegisterEntry = {
   seq?: number | null;
   createdAt: Moment | Date;
-  amount: number;
-  balance: number;
+  amount: number | string;
+  balance: number | string;
   isBalanceEntry: boolean;
   isPending: boolean;
   isProjected: boolean;
@@ -29,8 +29,8 @@ export const recalculateRunningBalanceAndSort = <
   }
 
   // Use the override balance argument if provided, otherwise use the balance entry's amount
-  const startingBalance =
-    balance !== undefined ? balance : latestBalance.amount;
+  const startingBalance: number =
+    balance !== undefined ? balance : +latestBalance.amount;
 
   latestBalance.balance = startingBalance;
   latestBalance.amount = startingBalance;
@@ -45,7 +45,7 @@ export const recalculateRunningBalanceAndSort = <
 
   const returnedData: T[] = [latestBalance];
 
-  let runningBalance = startingBalance; // Start from the override balance or balance entry's amount
+  let runningBalance: number = startingBalance; // Start from the override balance or balance entry's amount
 
   const sortedPendingData = pendingEntries
     .sort((a, b) => {
@@ -56,15 +56,15 @@ export const recalculateRunningBalanceAndSort = <
       } else {
         // If createdAt is the same, sort by amount
         if (type === "credit") {
-          return a.amount - b.amount; // Ascending for credit
+          return +a.amount - +b.amount; // Ascending for credit
         } else {
-          return b.amount - a.amount; // Descending for debit
+          return +b.amount - +a.amount; // Descending for debit
         }
       }
     })
     .map((item) => {
-      runningBalance += item.amount;
-
+      runningBalance += +item.amount;
+      console.log("runningBalance", runningBalance);
       return { ...item, balance: runningBalance };
     });
 
@@ -78,16 +78,18 @@ export const recalculateRunningBalanceAndSort = <
       } else {
         // If createdAt is the same, sort by amount
         if (type === "credit") {
-          return b.amount - a.amount; // Descending for debit
+          return +b.amount - +a.amount; // Descending for debit
         } else {
-          return a.amount - b.amount; // Ascending for credit
+          return +a.amount - +b.amount; // Ascending for credit
         }
       }
     })
     // we have to reverse to calculate balance correctly for cleared entries
     .reverse()
     .map((item) => {
-      runningBalance += item.amount * -1;
+      runningBalance += +item.amount * -1;
+
+      console.log("runningBalance", runningBalance);
 
       return { ...item, balance: runningBalance };
     })

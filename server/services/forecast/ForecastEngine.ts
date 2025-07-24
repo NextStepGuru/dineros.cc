@@ -277,6 +277,12 @@ export class ForecastEngine implements IForecastEngine {
         currentDate
       );
 
+      // Update statement dates after processing interest to advance to next statement date
+      await this.accountService.updateStatementDates(
+        interestAccounts,
+        currentDate
+      );
+
       // Process reoccurrences due on this date
       const dueReoccurrences = this.reoccurrenceService.getReoccurrencesDue(
         currentDate.toDate()

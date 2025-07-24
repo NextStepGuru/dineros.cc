@@ -121,10 +121,10 @@ model AccountRegister {
   typeId                  Int       @map("type_id") @db.UnsignedInt
   budgetId                Int       @map("budget_id") @db.UnsignedInt
   name                    String
-  balance                 Float     @default(0)
-  creditLimit             Float?    @map("credit_limit")
-  latestBalance           Float     @default(0) @map("latest_balance")
-  minPayment              Decimal?  @map("min_payment")
+  balance                 Decimal   @default(0) @db.Decimal(19, 2)
+  creditLimit             Decimal?  @map("credit_limit") @db.Decimal(19, 2)
+  latestBalance           Decimal   @default(0) @map("latest_balance") @db.Decimal(19, 2)
+  minPayment              Decimal?  @map("min_payment") @db.Decimal(19, 2)
   statementAt             DateTime  @map("statement_at")
   statementIntervalId     Int       @default(3) @map("statement_interval_id") @db.UnsignedInt
   apr1                    Decimal?  @db.Decimal(7, 5)
@@ -137,12 +137,12 @@ model AccountRegister {
   loanStartAt             DateTime? @map("loan_start_at")
   loanPaymentsPerYear     Int?      @map("loan_payments_per_year")
   loanTotalYears          Int?      @map("loan_total_years")
-  loanOriginalAmount      Int?      @map("loan_original_amount")
+  loanOriginalAmount      Decimal?  @map("loan_original_amount") @db.Decimal(19, 2)
   sortOrder               Int       @default(999) @map("sort_order") @db.UnsignedInt
   loanPaymentSortOrder    Int       @default(999) @map("loan_payment_sort_order") @db.UnsignedInt
   savingsGoalSortOrder    Int       @default(999) @map("savings_goal_sort_order") @db.UnsignedInt
-  accountSavingsGoal      Float?    @map("account_savings_goal")
-  minAccountBalance       Decimal   @default(0) @map("min_account_balance")
+  accountSavingsGoal      Decimal?  @map("account_savings_goal") @db.Decimal(19, 2)
+  minAccountBalance       Decimal   @default(0) @map("min_account_balance") @db.Decimal(19, 2)
   allowExtraPayment       Boolean   @default(false) @map("allow_extra_payment")
   isArchived              Boolean   @default(false) @map("is_archived")
   plaidId                 String?   @map("plaid_id") /// @encrypted
@@ -170,7 +170,7 @@ model AccountRegister {
 model AccountRegisterSummary {
   id                String   @id @default(uuid())
   accountRegisterId Int      @map("account_register_id") @db.UnsignedInt
-  balance           Float
+  balance           Decimal  @db.Decimal(19, 2)
   month             Int      @db.UnsignedInt
   year              Int      @db.UnsignedInt
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
@@ -188,8 +188,8 @@ model RegisterEntry {
   checkNo                 String?
   description             String
   reoccurrenceId          Int?     @map("reoccurrence_id") @db.UnsignedInt
-  amount                  Float
-  balance                 Float
+  amount                  Decimal  @db.Decimal(19, 2)
+  balance                 Decimal  @db.Decimal(19, 2)
   typeId                  Int?     @map("type_id") @db.UnsignedInt
   isProjected             Boolean  @default(false) @map("is_projected")
   isReconciled            Boolean  @default(false) @map("is_reconciled")
@@ -251,7 +251,7 @@ model Reoccurrence {
   endAt                     DateTime? @map("end_at")
   totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
   elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
-  amount                    Float
+  amount                    Decimal   @db.Decimal(19, 2)
   description               String
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 

@@ -147,12 +147,6 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    console.log(
-      "balance",
-      pocketBalances._sum.balance,
-      accountRegister.latestBalance
-    );
-
     const balance =
       accountRegister.latestBalance - (pocketBalances._sum.balance || 0);
 

@@ -50,7 +50,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       throw new Error(`Account not found ${accountRegisterId}`);
     }
 
-    const balance = lookupAccountRegister.balance + +amount;
+    const balance = +(lookupAccountRegister.balance) + (+amount);
     const targetBalance = balance; // Always use the running balance
 
     // Use explicit forecastDate if provided, otherwise fall back to existing logic
@@ -119,7 +119,7 @@ export class RegisterEntryService implements IRegisterEntryService {
 
     // Update account balance
     if (!isBalanceEntry) {
-      lookupAccountRegister.balance = targetBalance;
+      lookupAccountRegister.balance = +targetBalance;
       this.cache.accountRegister.update(lookupAccountRegister);
     }
   }
@@ -302,7 +302,7 @@ export class RegisterEntryService implements IRegisterEntryService {
 
     // Update the account register's balance to match the latest balance
     // This ensures the running balance calculation starts from the correct opening balance
-    accountRegister.balance = accountRegister.latestBalance;
+    accountRegister.balance = +accountRegister.latestBalance;
     this.cache.accountRegister.update(accountRegister);
   }
 }
