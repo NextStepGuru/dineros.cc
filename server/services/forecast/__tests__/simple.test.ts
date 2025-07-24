@@ -16,8 +16,6 @@ describe("Simple Forecast Engine Test", () => {
   });
 
   it("should create forecast engine and return success", async () => {
-    console.log("=== SIMPLE TEST START ===");
-
     // Create a simple account register
     const accountRegister = await db.accountRegister.create({
       data: {
@@ -52,11 +50,8 @@ describe("Simple Forecast Engine Test", () => {
       },
     });
 
-    console.log("Account register created:", accountRegister);
-
     // Create forecast engine
     const engine = ForecastEngineFactory.create(db);
-    console.log("Forecast engine created");
 
     // Call recalculate
     const result = await engine.recalculate({
@@ -64,18 +59,6 @@ describe("Simple Forecast Engine Test", () => {
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "month").toDate(),
     });
-
-    console.log("Recalculate result:", result);
-    console.log("Result details:", {
-      isSuccess: result.isSuccess,
-      registerEntriesLength: result.registerEntries?.length,
-      errors: result.errors,
-      accountRegistersLength: result.accountRegisters?.length,
-      datesProcessed: result.datesProcessed,
-      resultKeys: Object.keys(result)
-    });
-    console.log("Full result object:", JSON.stringify(result, null, 2));
-    console.log("=== SIMPLE TEST END ===");
 
     // For now, just expect it to not throw an error
     expect(result).toBeDefined();

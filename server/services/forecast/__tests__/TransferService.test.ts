@@ -396,36 +396,17 @@ describe("TransferService", () => {
         accountRegisterId: 1,
       });
 
-      console.log("All entries in cache:", allEntries.length);
-      console.log("Account entries:", accountEntries.length);
-      console.log(
-        "Entry dates:",
-        accountEntries.map((e) => e.createdAt)
-      );
-      console.log(
-        "Entry amounts:",
-        accountEntries.map((e) => e.amount)
-      );
-
       const targetDate = dateTimeService.create("2024-01-20").toDate();
-      console.log("Target date:", targetDate);
 
       // Test the date comparison directly
       const filteredEntries = accountEntries.filter((entry) =>
         dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
-      );
-      console.log("Filtered entries:", filteredEntries.length);
-      console.log(
-        "Filtered entry amounts:",
-        filteredEntries.map((e) => e.amount)
       );
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
         targetDate
       );
-
-      console.log("Result:", result);
 
       expect(result).toBe(1300); // 1000 + 500 - 200 (excluding the 300 after target date)
     });
@@ -489,7 +470,6 @@ describe("TransferService", () => {
         dateTimeService.create("2024-01-01").toDate()
       );
 
-      console.log("Projected balance:", projectedBalance);
       expect(projectedBalance).toBe(3000);
     });
 
@@ -509,10 +489,6 @@ describe("TransferService", () => {
         dateTimeService.create("2024-01-01").toDate()
       );
 
-      console.log(
-        "Projected balance for multiple debt test:",
-        projectedBalance
-      );
       expect(projectedBalance).toBe(3000);
     });
   });
@@ -629,16 +605,6 @@ describe("TransferService", () => {
       const debtAccounts = mockCache.accountRegister.find(
         (account) => account.balance < 0
       );
-      console.log("All accounts:", allAccounts.length);
-      console.log("Debt accounts:", debtAccounts.length);
-      console.log(
-        "Debt account details:",
-        debtAccounts.map((a) => ({
-          id: a.id,
-          balance: a.balance,
-          sortOrder: a.loanPaymentSortOrder,
-        }))
-      );
 
       // Test the sorting logic directly
       const sortedDebtAccounts = debtAccounts.sort((a, b) => {
@@ -647,14 +613,6 @@ describe("TransferService", () => {
         }
         return a.balance - b.balance;
       });
-      console.log(
-        "Sorted debt accounts:",
-        sortedDebtAccounts.map((a) => ({
-          id: a.id,
-          balance: a.balance,
-          sortOrder: a.loanPaymentSortOrder,
-        }))
-      );
 
       // Reset mock to clear previous calls
       vi.clearAllMocks();
@@ -667,12 +625,6 @@ describe("TransferService", () => {
         sourceAccountId: 1,
         lastAt: dateTimeService.create("2024-01-01").toDate(),
       });
-
-      console.log(
-        "Mock calls:",
-        (mockEntryService.createEntry as any).mock.calls.length
-      );
-      console.log("Mock calls:", (mockEntryService.createEntry as any).mock?.calls);
 
       // Should pay both debts: $500 to first debt (higher priority), then $1000 to second debt
       // The exact number of calls depends on the projected balance calculation
@@ -982,13 +934,6 @@ describe("TransferService", () => {
       const accounts = [sourceAccount, savingsAccount];
       const filteredAccounts = accounts.filter(filterFunction);
 
-      console.log("Filter test:", {
-        totalAccounts: accounts.length,
-        filteredAccounts: filteredAccounts.length,
-        savingsAccount: savingsAccount.accountSavingsGoal,
-        filterResult: filterFunction(savingsAccount),
-      });
-
       expect(filteredAccounts.length).toBe(1);
       expect(filteredAccounts[0].id).toBe(2);
     });
@@ -1005,8 +950,6 @@ describe("TransferService", () => {
       mockCache.registerEntry.insert(entry);
 
       const found = mockCache.registerEntry.find({ accountRegisterId: 1 });
-      console.log("Found entries:", found.length);
-      console.log("Entry data:", found[0]);
 
       expect(found.length).toBe(1);
       expect(found[0].amount).toBe(500);
@@ -1075,13 +1018,6 @@ describe("TransferService", () => {
       (account) => account.balance < 0
     );
 
-    console.log("All accounts found:", allAccounts.length);
-    console.log("Debt accounts found:", debtAccounts.length);
-    console.log(
-      "Debt account IDs:",
-      debtAccounts.map((a) => a.id)
-    );
-
     expect(allAccounts.length).toBe(3);
     expect(debtAccounts.length).toBe(2);
     expect(debtAccounts.map((a) => a.id)).toContain(2);
@@ -1117,8 +1053,6 @@ describe("TransferService", () => {
       1,
       dateTimeService.create("2024-01-01").toDate()
     );
-    console.log("Projected balance:", projectedBalance);
-    console.log("Available amount:", projectedBalance - 500);
 
     // Reset mock
     vi.clearAllMocks();
@@ -1129,9 +1063,6 @@ describe("TransferService", () => {
       sourceAccountId: 1,
       lastAt: dateTimeService.create("2024-01-01").toDate(),
     });
-
-    console.log("Method result:", result);
-          console.log("Mock calls:", (mockEntryService.createEntry as any).mock?.calls?.length);
 
     // The method should return true if it processed any payments
     expect(result).toBe(true);

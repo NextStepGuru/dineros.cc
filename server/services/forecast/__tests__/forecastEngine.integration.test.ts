@@ -70,7 +70,6 @@ describe("ForecastEngine Integration Tests", () => {
   function setupMockData() {
     // Mock account registers
     mockDb.accountRegister.findMany.mockImplementation((args) => {
-      console.log("Mock findMany called with:", args);
       return Promise.resolve([
         {
           id: 1,
@@ -217,12 +216,10 @@ describe("ForecastEngine Integration Tests", () => {
   describe("Basic Forecast Calculation", () => {
     it("should successfully calculate a basic forecast", async () => {
       try {
-        console.log("About to call engine.recalculate...");
         const result = await engine.recalculate(testContext);
-        console.log("Result received:", result);
 
         if (!result.isSuccess) {
-          console.log("Forecast failed with errors:", result.errors);
+          // console.log("Forecast failed with errors:", result.errors);
         }
 
         expect(result.isSuccess).toBe(true);
@@ -230,7 +227,7 @@ describe("ForecastEngine Integration Tests", () => {
         expect(result.registerEntries.length).toBeGreaterThan(0);
         expect(result.accountRegisters.length).toBeGreaterThan(0);
       } catch (error) {
-        console.log("Test failed with error:", error);
+        // console.log("Test failed with error:", error);
         throw error;
       }
     });

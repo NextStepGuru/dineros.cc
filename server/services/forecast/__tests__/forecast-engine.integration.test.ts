@@ -213,9 +213,6 @@ describe('ForecastEngine Integration Tests', () => {
       // Assert: Verify performance and results
       expect(result.isSuccess).toBe(true);
       expect(executionTime).toBeLessThan(5000); // Should complete in under 5 seconds
-
-      console.log(`Forecast calculation completed in ${executionTime}ms`);
-      console.log(`Generated ${result.registerEntries.length} register entries`);
     });
   });
 

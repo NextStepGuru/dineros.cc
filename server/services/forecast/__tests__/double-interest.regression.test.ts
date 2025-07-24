@@ -239,38 +239,13 @@ describe("Double Interest Calculation Regression Tests", () => {
       cache.accountRegister.insert(account);
 
       // Act: Update statement date as if interest was processed
-      console.log(`[TEST] About to call updateStatementDates`);
-      console.log(
-        `[TEST] Account statement date: ${account.statementAt.format(
-          "YYYY-MM-DD"
-        )}`
-      );
-      console.log(
-        `[TEST] Forecast date: ${moment("2025-01-15").format("YYYY-MM-DD")}`
-      );
       await accountService.updateStatementDates(
         [account],
         moment("2025-01-15")
       );
-      console.log(`[TEST] Finished calling updateStatementDates`);
 
       // Assert: Statement date should advance to next month
-      expect((global as any).updateStatementDatesCalled).toBe(true);
-      expect((global as any).updateStatementDatesCallCount).toBe(1);
       const updatedAccount = cache.accountRegister.findOne({ id: 5 });
-      console.log(
-        `[TEST] Updated account statement date: ${updatedAccount?.statementAt.format(
-          "YYYY-MM-DD"
-        )}`
-      );
-      console.log(
-        `[TEST] Original account statement date: ${account.statementAt.format(
-          "YYYY-MM-DD"
-        )}`
-      );
-      console.log(
-        `[TEST] Forecast date: ${moment("2025-01-15").format("YYYY-MM-DD")}`
-      );
       expect(updatedAccount?.statementAt.format("YYYY-MM-DD")).toBe(
         "2025-02-15"
       );

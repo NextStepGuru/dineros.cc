@@ -16,10 +16,7 @@ describe("Debug Forecast Engine Test", () => {
   });
 
   it("should create forecast engine and run basic test", async () => {
-    console.log("=== DEBUG TEST START ===");
-
     // Create a simple account register
-    console.log("Creating account register...");
     const accountRegister = await db.accountRegister.create({
       data: {
         id: 1,
@@ -52,10 +49,8 @@ describe("Debug Forecast Engine Test", () => {
         plaidId: null,
       },
     });
-    console.log("Account register created:", accountRegister);
 
     // Create a simple register entry
-    console.log("Creating register entry...");
     const registerEntry = await db.registerEntry.create({
       data: {
         id: "entry-1",
@@ -72,27 +67,20 @@ describe("Debug Forecast Engine Test", () => {
         createdAt: dateTimeService.create(),
       },
     });
-    console.log("Register entry created:", registerEntry);
 
     // Verify the data was created
     const allEntries = await db.registerEntry.findMany();
-    console.log("All register entries in DB:", allEntries);
 
     // Create forecast engine
-    console.log("Creating forecast engine...");
     const engine = ForecastEngineFactory.create(db);
-    console.log("Forecast engine created:", engine);
 
     // Run forecast
-    console.log("Calling recalculate...");
     const result = await engine.recalculate({
       accountId: "test-account",
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "month").toDate(),
     });
-    console.log("Recalculate result:", result);
 
     expect(result.isSuccess).toBe(true);
-    console.log("=== DEBUG TEST END ===");
   });
 });

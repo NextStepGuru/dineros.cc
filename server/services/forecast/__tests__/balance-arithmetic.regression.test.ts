@@ -38,7 +38,6 @@ describe("Balance Arithmetic Regression Tests", () => {
 
   it("should handle basic balance arithmetic correctly", async () => {
     // Increase timeout for this test
-    console.log("TEST STARTING");
 
     // Capture console output
     const originalConsoleLog = console.log;
@@ -49,8 +48,6 @@ describe("Balance Arithmetic Regression Tests", () => {
     };
 
     try {
-      console.log("Setting up mock data...");
-
       // Set up mock data
       const testAccountRegister = {
         id: 1,
@@ -150,19 +147,12 @@ describe("Balance Arithmetic Regression Tests", () => {
       // Mock the database responses with proper implementations
       mockPrisma.accountRegister.findMany.mockImplementation(
         async (query: any) => {
-          console.log("Mock accountRegister.findMany called with:", query);
           if (query?.where?.accountId) {
             const filtered = mockAccountRegisters.filter(
               (ar) => ar.accountId === query.where.accountId
             );
-            console.log(
-              `Found ${filtered.length} account registers for accountId: ${query.where.accountId}`
-            );
             return filtered;
           }
-          console.log(
-            `Returning all ${mockAccountRegisters.length} account registers`
-          );
           return mockAccountRegisters;
         }
       );
@@ -239,10 +229,8 @@ describe("Balance Arithmetic Regression Tests", () => {
       mockPrisma.registerEntry.update.mockResolvedValue({});
 
       // Verify the data was created
-      console.log("Mock data set up successfully");
 
       // Run forecast
-      console.log("Calling recalculate...");
 
       let result;
       try {
@@ -251,22 +239,11 @@ describe("Balance Arithmetic Regression Tests", () => {
           startDate: dateTimeService.create().toDate(),
           endDate: dateTimeService.create().add(1, "month").toDate(),
         });
-        console.log("Recalculate result:", result);
       } catch (error) {
         console.error("Error in recalculate:", error);
         console.error("Error stack:", error.stack);
         throw error;
       }
-
-      console.log("Forecast result:", {
-        isSuccess: result.isSuccess,
-        registerEntriesLength: result.registerEntries?.length,
-        errors: result.errors,
-        accountRegistersLength: result.accountRegisters?.length,
-        datesProcessed: result.datesProcessed,
-        resultKeys: Object.keys(result),
-      });
-      console.log("Full result object:", JSON.stringify(result, null, 2));
 
       expect(result.isSuccess).toBe(true);
       expect(result.registerEntries.length).toBeGreaterThan(0);

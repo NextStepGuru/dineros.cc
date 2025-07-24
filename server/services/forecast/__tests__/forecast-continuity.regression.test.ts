@@ -143,9 +143,6 @@ describe("Forecast Continuity Regression Tests", () => {
       });
 
       // Assert: Should complete successfully without stopping
-      if (!result.isSuccess) {
-        console.log("Forecast failed with errors:", result.errors);
-      }
       expect(result.isSuccess).toBe(true);
       expect(result.errors).toBeUndefined();
 
@@ -161,7 +158,9 @@ describe("Forecast Continuity Regression Tests", () => {
         const latestEntryDate = Math.max(
           ...allEntries.map((entry) => new Date(entry.createdAt).getTime())
         );
-        expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(new Date("2025-12-01").getTime());
+        expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
+          new Date("2025-12-01").getTime()
+        );
       }
     });
 

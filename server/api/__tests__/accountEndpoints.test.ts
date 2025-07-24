@@ -524,11 +524,6 @@ describe("Account Register API Endpoints", () => {
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.update as any).mockResolvedValue({});
 
-      // Debug: Let's see what's actually being passed
-      console.log("Mock body:", mockBody);
-      console.log("Mock body accountRegisters:", mockBody.accountRegisters);
-      console.log("First account register:", mockBody.accountRegisters[0]);
-
       const result = await accountRegisterSortHandler(mockEvent);
 
       expect(result).toEqual({
