@@ -24,7 +24,10 @@ const app = createApp();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler: any = module.default; // Use `any` to bypass type errors
 
-    log({ message: `Registering ${method.toUpperCase()} /${route}`, level: "debug" });
+    log({
+      message: `Registering ${method.toUpperCase()} /${route}`,
+      level: "debug",
+    });
 
     app.use(
       `/${route === "index" ? "" : route}`,
@@ -37,7 +40,12 @@ const app = createApp();
     );
   }
 
-  app.use(bull);
+  // Add Bull Board if not in test mode
+  if (typeof bull === "function") {
+    app.use("/bull", bull);
+  } else {
+    app.use("/bull", eventHandler(bull));
+  }
 
   listen(toNodeListener(app), { port: env.PORT }).then(({ url }) => {
     log({ message: `Server running at ${url}`, level: "debug" });

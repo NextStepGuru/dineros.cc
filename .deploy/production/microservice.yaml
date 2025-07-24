@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dineros-microservice-production-deployment
+  labels:
+    app: dineros-microservice-production
+  namespace: gs-services
+spec:
+  selector:
+    matchLabels:
+      app: dineros-microservice-production
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  minReadySeconds: 10
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/change-cause: "Updated at $(date +%s)"
+      labels:
+        app: dineros-microservice-production
+    spec:
+      serviceAccountName: dineros
+      containers:
+        - name: dineros-microservice-production-container
+          image: gcr.io/nextstepguru/dineros-microservice:2
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: service-account-volume
+              mountPath: /etc/google-service-account
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 3050
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              value: "mysql://production-dineros:production-dineros@10.127.192.3:3306/production-dineros"
+            - name: DEPLOY_ENV
+              value: "production"
+            - name: PORT
+              value: "3050"
+            - name: NODE_ENV
+              value: "production"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_HOST
+              value: "redis-master.redis.svc.cluster.local"
+            - name: DB_DECRYPTION_KEY_1
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_DECRYPTION_KEY_1
+            - name: DB_DECRYPTION_KEY_2
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_DECRYPTION_KEY_2
+            - name: DB_DECRYPTION_KEY_3
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_DECRYPTION_KEY_3
+            - name: DB_DECRYPTION_KEY_4
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_DECRYPTION_KEY_4
+            - name: DB_DECRYPTION_KEY_5
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_DECRYPTION_KEY_5
+            - name: DB_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: production-db-secrets
+                  key: DB_ENCRYPTION_KEY
+      volumes:
+        - name: service-account-volume
+          secret:
+            secretName: google-service-account
