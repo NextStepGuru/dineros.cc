@@ -15,7 +15,7 @@ describe("DataPersisterService", () => {
     mockDb = await createTestDatabase();
     mockCache = new ModernCacheService();
 
-    service = new DataPersisterService(mockDb, mockCache);
+    service = new DataPersisterService(mockDb);
 
     // Mock forecastLogger to avoid test output
     vi.spyOn(forecastLogger, "service").mockImplementation(() => {});

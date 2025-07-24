@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ForecastEngineFactory, ForecastEngine } from '../index';
+import { forecastLogger } from "../logger";
 
 // Mock the PrismaClient
 const mockPrismaClient = {
@@ -8,8 +9,9 @@ const mockPrismaClient = {
 
 describe('ForecastEngineFactory', () => {
   beforeEach(() => {
-    // Mock console.log to avoid test output
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Mock forecastLogger to avoid test output
+    vi.spyOn(forecastLogger, 'debug').mockImplementation(() => {});
+    vi.spyOn(forecastLogger, 'info').mockImplementation(() => {});
   });
 
   afterEach(() => {

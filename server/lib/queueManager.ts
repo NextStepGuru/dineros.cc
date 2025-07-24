@@ -1,5 +1,4 @@
 import type { JobsOptions } from "bullmq";
-import { Queue, Worker } from "bullmq";
 import type Redis from "ioredis";
 import { dateTimeService } from "../services/forecast/DateTimeService";
 
@@ -10,9 +9,9 @@ interface QueueConfig {
 }
 
 class QueueManager {
-  queues: Map<string, Queue> = new Map();
-  workers: Map<string, Worker> = new Map();
-  connection: Redis;
+  queues: Map<string, any> = new Map();
+  workers: Map<string, any> = new Map();
+  connection: Redis | null;
   isTestMode: boolean;
 
   constructor(private queueConfigs: QueueConfig[], connection: Redis) {
@@ -20,19 +19,27 @@ class QueueManager {
     this.isTestMode = process.env.NODE_ENV === "test";
 
     if (!this.isTestMode) {
-      this.initializeQueues();
+      // Initialize queues asynchronously
+      this.initializeQueues().catch((error) => {
+        console.error("Failed to initialize queues:", error);
+      });
     }
   }
 
-  private initializeQueues() {
-    for (const config of this.queueConfigs) {
-      const queue = new Queue(config.name, { connection: this.connection });
-      const worker = new Worker(config.name, config.processor, {
-        connection: this.connection,
-      });
+  private async initializeQueues() {
+    // Only import BullMQ in non-test mode to avoid connection attempts
+    const { Queue, Worker } = await import("bullmq");
 
-      this.queues.set(config.name, queue);
-      this.workers.set(config.name, worker);
+    for (const config of this.queueConfigs) {
+      if (this.connection) {
+        const queue = new Queue(config.name, { connection: this.connection });
+        const worker = new Worker(config.name, config.processor, {
+          connection: this.connection,
+        });
+
+        this.queues.set(config.name, queue);
+        this.workers.set(config.name, worker);
+      }
     }
   }
 

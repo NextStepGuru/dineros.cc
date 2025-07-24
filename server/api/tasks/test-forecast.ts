@@ -3,10 +3,11 @@ import {
   dateTimeService,
 } from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
+import { log } from "../../logger";
 
 export default defineEventHandler(async () => {
   try {
-    console.log("[test-forecast] Starting test forecast...");
+    log({ message: "[test-forecast] Starting test forecast...", level: "debug" });
 
     // Use the new ForecastEngine directly
     const engine = ForecastEngineFactory.create(prisma);
@@ -22,15 +23,15 @@ export default defineEventHandler(async () => {
       },
     };
 
-    console.log("[test-forecast] Running forecast with context:", context);
+    log({ message: "[test-forecast] Running forecast with context:", data: context, level: "debug" });
 
     const result = await engine.recalculate(context);
 
-    console.log("[test-forecast] Forecast result:", {
+    log({ message: "[test-forecast] Forecast result:", data: {
       isSuccess: result.isSuccess,
       registerEntriesCount: result.registerEntries?.length || 0,
       errors: result.errors,
-    });
+    }, level: "debug" });
 
     if (!result.isSuccess) {
       throw new Error(
@@ -44,14 +45,14 @@ export default defineEventHandler(async () => {
       .find({})
       .filter((e: any) => e.isBalanceEntry);
 
-    console.log("[test-forecast] Balance entries in cache after forecast:", {
+    log({ message: "[test-forecast] Balance entries in cache after forecast:", data: {
       count: balanceEntries.length,
       entries: balanceEntries.map((e: any) => ({
         id: e.id,
         accountRegisterId: e.accountRegisterId,
         description: e.description,
       })),
-    });
+    }, level: "debug" });
 
     // Check database state after forecast
     const dbBalanceEntries = await prisma.registerEntry.findMany({
@@ -64,10 +65,10 @@ export default defineEventHandler(async () => {
       },
     });
 
-    console.log("[test-forecast] Balance entries in database after forecast:", {
+    log({ message: "[test-forecast] Balance entries in database after forecast:", data: {
       count: dbBalanceEntries.length,
       entries: dbBalanceEntries,
-    });
+    }, level: "debug" });
 
     return {
       success: true,
@@ -76,7 +77,7 @@ export default defineEventHandler(async () => {
       totalRegisterEntries: result.registerEntries?.length || 0,
     };
   } catch (error) {
-    console.error("[test-forecast] Error:", error);
+    log({ message: "[test-forecast] Error:", data: error, level: "error" });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

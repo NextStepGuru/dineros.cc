@@ -7,5 +7,5 @@ export const log = ({
   data?: unknown;
   level?: string;
 }): void => {
-  console.log({ message, data, level });
+  // Remove this console.log since it's in the logger itself
 };

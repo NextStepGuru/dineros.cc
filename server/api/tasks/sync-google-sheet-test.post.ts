@@ -5,6 +5,7 @@ import { handleApiError } from "~/server/lib/handleApiError";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { dateTimeService } from "~/server/services/forecast";
+import { log } from "../../logger";
 
 // Google Sheets API configuration
 const GOOGLE_SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -160,7 +161,7 @@ export default defineEventHandler(async (event) => {
         },
       };
     } catch (sheetsError: any) {
-      console.error("Google Sheets API error:", sheetsError);
+      log({ message: "Google Sheets API error:", data: sheetsError, level: "error" });
       setResponseStatus(event, 500);
       return {
         success: false,

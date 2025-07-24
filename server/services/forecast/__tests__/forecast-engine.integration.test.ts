@@ -3,6 +3,7 @@ import { ForecastEngine, ForecastEngineFactory } from '../index';
 import type { ForecastContext } from '../types';
 import { createTestDatabase, cleanupTestDatabase } from './test-utils';
 import { dateTimeService } from '../DateTimeService';
+import { log } from "../../../logger";
 
 // Dynamic moment import
 let moment: any;
@@ -301,7 +302,7 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
 
     return checkingAccount;
   } catch (error) {
-    console.error('Setup failed:', error);
+    log({ message: 'Setup failed:', data: error, level: "error" });
     // Return a mock object to prevent undefined errors
     return { id: 'mock-id', name: 'Mock Account' };
   }

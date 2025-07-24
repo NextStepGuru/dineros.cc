@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
+import { log } from "../server/logger";
 
 export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)
@@ -27,22 +28,18 @@ export const prisma = globalClient.$extends(
 export const initializePrisma = async () => {
   try {
     await prisma.$connect();
-    console.log({ message: "Prisma client connected to the database." });
+    log({ message: "Prisma client connected to the database.", level: "debug" });
   } catch (error) {
-    console.log({
-      message: "Error connecting Prisma client:",
-      data: error,
-      level: "error",
-    });
+    log({ message: "Error connecting Prisma client:", data: error, level: "error" });
   }
 };
 
 export const closePrisma = async () => {
   try {
     await prisma.$disconnect();
-    console.log({ message: "Prisma client disconnected successfully." });
+    log({ message: "Prisma client disconnected successfully.", level: "debug" });
   } catch (error) {
-    console.log({
+    log({
       message: "Error disconnecting Prisma client:",
       data: error,
       level: "error",
@@ -57,7 +54,7 @@ export const isPrismaActive = async () => {
     await prisma.$connect();
     return true;
   } catch (error) {
-    console.log({
+    log({
       message: "isPrismaActive Error",
       data: error,
       level: "error",

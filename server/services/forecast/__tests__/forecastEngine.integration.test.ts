@@ -8,6 +8,7 @@ import { AccountRegisterService } from "../AccountRegisterService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
+import { forecastLogger } from "../logger";
 
 // Dynamic moment import
 let moment: any;
@@ -26,6 +27,7 @@ const mockDb = {
     update: vi.fn(),
     updateMany: vi.fn(),
     count: vi.fn(),
+    create: vi.fn(),
   },
   reoccurrence: {
     findMany: vi.fn(),
@@ -197,6 +199,7 @@ describe("ForecastEngine Integration Tests", () => {
     // Mock database operations
     mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 0 });
     mockDb.registerEntry.createMany.mockResolvedValue({ count: 0 });
+    mockDb.registerEntry.create.mockResolvedValue({});
     mockDb.registerEntry.update.mockResolvedValue({});
     mockDb.registerEntry.updateMany.mockResolvedValue({ count: 0 });
     mockDb.registerEntry.count.mockResolvedValue(0);
@@ -211,6 +214,21 @@ describe("ForecastEngine Integration Tests", () => {
         lastAt: moment().startOf("month").toDate(),
       },
     });
+
+    // Mock DataPersisterService operations
+    mockDb.registerEntry.updateMany.mockImplementation((args) => {
+      // Handle different updateMany calls with different where clauses
+      if (args?.where?.isProjected === true) {
+        return Promise.resolve({ count: 0 });
+      }
+      if (args?.where?.isManualEntry === true) {
+        return Promise.resolve({ count: 0 });
+      }
+      if (args?.where?.description === "Latest Balance") {
+        return Promise.resolve({ count: 0 });
+      }
+      return Promise.resolve({ count: 0 });
+    });
   }
 
   describe("Basic Forecast Calculation", () => {
@@ -219,7 +237,7 @@ describe("ForecastEngine Integration Tests", () => {
         const result = await engine.recalculate(testContext);
 
         if (!result.isSuccess) {
-          // console.log("Forecast failed with errors:", result.errors);
+          forecastLogger.debug("Forecast failed with errors:", result.errors);
         }
 
         expect(result.isSuccess).toBe(true);
@@ -227,7 +245,7 @@ describe("ForecastEngine Integration Tests", () => {
         expect(result.registerEntries.length).toBeGreaterThan(0);
         expect(result.accountRegisters.length).toBeGreaterThan(0);
       } catch (error) {
-        // console.log("Test failed with error:", error);
+        forecastLogger.error("Test failed with error:", error);
         throw error;
       }
     });
@@ -345,17 +363,26 @@ describe("ForecastEngine Integration Tests", () => {
 
   describe("Error Handling", () => {
     it("should handle database errors gracefully", async () => {
-      // Simulate database error
-      mockDb.accountRegister.findMany.mockRejectedValue(
-        new Error("Database connection failed")
-      );
+      // Suppress forecastLogger for this test
+      const originalError = forecastLogger.error;
+      forecastLogger.error = vi.fn();
 
-      const result = await engine.recalculate(testContext);
+      try {
+        // Simulate database error
+        mockDb.accountRegister.findMany.mockRejectedValue(
+          new Error("Database connection failed")
+        );
 
-      expect(result.isSuccess).toBe(false);
-      expect(result.errors).toBeDefined();
-      expect(result.errors!.length).toBeGreaterThan(0);
-      expect(result.errors![0]).toContain("Database connection failed");
+        const result = await engine.recalculate(testContext);
+
+        expect(result.isSuccess).toBe(false);
+        expect(result.errors).toBeDefined();
+        expect(result.errors!.length).toBeGreaterThan(0);
+        expect(result.errors![0]).toContain("Database connection failed");
+      } finally {
+        // Restore forecastLogger.error
+        forecastLogger.error = originalError;
+      }
     });
 
     it("should validate context parameters", async () => {

@@ -1,8 +1,9 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
+import { log } from "../../logger";
 
 export default defineEventHandler(async (event: any) => {
   try {
-    console.log("Countries API endpoint called");
+    log({ message: "Countries API endpoint called", level: "debug" });
 
     // Use raw SQL query as workaround for type issues
     const countries = (await PrismaDb.$queryRaw`
@@ -17,10 +18,10 @@ export default defineEventHandler(async (event: any) => {
       code3: string;
     }>;
 
-    console.log(`Returning ${countries.length} countries`);
+    log({ message: `Returning ${countries.length} countries`, level: "debug" });
     return countries;
   } catch (error) {
-    console.error("Error in countries API:", error);
+    log({ message: "Error in countries API:", data: error, level: "error" });
     throw createError({
       statusCode: 500,
       statusMessage: "Failed to fetch countries",

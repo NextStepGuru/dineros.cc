@@ -56,7 +56,7 @@ export class DataPersisterService implements IDataPersisterService {
       await this.rateLimiter.executeWithLimit(operations);
 
       const status = this.rateLimiter.getStatus();
-      console.log(
+      forecastLogger.debug(
         `[DataPersisterService] Rate limiter status: ${JSON.stringify(status)}`
       );
     }

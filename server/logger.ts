@@ -4,7 +4,7 @@ import winston, { format } from "winston";
 import type { HttpRequest } from "@google-cloud/logging";
 
 const isLocal = process.env.DEPLOY_ENV === "local";
-const minLogLevel = isLocal ? "debug" : "info";
+const minLogLevel = isLocal ? "info" : "info";
 
 const transports = [];
 
@@ -32,10 +32,7 @@ if (!isLocal) {
       keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
       defaultCallback: (err) => {
         if (err) {
-          console.error(
-            "Logging Error: Error occurred while sending logs",
-            err
-          );
+          // Remove this console.error since it's in the logger itself
         }
       },
     })

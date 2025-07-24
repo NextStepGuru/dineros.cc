@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IAccountRegisterService } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
+import { Decimal } from "@prisma/client/runtime/library";
 import { ModernCacheService } from "./ModernCacheService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { RegisterEntryService } from "./RegisterEntryService";
@@ -37,12 +38,12 @@ export class AccountRegisterService implements IAccountRegisterService {
     accounts: CacheAccountRegister[],
     forecastDate?: any
   ): Promise<void> {
-    const interestAccounts = accounts.filter((account) =>
-      this.loanCalculator.shouldProcessInterest(account, forecastDate)
-    );
-
-    for (const account of interestAccounts) {
-      await this.processAccountInterestCharge(account, forecastDate);
+    // Process interest for each account, handling all missed statement dates
+    for (const account of accounts) {
+      // Continue processing interest while the current date is on or after the statement date
+      while (this.loanCalculator.shouldProcessInterest(account, forecastDate)) {
+        await this.processAccountInterestCharge(account, forecastDate);
+      }
     }
   }
 
@@ -86,7 +87,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegisterId: accountRegister.id,
         description: accountRegister.name,
         lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-        amount: Math.abs(interest),
+        amount: new Decimal(Math.abs(interest)),
         transferAccountRegisterId: accountRegister.targetAccountRegisterId,
         intervalId: intervalId,
         intervalCount: 1,
@@ -121,7 +122,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             accountRegisterId: accountRegister.id,
             description: "Min Payment to Credit Card",
             lastAt: dateTimeService.nowDate(),
-            amount: Number(paymentAmount),
+            amount: new Decimal(Number(paymentAmount)),
             transferAccountRegisterId: accountRegister.targetAccountRegisterId,
             intervalId: intervalId,
             intervalCount: 1,
@@ -152,7 +153,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             accountRegisterId: accountRegister.id,
             description: "Payment for Loan Account",
             lastAt: dateTimeService.nowDate(),
-            amount: Number(paymentAmount),
+            amount: new Decimal(Number(paymentAmount)),
             transferAccountRegisterId: null,
             intervalId: intervalId,
             intervalCount: 1,
@@ -222,7 +223,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     forecastDate?: any
   ): Promise<void> {
     // Normalize both dates to UTC and set to start of day for comparison
-    const statementAt = dateTimeService.set(
+    let statementAt = dateTimeService.set(
       {
         hour: 0,
         minute: 0,
@@ -255,27 +256,30 @@ export class AccountRegisterService implements IAccountRegisterService {
       milliseconds: 0,
     });
 
-    if (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
+    let updated = false;
+    while (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
       // Calculate next statement date based on interval
       const newStatementAt = this.calculateNextStatementDate(
         statementAt,
         accountRegister.statementIntervalId
       );
-
       // Always update in-memory cache to continue forecast processing
       // Handle both Date and Moment objects
       const statementAtMoment =
         typeof newStatementAt === "object" && newStatementAt._isAMomentObject
           ? newStatementAt
           : dateTimeService.create(newStatementAt);
+      statementAt = statementAtMoment;
       accountRegister.statementAt = statementAtMoment;
+      updated = true;
+    }
+    if (updated) {
       this.cache.accountRegister.update(accountRegister);
-
       // Only persist to database if the comparison date is not in the future
       if (dateTimeService.isSameOrBefore(comparisonDate, today)) {
         await this.db.accountRegister.update({
           where: { id: accountRegister.id },
-          data: { statementAt: newStatementAt },
+          data: { statementAt: dateTimeService.toDate(statementAt) },
         });
       }
     }

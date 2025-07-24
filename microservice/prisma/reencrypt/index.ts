@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 import { migrate as migrateUser } from './User'
 import { migrate as migrateAccountRegister } from './AccountRegister'
 import { migrate as migrateRegisterEntry } from './RegisterEntry'
+import { log } from "../../logger";
 
 export interface ProgressReport {
   model: string
@@ -26,11 +27,11 @@ export const defaultProgressReport: ProgressReportCallback = ({
   const pct = Math.round((100 * processed) / totalCount)
     .toString()
     .padStart(3)
-  console.info(
+  log({ message:
     `${model.padEnd(15)} ${pct}% processed ${processed
       .toString()
       .padStart(length)} / ${totalCount} (took ${performance.toFixed(2)}ms)`
-  )
+  })
 }
 
 // --

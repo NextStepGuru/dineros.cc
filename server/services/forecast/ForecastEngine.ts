@@ -14,6 +14,7 @@ import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { createId } from "@paralleldrive/cuid2";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export class ForecastEngine implements IForecastEngine {
   private cache: ModernCacheService;
@@ -99,6 +100,17 @@ export class ForecastEngine implements IForecastEngine {
         )}`
       );
 
+      // Validate that the forecast date range doesn't exceed 10 years
+      const yearsDifference = endDate.diff(startDate, "years");
+      if (yearsDifference > 10) {
+        const errorMessage = `Forecast date range exceeds 10 years: ${yearsDifference} years from ${dateTimeService.format(
+          "YYYY-MM-DD",
+          startDate
+        )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`;
+        forecastLogger.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+
       // 6. Load existing manual entries into the timeline
       await this.loadExistingEntries(accountData, startDate);
 
@@ -163,12 +175,12 @@ export class ForecastEngine implements IForecastEngine {
       await this.dataPersister.performFinalCleanup(context.accountId);
 
       // 14. Convert results to expected format
-      console.log(
+      forecastLogger.debug(
         `Converting ${processedResults.length} processed results to final format`
       );
       const finalResults = this.convertToFinalFormat(processedResults);
-      console.log(`Final results: ${finalResults.length} entries`);
-      console.log("=== FORECAST ENGINE RECALCULATE SUCCESS ===");
+      forecastLogger.debug(`Final results: ${finalResults.length} entries`);
+      forecastLogger.debug("=== FORECAST ENGINE RECALCULATE SUCCESS ===");
 
       return {
         registerEntries: finalResults,
@@ -256,7 +268,7 @@ export class ForecastEngine implements IForecastEngine {
       )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
 
-    while (currentDate.isBefore(endDate)) {
+    while (currentDate.isSameOrBefore(endDate)) {
       dayCount++;
       if (dayCount % 100 === 0) {
         forecastLogger.info(
@@ -298,7 +310,12 @@ export class ForecastEngine implements IForecastEngine {
         currentDate.toDate()
       );
       await this.reoccurrenceService.processReoccurrences(
-        dueReoccurrences,
+        dueReoccurrences.map((reoccurrence) => ({
+          ...reoccurrence,
+          amount: new Decimal(reoccurrence.amount),
+          lastAt: reoccurrence.lastAt || new Date(),
+          updatedAt: reoccurrence.updatedAt || new Date(),
+        })),
         endDate.toDate()
       );
 

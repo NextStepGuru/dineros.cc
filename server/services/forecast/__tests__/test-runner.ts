@@ -3,6 +3,7 @@
 import { performance } from "perf_hooks";
 import { dateTimeService } from "../DateTimeService";
 import { ForecastEngineFactory } from "../index";
+import { log } from "../../logger";
 
 // ANSI color codes for pretty output
 const colors = {
@@ -134,9 +135,7 @@ const createMockDatabase = () =>
   } as any);
 
 async function testBasicFunctionality() {
-  console.log(
-    `${colors.cyan}${colors.bright}🧪 Testing Basic Functionality${colors.reset}\n`
-  );
+  log({ message: `${colors.cyan}${colors.bright}🧪 Testing Basic Functionality${colors.reset}\n`, level: "debug" });
 
   const mockDb = createMockDatabase();
   const engine = ForecastEngineFactory.create(mockDb);
@@ -155,13 +154,11 @@ async function testBasicFunctionality() {
     const executionTime = endTime - startTime;
 
     if (result.isSuccess) {
-      console.log(
-        `${colors.green}✅ Forecast calculation successful!${colors.reset}`
-      );
-      console.log(`${colors.blue}📊 Results:${colors.reset}`);
-      console.log(`   • Execution time: ${executionTime.toFixed(2)}ms`);
-      console.log(`   • Register entries: ${result.registerEntries.length}`);
-      console.log(`   • Account registers: ${result.accountRegisters.length}`);
+      log({ message: `${colors.green}✅ Forecast calculation successful!${colors.reset}`, level: "debug" });
+      log({ message: `${colors.blue}📊 Results:${colors.reset}`, level: "debug" });
+      log({ message: `   • Execution time: ${executionTime.toFixed(2)}ms`, level: "debug" });
+      log({ message: `   • Register entries: ${result.registerEntries.length}`, level: "debug" });
+      log({ message: `   • Account registers: ${result.accountRegisters.length}`, level: "debug" });
 
       // Analyze results
       const balanceEntries = result.registerEntries.filter(
@@ -172,56 +169,46 @@ async function testBasicFunctionality() {
       );
       const pendingEntries = result.registerEntries.filter((e) => e.isPending);
 
-      console.log(`   • Balance entries: ${balanceEntries.length}`);
-      console.log(`   • Projected entries: ${projectedEntries.length}`);
-      console.log(`   • Pending entries: ${pendingEntries.length}`);
+      log({ message: `   • Balance entries: ${balanceEntries.length}`, level: "debug" });
+      log({ message: `   • Projected entries: ${projectedEntries.length}`, level: "debug" });
+      log({ message: `   • Pending entries: ${pendingEntries.length}`, level: "debug" });
 
       // Show sample entries
-      console.log(`\n${colors.blue}📝 Sample Entries:${colors.reset}`);
+      log({ message: `\n${colors.blue}📝 Sample Entries:${colors.reset}`, level: "debug" });
       result.registerEntries.slice(0, 5).forEach((entry, i) => {
         const date = moment(entry.createdAt).format("YYYY-MM-DD");
         const amount =
           entry.amount >= 0
             ? `+$${entry.amount.toFixed(2)}`
             : `-$${Math.abs(entry.amount).toFixed(2)}`;
-        console.log(
-          `   ${i + 1}. ${date} | ${
+        log({ message: `   ${i + 1}. ${date} | ${
             entry.description
-          } | ${amount} | Balance: $${entry.balance.toFixed(2)}`
-        );
+          } | ${amount} | Balance: $${entry.balance.toFixed(2)}`, level: "debug" });
       });
     } else {
-      console.log(
-        `${colors.red}❌ Forecast calculation failed!${colors.reset}`
-      );
+      log({ message: `${colors.red}❌ Forecast calculation failed!${colors.reset}`, level: "debug" });
       if (result.errors) {
         result.errors.forEach((error) => {
-          console.log(`   ${colors.red}Error: ${error}${colors.reset}`);
+          log({ message: `   ${colors.red}Error: ${error}${colors.reset}`, level: "debug" });
         });
       }
     }
   } catch (error) {
-    console.log(
-      `${colors.red}❌ Test failed with error: ${error}${colors.reset}`
-    );
+    log({ message: `${colors.red}❌ Test failed with error: ${error}${colors.reset}`, level: "error" });
   }
 
-  console.log("\n");
+  log({ message: "\n", level: "debug" });
 }
 
 async function testCachePerformance() {
-  console.log(
-    `${colors.magenta}${colors.bright}⚡ Testing Cache Performance${colors.reset}\n`
-  );
+  log({ message: `${colors.magenta}${colors.bright}⚡ Testing Cache Performance${colors.reset}\n`, level: "debug" });
 
   const mockDb = createMockDatabase();
   const engine = ForecastEngineFactory.create(mockDb);
   const cache = engine.getCache();
 
   // Test cache insertion performance
-  console.log(
-    `${colors.blue}Testing cache insertion performance...${colors.reset}`
-  );
+  log({ message: `${colors.blue}Testing cache insertion performance...${colors.reset}`, level: "debug" });
   const insertStart = performance.now();
 
   for (let i = 1; i <= 1000; i++) {
@@ -255,32 +242,26 @@ async function testCachePerformance() {
   }
 
   const insertTime = performance.now() - insertStart;
-  console.log(
-    `${colors.green}✅ Inserted 1,000 accounts in ${insertTime.toFixed(2)}ms${
-      colors.reset
-    }`
-  );
+  log({ message: `${colors.green}✅ Inserted 1,000 accounts in ${insertTime.toFixed(2)}ms${
+      colors.reset}`, level: "debug" });
 
   // Test query performance
-  console.log(`${colors.blue}Testing query performance...${colors.reset}`);
+  log({ message: `${colors.blue}Testing query performance...${colors.reset}`, level: "debug" });
   const queryStart = performance.now();
 
   for (let i = 0; i < 100; i++) {
     const randomType = Math.floor(Math.random() * 5) + 1;
     const results = cache.accountRegister.find({ typeId: randomType });
     // Do something with results to prevent optimization
-    if (results.length === 0) console.log("No results");
+    if (results.length === 0) log({ message: "No results", level: "debug" });
   }
 
   const queryTime = performance.now() - queryStart;
-  console.log(
-    `${colors.green}✅ Completed 100 queries in ${queryTime.toFixed(2)}ms${
-      colors.reset
-    }`
-  );
+  log({ message: `${colors.green}✅ Completed 100 queries in ${queryTime.toFixed(2)}ms${
+      colors.reset}`, level: "debug" });
 
   // Test chained operations
-  console.log(`${colors.blue}Testing chained operations...${colors.reset}`);
+  log({ message: `${colors.blue}Testing chained operations...${colors.reset}`, level: "debug" });
   const chainStart = performance.now();
 
   const chainedResults = cache.accountRegister
@@ -291,33 +272,25 @@ async function testCachePerformance() {
     .data();
 
   const chainTime = performance.now() - chainStart;
-  console.log(
-    `${colors.green}✅ Chained operation completed in ${chainTime.toFixed(
+  log({ message: `${colors.green}✅ Chained operation completed in ${chainTime.toFixed(
       2
-    )}ms${colors.reset}`
-  );
-  console.log(
-    `   Found ${chainedResults.length} accounts with balance > $5,000`
-  );
+    )}ms${colors.reset}`, level: "debug" });
+  log({ message: `   Found ${chainedResults.length} accounts with balance > $5,000`, level: "debug" });
 
   // Show cache statistics
   const stats = cache.getStats();
-  console.log(`\n${colors.blue}📊 Cache Statistics:${colors.reset}`);
-  console.log(`   • Account Registers: ${stats.accountRegisters}`);
-  console.log(`   • Register Entries: ${stats.registerEntries}`);
-  console.log(`   • Reoccurrences: ${stats.reoccurrences}`);
-  console.log(`   • Reoccurrence Skips: ${stats.reoccurrenceSkips}`);
+  log({ message: `\n${colors.blue}📊 Cache Statistics:${colors.reset}`, level: "debug" });
+  log({ message: `   • Account Registers: ${stats.accountRegisters}`, level: "debug" });
+  log({ message: `   • Register Entries: ${stats.registerEntries}`, level: "debug" });
+  log({ message: `   • Reoccurrences: ${stats.reoccurrences}`, level: "debug" });
+  log({ message: `   • Reoccurrence Skips: ${stats.reoccurrenceSkips}`, level: "debug" });
 
-  console.log("\n");
+  log({ message: "\n", level: "debug" });
 }
 
 async function runAllTests() {
-  console.log(
-    `${colors.bright}${colors.green}🚀 Forecast Engine Test Suite${colors.reset}\n`
-  );
-  console.log(
-    `${colors.yellow}Testing the new ModernCacheService-based forecast system...${colors.reset}\n`
-  );
+  log({ message: `${colors.bright}${colors.green}🚀 Forecast Engine Test Suite${colors.reset}\n`, level: "debug" });
+  log({ message: `${colors.yellow}Testing the new ModernCacheService-based forecast system...${colors.reset}\n`, level: "debug" });
 
   // Run basic functionality test
   await testBasicFunctionality();
@@ -325,30 +298,20 @@ async function runAllTests() {
   // Run cache performance test
   await testCachePerformance();
 
-  console.log(
-    `${colors.bright}${colors.green}✨ All tests completed!${colors.reset}\n`
-  );
+  log({ message: `${colors.bright}${colors.green}✨ All tests completed!${colors.reset}\n`, level: "debug" });
 
   // Show next steps
-  console.log(`${colors.blue}${colors.bright}🎯 Next Steps:${colors.reset}`);
-  console.log(
-    `${colors.blue}1.${colors.reset} Run unit tests: ${colors.cyan}npm run test:forecast:unit${colors.reset}`
-  );
-  console.log(
-    `${colors.blue}2.${colors.reset} Run integration tests: ${colors.cyan}npm run test:forecast:integration${colors.reset}`
-  );
-  console.log(
-    `${colors.blue}3.${colors.reset} Run performance comparison: ${colors.cyan}npm run test:forecast:performance${colors.reset}`
-  );
-  console.log(
-    `${colors.blue}4.${colors.reset} Test with your real data by replacing the mock database`
-  );
-  console.log("\n");
+  log({ message: `${colors.blue}${colors.bright}🎯 Next Steps:${colors.reset}`, level: "debug" });
+  log({ message: `${colors.blue}1.${colors.reset} Run unit tests: ${colors.cyan}npm run test:forecast:unit${colors.reset}`, level: "debug" });
+  log({ message: `${colors.blue}2.${colors.reset} Run integration tests: ${colors.cyan}npm run test:forecast:integration${colors.reset}`, level: "debug" });
+  log({ message: `${colors.blue}3.${colors.reset} Run performance comparison: ${colors.cyan}npm run test:forecast:performance${colors.reset}`, level: "debug" });
+  log({ message: `${colors.blue}4.${colors.reset} Test with your real data by replacing the mock database`, level: "debug" });
+  log({ message: "\n", level: "debug" });
 }
 
 // Main execution
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runAllTests().catch(console.error);
+  runAllTests().catch((error) => log({ message: "Test runner error", data: error, level: "error" }));
 }
 
 export { testBasicFunctionality, testCachePerformance, runAllTests };

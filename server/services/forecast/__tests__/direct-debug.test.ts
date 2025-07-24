@@ -3,6 +3,7 @@ import { ForecastEngineFactory } from "../index";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import type { PrismaClient } from "@prisma/client";
 import { dateTimeService } from "../DateTimeService";
+import { log } from "../../../logger";
 
 describe("Direct Debug Test", () => {
   let db: PrismaClient;
@@ -81,7 +82,11 @@ describe("Direct Debug Test", () => {
       // Wait a bit to ensure async operations complete
       await new Promise((resolve) => setTimeout(resolve, 100));
     } catch (error) {
-      console.error("Error loading account data:", error);
+      log({
+        message: "Error loading account data:",
+        data: error,
+        level: "error",
+      });
     }
 
     expect(true).toBe(true);

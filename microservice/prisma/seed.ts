@@ -15,6 +15,7 @@ import HashService from "../server/services/HashService";
 
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import dotenv from "dotenv";
+import { log } from "../../logger";
 dotenv.config();
 
 export const prisma = new PrismaClient().$extends(
@@ -25,7 +26,7 @@ export const prisma = new PrismaClient().$extends(
 );
 
 async function main() {
-  console.log("start");
+  log({ message: "start", level: "debug" });
   await prisma.account.createMany({
     data: accounts,
   });
@@ -104,11 +105,11 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.log("HERE");
-    console.error(e);
+    log({ message: "HERE", level: "debug" });
+    log({ message: "Seed error", data: e, level: "error" });
     process.exit(1);
   })
   .finally(async () => {
-    console.log("Finally");
+    log({ message: "Finally", level: "debug" });
     await prisma.$disconnect();
   });

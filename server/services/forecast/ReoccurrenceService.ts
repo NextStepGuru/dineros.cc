@@ -1,5 +1,7 @@
 import type { PrismaClient, Reoccurrence } from "@prisma/client";
-import type { IReoccurrenceService } from "./types";
+import type { IReoccurrenceService, CreateEntryParams } from "./types";
+import type { CacheAccountRegister, CacheReoccurrence } from "./ModernCacheService";
+import { Decimal } from "@prisma/client/runtime/library";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
@@ -164,15 +166,15 @@ export class ReoccurrenceService implements IReoccurrenceService {
     const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
     if (dayOfWeek === 0) {
       // Sunday - move to Friday
-      return dateTimeService.subtract(date, "2", "days");
+      return dateTimeService.subtract(2, "days", date);
     } else if (dayOfWeek === 6) {
       // Saturday - move to Friday
-              return dateTimeService.subtract(date, "1", "days");
+              return dateTimeService.subtract(1, "days", date);
     }
     return date;
   }
 
-  getReoccurrencesDue(maxDate: Date): Reoccurrence[] {
+  getReoccurrencesDue(maxDate: Date): CacheReoccurrence[] {
     const dueMoment = dateTimeService.createUTC(maxDate);
     return this.cache.reoccurrence.find((reoccurrence) =>
       dateTimeService.isSameOrBefore(

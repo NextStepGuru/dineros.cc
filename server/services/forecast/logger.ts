@@ -1,4 +1,5 @@
 import type { ForecastLoggingConfig } from "./types";
+import { log } from "../../logger";
 
 class ForecastLogger {
   private config: ForecastLoggingConfig = {
@@ -22,37 +23,61 @@ class ForecastLogger {
 
   debug(message: string, data?: any): void {
     if (this.shouldLog("debug")) {
-      console.log(`[ForecastEngine] ${message}`, data || "");
+      log({
+        message: `[ForecastEngine] ${message}`,
+        data: data || "",
+        level: "debug",
+      });
     }
   }
 
   info(message: string, data?: any): void {
     if (this.shouldLog("info")) {
-      console.log(`[ForecastEngine] ${message}`, data || "");
+      log({
+        message: `[ForecastEngine] ${message}`,
+        data: data || "",
+        level: "debug",
+      });
     }
   }
 
   warn(message: string, data?: any): void {
     if (this.shouldLog("warn")) {
-      console.warn(`[ForecastEngine] ${message}`, data || "");
+      log({
+        message: `[ForecastEngine] ${message}`,
+        data: data || "",
+        level: "warn",
+      });
     }
   }
 
   error(message: string, data?: any): void {
     if (this.shouldLog("error")) {
-      console.error(`[ForecastEngine] ${message}`, data || "");
+      log({
+        message: `[ForecastEngine] ${message}`,
+        data: data || "",
+        level: "error",
+      });
     }
   }
 
   service(serviceName: string, message: string, data?: any): void {
     if (this.shouldLog("info")) {
-      console.log(`[${serviceName}] ${message}`, data || "");
+      log({
+        message: `[${serviceName}] ${message}`,
+        data: data || "",
+        level: "debug",
+      });
     }
   }
 
   serviceDebug(serviceName: string, message: string, data?: any): void {
     if (this.shouldLog("debug")) {
-      console.log(`[${serviceName}] ${message}`, data || "");
+      log({
+        message: `[${serviceName}] ${message}`,
+        data: data || "",
+        level: "debug",
+      });
     }
   }
 }

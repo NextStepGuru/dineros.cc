@@ -21,6 +21,7 @@ export interface ForecastResult {
   registerEntries: RegisterEntry[];
   accountRegisters: AccountRegister[];
   isSuccess: boolean;
+  datesProcessed?: number;
   errors?: string[];
 }
 
@@ -85,6 +86,7 @@ export interface ITransferService {
     sourceAccounts: CacheAccountRegister[],
     targetDate: Date
   ): Promise<void>;
+  getAccountBalance(accountRegisterId: number): number;
 }
 
 export interface IDataPersisterService {

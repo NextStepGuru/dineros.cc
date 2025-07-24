@@ -1,4 +1,5 @@
 import type { User } from "~/types/types";
+import { log } from "~/server/logger";
 
 export const useAuthStore = defineStore("authStore", {
   state: () => ({
@@ -43,7 +44,7 @@ export const useAuthStore = defineStore("authStore", {
             const tokenPayload = JSON.parse(atob(this.token.split('.')[1]));
             const now = Math.floor(Date.now() / 1000);
             if (tokenPayload.exp && tokenPayload.exp < now) {
-              console.log("Token is expired, clearing cookie");
+              log({ message: "Token is expired, clearing cookie", level: "debug" });
               authTokenCookie.value = undefined;
               this.isLoggedIn = false;
               this.token = "";
@@ -51,7 +52,7 @@ export const useAuthStore = defineStore("authStore", {
               return;
             }
           } catch (error) {
-            console.log("Error parsing token:", error);
+            log({ message: "Error parsing token:", data: error, level: "debug" });
             // If we can't parse the token, it's invalid
             authTokenCookie.value = undefined;
             this.isLoggedIn = false;
@@ -69,12 +70,12 @@ export const useAuthStore = defineStore("authStore", {
             this.isLoggedIn = true;
           } else {
             // API call failed - check if it's a server error vs auth error
-            console.warn("API validation failed:", error.value);
+            log({ message: "API validation failed:", data: error.value, level: "warn" });
 
             // Only clear auth state if it's definitely an auth error (401/403)
             // For network errors or server errors, preserve the token and try again later
             if (error.value?.status === 401 || error.value?.status === 403) {
-              console.log("Authentication failed, clearing auth state");
+              log({ message: "Authentication failed, clearing auth state", level: "debug" });
               this.isLoggedIn = false;
               this.token = "";
               this.user = null;
@@ -82,7 +83,7 @@ export const useAuthStore = defineStore("authStore", {
             } else {
               // For other errors (500, network issues, etc.), keep the token
               // but don't set isLoggedIn yet - let the user retry
-              console.log("Non-auth error, preserving token for retry");
+              log({ message: "Non-auth error, preserving token for retry", level: "debug" });
               this.isLoggedIn = false;
               // Keep this.token and don't clear the cookie
             }
@@ -91,7 +92,7 @@ export const useAuthStore = defineStore("authStore", {
           this.isLoggedIn = false;
         }
       } catch (error) {
-        console.warn("Could not validate login - cookie access failed:", error);
+        log({ message: "Could not validate login - cookie access failed:", data: error, level: "warn" });
         // Don't clear tokens on cookie access errors - might be SSR context issues
         this.isLoggedIn = false;
       }
@@ -122,7 +123,7 @@ export const useAuthStore = defineStore("authStore", {
         try {
           localStorage.removeItem("authToken");
         } catch (error) {
-          console.log("Error removing authToken from localStorage:", error);
+          log({ message: "Error removing authToken from localStorage:", data: error, level: "debug" });
         }
       }
 
@@ -140,14 +141,14 @@ export const useAuthStore = defineStore("authStore", {
       } catch (error) {
         // Cookie clearing failed - this can happen when called outside Nuxt context
         // This is expected when logout is called from API error handlers
-        console.warn("Could not clear auth cookie:", error);
+        log({ message: "Could not clear auth cookie:", data: error, level: "warn" });
       }
 
       // Try to reset list store, but don't fail if we're outside Nuxt context
       try {
         useListStore().resetList();
       } catch (error) {
-        console.warn("Could not reset list store:", error);
+        log({ message: "Could not reset list store:", data: error, level: "warn" });
       }
     },
     disconnectPlaid() {

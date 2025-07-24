@@ -3,6 +3,7 @@ import bull from "./lib/bull";
 import { createApp, createError, eventHandler, toNodeListener } from "h3";
 import fg from "fast-glob";
 import env from "./env";
+import { log } from "./logger";
 
 const app = createApp();
 
@@ -15,7 +16,7 @@ const app = createApp();
     const [route, method] = routePath.split("."); // Extract route and method (e.g., users.get → /users)
 
     if (!method || !route) {
-      console.warn(`Skipping invalid route file: ${file}`);
+      log({ message: `Skipping invalid route file: ${file}`, level: "warn" });
       continue;
     }
 
@@ -23,7 +24,7 @@ const app = createApp();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler: any = module.default; // Use `any` to bypass type errors
 
-    console.log(`Registering ${method.toUpperCase()} /${route}`);
+    log({ message: `Registering ${method.toUpperCase()} /${route}`, level: "debug" });
 
     app.use(
       `/${route === "index" ? "" : route}`,
@@ -39,6 +40,6 @@ const app = createApp();
   app.use(bull);
 
   listen(toNodeListener(app), { port: env.PORT }).then(({ url }) => {
-    console.log(`Server running at ${url}`);
+    log({ message: `Server running at ${url}`, level: "debug" });
   });
 })();

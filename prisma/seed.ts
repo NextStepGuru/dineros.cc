@@ -12,6 +12,7 @@ import { reoccurrences } from "./backup/reoccurrences";
 import { reoccurrenceSkips } from "./backup/reoccurrenceSkips";
 import { registerEntry } from "./backup/registerEntry";
 import HashService from "../server/services/HashService";
+import { log } from "../server/logger";
 // Countries data
 const countries = [
   { id: 4, name: "Afghanistan", code: "AF", code3: "AFG" },
@@ -266,15 +267,15 @@ export const prisma = new PrismaClient().$extends(
 );
 
 async function main() {
-  console.log("start");
+  log({ message: "start", level: "debug" });
 
   // Seed countries first
-  console.log("🌍 Seeding countries...");
+  log({ message: "🌍 Seeding countries...", level: "debug" });
   await prisma.country.createMany({
     data: countries,
     skipDuplicates: true,
   });
-  console.log(`✅ Seeded ${countries.length} countries`);
+  log({ message: `✅ Seeded ${countries.length} countries`, level: "debug" });
 
   await prisma.account.createMany({
     data: accounts,
@@ -354,11 +355,11 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.log("HERE");
-    console.error(e);
+    log({ message: "HERE", level: "debug" });
+    log({ message: "Seed error", data: e, level: "error" });
     process.exit(1);
   })
   .finally(async () => {
-    console.log("Finally");
+    log({ message: "Finally", level: "debug" });
     await prisma.$disconnect();
   });

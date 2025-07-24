@@ -14,6 +14,7 @@ import {
   maxMoney,
   absoluteMoney,
 } from "../../../lib/bankers-rounding";
+import { forecastLogger } from "./logger";
 
 export class LoanCalculatorService implements ILoanCalculatorService {
   async calculateInterestCharge(
@@ -59,7 +60,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
 
     // Determine which APR to use based on dates
     const apr = this.determineCurrentAPR(accountRegister);
-    console.log("DEBUG: apr =", apr);
+    forecastLogger.debug("DEBUG: apr =", apr);
 
     if (apr > 0) {
       // Use projected balance if provided, otherwise use current balance
@@ -69,11 +70,11 @@ export class LoanCalculatorService implements ILoanCalculatorService {
           ? Number(projectedBalance)
           : Number(accountRegister.balance);
 
-      console.log("DEBUG: balanceToUse =", balanceToUse);
+      forecastLogger.debug("DEBUG: balanceToUse =", balanceToUse);
 
       // Validate balance is a valid number
       if (isNaN(balanceToUse)) {
-        console.log("DEBUG: balanceToUse is NaN, returning 0");
+        forecastLogger.debug("DEBUG: balanceToUse is NaN, returning 0");
         return 0;
       }
 
@@ -85,7 +86,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
         accountRegister.typeId
       );
 
-      console.log("DEBUG: interest before sign adjustment =", interest);
+      forecastLogger.debug("DEBUG: interest before sign adjustment =", interest);
 
       // Apply correct sign for savings vs credit accounts
       if (accountRegister.typeId === 2) {
@@ -96,13 +97,13 @@ export class LoanCalculatorService implements ILoanCalculatorService {
         interest = -absoluteMoney(interest);
       }
 
-      console.log("DEBUG: interest after sign adjustment =", interest);
+      forecastLogger.debug("DEBUG: interest after sign adjustment =", interest);
     } else {
-      console.log("DEBUG: apr is 0 or negative, returning 0");
+      forecastLogger.debug("DEBUG: apr is 0 or negative, returning 0");
     }
 
     const result = roundToCents(interest);
-    console.log("DEBUG: final result =", result);
+    forecastLogger.debug("DEBUG: final result =", result);
     return result;
   }
 
@@ -251,20 +252,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     const hasAPR = this.determineCurrentAPR(accountRegister, checkDate) > 0;
     const hasBalance = accountRegister.balance !== 0;
 
-    // Process interest after the statement date (not on the statement date itself)
-    // Allow processing within 1 day after statement date to handle timezone issues
-    const isAfterStatement = dateTimeService.isAfter(
-      normalizedCheckDate,
-      normalizedStatementDate
-    );
-    const isSameDate =
+    // Process interest on the exact statement date
+    const isOnStatementDate =
       dateTimeService.formatDate(normalizedCheckDate, "YYYY-MM-DD") ===
       dateTimeService.formatDate(normalizedStatementDate, "YYYY-MM-DD");
-    const isWithinOneDay = dateTimeService.isSameOrBefore(
-      normalizedCheckDate,
-      dateTimeService.add(1, "day", normalizedStatementDate)
-    );
-    const isOnStatementDate = isAfterStatement && !isSameDate && isWithinOneDay;
 
     return hasAPR && hasBalance && isOnStatementDate;
   }

@@ -6,6 +6,7 @@ import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import type { CacheAccountRegister } from "../ModernCacheService";
 import { dateTimeService } from "../DateTimeService";
+import { forecastLogger } from "../logger";
 
 describe("AccountRegisterService", () => {
   let service: AccountRegisterService;
@@ -64,8 +65,9 @@ describe("AccountRegisterService", () => {
       mockTransferService
     );
 
-    // Mock console.log to avoid test output
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    // Mock forecastLogger to avoid test output
+    vi.spyOn(forecastLogger, "debug").mockImplementation(() => {});
+    vi.spyOn(forecastLogger, "info").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -168,12 +170,11 @@ describe("AccountRegisterService", () => {
       const account2 = createMockAccount({ id: 2, name: "Account 2" });
       const accounts = [account1, account2];
 
-      // Mock loan calculator - it's called in the forEach AND in the filter
+      // Mock loan calculator to handle the while loop properly
       mockLoanCalculator.shouldProcessInterest
-        .mockReturnValueOnce(true) // forEach call for account1
-        .mockReturnValueOnce(false) // forEach call for account2
-        .mockReturnValueOnce(true) // filter call for account1
-        .mockReturnValueOnce(false); // filter call for account2
+        .mockReturnValueOnce(true) // First call for account1 - should process
+        .mockReturnValueOnce(false) // Second call for account1 - stop processing
+        .mockReturnValueOnce(false); // Call for account2 - no processing
 
       mockLoanCalculator.isCreditAccount.mockReturnValue(true); // Credit account
       mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-50); // Negative = interest charge
@@ -183,7 +184,7 @@ describe("AccountRegisterService", () => {
 
       await service.processInterestCharges(accounts, forecastDate);
 
-      expect(mockLoanCalculator.shouldProcessInterest).toHaveBeenCalledTimes(2);
+      expect(mockLoanCalculator.shouldProcessInterest).toHaveBeenCalledTimes(3);
       expect(
         mockLoanCalculator.calculateInterestForAccount
       ).toHaveBeenCalledWith(account1, 0); // Should include projected balance parameter
@@ -198,7 +199,9 @@ describe("AccountRegisterService", () => {
       const account = createMockAccount({ id: 1 });
       const accounts = [account];
 
-      mockLoanCalculator.shouldProcessInterest.mockReturnValue(true);
+      mockLoanCalculator.shouldProcessInterest
+        .mockReturnValueOnce(true) // First call - should process
+        .mockReturnValueOnce(false); // Second call - stop processing
       mockLoanCalculator.isCreditAccount.mockReturnValue(true); // Credit account
       mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(0); // No interest
       mockLoanCalculator.calculatePaymentAmount.mockReturnValue(0);
@@ -222,7 +225,9 @@ describe("AccountRegisterService", () => {
 
     it("should process without forecast date", async () => {
       const account = createMockAccount({ id: 1 });
-      mockLoanCalculator.shouldProcessInterest.mockReturnValue(true);
+      mockLoanCalculator.shouldProcessInterest
+        .mockReturnValueOnce(true) // First call - should process
+        .mockReturnValueOnce(false); // Second call - stop processing
       mockLoanCalculator.isCreditAccount.mockReturnValue(true); // Credit account
       mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-25);
       mockLoanCalculator.calculatePaymentAmount.mockReturnValue(50);
@@ -263,10 +268,21 @@ describe("AccountRegisterService", () => {
           description: "Interest Charge",
           amount: 75, // Absolute value
           sourceAccountRegisterId: 2,
+          forecastDate: expect.any(Date),
           reoccurrence: expect.objectContaining({
             accountRegisterId: 1,
-            amount: 75,
+            amount: expect.any(Object), // Decimal object
             transferAccountRegisterId: 2,
+            description: "Credit Card",
+            intervalId: undefined,
+            intervalCount: 1,
+            id: 0,
+            lastAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+            adjustBeforeIfOnWeekend: false,
+            endAt: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
           }),
         })
       );
@@ -280,10 +296,21 @@ describe("AccountRegisterService", () => {
           sourceAccountRegisterId: 2,
           amount: 150,
           description: "Min Payment to Credit Card",
+          forecastDate: expect.any(Date),
           reoccurrence: expect.objectContaining({
             accountRegisterId: 1,
-            amount: 150,
+            amount: expect.any(Object), // Decimal object
             description: "Min Payment to Credit Card",
+            intervalId: undefined,
+            intervalCount: 1,
+            id: 0,
+            lastAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+            adjustBeforeIfOnWeekend: false,
+            endAt: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            transferAccountRegisterId: 2,
           }),
         })
       );
@@ -540,9 +567,9 @@ describe("AccountRegisterService", () => {
       });
 
       // Use vi.spyOn to mock Date instead of moment
-              const mockNow = vi
-          .spyOn(Date, "now")
-          .mockReturnValue(dateTimeService.create("2024-01-05").valueOf());
+      const mockNow = vi
+        .spyOn(Date, "now")
+        .mockReturnValue(dateTimeService.create("2024-01-05").valueOf());
 
       const forecastDate = dateTimeService.create("2024-01-10"); // Future date
 

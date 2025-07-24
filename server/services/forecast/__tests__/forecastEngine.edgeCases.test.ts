@@ -30,11 +30,12 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       registerEntry: {
         findMany: vi.fn(),
         create: vi.fn(),
-        updateMany: vi.fn(),
-        deleteMany: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       reoccurrence: {
         findMany: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
       },
       reoccurrenceSkip: {
         findMany: vi.fn(),
@@ -87,6 +88,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
   describe("loadExistingEntries - Error Handling", () => {
     it("should handle database errors gracefully", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       const mockAccountData = {
         registerEntries: [
           {
@@ -139,6 +144,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
     });
 
     it("should handle entries with missing required fields", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       const mockAccountData = {
         registerEntries: [
           {
@@ -173,6 +182,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
   describe("processForecastTimeline - Error Handling", () => {
     it("should handle errors in timeline processing", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       const startDate = moment("2024-01-01");
       const endDate = moment("2024-01-05");
 
@@ -238,6 +251,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
   describe("loadManualEntriesForDate - Error Handling", () => {
     it("should handle database errors when loading manual entries", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       const testDate = moment("2024-01-15");
 
       // Mock the cache to throw an error
@@ -274,6 +291,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
   describe("processAccountEntries - Error Handling", () => {
     it("should handle errors in account processing", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       const mockAccountRegisters = [
         {
           id: 1,
@@ -354,6 +375,10 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
   describe("validateResults - Error Handling", () => {
     it("should handle validation errors gracefully", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
       // Mock the cache to throw an error
       const mockCache = {
         registerEntry: {
@@ -400,6 +425,78 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       const result = forecastEngine.getCache();
       expect(result).toBe(mockCache);
+    });
+  });
+
+  describe("Date Range Validation", () => {
+    it("should throw error when forecast date range exceeds 10 years", async () => {
+      // Disable logging for this test
+      const { forecastLogger } = await import("../logger");
+      forecastLogger.setConfig({ enabled: false });
+
+      const mockDb = {
+        accountRegister: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        registerEntry: {
+          findMany: vi.fn().mockResolvedValue([]),
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        reoccurrence: {
+          findMany: vi.fn().mockResolvedValue([]),
+          aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
+        },
+        reoccurrenceSkip: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+      } as any;
+
+      const engine = new ForecastEngine(mockDb);
+
+      const context: ForecastContext = {
+        accountId: "test-account",
+        startDate: new Date("2024-01-01"),
+        endDate: new Date("2035-01-01"), // 11 years later
+      };
+
+      const result = await engine.recalculate(context);
+      expect(result.isSuccess).toBe(false);
+      expect(result.errors?.[0]).toContain(
+        "Forecast date range exceeds 10 years"
+      );
+    });
+
+    it("should allow forecast date range of exactly 10 years", async () => {
+      const mockDb = {
+        accountRegister: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        registerEntry: {
+          findMany: vi.fn().mockResolvedValue([]),
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        reoccurrence: {
+          findMany: vi.fn().mockResolvedValue([]),
+          aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
+        },
+        reoccurrenceSkip: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+      } as any;
+
+      const engine = new ForecastEngine(mockDb);
+
+      const context: ForecastContext = {
+        accountId: "test-account",
+        startDate: new Date("2024-01-01"),
+        endDate: new Date("2034-01-01"), // Exactly 10 years later
+      };
+
+      // Should not throw an error
+      const result = await engine.recalculate(context);
+      expect(result.isSuccess).toBe(true);
     });
   });
 });

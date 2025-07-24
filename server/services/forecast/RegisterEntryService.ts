@@ -10,6 +10,7 @@ import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";
 import { dateTimeService } from "./DateTimeService";
+import { forecastLogger } from "./logger";
 
 export class RegisterEntryService implements IRegisterEntryService {
   constructor(private db: PrismaClient, private cache: ModernCacheService) {}
@@ -161,10 +162,10 @@ export class RegisterEntryService implements IRegisterEntryService {
     initialBalance: number,
     accountType: "credit" | "debit"
   ): CacheRegisterEntry[] {
-    console.log(
+    forecastLogger.debug(
       `calculateRunningBalances called with ${entries?.length || 0} entries`
     );
-    console.log(`Entries:`, entries);
+    forecastLogger.debug(`Entries:`, entries);
 
     // Sort entries by date and amount (descending for same date)
     const sortedEntries = recalculateRunningBalanceAndSort({
@@ -217,8 +218,11 @@ export class RegisterEntryService implements IRegisterEntryService {
   }
 
   createBalanceEntry(accountRegister: CacheAccountRegister): void {
-    console.log(
-      `Creating balance entry for account ${accountRegister.id} (${accountRegister.name}) with balance ${accountRegister.balance}`
+    forecastLogger.debug(
+      `Creating balance entry for account ${accountRegister.id} on ${dateTimeService.format(
+        "YYYY-MM-DD",
+        dateTimeService.nowDate()
+      )}`
     );
     this.createEntry({
       accountRegisterId: accountRegister.id,
@@ -228,7 +232,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       isManualEntry: false,
       forecastDate: dateTimeService.nowDate(), // Use current date for balance entries
     });
-    console.log(
+    forecastLogger.debug(
       `Balance entry created. Cache now has ${
         this.cache.registerEntry.find({}).length
       } entries`

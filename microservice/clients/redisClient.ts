@@ -20,7 +20,7 @@ const redisOptions: RedisOptions = {
 
 export const sharedRedisConnection = new Redis(redisOptions);
 sharedRedisConnection.on("ready", () => {
-  console.log("Redis connection ready.");
+  log({ message: "Redis connection ready.", level: "debug" });
 });
 sharedRedisConnection.on("error", (error) => {
   log({ message: "Redis error:", data: error, level: "error" });

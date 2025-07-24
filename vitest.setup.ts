@@ -4,9 +4,6 @@ import { vi } from "vitest";
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
 
-// Log that queues and cron jobs are disabled for tests
-console.log("🧪 Test environment: Queues and cron jobs disabled for testing");
-
 // Required environment variables for server/env.ts validation
 process.env.DB_ENCRYPTION_KEY =
   "test-encryption-key-12345678901234567890123456789012";

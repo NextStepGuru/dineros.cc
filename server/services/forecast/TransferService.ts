@@ -1,5 +1,6 @@
 import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
+import { Decimal } from "@prisma/client/runtime/library";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
@@ -365,7 +366,7 @@ export class TransferService implements ITransferService {
           accountRegisterId: debtAccountRegister.id,
           description: `Extra debt payment from ${sourceAccountRegister.name}`,
           lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-          amount: Number(paymentAmount),
+          amount: new Decimal(Number(paymentAmount)),
           transferAccountRegisterId:
             debtAccountRegister.targetAccountRegisterId,
           intervalId: 3,
@@ -407,6 +408,11 @@ export class TransferService implements ITransferService {
     return this.cache.accountRegister.find(
       (account) => account.allowExtraPayment
     );
+  }
+
+  getAccountBalance(accountRegisterId: number): number {
+    const account = this.cache.accountRegister.findById(accountRegisterId);
+    return account?.balance || 0;
   }
 
   /**
