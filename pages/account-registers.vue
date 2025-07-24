@@ -602,7 +602,6 @@ function sortAccounts(accounts: AccountRegister[]): AccountRegister[] {
 async function handleDragEnd(event: any) {
   // Check if the item was actually moved (not just clicked)
   if (event.oldIndex === event.newIndex) {
-    console.log("No change detected, returning");
     return;
   }
 

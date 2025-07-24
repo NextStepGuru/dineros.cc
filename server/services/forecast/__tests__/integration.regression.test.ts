@@ -30,9 +30,15 @@ describe("Integration Regression Tests", () => {
         create: vi.fn(),
         deleteMany: vi.fn(),
         createMany: vi.fn(),
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({}),
       },
       reoccurrence: {
         findMany: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
+      },
+      reoccurrenceSkip: {
+        findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
     };
@@ -196,7 +202,7 @@ describe("Integration Regression Tests", () => {
       const latestEntryDate = Math.max(
         ...gmEntries.map((entry) => new Date(entry.createdAt).getTime())
       );
-      expect(new Date(latestEntryDate)).toBeAfter(new Date("2025-11-01"));
+      expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(new Date("2025-11-01").getTime());
     });
   });
 
@@ -445,7 +451,7 @@ describe("Integration Regression Tests", () => {
         const latestEntry = Math.max(
           ...accountEntries.map((e) => new Date(e.createdAt).getTime())
         );
-        expect(new Date(latestEntry)).toBeAfter(new Date("2025-03-01"));
+        expect(new Date(latestEntry).getTime()).toBeGreaterThan(new Date("2025-03-01").getTime());
       }
     });
   });

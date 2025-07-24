@@ -251,17 +251,20 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     const hasAPR = this.determineCurrentAPR(accountRegister, checkDate) > 0;
     const hasBalance = accountRegister.balance !== 0;
 
-    // Process interest on statement date or within a small window to handle edge cases
-    // Allow processing on the statement date or within 1 day to handle timezone issues
-    const isOnStatementDate =
-      dateTimeService.isSameOrAfter(
-        normalizedCheckDate,
-        normalizedStatementDate
-      ) &&
-      dateTimeService.isSameOrBefore(
-        normalizedCheckDate,
-        dateTimeService.add(1, "day", normalizedStatementDate)
-      );
+    // Process interest after the statement date (not on the statement date itself)
+    // Allow processing within 1 day after statement date to handle timezone issues
+    const isAfterStatement = dateTimeService.isAfter(
+      normalizedCheckDate,
+      normalizedStatementDate
+    );
+    const isSameDate =
+      dateTimeService.formatDate(normalizedCheckDate, "YYYY-MM-DD") ===
+      dateTimeService.formatDate(normalizedStatementDate, "YYYY-MM-DD");
+    const isWithinOneDay = dateTimeService.isSameOrBefore(
+      normalizedCheckDate,
+      dateTimeService.add(1, "day", normalizedStatementDate)
+    );
+    const isOnStatementDate = isAfterStatement && !isSameDate && isWithinOneDay;
 
     return hasAPR && hasBalance && isOnStatementDate;
   }

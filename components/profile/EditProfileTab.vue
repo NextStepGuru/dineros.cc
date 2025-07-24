@@ -37,7 +37,6 @@ const countryOptions = computed(() => {
 // Load countries on component mount
 onMounted(async () => {
   try {
-    console.log("Loading countries...");
     isLoadingCountries.value = true;
 
     const { data, error } = await useAPI<Country[]>("/api/countries");
@@ -53,7 +52,6 @@ onMounted(async () => {
 
     if (data.value && data.value.length > 0) {
       countries.value = data.value;
-      console.log(`Loaded ${countries.value.length} countries`);
     } else {
       console.warn("No countries data received from API");
       // Set a fallback with at least United States
@@ -84,9 +82,6 @@ watch(
         formState.value.timezoneOffset !== firstTimezone.value
       ) {
         formState.value.timezoneOffset = firstTimezone.value;
-        console.log(
-          `Auto-selected timezone ${firstTimezone.name} for country ${newCountryId}`
-        );
       }
     }
   }

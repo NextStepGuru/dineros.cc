@@ -47,11 +47,6 @@ const formState = ref<RegisterEntry>(props.registerEntry);
 
 const isNewEntry = computed(() => {
   const isNew = !formState.value.id;
-  console.log("isNewEntry computed:", {
-    id: formState.value.id,
-    isNew,
-    formState: formState.value,
-  });
   return isNew;
 });
 

@@ -122,8 +122,9 @@ export class ForecastEngine implements IForecastEngine {
       console.log(`After loading existing entries. Cache has ${this.cache.registerEntry.find({}).length} entries`);
 
       // 7. Process forecast day by day
+      let datesProcessed = 0;
       try {
-        await this.processForecastTimeline(startDate, endDate);
+        datesProcessed = await this.processForecastTimeline(startDate, endDate);
       } catch (error) {
         forecastLogger.error(`Error in processForecastTimeline:`, error);
         throw error;
@@ -193,6 +194,7 @@ export class ForecastEngine implements IForecastEngine {
           statementAt: acc.statementAt.toDate(),
         })) as any[], // TODO: Fix type mapping for AccountRegister
         isSuccess: true,
+        datesProcessed,
       };
     } catch (error) {
       console.log("=== FORECAST ENGINE RECALCULATE ERROR ===");
@@ -208,6 +210,7 @@ export class ForecastEngine implements IForecastEngine {
         registerEntries: [],
         accountRegisters: [],
         isSuccess: false,
+        datesProcessed: 0,
         errors: [
           error instanceof Error ? error.message : "Unknown error occurred",
         ],
@@ -270,7 +273,7 @@ export class ForecastEngine implements IForecastEngine {
   private async processForecastTimeline(
     startDate: any,
     endDate: any
-  ): Promise<void> {
+  ): Promise<number> {
     const currentDate = dateTimeService.clone(startDate);
     let dayCount = 0;
 
@@ -337,6 +340,7 @@ export class ForecastEngine implements IForecastEngine {
     forecastLogger.info(
       `Completed timeline processing. Total days processed: ${dayCount}`
     );
+    return dayCount;
   }
 
   private async loadManualEntriesForDate(date: any): Promise<void> {

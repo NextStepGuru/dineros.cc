@@ -20,6 +20,7 @@ describe("Balance Arithmetic Regression Tests", () => {
         createMany: vi.fn(),
         deleteMany: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({}),
       },
       reoccurrence: {
         findMany: vi.fn(),
@@ -235,6 +236,7 @@ describe("Balance Arithmetic Regression Tests", () => {
         _min: { lastAt: new Date() },
       });
       mockPrisma.registerEntry.updateMany.mockResolvedValue({});
+      mockPrisma.registerEntry.update.mockResolvedValue({});
 
       // Verify the data was created
       console.log("Mock data set up successfully");

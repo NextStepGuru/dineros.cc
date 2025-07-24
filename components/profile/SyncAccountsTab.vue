@@ -7,12 +7,7 @@ const toast = useToast();
 const authStore = useAuthStore();
 const listStore = useListStore();
 
-// Debug auth state
-console.log("Auth store state:", {
-  isLoggedIn: authStore.getIsUserLoggedIn,
-  hasPlaidConnected: authStore.hasPlaidConnected,
-  token: authStore.getToken ? "present" : "missing",
-});
+
 
 const isLoaded = ref(false);
 const publicToken = ref("");
@@ -37,27 +32,15 @@ const plaidLinkOptions = ref<PlaidLinkOptions>({
 });
 
 async function connectToPlaid() {
-  console.log("connectToPlaid called");
-  console.log("Current auth state:", {
-    isLoggedIn: authStore.getIsUserLoggedIn,
-    hasPlaidConnected: authStore.hasPlaidConnected,
-    token: authStore.getToken ? "present" : "missing",
-  });
-
   try {
-    console.log("Making API call to /api/plaid-link");
     const { data: res, error } = await useAPI<{
       expiration: string;
       link_token: string;
       request_id: string;
     }>("/api/plaid-link");
 
-    console.log("API response:", res?.value);
-    console.log("API error:", error?.value);
-
     if (res?.value && res.value.link_token) {
       plaidLinkOptions.value.token = res.value.link_token;
-      console.log("Token set:", res.value.link_token);
     } else if (error?.value) {
       console.error("API error:", error.value);
       toast.add({

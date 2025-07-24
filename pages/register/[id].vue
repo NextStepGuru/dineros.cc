@@ -105,12 +105,6 @@ const loadInitialEntries = async () => {
     });
 
     if (data.value) {
-      console.log("Initial load data received:", {
-        entriesCount: data.value.entries?.length,
-        isPartialLoad: data.value.isPartialLoad,
-        hasMore: data.value.hasMore,
-      });
-
       // Update both accountEntries and tableEntries directly
       accountEntries.value = {
         entries: data.value.entries || [],

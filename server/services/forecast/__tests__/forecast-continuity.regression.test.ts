@@ -36,13 +36,15 @@ describe("Forecast Continuity Regression Tests", () => {
         create: vi.fn(),
         deleteMany: vi.fn(),
         createMany: vi.fn(),
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({}),
       },
       reoccurrence: {
         findMany: vi.fn(),
         aggregate: vi.fn(),
       },
       reoccurrenceSkip: {
-        findMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
     };
@@ -159,7 +161,7 @@ describe("Forecast Continuity Regression Tests", () => {
         const latestEntryDate = Math.max(
           ...allEntries.map((entry) => new Date(entry.createdAt).getTime())
         );
-        expect(new Date(latestEntryDate)).toBeAfter(new Date("2025-12-01"));
+        expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(new Date("2025-12-01").getTime());
       }
     });
 

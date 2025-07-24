@@ -22,17 +22,12 @@ export const recalculateRunningBalanceAndSort = <
   balance: number;
   type: "credit" | "debit";
 }): T[] => {
-  console.log(`recalculateRunningBalanceAndSort called with ${registerEntries?.length || 0} entries`);
-  console.log(`registerEntries:`, registerEntries);
-
   if (!registerEntries || registerEntries.length === 0) {
-    console.log("No entries provided, returning empty array");
     return [];
   }
 
   const latestBalance = registerEntries.find((item) => item.isBalanceEntry);
   if (!latestBalance) {
-    console.log("No balance entry found, returning empty array");
     return [];
   }
 
@@ -72,7 +67,6 @@ export const recalculateRunningBalanceAndSort = <
     })
     .map((item) => {
       runningBalance += +item.amount;
-      console.log("runningBalance", runningBalance);
       return { ...item, balance: runningBalance };
     });
 

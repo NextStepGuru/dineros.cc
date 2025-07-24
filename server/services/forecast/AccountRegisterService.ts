@@ -303,24 +303,12 @@ export class AccountRegisterService implements IAccountRegisterService {
       console.log(`  Interval ID: ${accountRegister.statementIntervalId}`);
 
       // Always update in-memory cache to continue forecast processing
-      console.log(
-        `[updateStatementDate] Before assignment: newStatementAt=${dateTimeService.formatDate(
-          newStatementAt,
-          "YYYY-MM-DD"
-        )}`
-      );
       // Handle both Date and Moment objects
       const statementAtMoment =
         typeof newStatementAt === "object" && newStatementAt._isAMomentObject
           ? newStatementAt
           : dateTimeService.create(newStatementAt);
       accountRegister.statementAt = statementAtMoment;
-      console.log(
-        `[updateStatementDate] After assignment: statementAt=${dateTimeService.formatDate(
-          accountRegister.statementAt,
-          "YYYY-MM-DD"
-        )}`
-      );
       this.cache.accountRegister.update(accountRegister);
 
       // Only persist to database if the comparison date is not in the future
