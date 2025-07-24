@@ -5,8 +5,8 @@ import type {
   CacheAccountRegister,
 } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
-import { recalculateRunningBalanceAndSort } from "~/lib/sort";
-import { IS_CREDIT_TYPE_IDS } from "~/consts";
+import { recalculateRunningBalanceAndSort } from "../../../lib/sort";
+import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";
 import { dateTimeService } from "./DateTimeService";
@@ -161,6 +161,11 @@ export class RegisterEntryService implements IRegisterEntryService {
     initialBalance: number,
     accountType: "credit" | "debit"
   ): CacheRegisterEntry[] {
+    console.log(
+      `calculateRunningBalances called with ${entries?.length || 0} entries`
+    );
+    console.log(`Entries:`, entries);
+
     // Sort entries by date and amount (descending for same date)
     const sortedEntries = recalculateRunningBalanceAndSort(entries);
 
@@ -190,7 +195,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       }
 
       // Check if this entry's date is in the skip list
-      const skipDate = dateTimeService.format(entry.createdAt, "YYYY-MM-DD");
+      const skipDate = dateTimeService.format("YYYY-MM-DD", entry.createdAt);
       const skips = this.cache.reoccurrenceSkip.find({
         reoccurrenceId: entry.reoccurrenceId,
       });
@@ -223,13 +228,21 @@ export class RegisterEntryService implements IRegisterEntryService {
   }
 
   createBalanceEntry(accountRegister: CacheAccountRegister): void {
+    console.log(
+      `Creating balance entry for account ${accountRegister.id} (${accountRegister.name}) with balance ${accountRegister.balance}`
+    );
     this.createEntry({
       accountRegisterId: accountRegister.id,
       description: `Balance for ${accountRegister.name}`,
       amount: accountRegister.balance,
       isBalanceEntry: true,
       isManualEntry: false,
-      forecastDate: dateTimeService.nowDate(),
+      forecastDate: dateTimeService.nowDate(), // Use current date for balance entries
     });
+    console.log(
+      `Balance entry created. Cache now has ${
+        this.cache.registerEntry.find({}).length
+      } entries`
+    );
   }
 }

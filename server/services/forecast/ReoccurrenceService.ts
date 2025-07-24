@@ -22,7 +22,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       "ReoccurrenceService",
       `Processing ${
         reoccurrences.length
-      } reoccurrences up to ${dateTimeService.format(endDate, "YYYY-MM-DD")}`
+      } reoccurrences up to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
     for (const reoccurrence of reoccurrences) {
       await this.processReoccurrence(reoccurrence, endDate);
@@ -52,7 +52,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       }) from ${dateTimeService.format(
         lastAt,
         "YYYY-MM-DD"
-      )} to ${dateTimeService.format(endDate, "YYYY-MM-DD")}`
+      )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
 
     // Process all due occurrences up to endDate
@@ -87,7 +87,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: reoccurrence.accountRegisterId,
           sourceAccountRegisterId: reoccurrence.transferAccountRegisterId,
-          amount: reoccurrence.amount,
+          amount: Number(reoccurrence.amount),
           description: reoccurrence.description,
           reoccurrence: reoccurrenceForEntry,
         });
@@ -119,7 +119,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
       // Safety check to prevent infinite loops
       if (occurrenceCount > 1000) {
-        forecastLogger.serviceError(
+        forecastLogger.error(
           "ReoccurrenceService",
           `Too many occurrences for reoccurrence ${reoccurrence.id}, stopping`
         );
@@ -164,10 +164,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
     const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
     if (dayOfWeek === 0) {
       // Sunday - move to Friday
-      return dateTimeService.subtract(date, 2, "days");
+      return dateTimeService.subtract(date, "2", "days");
     } else if (dayOfWeek === 6) {
       // Saturday - move to Friday
-      return dateTimeService.subtract(date, 1, "days");
+              return dateTimeService.subtract(date, "1", "days");
     }
     return date;
   }
@@ -179,7 +179,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         dateTimeService.createUTC(reoccurrence.lastAt),
         dueMoment
       )
-    );
+    ) || [];
   }
 
   isReoccurrenceActive(reoccurrence: Reoccurrence, currentDate: Date): boolean {

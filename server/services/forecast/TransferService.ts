@@ -379,7 +379,7 @@ export class TransferService implements ITransferService {
           accountRegisterId: debtAccountRegister.id,
           description: `Extra debt payment from ${sourceAccountRegister.name}`,
           lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-          amount: paymentAmount,
+          amount: Number(paymentAmount),
           transferAccountRegisterId:
             debtAccountRegister.targetAccountRegisterId,
           intervalId: 3,
@@ -644,7 +644,7 @@ export class TransferService implements ITransferService {
           accountRegisterId: savingsAccountRegister.id,
           description: `Savings goal contribution from ${sourceAccountRegister.name}`,
           lastAt: dateTimeService.nowDate(),
-          amount: savingsAmount,
+          amount: Number(savingsAmount),
           transferAccountRegisterId:
             savingsAccountRegister.targetAccountRegisterId,
           intervalId: 3,

@@ -217,7 +217,9 @@ describe("ForecastEngine Integration Tests", () => {
   describe("Basic Forecast Calculation", () => {
     it("should successfully calculate a basic forecast", async () => {
       try {
+        console.log("About to call engine.recalculate...");
         const result = await engine.recalculate(testContext);
+        console.log("Result received:", result);
 
         if (!result.isSuccess) {
           console.log("Forecast failed with errors:", result.errors);

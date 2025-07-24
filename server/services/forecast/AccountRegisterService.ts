@@ -86,7 +86,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegisterId: accountRegister.id,
         description: accountRegister.name,
         lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-        amount: Number(Math.abs(interest)),
+        amount: Math.abs(interest),
         transferAccountRegisterId: accountRegister.targetAccountRegisterId,
         intervalId: intervalId,
         intervalCount: 1,

@@ -3,7 +3,7 @@ import type {
   Reoccurrence,
   AccountRegister,
 } from "@prisma/client";
-import type { RegisterEntry } from "~/types/types";
+import type { RegisterEntry } from "../../../types/types";
 import type {
   CacheRegisterEntry,
   CacheAccountRegister,

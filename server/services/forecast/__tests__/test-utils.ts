@@ -9,10 +9,25 @@ export async function createTestDatabase(): Promise<PrismaClient> {
   // This could use an in-memory SQLite database for testing
   // or connect to a dedicated test database instance
 
+  // Store data in memory for the mock
+  const accountRegisters: any[] = [];
+  const registerEntries: any[] = [];
+  const reoccurrences: any[] = [];
+  const reoccurrenceSkips: any[] = [];
+
   const mockDb = {
     accountRegister: {
-      create: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockImplementation(async (data: any) => {
+        const accountRegister = { ...data.data, id: data.data.id || Date.now() };
+        accountRegisters.push(accountRegister);
+        return accountRegister;
+      }),
+      findMany: vi.fn().mockImplementation(async (query: any) => {
+        if (query?.where?.accountId) {
+          return accountRegisters.filter(ar => ar.accountId === query.where.accountId);
+        }
+        return accountRegisters;
+      }),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
@@ -20,7 +35,12 @@ export async function createTestDatabase(): Promise<PrismaClient> {
     },
     reoccurrence: {
       create: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: vi.fn().mockImplementation(async (query: any) => {
+        if (query?.where?.accountId) {
+          return reoccurrences.filter(r => r.accountId === query.where.accountId);
+        }
+        return reoccurrences;
+      }),
       aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: new Date() } }),
       update: vi.fn(),
       updateMany: vi.fn(),
@@ -28,9 +48,29 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       deleteMany: vi.fn(),
     },
     registerEntry: {
-      create: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockImplementation(async (data: any) => {
+        const entry = { ...data.data, id: data.data.id || `entry-${Date.now()}` };
+        registerEntries.push(entry);
+        return entry;
+      }),
+      createMany: vi.fn().mockImplementation(async (data: any) => {
+        data.data.forEach((entry: any) => {
+          registerEntries.push({ ...entry, id: entry.id || `entry-${Date.now()}` });
+        });
+        return { count: data.data.length };
+      }),
+      findMany: vi.fn().mockImplementation(async (query: any) => {
+        if (query?.where?.register?.accountId) {
+          return registerEntries.filter(re => {
+            const accountRegister = accountRegisters.find(ar => ar.id === re.accountRegisterId);
+            return accountRegister && accountRegister.accountId === query.where.register.accountId;
+          });
+        }
+        if (query?.where?.accountRegisterId) {
+          return registerEntries.filter(re => re.accountRegisterId === query.where.accountRegisterId);
+        }
+        return registerEntries;
+      }),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
@@ -39,7 +79,12 @@ export async function createTestDatabase(): Promise<PrismaClient> {
     },
     reoccurrenceSkip: {
       create: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: vi.fn().mockImplementation(async (query: any) => {
+        if (query?.where?.accountId) {
+          return reoccurrenceSkips.filter(rs => rs.accountId === query.where.accountId);
+        }
+        return reoccurrenceSkips;
+      }),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),

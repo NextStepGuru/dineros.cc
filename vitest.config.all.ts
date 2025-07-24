@@ -4,7 +4,7 @@ import { resolve } from "path";
 export default defineConfig({
   test: {
     // Suppress console output during tests
-    silent: true,
+    silent: false,
 
     // Set up global test configuration
     setupFiles: ["./vitest.setup.ts"],

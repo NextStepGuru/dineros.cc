@@ -8,6 +8,8 @@ export class DataLoaderService implements IDataLoaderService {
   constructor(private db: PrismaClient, private cache: ModernCacheService) {}
 
   async loadAccountData(context: ForecastContext): Promise<AccountData> {
+    console.log(`loadAccountData: Loading data for accountId = ${context.accountId}`);
+
     // Clear existing cache
     this.cache.accountRegister.clear();
     this.cache.registerEntry.clear();
@@ -16,24 +18,31 @@ export class DataLoaderService implements IDataLoaderService {
 
     // Load account registers
     const accountRegisters = await this.loadAccountRegisters(context.accountId);
+    console.log(`loadAccountData: Loaded ${accountRegisters.length} account registers`);
 
     // Load register entries
     const registerEntries = await this.loadRegisterEntries(context.accountId);
+    console.log(`loadAccountData: Loaded ${registerEntries.length} register entries`);
 
     // Load reoccurrences
     const reoccurrences = await this.loadReoccurrences(context.accountId);
+    console.log(`loadAccountData: Loaded ${reoccurrences.length} reoccurrences`);
 
     // Load reoccurrence skips
     const reoccurrenceSkips = await this.loadReoccurrenceSkips(
       context.accountId
     );
+    console.log(`loadAccountData: Loaded ${reoccurrenceSkips.length} reoccurrence skips`);
 
-    return {
+    const result = {
       accountRegisters,
       registerEntries,
       reoccurrences,
       reoccurrenceSkips,
     };
+
+    console.log(`loadAccountData: Returning data:`, result);
+    return result;
   }
 
   private async loadAccountRegisters(
@@ -85,6 +94,15 @@ export class DataLoaderService implements IDataLoaderService {
     const lokiAccountRegisters: CacheAccountRegister[] = accountRegisters.map(
       (reg) => ({
         ...reg,
+        balance: Number(reg.balance),
+        latestBalance: Number(reg.latestBalance),
+        minPayment: reg.minPayment ? Number(reg.minPayment) : null,
+        apr1: reg.apr1 ? Number(reg.apr1) : null,
+        apr2: reg.apr2 ? Number(reg.apr2) : null,
+        apr3: reg.apr3 ? Number(reg.apr3) : null,
+        loanOriginalAmount: reg.loanOriginalAmount ? Number(reg.loanOriginalAmount) : null,
+        minAccountBalance: reg.minAccountBalance ? Number(reg.minAccountBalance) : null,
+        accountSavingsGoal: reg.accountSavingsGoal ? Number(reg.accountSavingsGoal) : null,
         statementAt: dateTimeService.createUTC(reg.statementAt),
       })
     );
@@ -113,6 +131,8 @@ export class DataLoaderService implements IDataLoaderService {
 
     const cacheEntries = registerEntries.map((entry) => ({
       ...entry,
+      amount: Number(entry.amount),
+      balance: Number(entry.balance),
       createdAt: dateTimeService.createUTC(entry.createdAt),
     }));
 
@@ -133,6 +153,7 @@ export class DataLoaderService implements IDataLoaderService {
     reoccurrences.forEach((item) => {
       this.cache.reoccurrence.insert({
         ...item,
+        amount: Number(item.amount),
         lastAt: item.lastAt,
         endAt: item.endAt ? item.endAt : null,
       });
@@ -150,7 +171,7 @@ export class DataLoaderService implements IDataLoaderService {
     reoccurrenceSkips.forEach((item) => {
       this.cache.reoccurrenceSkip.insert({
         ...item,
-        skippedAt: dateTimeService.format(item.skippedAt, "YYYY-MM-DD"),
+        skippedAt: dateTimeService.format("YYYY-MM-DD", item.skippedAt),
       });
     });
 
