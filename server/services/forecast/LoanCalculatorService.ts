@@ -260,7 +260,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       ) &&
       dateTimeService.isSameOrBefore(
         normalizedCheckDate,
-        dateTimeService.add(normalizedStatementDate, "1", "day")
+        dateTimeService.add(1, "day", normalizedStatementDate)
       );
 
     // For testing purposes, if the statement date is the current date, allow processing

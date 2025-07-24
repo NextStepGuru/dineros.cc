@@ -12,7 +12,7 @@ export const prisma = globalClient.$extends(
     encryptionKey: env.DB_ENCRYPTION_KEY,
     decryptionKeys: env.DB_DECRYPTION_KEYS,
   })
-);
+) as PrismaClient;
 
 export const initializePrisma = async () => {
   try {

@@ -50,8 +50,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
       `Processing reoccurrence ${reoccurrence.id} (${
         reoccurrence.description
       }) from ${dateTimeService.format(
-        lastAt,
-        "YYYY-MM-DD"
+        "YYYY-MM-DD",
+        lastAt
       )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
 

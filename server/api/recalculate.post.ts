@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
       accountId,
       startDate: dateTimeService.now().startOf("month").toDate(),
       endDate: dateTimeService.now().add(2, "years").toDate(),
+      logging: { enabled: false },
     };
 
     const result = await engine.recalculate(context);

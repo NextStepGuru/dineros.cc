@@ -137,6 +137,7 @@ describe("Recalculate API Endpoints", () => {
         accountId: "account-123",
         startDate: expect.any(Date),
         endDate: expect.any(Date),
+        logging: { enabled: false },
       });
     });
 
@@ -286,6 +287,7 @@ describe("Recalculate API Endpoints", () => {
         accountId: "account-123",
         startDate: mockStartDate,
         endDate: mockEndDate,
+        logging: { enabled: false },
       });
     });
   });

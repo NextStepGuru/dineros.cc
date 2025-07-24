@@ -130,6 +130,7 @@ describe("Recalculate POST API Endpoint", () => {
       accountId: "account123",
       startDate: expect.any(Date),
       endDate: expect.any(Date),
+      logging: { enabled: false },
     });
     expect(result).toEqual({
       success: true,
@@ -275,6 +276,7 @@ describe("Recalculate POST API Endpoint", () => {
       accountId: "account123",
       startDate: expect.any(Date),
       endDate: expect.any(Date),
+      logging: { enabled: false },
     });
     expect(result).toEqual({
       success: true,

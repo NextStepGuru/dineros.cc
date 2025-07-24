@@ -207,7 +207,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     console.log(
       `[updateStatementDates] Called with ${
         accounts.length
-      } accounts, forecastDate: ${dateTimeService.format(forecastDate, "YYYY-MM-DD")}`
+      } accounts, forecastDate: ${dateTimeService.format("YYYY-MM-DD", forecastDate)}`
     );
     // Add a simple flag to track if method is called
     (global as any).updateStatementDatesCalled = true;

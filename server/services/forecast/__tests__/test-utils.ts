@@ -90,6 +90,8 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    // Add missing tables that DataLoaderService might need
+    $transaction: vi.fn((callback) => callback(mockDb)),
   } as any;
 
   return mockDb;

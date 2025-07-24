@@ -72,7 +72,9 @@ describe("Simple Forecast Engine Test", () => {
       errors: result.errors,
       accountRegistersLength: result.accountRegisters?.length,
       datesProcessed: result.datesProcessed,
+      resultKeys: Object.keys(result)
     });
+    console.log("Full result object:", JSON.stringify(result, null, 2));
     console.log("=== SIMPLE TEST END ===");
 
     // For now, just expect it to not throw an error
