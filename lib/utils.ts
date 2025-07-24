@@ -2,8 +2,6 @@ import type { FormErrorEvent } from "@nuxt/ui";
 import type { Toast } from "@nuxt/ui/runtime/composables/useToast.js";
 import type { AccountRegister, AccountType, Interval } from "~/types/types";
 
-import type moment from "moment";
-
 export const getIntervalLabel = (intervalId: number, intervals: Interval[]) => {
   const item = intervals.find((i) => i.id === intervalId);
   return item?.name || "Unknown";
@@ -180,16 +178,16 @@ export const formatCurrencyOptions: Intl.NumberFormatOptions = {
   currencySign: "accounting",
 };
 
-export const adjustBeforeIfOnWeekend = function (
-  date: moment.Moment
-): moment.Moment {
-  if (date.day() === 6) {
-    // Saturday
-    return date.subtract(1, "days");
-  } else if (date.day() === 0) {
-    // Sunday
-    return date.subtract(2, "days");
-  }
+// export const adjustBeforeIfOnWeekend = function (
+//   date: moment.Moment
+// ): moment.Moment {
+//   if (date.day() === 6) {
+//     // Saturday
+//     return date.subtract(1, "days");
+//   } else if (date.day() === 0) {
+//     // Sunday
+//     return date.subtract(2, "days");
+//   }
 
-  return date;
-};
+//   return date;
+// };

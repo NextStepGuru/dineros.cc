@@ -159,7 +159,28 @@ export class DataPersisterService implements IDataPersisterService {
           });
       });
 
-      await this.rateLimiter.executeWithLimit(updateOperations);
+      // Verify entries exist before updating
+      const existingEntryIds = await this.db.registerEntry.findMany({
+        where: {
+          id: { in: sortedEntries.map((entry) => entry.id) },
+        },
+        select: { id: true },
+      });
+
+      const existingIds = new Set(existingEntryIds.map((entry) => entry.id));
+      const validUpdateOperations = updateOperations.filter((_, index) =>
+        existingIds.has(sortedEntries[index].id)
+      );
+
+      if (validUpdateOperations.length !== updateOperations.length) {
+        forecastLogger.warn(
+          `[DataPersisterService] Skipping ${
+            updateOperations.length - validUpdateOperations.length
+          } entries that don't exist in database`
+        );
+      }
+
+      await this.rateLimiter.executeWithLimit(validUpdateOperations);
     }
 
     const status = this.rateLimiter.getStatus();

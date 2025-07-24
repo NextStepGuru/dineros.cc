@@ -1,10 +1,9 @@
-import type {
-  Moment,
-  DurationInputArg2,
-  unitOfTime,
-  MomentSetObject,
+import moment, {
+  type Moment,
+  type DurationInputArg2,
+  type unitOfTime,
+  type MomentSetObject,
 } from "moment";
-const moment = require("moment");
 
 /**
  * Centralized date/time service that can be overridden for testing

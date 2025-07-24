@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import envSchema from "./envSchema";
-import { log } from "./logger";
 
 dotenv.config();
 
@@ -20,14 +19,5 @@ if (process.env?.DB_ENCRYPTION_KEY) {
 process.env.DB_DECRYPTION_KEYS = dbDecryptionKeyValues.join(",");
 
 const parsedEnv = envSchema.safeParse(process.env);
-
-if (!parsedEnv.success) {
-  log({
-    level: "error",
-    message: "Invalid environment variables:",
-    data: parsedEnv.error.format(),
-  });
-  throw new Error("Environment variable validation failed");
-}
 
 export default parsedEnv.data;

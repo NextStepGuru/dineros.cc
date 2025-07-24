@@ -1,5 +1,3 @@
-import { log } from "~/server/logger";
-
 export default defineNuxtPlugin(async () => {
   const authStore = useAuthStore();
   const listStore = useListStore();
@@ -11,6 +9,10 @@ export default defineNuxtPlugin(async () => {
       authStore.setBudgetId(listStore.getBudgets[0].id);
     }
   } catch (error) {
-    log({ message: "Failed to fetch lists:", data: error, level: "error" });
+    console.log({
+      message: "Failed to fetch lists:",
+      data: error,
+      level: "error",
+    });
   }
 });

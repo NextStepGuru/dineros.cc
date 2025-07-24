@@ -1,5 +1,5 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
-import { log } from "../../logger";
+import { log } from "../logger";
 
 export default defineEventHandler(async (event: any) => {
   try {

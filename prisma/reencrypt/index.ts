@@ -4,7 +4,7 @@ import type { PrismaClient } from "@prisma/client";
 import { migrate as migrateUser } from "./User";
 import { migrate as migrateAccountRegister } from "./AccountRegister";
 import { migrate as migrateRegisterEntry } from "./RegisterEntry";
-import { log } from "../server/logger";
+import { log } from "../../server/logger";
 
 export interface ProgressReport {
   model: string;

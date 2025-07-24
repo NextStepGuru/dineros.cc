@@ -242,7 +242,7 @@ if (formState.value.isDaylightSaving === undefined) {
 const onTimezoneChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
   const value = parseInt(target.value);
-  console.log("Timezone changed to:", value);
+
   formState.value.timezoneOffset = value;
 };
 
