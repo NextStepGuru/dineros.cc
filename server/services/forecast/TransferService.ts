@@ -172,14 +172,6 @@ export class TransferService implements ITransferService {
     const shouldProcess =
       dayOfMonth === 1 || dayOfMonth === 2 || dayOfMonth === 3; // Allow 1st, 2nd, or 3rd to handle weekends/holidays
 
-    console.log(`[DEBUG] Extra debt payment date check for ${account.name}:`, {
-      accountId: account.id,
-      date: targetDate.toISOString().split("T")[0],
-      originalDate: targetDate.toISOString(),
-      dayOfMonth,
-      shouldProcess,
-    });
-
     return shouldProcess;
   }
 
@@ -196,7 +188,9 @@ export class TransferService implements ITransferService {
       .find({
         accountRegisterId: accountId,
       })
-      .filter((entry) => dateTimeService.isSameOrBefore(entry.createdAt, targetDate));
+      .filter((entry) =>
+        dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
+      );
 
     // Start with the initial balance and add all entries up to target date
     let projectedBalance = account.latestBalance;
@@ -204,7 +198,7 @@ export class TransferService implements ITransferService {
     // Add up all entries up to the target date (excluding balance entries)
     for (const entry of entries) {
       if (!entry.isBalanceEntry) {
-        projectedBalance = +(projectedBalance) + (+entry.amount);
+        projectedBalance = +projectedBalance + +entry.amount;
       }
     }
 
@@ -330,14 +324,7 @@ export class TransferService implements ITransferService {
 
     // Pay debts in priority order until all available funds are used
     for (const debtAccountRegister of sortedDebtAccounts) {
-      console.log(`[DEBUG] Processing debt account ${debtAccountRegister.id}:`, {
-        debtBalance: debtAccountRegister.balance,
-        remainingAvailableAmount,
-        paymentAmount: Math.min(remainingAvailableAmount, Math.abs(debtAccountRegister.balance)),
-      });
-
       if (remainingAvailableAmount <= 0) {
-        console.log(`[DEBUG] No more funds available, breaking`);
         break; // No more funds available
       }
 
@@ -350,7 +337,6 @@ export class TransferService implements ITransferService {
 
       // Skip if no payment needed (debt is already paid off)
       if (paymentAmount <= 0) {
-        console.log(`[DEBUG] No payment needed for debt account ${debtAccountRegister.id}`);
         continue;
       }
 
@@ -397,13 +383,6 @@ export class TransferService implements ITransferService {
       remainingAvailableAmount -= paymentAmount;
       totalPaymentsMade += paymentAmount;
       paymentsProcessed++;
-
-      console.log(`[DEBUG] After payment to ${debtAccountRegister.id}:`, {
-        paymentAmount,
-        remainingAvailableAmount,
-        totalPaymentsMade,
-        paymentsProcessed,
-      });
     }
 
     forecastLogger.serviceDebug(
@@ -563,30 +542,13 @@ export class TransferService implements ITransferService {
     let remainingAvailableAmount =
       projectedBalance - Number(sourceAccountRegister.minAccountBalance);
 
-    console.log(`[DEBUG] Savings goal check:`, {
-      sourceAccountId: sourceAccountRegister.id,
-      sourceAccountName: sourceAccountRegister.name,
-      currentCacheBalance: sourceAccountRegister.balance,
-      projectedBalance,
-      minBalance: sourceAccountRegister.minAccountBalance,
-      totalAvailableAmount: remainingAvailableAmount,
-      savingsGoalAccountsFound: sortedSavingsGoalAccounts.length,
-      date: targetDate.toISOString().split("T")[0],
-    });
-
     // Ensure we don't transfer if it would bring the source account below minimum
     if (remainingAvailableAmount <= 0) {
-      console.log(
-        `[DEBUG] Savings goal: Available amount (${remainingAvailableAmount}) <= 0, skipping`
-      );
       return false;
     }
 
     // Additional safety check: ensure projected balance is positive
     if (projectedBalance <= 0) {
-      console.log(
-        `[DEBUG] Savings goal: Projected balance (${projectedBalance}) <= 0, skipping`
-      );
       return false;
     }
 
@@ -605,31 +567,10 @@ export class TransferService implements ITransferService {
       const remainingToGoal = savingsGoal - currentBalance;
 
       if (remainingToGoal <= 0) {
-        console.log(
-          `[DEBUG] Savings goal ${savingsAccountRegister.name} already reached:`,
-          {
-            currentBalance,
-            savingsGoal,
-            remainingToGoal,
-          }
-        );
         continue; // This savings goal is already reached
       }
 
       let savingsAmount = Math.min(remainingAvailableAmount, remainingToGoal);
-
-      console.log(
-        `[DEBUG] Savings goal contribution to ${savingsAccountRegister.name}:`,
-        {
-          savingsAccountId: savingsAccountRegister.id,
-          savingsAccountName: savingsAccountRegister.name,
-          currentBalance,
-          savingsGoal,
-          remainingToGoal,
-          savingsAmount,
-          remainingAvailableAmount,
-        }
-      );
 
       // Execute the transfer with the correct forecast date
       this.transferBetweenAccountsWithDate({
@@ -637,25 +578,7 @@ export class TransferService implements ITransferService {
         sourceAccountRegisterId: sourceAccountRegister.id,
         amount: savingsAmount,
         description: `Savings goal contribution from ${sourceAccountRegister.name}`,
-        fromDescription: `Savings to ${savingsAccountRegister.name}`,
         forecastDate: targetDate,
-        reoccurrence: {
-          accountId: "",
-          accountRegisterId: savingsAccountRegister.id,
-          description: `Savings goal contribution from ${sourceAccountRegister.name}`,
-          lastAt: dateTimeService.nowDate(),
-          amount: Number(savingsAmount),
-          transferAccountRegisterId:
-            savingsAccountRegister.targetAccountRegisterId,
-          intervalId: 3,
-          intervalCount: 1,
-          id: 0,
-          endAt: null,
-          totalIntervals: null,
-          elapsedIntervals: null,
-          updatedAt: dateTimeService.nowDate(),
-          adjustBeforeIfOnWeekend: false,
-        },
       });
 
       // Update remaining available amount
@@ -673,12 +596,5 @@ export class TransferService implements ITransferService {
     });
 
     return savingsProcessed > 0;
-  }
-
-  getAccountBalance(accountId: number): number {
-    const account = this.cache.accountRegister.findOne({
-      id: accountId,
-    });
-    return account?.balance || 0;
   }
 }
