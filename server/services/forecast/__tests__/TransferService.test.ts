@@ -35,10 +35,7 @@ describe("TransferService", () => {
       getAccount: vi.fn(),
     } as any;
 
-    service = new TransferService(
-      mockCache,
-      mockEntryService
-    );
+    service = new TransferService(mockCache, mockEntryService);
 
     // Mock forecastLogger to avoid test output
     vi.spyOn(forecastLogger, "service").mockImplementation(() => {});
@@ -49,7 +46,7 @@ describe("TransferService", () => {
     await cleanupTestDatabase(mockDb);
     vi.restoreAllMocks();
     // Clear cache between tests
-    mockCache.clearAll();
+    // mockCache.clearAll(); // Temporarily disabled for debugging
   });
 
   function createMockAccount(overrides: any = {}) {
@@ -87,7 +84,7 @@ describe("TransferService", () => {
 
   function createMockEntry(overrides: any = {}) {
     return {
-      id: "test-entry",
+      id: `test-entry-${Math.random()}`, // Make ID unique
       accountRegisterId: 1,
       sourceAccountRegisterId: null,
       description: "Test Entry",
@@ -237,13 +234,21 @@ describe("TransferService", () => {
         }),
       ];
 
+      // Add a debt account to the cache
+      const debtAccount = createMockAccount({
+        id: 3,
+        balance: -500, // Negative balance = debt
+        loanPaymentSortOrder: 1,
+      });
+
       // Insert accounts into cache
       mockCache.accountRegister.insert(sourceAccounts[0]);
       mockCache.accountRegister.insert(sourceAccounts[1]);
+      mockCache.accountRegister.insert(debtAccount);
 
       await service.processExtraDebtPayments(
         sourceAccounts,
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate() // Use 1st of month
       );
 
       // Should only process the account with allowExtraPayment=true
@@ -332,14 +337,16 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(account);
 
       // Insert entries that would increase balance
-      mockCache.registerEntry.insert(createMockEntry({
-        accountRegisterId: 1,
-        amount: 1000,
-        isBalanceEntry: false,
-        createdAt: dateTimeService.create("2024-01-15"),
-      }));
+      mockCache.registerEntry.insert(
+        createMockEntry({
+          accountRegisterId: 1,
+          amount: 1000,
+          isBalanceEntry: false,
+          createdAt: dateTimeService.create("2024-01-15").toDate(),
+        })
+      );
 
-      const targetDate = dateTimeService.create("2024-01-20");
+      const targetDate = dateTimeService.create("2024-01-20").toDate();
       const result = (service as any).shouldProcessExtraDebtPayment(
         account,
         targetDate
@@ -360,30 +367,65 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(account);
 
       // Insert entries
-      mockCache.registerEntry.insert(createMockEntry({
+      const entry1 = createMockEntry({
         accountRegisterId: 1,
         amount: 500,
         isBalanceEntry: false,
-        createdAt: dateTimeService.create("2024-01-15"),
-      }));
-      mockCache.registerEntry.insert(createMockEntry({
+        createdAt: dateTimeService.create("2024-01-15").toDate(),
+      });
+      const entry2 = createMockEntry({
         accountRegisterId: 1,
         amount: -200,
         isBalanceEntry: false,
-        createdAt: dateTimeService.create("2024-01-16"),
-      }));
-      mockCache.registerEntry.insert(createMockEntry({
+        createdAt: dateTimeService.create("2024-01-16").toDate(),
+      });
+      const entry3 = createMockEntry({
         accountRegisterId: 1,
         amount: 300,
         isBalanceEntry: false,
-        createdAt: dateTimeService.create("2024-01-25"), // After target date
-      }));
+        createdAt: dateTimeService.create("2024-01-25").toDate(), // After target date
+      });
 
-      const targetDate = dateTimeService.create("2024-01-20");
+      mockCache.registerEntry.insert(entry1);
+      mockCache.registerEntry.insert(entry2);
+      mockCache.registerEntry.insert(entry3);
+
+      // Debug: Check if entries are in cache
+      const allEntries = mockCache.registerEntry.find({});
+      const accountEntries = mockCache.registerEntry.find({
+        accountRegisterId: 1,
+      });
+
+      console.log("All entries in cache:", allEntries.length);
+      console.log("Account entries:", accountEntries.length);
+      console.log(
+        "Entry dates:",
+        accountEntries.map((e) => e.createdAt)
+      );
+      console.log(
+        "Entry amounts:",
+        accountEntries.map((e) => e.amount)
+      );
+
+      const targetDate = dateTimeService.create("2024-01-20").toDate();
+      console.log("Target date:", targetDate);
+
+      // Test the date comparison directly
+      const filteredEntries = accountEntries.filter((entry) =>
+        dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
+      );
+      console.log("Filtered entries:", filteredEntries.length);
+      console.log(
+        "Filtered entry amounts:",
+        filteredEntries.map((e) => e.amount)
+      );
+
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
         targetDate
       );
+
+      console.log("Result:", result);
 
       expect(result).toBe(1300); // 1000 + 500 - 200 (excluding the 300 after target date)
     });
@@ -407,22 +449,26 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(account);
 
       // Insert entries
-      mockCache.registerEntry.insert(createMockEntry({
-        accountRegisterId: 1,
-        amount: 500,
-        isBalanceEntry: true, // Should be excluded
-        createdAt: dateTimeService.create("2024-01-15"),
-      }));
-      mockCache.registerEntry.insert(createMockEntry({
-        accountRegisterId: 1,
-        amount: 200,
-        isBalanceEntry: false,
-        createdAt: dateTimeService.create("2024-01-15"),
-      }));
+      mockCache.registerEntry.insert(
+        createMockEntry({
+          accountRegisterId: 1,
+          amount: 500,
+          isBalanceEntry: true, // Should be excluded
+          createdAt: dateTimeService.create("2024-01-15").toDate(),
+        })
+      );
+      mockCache.registerEntry.insert(
+        createMockEntry({
+          accountRegisterId: 1,
+          amount: 200,
+          isBalanceEntry: false,
+          createdAt: dateTimeService.create("2024-01-15").toDate(),
+        })
+      );
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
-        dateTimeService.create("2024-01-20")
+        dateTimeService.create("2024-01-20").toDate()
       );
 
       expect(result).toBe(1200); // 1000 + 200 (excluding balance entry)
@@ -857,6 +903,25 @@ describe("TransferService", () => {
 
       expect(filteredAccounts.length).toBe(1);
       expect(filteredAccounts[0].id).toBe(2);
+    });
+  });
+
+  describe("DEBUG: Cache tests", () => {
+    it("should verify cache is working", () => {
+      // Test basic cache functionality
+      const entry = createMockEntry({
+        accountRegisterId: 1,
+        amount: 500,
+      });
+
+      mockCache.registerEntry.insert(entry);
+
+      const found = mockCache.registerEntry.find({ accountRegisterId: 1 });
+      console.log("Found entries:", found.length);
+      console.log("Entry data:", found[0]);
+
+      expect(found.length).toBe(1);
+      expect(found[0].amount).toBe(500);
     });
   });
 });
