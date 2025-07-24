@@ -45,24 +45,16 @@ describe("ForecastEngine Integration Tests", () => {
   beforeEach(async () => {
     moment = (await import("moment")).default;
     vi.clearAllMocks();
-    const mockDb = {
-      accountRegister: {
-        findMany: vi.fn(),
-        updateMany: vi.fn(),
-      },
-      registerEntry: {
-        findMany: vi.fn(),
-        create: vi.fn(),
-        updateMany: vi.fn(),
-        deleteMany: vi.fn(),
-      },
-      reoccurrence: {
-        findMany: vi.fn(),
-      },
-      reoccurrenceSkip: {
-        findMany: vi.fn(),
-      },
-    } as any;
+
+    // Reset the global mockDb
+    Object.keys(mockDb).forEach((key) => {
+      Object.keys(mockDb[key]).forEach((method) => {
+        if (typeof mockDb[key][method] === "function") {
+          mockDb[key][method].mockReset();
+        }
+      });
+    });
+
     engine = new ForecastEngine(mockDb);
 
     testContext = {
@@ -77,62 +69,65 @@ describe("ForecastEngine Integration Tests", () => {
 
   function setupMockData() {
     // Mock account registers
-    mockDb.accountRegister.findMany.mockResolvedValue([
-      {
-        id: 1,
-        budgetId: 1,
-        accountId: "test-account-123",
-        name: "Checking Account",
-        balance: 1000,
-        latestBalance: 1000,
-        minPayment: null,
-        statementAt: dateTimeService.add(1, "month").toDate(),
-        apr1: null,
-        apr1StartAt: null,
-        apr2: null,
-        apr2StartAt: null,
-        apr3: null,
-        apr3StartAt: null,
-        targetAccountRegisterId: null,
-        loanStartAt: null,
-        loanPaymentsPerYear: null,
-        loanTotalYears: null,
-        loanOriginalAmount: null,
-        loanPaymentSortOrder: 1,
-        minAccountBalance: 500,
-        allowExtraPayment: true,
-        isArchived: false,
-        typeId: 1,
-        plaidId: null,
-      },
-      {
-        id: 2,
-        budgetId: 1,
-        accountId: "test-account-123",
-        name: "Credit Card",
-        balance: -500, // Debt
-        latestBalance: -500,
-        minPayment: 25,
-        statementAt: dateTimeService.add(15, "days").toDate(),
-        apr1: 0.18, // 18% APR
-        apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
-        apr2: null,
-        apr2StartAt: null,
-        apr3: null,
-        apr3StartAt: null,
-        targetAccountRegisterId: 1, // Paid from checking account
-        loanStartAt: null,
-        loanPaymentsPerYear: null,
-        loanTotalYears: null,
-        loanOriginalAmount: null,
-        loanPaymentSortOrder: 1,
-        minAccountBalance: null,
-        allowExtraPayment: false,
-        isArchived: false,
-        typeId: 2,
-        plaidId: null,
-      },
-    ]);
+    mockDb.accountRegister.findMany.mockImplementation((args) => {
+      console.log("Mock findMany called with:", args);
+      return Promise.resolve([
+        {
+          id: 1,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "Checking Account",
+          balance: 1000,
+          latestBalance: 1000,
+          minPayment: null,
+          statementAt: dateTimeService.add(1, "month").toDate(),
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: 1,
+          minAccountBalance: 500,
+          allowExtraPayment: true,
+          isArchived: false,
+          typeId: 1,
+          plaidId: null,
+        },
+        {
+          id: 2,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "Credit Card",
+          balance: -500, // Debt
+          latestBalance: -500,
+          minPayment: 25,
+          statementAt: dateTimeService.add(15, "days").toDate(),
+          apr1: 0.18, // 18% APR
+          apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: 1, // Paid from checking account
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: 1,
+          minAccountBalance: null,
+          allowExtraPayment: false,
+          isArchived: false,
+          typeId: 2,
+          plaidId: null,
+        },
+      ]);
+    });
 
     // Mock register entries
     mockDb.registerEntry.findMany.mockResolvedValue([
@@ -209,16 +204,33 @@ describe("ForecastEngine Integration Tests", () => {
     mockDb.accountRegister.update.mockResolvedValue({});
     mockDb.accountRegister.updateMany.mockResolvedValue({ count: 0 });
     mockDb.reoccurrence.update.mockResolvedValue({});
+
+    // Mock missing queries that DataLoaderService makes
+    mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
+    mockDb.reoccurrence.aggregate.mockResolvedValue({
+      _min: {
+        lastAt: moment().startOf("month").toDate(),
+      },
+    });
   }
 
   describe("Basic Forecast Calculation", () => {
     it("should successfully calculate a basic forecast", async () => {
-      const result = await engine.recalculate(testContext);
+      try {
+        const result = await engine.recalculate(testContext);
 
-      expect(result.isSuccess).toBe(true);
-      expect(result.errors).toBeUndefined();
-      expect(result.registerEntries.length).toBeGreaterThan(0);
-      expect(result.accountRegisters.length).toBeGreaterThan(0);
+        if (!result.isSuccess) {
+          console.log("Forecast failed with errors:", result.errors);
+        }
+
+        expect(result.isSuccess).toBe(true);
+        expect(result.errors).toBeUndefined();
+        expect(result.registerEntries.length).toBeGreaterThan(0);
+        expect(result.accountRegisters.length).toBeGreaterThan(0);
+      } catch (error) {
+        console.log("Test failed with error:", error);
+        throw error;
+      }
     });
 
     it("should create balance entries for all accounts", async () => {

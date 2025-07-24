@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IForecastEngine, ForecastContext, ForecastResult } from "./types";
-import type { RegisterEntry } from "~/types/types";
+import type { RegisterEntry } from "../../../types/types";
 import type { CacheRegisterEntry } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { DataLoaderService } from "./DataLoaderService";
@@ -10,7 +10,7 @@ import { RegisterEntryService } from "./RegisterEntryService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { TransferService } from "./TransferService";
 import { DataPersisterService } from "./DataPersisterService";
-import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "~/consts";
+import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { createId } from "@paralleldrive/cuid2";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
@@ -173,6 +173,10 @@ export class ForecastEngine implements IForecastEngine {
       };
     } catch (error) {
       forecastLogger.error("Forecast calculation failed:", error);
+      console.error("Forecast calculation failed:", error);
+      if (error instanceof Error) {
+        console.error("Error stack:", error.stack);
+      }
       return {
         registerEntries: [],
         accountRegisters: [],

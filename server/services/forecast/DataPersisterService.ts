@@ -4,6 +4,7 @@ import type { CacheRegisterEntry } from "./ModernCacheService";
 import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
 import { dateTimeService } from "./DateTimeService";
+import { forecastLogger } from "./logger";
 
 export class DataPersisterService implements IDataPersisterService {
   private rateLimiter: DatabaseRateLimiter;
@@ -17,7 +18,10 @@ export class DataPersisterService implements IDataPersisterService {
     // Generate new IDs for all forecast entries to avoid conflicts, except for balance entries
     const insertData = results.map((item) => ({
       ...item,
-      createdAt: dateTimeService.format(dateTimeService.createUTC(item.createdAt), "YYYY-MM-DDTHH:mm:ss.SSS[Z]"),
+      createdAt: dateTimeService.formatDate(
+        dateTimeService.createUTC(item.createdAt),
+        "YYYY-MM-DDTHH:mm:ss.SSS[Z]"
+      ),
       id: item.isBalanceEntry ? item.id : createId(), // Preserve original IDs for balance entries
     }));
 
@@ -29,8 +33,9 @@ export class DataPersisterService implements IDataPersisterService {
       });
     } catch (error) {
       // Fallback to individual creates if createMany fails
-      console.log(
-        `[DataPersisterService] Using rate-limited fallback for ${insertData.length} entries`
+      forecastLogger.service(
+        "DataPersisterService",
+        `Using rate-limited fallback for ${insertData.length} entries`
       );
 
       const operations = insertData.map(
@@ -41,8 +46,9 @@ export class DataPersisterService implements IDataPersisterService {
             })
             .catch(() => {
               // Ignore duplicate key errors
-              console.log(
-                `[DataPersisterService] Skipped duplicate entry: ${item.id}`
+              forecastLogger.service(
+                "DataPersisterService",
+                `Skipped duplicate entry: ${item.id}`
               );
             })
       );
@@ -65,7 +71,7 @@ export class DataPersisterService implements IDataPersisterService {
 
     // Update the latestBalance field to match the current balance
     // This ensures that future recalculations will use the current balance as the opening balance
-    console.log(
+    forecastLogger.info(
       `[DataPersisterService] Updating ${accountRegisters.length} account register balances with rate limiting`
     );
 
@@ -80,7 +86,7 @@ export class DataPersisterService implements IDataPersisterService {
     await this.rateLimiter.executeWithLimit(updateOperations);
 
     const status = this.rateLimiter.getStatus();
-    console.log(
+    forecastLogger.debug(
       `[DataPersisterService] Updated latestBalance for ${
         accountRegisters.length
       } account registers. Rate limiter status: ${JSON.stringify(status)}`
@@ -90,7 +96,7 @@ export class DataPersisterService implements IDataPersisterService {
   async updateRegisterEntryBalances(
     calculatedEntries: CacheRegisterEntry[]
   ): Promise<void> {
-    console.log(
+    forecastLogger.info(
       `[DataPersisterService] Starting balance update for ${calculatedEntries.length} register entries`
     );
 
@@ -105,12 +111,12 @@ export class DataPersisterService implements IDataPersisterService {
         (entry.isProjected && entry.isCleared === false)
     );
 
-    console.log(
+    forecastLogger.info(
       `[DataPersisterService] Found ${entriesToUpdate.length} entries to update balances for`
     );
 
     if (entriesToUpdate.length === 0) {
-      console.log(
+      forecastLogger.info(
         `[DataPersisterService] No entries to update balances for`
       );
       return;
@@ -129,7 +135,7 @@ export class DataPersisterService implements IDataPersisterService {
     for (const [accountRegisterId, entries] of Object.entries(
       entriesByAccount
     )) {
-      console.log(
+      forecastLogger.info(
         `[DataPersisterService] Updating balances for account register ${accountRegisterId} with ${entries.length} entries`
       );
 
@@ -157,17 +163,20 @@ export class DataPersisterService implements IDataPersisterService {
     }
 
     const status = this.rateLimiter.getStatus();
-    console.log(
-      `[DataPersisterService] Updated balances for ${entriesToUpdate.length} entries. Rate limiter status: ${JSON.stringify(
-        status
-      )}`
+    forecastLogger.debug(
+      `[DataPersisterService] Updated balances for ${
+        entriesToUpdate.length
+      } entries. Rate limiter status: ${JSON.stringify(status)}`
     );
   }
 
   async convertOldProjectedToPending(accountId?: string): Promise<void> {
-    const now = dateTimeService.nowDate();
-    console.log(
-      `[DataPersisterService] Current date for conversion: ${dateTimeService.format(now, "YYYY-MM-DD")}`
+    const now = dateTimeService.toDateFromInput(dateTimeService.now());
+    forecastLogger.info(
+      `[DataPersisterService] Current date for conversion: ${dateTimeService.formatDate(
+        now,
+        "YYYY-MM-DD"
+      )}`
     );
 
     // Convert old projected entries to pending
@@ -182,8 +191,10 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    console.log(
-      `[DataPersisterService] Converted ${updateResult.count} projected entries to pending`
+    forecastLogger.info(
+      `[DataPersisterService] Converted ${
+        updateResult?.count || 0
+      } projected entries to pending`
     );
 
     // Convert old manual entries to pending
@@ -197,8 +208,10 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    console.log(
-      `[DataPersisterService] Converted ${manualUpdateResult.count} manual entries to pending`
+    forecastLogger.info(
+      `[DataPersisterService] Converted ${
+        manualUpdateResult?.count || 0
+      } manual entries to pending`
     );
   }
 
@@ -225,12 +238,14 @@ export class DataPersisterService implements IDataPersisterService {
   }
 
   async updateEntryStatuses(accountId?: string): Promise<void> {
-    const now = dateTimeService.toDate(dateTimeService.set(dateTimeService.now(), {
-      hour: 0,
-      minute: 0,
-      second: 0,
-      milliseconds: 0,
-    }));
+    const now = dateTimeService.toDateFromInput(
+      dateTimeService.setDateUnits(dateTimeService.now(), {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      })
+    );
 
     // Update Projected Entries if past current date
     await this.db.registerEntry.updateMany({
@@ -282,15 +297,16 @@ export class DataPersisterService implements IDataPersisterService {
       where: {
         accountRegisterId: accountId,
         isProjected: true,
-        isPending: false,
         isManualEntry: false,
       },
     });
   }
 
   async performInitialCleanup(accountId?: string): Promise<void> {
-    console.log(
-      `[DataPersisterService] Performing initial cleanup for account: ${accountId || "all"}`
+    forecastLogger.info(
+      `[DataPersisterService] Performing initial cleanup for account: ${
+        accountId || "all"
+      }`
     );
 
     // Convert old projected entries to pending
@@ -300,23 +316,46 @@ export class DataPersisterService implements IDataPersisterService {
     await this.cleanupProjectedEntries(accountId);
 
     // Clean up zero balance entries
-    await this.cleanupZeroBalanceEntries(accountId);
+    if (accountId) {
+      // Get account register IDs for this account
+      const accountRegisters = await this.db.accountRegister.findMany({
+        where: { accountId },
+        select: { id: true },
+      });
 
-    console.log(
-      `[DataPersisterService] Initial cleanup completed for account: ${accountId || "all"}`
+      const accountRegisterIds = accountRegisters.map((reg) => reg.id);
+
+      await this.db.registerEntry.deleteMany({
+        where: {
+          description: "Latest Balance",
+          accountRegisterId: { in: accountRegisterIds },
+        },
+      });
+    } else {
+      await this.cleanupZeroBalanceEntries(accountId);
+    }
+
+    forecastLogger.info(
+      `[DataPersisterService] Initial cleanup completed for account: ${
+        accountId || "all"
+      }`
     );
   }
 
   async performFinalCleanup(accountId?: string): Promise<void> {
-    console.log(
-      `[DataPersisterService] Performing final cleanup for account: ${accountId || "all"}`
+    forecastLogger.info(
+      `[DataPersisterService] Performing final cleanup for account: ${
+        accountId || "all"
+      }`
     );
 
     // Update entry statuses based on current date
     await this.updateEntryStatuses(accountId);
 
-    console.log(
-      `[DataPersisterService] Final cleanup completed for account: ${accountId || "all"}`
+    forecastLogger.info(
+      `[DataPersisterService] Final cleanup completed for account: ${
+        accountId || "all"
+      }`
     );
   }
 
@@ -339,7 +378,6 @@ export class DataPersisterService implements IDataPersisterService {
         where: {
           ...(accountId && { register: { accountId } }),
           isPending: true,
-          isCleared: false,
         },
       }),
       this.db.registerEntry.count({
@@ -351,7 +389,7 @@ export class DataPersisterService implements IDataPersisterService {
       this.db.registerEntry.count({
         where: {
           ...(accountId && { register: { accountId } }),
-          isBalanceEntry: true,
+          description: "Latest Balance",
         },
       }),
     ]);

@@ -110,6 +110,7 @@ describe("DataPersisterService", () => {
       expect(mockDb.registerEntry.createMany).toHaveBeenCalled();
       expect(mockDb.registerEntry.create).toHaveBeenCalledTimes(2);
       expect(forecastLogger.service).toHaveBeenCalledWith(
+        "DataPersisterService",
         expect.stringContaining("Using rate-limited fallback for 2 entries")
       );
     });
@@ -129,6 +130,7 @@ describe("DataPersisterService", () => {
 
       expect(mockDb.registerEntry.create).toHaveBeenCalled();
       expect(forecastLogger.service).toHaveBeenCalledWith(
+        "DataPersisterService",
         expect.stringContaining("Skipped duplicate entry")
       );
     });
@@ -204,7 +206,8 @@ describe("DataPersisterService", () => {
         where: {
           register: { accountId },
           isProjected: true,
-          isCleared: false,
+          isPending: false,
+          isManualEntry: false,
         },
       });
 
@@ -212,7 +215,6 @@ describe("DataPersisterService", () => {
         where: {
           register: { accountId },
           isPending: true,
-          isCleared: false,
         },
       });
 
@@ -220,14 +222,13 @@ describe("DataPersisterService", () => {
         where: {
           register: { accountId },
           isManualEntry: true,
-          isCleared: false,
         },
       });
 
       expect(mockDb.registerEntry.count).toHaveBeenNthCalledWith(4, {
         where: {
           register: { accountId },
-          isBalanceEntry: true,
+          description: "Latest Balance",
         },
       });
     });
@@ -252,9 +253,9 @@ describe("DataPersisterService", () => {
       // Should pass undefined accountId to all queries
       expect(mockDb.registerEntry.count).toHaveBeenNthCalledWith(1, {
         where: {
-          register: { accountId: undefined },
           isProjected: true,
-          isCleared: false,
+          isPending: false,
+          isManualEntry: false,
         },
       });
     });
@@ -478,7 +479,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
-          isBalanceEntry: true,
+          description: "Latest Balance",
           accountRegisterId: { in: [1, 2] },
         },
       });
@@ -494,7 +495,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
-          isBalanceEntry: true,
+          description: "Latest Balance",
           accountRegisterId: { in: [] },
         },
       });
@@ -541,6 +542,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
         where: {
           register: { accountId },
           isProjected: true,
+          isPending: false,
           isManualEntry: false,
         },
       });
@@ -553,8 +555,8 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
-          register: { accountId: undefined },
           isProjected: true,
+          isPending: false,
           isManualEntry: false,
         },
       });
@@ -588,7 +590,8 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
           description: "Latest Balance",
-          isBalanceEntry: false,
+          amount: 0,
+          isProjected: false,
         },
       });
     });

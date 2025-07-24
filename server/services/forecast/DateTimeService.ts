@@ -1,4 +1,10 @@
-import moment from "moment";
+import type {
+  Moment,
+  DurationInputArg2,
+  unitOfTime,
+  MomentSetObject,
+} from "moment";
+const moment = require("moment");
 
 /**
  * Centralized date/time service that can be overridden for testing
@@ -7,7 +13,7 @@ import moment from "moment";
  */
 export class DateTimeService {
   private static _instance: DateTimeService | null = null;
-  private _nowOverride: moment.Moment | null = null;
+  private _nowOverride: Moment | null = null;
   private _momentInstance: typeof moment;
 
   private constructor() {
@@ -27,7 +33,7 @@ export class DateTimeService {
    * Get the current date/time
    * Returns the override if set, otherwise returns the actual current time
    */
-  now(): moment.Moment {
+  now(): Moment {
     if (this._nowOverride) {
       return this._nowOverride.clone();
     }
@@ -45,7 +51,7 @@ export class DateTimeService {
    * Set a time override for testing
    * @param date - The date to use as "now" for all subsequent calls
    */
-  setNowOverride(date: moment.Moment | Date | string): void {
+  setNowOverride(date: Moment | Date | string): void {
     this._nowOverride = this._momentInstance(date);
   }
 
@@ -66,7 +72,7 @@ export class DateTimeService {
   /**
    * Get the current override value (for debugging)
    */
-  getOverride(): moment.Moment | null {
+  getOverride(): Moment | null {
     return this._nowOverride?.clone() || null;
   }
 
@@ -76,7 +82,7 @@ export class DateTimeService {
    * Create a moment object from various input types
    * If no input is provided, uses the current "now" context
    */
-  create(date?: moment.Moment | Date | string): moment.Moment {
+  create(date?: Moment | Date | string): Moment {
     if (date === undefined) {
       return this.now();
     }
@@ -87,7 +93,7 @@ export class DateTimeService {
    * Create a moment object and convert to UTC
    * If no input is provided, uses the current "now" context
    */
-  createUTC(date?: moment.Moment | Date | string): moment.Moment {
+  createUTC(date?: Moment | Date | string): Moment {
     if (date === undefined) {
       return this.now().utc();
     }
@@ -100,9 +106,9 @@ export class DateTimeService {
    */
   add(
     amount: number,
-    unit: moment.DurationInputArg2,
-    date?: moment.Moment | Date | string
-  ): moment.Moment {
+    unit: DurationInputArg2,
+    date?: Moment | Date | string
+  ): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.add(amount, unit);
@@ -114,9 +120,9 @@ export class DateTimeService {
    */
   subtract(
     amount: number,
-    unit: moment.DurationInputArg2,
-    date?: moment.Moment | Date | string
-  ): moment.Moment {
+    unit: DurationInputArg2,
+    date?: Moment | Date | string
+  ): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.subtract(amount, unit);
@@ -127,8 +133,8 @@ export class DateTimeService {
    * If date2 is not provided, compares against current "now" context
    */
   isAfter(
-    date1: moment.Moment | Date | string,
-    date2?: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2?: Moment | Date | string
   ): boolean {
     const compareDate =
       date2 !== undefined ? this._momentInstance(date2) : this.now();
@@ -140,8 +146,8 @@ export class DateTimeService {
    * If date2 is not provided, compares against current "now" context
    */
   isBefore(
-    date1: moment.Moment | Date | string,
-    date2?: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2?: Moment | Date | string
   ): boolean {
     const compareDate =
       date2 !== undefined ? this._momentInstance(date2) : this.now();
@@ -153,8 +159,8 @@ export class DateTimeService {
    * If date2 is not provided, compares against current "now" context
    */
   isSameOrBefore(
-    date1: moment.Moment | Date | string,
-    date2?: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2?: Moment | Date | string
   ): boolean {
     const compareDate =
       date2 !== undefined ? this._momentInstance(date2) : this.now();
@@ -166,8 +172,8 @@ export class DateTimeService {
    * If date2 is not provided, compares against current "now" context
    */
   isSameOrAfter(
-    date1: moment.Moment | Date | string,
-    date2?: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2?: Moment | Date | string
   ): boolean {
     const compareDate =
       date2 !== undefined ? this._momentInstance(date2) : this.now();
@@ -178,10 +184,7 @@ export class DateTimeService {
    * Get start of time unit
    * If no date is provided, uses the current "now" context
    */
-  startOf(
-    unit: moment.unitOfTime.StartOf,
-    date?: moment.Moment | Date | string
-  ): moment.Moment {
+  startOf(unit: unitOfTime.StartOf, date?: Moment | Date | string): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.startOf(unit);
@@ -191,10 +194,7 @@ export class DateTimeService {
    * Get end of time unit
    * If no date is provided, uses the current "now" context
    */
-  endOf(
-    unit: moment.unitOfTime.StartOf,
-    date?: moment.Moment | Date | string
-  ): moment.Moment {
+  endOf(unit: unitOfTime.StartOf, date?: Moment | Date | string): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.endOf(unit);
@@ -204,7 +204,7 @@ export class DateTimeService {
    * Format a date as string
    * If no date is provided, uses the current "now" context
    */
-  format(format: string, date?: moment.Moment | Date | string): string {
+  format(format: string, date?: Moment | Date | string): string {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.format(format);
@@ -214,7 +214,7 @@ export class DateTimeService {
    * Convert to JavaScript Date
    * If no date is provided, uses the current "now" context
    */
-  toDate(date?: moment.Moment | Date | string): Date {
+  toDate(date?: Moment | Date | string): Date {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.toDate();
@@ -224,7 +224,7 @@ export class DateTimeService {
    * Clone a moment object
    * If no date is provided, uses the current "now" context
    */
-  clone(date?: moment.Moment | Date | string): moment.Moment {
+  clone(date?: Moment | Date | string): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.clone();
@@ -234,10 +234,7 @@ export class DateTimeService {
    * Set specific time units on a date
    * If no date is provided, uses the current "now" context
    */
-  set(
-    units: moment.MomentSetObject,
-    date?: moment.Moment | Date | string
-  ): moment.Moment {
+  set(units: MomentSetObject, date?: Moment | Date | string): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.set(units);
@@ -248,9 +245,9 @@ export class DateTimeService {
    * If date2 is not provided, compares against current "now" context
    */
   diff(
-    date1: moment.Moment | Date | string,
-    date2?: moment.Moment | Date | string,
-    unit: moment.DurationInputArg2 = "milliseconds"
+    date1: Moment | Date | string,
+    date2?: Moment | Date | string,
+    unit: DurationInputArg2 = "milliseconds"
   ): number {
     const compareDate =
       date2 !== undefined ? this._momentInstance(date2) : this.now();
@@ -267,7 +264,7 @@ export class DateTimeService {
   /**
    * Parse a date string with format
    */
-  parse(dateString: string, format: string): moment.Moment {
+  parse(dateString: string, format: string): Moment {
     return this._momentInstance(dateString, format);
   }
 
@@ -275,7 +272,7 @@ export class DateTimeService {
    * Get the number of days in a month
    * If no date is provided, uses the current "now" context
    */
-  daysInMonth(date?: moment.Moment | Date | string): number {
+  daysInMonth(date?: Moment | Date | string): number {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.daysInMonth();
@@ -285,7 +282,7 @@ export class DateTimeService {
    * Get the day of the month (1-31)
    * If no date is provided, uses the current "now" context
    */
-  date(date?: moment.Moment | Date | string): number {
+  date(date?: Moment | Date | string): number {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.date();
@@ -295,7 +292,7 @@ export class DateTimeService {
    * Set the day of the month
    * If no date is provided, uses the current "now" context
    */
-  setDate(day: number, date?: moment.Moment | Date | string): moment.Moment {
+  setDate(day: number, date?: Moment | Date | string): Moment {
     const baseDate =
       date !== undefined ? this._momentInstance(date) : this.now();
     return baseDate.date(day);
@@ -307,14 +304,14 @@ export class DateTimeService {
   /**
    * @deprecated Use create() instead
    */
-  createFromInput(date: moment.Moment | Date | string): moment.Moment {
+  createFromInput(date: Moment | Date | string): Moment {
     return this.create(date);
   }
 
   /**
    * @deprecated Use createUTC() instead
    */
-  createUTCFromInput(date: moment.Moment | Date | string): moment.Moment {
+  createUTCFromInput(date: Moment | Date | string): Moment {
     return this.createUTC(date);
   }
 
@@ -322,10 +319,10 @@ export class DateTimeService {
    * @deprecated Use add(amount, unit, date) instead
    */
   addToDate(
-    date: moment.Moment | Date | string,
+    date: Moment | Date | string,
     amount: number,
-    unit: moment.DurationInputArg2
-  ): moment.Moment {
+    unit: DurationInputArg2
+  ): Moment {
     return this.add(amount, unit, date);
   }
 
@@ -333,10 +330,10 @@ export class DateTimeService {
    * @deprecated Use subtract(amount, unit, date) instead
    */
   subtractFromDate(
-    date: moment.Moment | Date | string,
+    date: Moment | Date | string,
     amount: number,
-    unit: moment.DurationInputArg2
-  ): moment.Moment {
+    unit: DurationInputArg2
+  ): Moment {
     return this.subtract(amount, unit, date);
   }
 
@@ -344,8 +341,8 @@ export class DateTimeService {
    * @deprecated Use isAfter(date1, date2) instead
    */
   isAfterDates(
-    date1: moment.Moment | Date | string,
-    date2: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2: Moment | Date | string
   ): boolean {
     return this.isAfter(date1, date2);
   }
@@ -354,8 +351,8 @@ export class DateTimeService {
    * @deprecated Use isBefore(date1, date2) instead
    */
   isBeforeDates(
-    date1: moment.Moment | Date | string,
-    date2: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2: Moment | Date | string
   ): boolean {
     return this.isBefore(date1, date2);
   }
@@ -364,8 +361,8 @@ export class DateTimeService {
    * @deprecated Use isSameOrBefore(date1, date2) instead
    */
   isSameOrBeforeDates(
-    date1: moment.Moment | Date | string,
-    date2: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2: Moment | Date | string
   ): boolean {
     return this.isSameOrBefore(date1, date2);
   }
@@ -374,8 +371,8 @@ export class DateTimeService {
    * @deprecated Use isSameOrAfter(date1, date2) instead
    */
   isSameOrAfterDates(
-    date1: moment.Moment | Date | string,
-    date2: moment.Moment | Date | string
+    date1: Moment | Date | string,
+    date2: Moment | Date | string
   ): boolean {
     return this.isSameOrAfter(date1, date2);
   }
@@ -383,51 +380,42 @@ export class DateTimeService {
   /**
    * @deprecated Use startOf(unit, date) instead
    */
-  startOfDate(
-    date: moment.Moment | Date | string,
-    unit: moment.unitOfTime.StartOf
-  ): moment.Moment {
+  startOfDate(date: Moment | Date | string, unit: unitOfTime.StartOf): Moment {
     return this.startOf(unit, date);
   }
 
   /**
    * @deprecated Use endOf(unit, date) instead
    */
-  endOfDate(
-    date: moment.Moment | Date | string,
-    unit: moment.unitOfTime.StartOf
-  ): moment.Moment {
+  endOfDate(date: Moment | Date | string, unit: unitOfTime.StartOf): Moment {
     return this.endOf(unit, date);
   }
 
   /**
    * @deprecated Use format(format, date) instead
    */
-  formatDate(date: moment.Moment | Date | string, format: string): string {
+  formatDate(date: Moment | Date | string, format: string): string {
     return this.format(format, date);
   }
 
   /**
    * @deprecated Use toDate(date) instead
    */
-  toDateFromInput(date: moment.Moment | Date | string): Date {
+  toDateFromInput(date: Moment | Date | string): Date {
     return this.toDate(date);
   }
 
   /**
    * @deprecated Use clone(date) instead
    */
-  cloneDate(date: moment.Moment | Date | string): moment.Moment {
+  cloneDate(date: Moment | Date | string): Moment {
     return this.clone(date);
   }
 
   /**
    * @deprecated Use set(units, date) instead
    */
-  setDateUnits(
-    date: moment.Moment | Date | string,
-    units: moment.MomentSetObject
-  ): moment.Moment {
+  setDateUnits(date: Moment | Date | string, units: MomentSetObject): Moment {
     return this.set(units, date);
   }
 
@@ -435,9 +423,9 @@ export class DateTimeService {
    * @deprecated Use diff(date1, date2, unit) instead
    */
   diffDates(
-    date1: moment.Moment | Date | string,
-    date2: moment.Moment | Date | string,
-    unit: moment.DurationInputArg2 = "milliseconds"
+    date1: Moment | Date | string,
+    date2: Moment | Date | string,
+    unit: DurationInputArg2 = "milliseconds"
   ): number {
     return this.diff(date1, date2, unit);
   }
@@ -445,7 +433,7 @@ export class DateTimeService {
   /**
    * @deprecated Use daysInMonth(date) instead
    */
-  daysInMonthDate(date: moment.Moment | Date | string): number {
+  daysInMonthDate(date: Moment | Date | string): number {
     return this.daysInMonth(date);
   }
 

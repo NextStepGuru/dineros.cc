@@ -86,7 +86,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegisterId: accountRegister.id,
         description: accountRegister.name,
         lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-        amount: Math.abs(interest),
+        amount: Number(Math.abs(interest)),
         transferAccountRegisterId: accountRegister.targetAccountRegisterId,
         intervalId: intervalId,
         intervalCount: 1,
@@ -100,7 +100,72 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     // Update account balance with interest
-    this.updateBalance(accountRegister.id, interest);
+    this.updateBalance(accountRegister.id, Number(interest));
+
+    // If there's a target account, create a transfer payment
+    if (accountRegister.targetAccountRegisterId) {
+      const paymentAmount = this.loanCalculator.calculatePaymentAmount(
+        accountRegister,
+        Math.abs(interest)
+      );
+
+      if (paymentAmount > 0) {
+        this.transferService.transferBetweenAccountsWithDate({
+          targetAccountRegisterId: accountRegister.id,
+          sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
+          amount: Number(paymentAmount),
+          description: "Min Payment to Credit Card",
+          forecastDate: forecastDate?.toDate(),
+          reoccurrence: {
+            accountId: "",
+            accountRegisterId: accountRegister.id,
+            description: "Min Payment to Credit Card",
+            lastAt: dateTimeService.nowDate(),
+            amount: Number(paymentAmount),
+            transferAccountRegisterId: accountRegister.targetAccountRegisterId,
+            intervalId: intervalId,
+            intervalCount: 1,
+            id: 0,
+            endAt: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            updatedAt: dateTimeService.nowDate(),
+            adjustBeforeIfOnWeekend: false,
+          },
+        });
+      }
+    } else {
+      // If there's no target account, create a direct payment entry
+      const paymentAmount = this.loanCalculator.calculatePaymentAmount(
+        accountRegister,
+        Math.abs(interest)
+      );
+
+      if (paymentAmount > 0) {
+        this.entryService.createEntry({
+          accountRegisterId: accountRegister.id,
+          description: "Payment for Loan Account",
+          amount: Number(paymentAmount),
+          forecastDate: forecastDate?.toDate(),
+          reoccurrence: {
+            accountId: "",
+            accountRegisterId: accountRegister.id,
+            description: "Payment for Loan Account",
+            lastAt: dateTimeService.nowDate(),
+            amount: Number(paymentAmount),
+            transferAccountRegisterId: null,
+            intervalId: intervalId,
+            intervalCount: 1,
+            id: 0,
+            endAt: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            updatedAt: dateTimeService.nowDate(),
+            adjustBeforeIfOnWeekend: false,
+          },
+        });
+      }
+    }
 
     // Update statement date to next cycle
     await this.updateStatementDate(accountRegister, forecastDate);
@@ -110,16 +175,24 @@ export class AccountRegisterService implements IAccountRegisterService {
     accountId: number,
     targetDate: Date
   ): number {
+    const account = this.cache.accountRegister.findOne({
+      id: accountId,
+    });
+
+    if (!account) {
+      return 0;
+    }
+
     // Get all entries for this account up to the target date
     const entries = this.cache.registerEntry
       .find({
         accountRegisterId: accountId,
       })
-      .filter((entry) => dateTimeService.isSameOrBefore(entry.createdAt, targetDate))
+      .filter((entry) => !entry.isBalanceEntry && dateTimeService.isSameOrBefore(entry.createdAt, targetDate))
       .sort((a, b) => dateTimeService.diff(a.createdAt, b.createdAt));
 
-    // Calculate running balance
-    let balance = 0;
+    // Start with the account's latest balance
+    let balance = account.latestBalance;
     for (const entry of entries) {
       balance += entry.amount;
     }
@@ -177,8 +250,8 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     console.log(`[updateStatementDate] Account ${accountRegister.id}:`);
-    console.log(`  statementAt: ${dateTimeService.format(statementAt, "YYYY-MM-DD")}`);
-    console.log(`  comparisonDate: ${dateTimeService.format(comparisonDate, "YYYY-MM-DD")}`);
+    console.log(`  statementAt: ${dateTimeService.formatDate(statementAt, "YYYY-MM-DD")}`);
+    console.log(`  comparisonDate: ${dateTimeService.formatDate(comparisonDate, "YYYY-MM-DD")}`);
     console.log(
       `  isSameOrAfter: ${dateTimeService.isSameOrAfter(comparisonDate, statementAt)}`
     );
@@ -214,29 +287,45 @@ export class AccountRegisterService implements IAccountRegisterService {
       case 2: // Week
         return dateTimeService.toDate(dateTimeService.add(1, "week", currentStatementAt));
       case 3: // Month
-        // For monthly, try to keep the same day of month
-        const nextMonth = dateTimeService.add(1, "month", currentStatementAt);
-        const originalDay = dateTimeService.date(currentStatementAt);
-        const maxDay = dateTimeService.daysInMonth(nextMonth);
-        const targetDay = Math.min(originalDay, maxDay);
-        console.log(`[calculateNextStatementDate] Month calculation:`);
-        console.log(`  originalDay: ${originalDay}`);
-        console.log(`  maxDay: ${maxDay}`);
-        console.log(`  targetDay: ${targetDay}`);
-        console.log(`  nextMonth before date(): ${dateTimeService.format("YYYY-MM-DD", nextMonth)}`);
-        console.log(`  nextMonth after date(): ${dateTimeService.format("YYYY-MM-DD", dateTimeService.setDate(targetDay, nextMonth))}`);
-        return dateTimeService.toDate(dateTimeService.setDate(targetDay, nextMonth));
+        // For monthly, manually construct the next month's date
+        const currentMoment = dateTimeService.create(currentStatementAt);
+        const currentDay = currentMoment.date();
+        const currentMonth = currentMoment.month();
+        const currentYear = currentMoment.year();
+
+        // Calculate next month and year
+        let nextMonth = currentMonth + 1;
+        let nextYear = currentYear;
+        if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear++;
+        }
+
+        // Create the next month's date with the same day
+        const nextMonthMoment = dateTimeService.create().year(nextYear).month(nextMonth).date(currentDay);
+        return dateTimeService.toDate(nextMonthMoment);
       case 4: // Year
         return dateTimeService.toDate(dateTimeService.add(1, "year", currentStatementAt));
       case 5: // Once (one-time)
         return dateTimeService.toDate(dateTimeService.add(1, "year", currentStatementAt)); // Default to yearly for one-time
       default:
-        // For monthly, try to keep the same day of month
-        const nextMonthDefault = dateTimeService.add(1, "month", currentStatementAt);
-        const originalDayDefault = dateTimeService.date(currentStatementAt);
-        const maxDayDefault = dateTimeService.daysInMonth(nextMonthDefault);
-        const targetDayDefault = Math.min(originalDayDefault, maxDayDefault);
-        return dateTimeService.toDate(dateTimeService.setDate(targetDayDefault, nextMonthDefault));
+        // For monthly, manually construct the next month's date
+        const currentMomentDefault = dateTimeService.create(currentStatementAt);
+        const currentDayDefault = currentMomentDefault.date();
+        const currentMonthDefault = currentMomentDefault.month();
+        const currentYearDefault = currentMomentDefault.year();
+
+        // Calculate next month and year
+        let nextMonthDefault = currentMonthDefault + 1;
+        let nextYearDefault = currentYearDefault;
+        if (nextMonthDefault > 11) {
+          nextMonthDefault = 0;
+          nextYearDefault++;
+        }
+
+        // Create the next month's date with the same day
+        const nextMonthMomentDefault = dateTimeService.create().year(nextYearDefault).month(nextMonthDefault).date(currentDayDefault);
+        return dateTimeService.toDate(nextMonthMomentDefault);
     }
   }
 

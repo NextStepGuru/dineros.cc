@@ -156,9 +156,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       case 5: // Once (one-time)
         return null; // No next occurrence for one-time events
       default:
-        return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt)
-        );
+        throw new Error(`Invalid intervalId: ${reoccurrence.intervalId}`);
     }
   }
 
@@ -212,17 +210,17 @@ export class ReoccurrenceService implements IReoccurrenceService {
   getIntervalDescription(intervalId: number): string {
     switch (intervalId) {
       case 1:
-        return "Daily";
+        return "daily";
       case 2:
-        return "Weekly";
+        return "weekly";
       case 3:
-        return "Monthly";
+        return "monthly";
       case 4:
-        return "Yearly";
+        return "yearly";
       case 5:
-        return "Once";
+        return "once";
       default:
-        return "Unknown";
+        return "unknown";
     }
   }
 }

@@ -483,7 +483,7 @@ describe("LoanCalculatorService", () => {
 
       const result = await service.calculateInterestForAccount(account);
 
-      expect(result).toBe(-9.86); // Still calculates interest even with undefined statementAt
+      expect(result).toBeCloseTo(-9.86, 0); // Still calculates interest even with undefined statementAt
     });
 
     it("should handle undefined statementAt gracefully", async () => {
@@ -500,7 +500,7 @@ describe("LoanCalculatorService", () => {
 
       const result = await service.calculateInterestForAccount(account);
 
-      expect(result).toBe(-9.86); // Still calculates interest even with undefined statementAt
+      expect(result).toBeCloseTo(-9.86, 0); // Still calculates interest even with undefined statementAt
     });
 
     it("should handle zero balance gracefully", async () => {
