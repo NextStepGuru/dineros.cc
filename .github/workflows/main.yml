@@ -113,8 +113,7 @@ jobs:
   Test:
     runs-on: ubuntu-latest
     name: Test
-    needs: [Build1, Build2]
-    # For maximum speed, remove 'needs' above to run tests in parallel with builds
+    # Run tests in parallel with builds for maximum speed
     permissions:
       contents: "read"
     env:
@@ -167,7 +166,7 @@ jobs:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Deploy
-    needs: [Test]
+    needs: [Build1, Build2, Test]
     permissions:
       contents: "read"
       id-token: "write"
