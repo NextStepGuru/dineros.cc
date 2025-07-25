@@ -1,5 +1,5 @@
 import bankersRounding from "bankers-rounding";
-import { Decimal } from "~/types/test-types";
+import { Decimal } from "@prisma/client/runtime/library";
 
 /**
  * Bankers Rounding Utility for Financial Calculations
