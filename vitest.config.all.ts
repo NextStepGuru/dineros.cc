@@ -6,6 +6,12 @@ export default defineConfig({
     // Suppress console output during tests
     silent: false,
 
+    // Capture stderr output
+    reporters: ["verbose"],
+    onConsoleLog(log, type) {
+      // Capture stderr logs
+    },
+
     // Set up global test configuration
     setupFiles: ["./vitest.setup.ts"],
 

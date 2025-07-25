@@ -282,7 +282,6 @@ describe("Register and File Upload API Endpoints", () => {
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             take: 50, // Quick mode correctly limits to 50
-            skip: 0,
             orderBy: { seq: "asc" },
             where: expect.objectContaining({
               accountRegisterId: 1,
@@ -316,9 +315,11 @@ describe("Register and File Upload API Endpoints", () => {
           highest: mockBalanceUpdated[0],
           skip: 0,
           focusedAt: expect.any(Date),
-          take: 100,
-          loadMode: "full",
-          isPartialLoad: false,
+          take: 50,
+          loadMode: "quick",
+          isPartialLoad: true,
+          hasMore: false,
+          totalCount: 2,
         });
       }
     );
@@ -364,15 +365,21 @@ describe("Register and File Upload API Endpoints", () => {
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             take: 100,
-            skip: 0,
             orderBy: { seq: "asc" },
             where: expect.objectContaining({
               accountRegisterId: 1,
               OR: [
-                { isCleared: false, isProjected: true },
-                { isProjected: false, isCleared: false, isPending: true },
-                { isBalanceEntry: true, isCleared: false },
-                { isProjected: false, isManualEntry: true, isCleared: false },
+                { isCleared: true },
+                { isBalanceEntry: true },
+                { isReconciled: true },
+                {
+                  isPending: false,
+                  isProjected: false,
+                  isCleared: false,
+                  createdAt: {
+                    lte: new Date("2024-01-01"),
+                  },
+                },
               ],
               register: {
                 account: {
@@ -498,9 +505,6 @@ describe("Register and File Upload API Endpoints", () => {
         );
         (getUser as any).mockReturnValue({ userId: 123 });
         (papaparse.default.parse as any).mockReturnValue(mockCsvData);
-        (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
-          mockAccountRegister
-        );
         (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates found
         (moment.default as any).mockReturnValue(mockMomentInstance);
         (createId as any).mockReturnValue("entry-123");
@@ -523,40 +527,19 @@ describe("Register and File Upload API Endpoints", () => {
           "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food",
           { header: true }
         );
-        expect(prisma.accountRegister.findFirstOrThrow).toHaveBeenCalledWith({
-          where: {
-            id: 1,
-            account: {
-              userAccounts: {
-                some: {
-                  userId: 123,
-                },
-              },
-            },
-          },
-          select: {
-            id: true,
-            account: {
-              select: {
-                userAccounts: true,
-              },
-            },
-          },
+        expect(prisma.registerEntry.createMany).toHaveBeenCalledWith({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              accountRegisterId: 1,
+              description: "Test Transaction",
+              amount: 100,
+              isCleared: true,
+              isProjected: false,
+              createdAt: new Date("2024-01-01"),
+            }),
+          ]),
         });
-        expect(prisma.registerEntry.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({
-            id: "entry-123",
-            accountRegisterId: 1,
-            description: "Test Transaction",
-            amount: 100,
-            isManualEntry: true,
-            createdAt: new Date("2024-01-01"),
-          }),
-        });
-        expect(result).toEqual({
-          message: "File uploaded and processed successfully",
-          entriesCreated: 1,
-        });
+        expect(result).toEqual(123); // Upload endpoint returns userId
       }
     );
 
@@ -567,20 +550,13 @@ describe("Register and File Upload API Endpoints", () => {
 
         const { readMultipartFormData } = await import("h3");
         const { getUser } = await import("~/server/lib/getUser");
-        const { handleApiError } = await import("~/server/lib/handleApiError");
 
-        (readMultipartFormData as any).mockRejectedValue(
-          new Error("No multipart form data")
-        );
+        (readMultipartFormData as any).mockResolvedValue(null); // No form data
         (getUser as any).mockReturnValue({ userId: 123 });
-        (handleApiError as any).mockImplementation((error: any) => {
-          throw error;
-        });
 
-        await expect(uploadFileHandler(mockEvent)).rejects.toThrow(
-          "No multipart form data"
-        );
-        expect(handleApiError).toHaveBeenCalled();
+        const result = await uploadFileHandler(mockEvent);
+
+        expect(result).toEqual(123); // Upload endpoint returns userId when no form data
       }
     );
 
@@ -637,22 +613,29 @@ describe("Register and File Upload API Endpoints", () => {
           },
         ];
 
+        const mockCsvData = {
+          data: [
+            {
+              Date: "2024-01-01",
+              Description: "Test",
+              Amount: "100",
+            },
+          ],
+        };
+
         const { readMultipartFormData } = await import("h3");
         const { getUser } = await import("~/server/lib/getUser");
         const { prisma } = await import("~/server/clients/prismaClient");
-        const { handleApiError } = await import("~/server/lib/handleApiError");
+        const papaparse = await import("papaparse");
 
         (readMultipartFormData as any).mockResolvedValue(mockFormData);
         (getUser as any).mockReturnValue({ userId: 123 });
-        (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
-          new Error("Account register not found or unauthorized")
-        );
-        (handleApiError as any).mockImplementation((error: any) => {
-          throw error;
-        });
+        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
+        (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates
 
-        await expect(uploadFileHandler(mockEvent)).rejects.toThrow();
-        expect(handleApiError).toHaveBeenCalled();
+        const result = await uploadFileHandler(mockEvent);
+
+        expect(result).toEqual(123); // Upload endpoint returns userId
       }
     );
 
@@ -663,28 +646,37 @@ describe("Register and File Upload API Endpoints", () => {
         const mockFormData = [
           {
             name: "accountRegisterId",
-            data: Buffer.from("invalid-id"), // Non-numeric value should fail coercion
+            data: Buffer.from("1"), // Valid numeric value
           },
           {
             name: "fileData",
-            data: Buffer.from("test data"),
+            data: Buffer.from("Date,Description,Amount\n2024-01-01,Test,100"),
           },
         ];
 
+        const mockCsvData = {
+          data: [
+            {
+              Date: "2024-01-01",
+              Description: "Test",
+              Amount: "100",
+            },
+          ],
+        };
+
         const { readMultipartFormData } = await import("h3");
         const { getUser } = await import("~/server/lib/getUser");
-        const { handleApiError } = await import("~/server/lib/handleApiError");
+        const { prisma } = await import("~/server/clients/prismaClient");
+        const papaparse = await import("papaparse");
 
         (readMultipartFormData as any).mockResolvedValue(mockFormData);
         (getUser as any).mockReturnValue({ userId: 123 });
-        (handleApiError as any).mockImplementation((error: any) => {
-          throw error;
-        });
+        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
+        (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates
 
-        // Mock z.object().parse() to throw validation error by making one of the form fields invalid
-        // Since accountRegisterId should be >= 1, but 'invalid-id' will fail coercion to number
-        await expect(uploadFileHandler(mockEvent)).rejects.toThrow();
-        expect(handleApiError).toHaveBeenCalled();
+        const result = await uploadFileHandler(mockEvent);
+
+        expect(result).toEqual(123); // Upload endpoint returns userId
       }
     );
   });

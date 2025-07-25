@@ -18,6 +18,8 @@ process.env.REDIS_PORT = "6379";
 process.env.NATS_URL = "nats://localhost:4222";
 process.env.NUXT_UI_PRO_LICENSE = "test-license-key";
 process.env.DEPLOY_ENV = "local";
+process.env.RUN_EDGE_CASE_TESTS = "true";
+process.env.RUN_SLOW_TESTS = "true";
 
 // Mock H3/Nuxt utilities - optimized for speed
 const h3Mocks = {
@@ -85,3 +87,73 @@ vi.mock("crypto", async (importOriginal) => {
     })),
   };
 });
+
+// Utility to capture stderr during tests
+export const captureStderr = (fn: () => void | Promise<void>): string => {
+  const originalStderr = process.stderr.write;
+  const originalConsoleError = console.error;
+  const chunks: Buffer[] = [];
+
+  // Intercept process.stderr.write
+  process.stderr.write = (chunk: any, ...args: any[]) => {
+    if (typeof chunk === 'string') {
+      chunks.push(Buffer.from(chunk));
+    } else if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+    }
+    return originalStderr.call(process.stderr, chunk, ...args);
+  };
+
+  // Intercept console.error
+  console.error = (...args: any[]) => {
+    const message = args.map(arg =>
+      typeof arg === 'string' ? arg : JSON.stringify(arg)
+    ).join(' ') + '\n';
+    chunks.push(Buffer.from(message));
+    return originalConsoleError.apply(console, args);
+  };
+
+  try {
+    fn();
+  } finally {
+    process.stderr.write = originalStderr;
+    console.error = originalConsoleError;
+  }
+
+  return Buffer.concat(chunks).toString('utf8');
+};
+
+// Async version for async functions
+export const captureStderrAsync = async (fn: () => Promise<void>): Promise<string> => {
+  const originalStderr = process.stderr.write;
+  const originalConsoleError = console.error;
+  const chunks: Buffer[] = [];
+
+  // Intercept process.stderr.write
+  process.stderr.write = (chunk: any, ...args: any[]) => {
+    if (typeof chunk === 'string') {
+      chunks.push(Buffer.from(chunk));
+    } else if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+    }
+    return originalStderr.call(process.stderr, chunk, ...args);
+  };
+
+  // Intercept console.error
+  console.error = (...args: any[]) => {
+    const message = args.map(arg =>
+      typeof arg === 'string' ? arg : JSON.stringify(arg)
+    ).join(' ') + '\n';
+    chunks.push(Buffer.from(message));
+    return originalConsoleError.apply(console, args);
+  };
+
+  try {
+    await fn();
+  } finally {
+    process.stderr.write = originalStderr;
+    console.error = originalConsoleError;
+  }
+
+  return Buffer.concat(chunks).toString('utf8');
+};

@@ -5,8 +5,8 @@ import { log } from "../logger";
 
 // Configure Redis connection options
 const redisOptions: RedisOptions = {
-  port: env.REDIS_PORT,
-  host: env.REDIS_HOST,
+  port: env?.REDIS_PORT,
+  host: env?.REDIS_HOST,
   maxRetriesPerRequest: null,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000); // Exponential backoff up to 2 seconds
