@@ -159,6 +159,8 @@ jobs:
           else
             echo "❌ CACHE MISS - Slow install indicates downloading packages"
           fi
+      - name: Generate Prisma client
+        run: npx prisma generate
       - name: Run tests
         run: pnpm test
 
