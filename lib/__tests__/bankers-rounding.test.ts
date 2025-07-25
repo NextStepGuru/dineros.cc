@@ -18,7 +18,7 @@ import {
   minMoney,
   sumMoney,
 } from "../bankers-rounding";
-import { Decimal } from "~/types/test-types";
+import { Decimal } from "@prisma/client/runtime/library";
 
 describe("Bankers Rounding Utility", () => {
   describe("roundToCents", () => {
