@@ -14,6 +14,7 @@ import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { createId } from "@paralleldrive/cuid2";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
+import { DateTime } from "./DateTime";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export class ForecastEngine implements IForecastEngine {
@@ -186,7 +187,10 @@ export class ForecastEngine implements IForecastEngine {
         registerEntries: finalResults,
         accountRegisters: accountData.accountRegisters.map((acc) => ({
           ...acc,
-          statementAt: acc.statementAt.toDate(),
+          statementAt:
+            typeof acc.statementAt === "string"
+              ? new Date(acc.statementAt)
+              : acc.statementAt,
         })) as any[], // TODO: Fix type mapping for AccountRegister
         isSuccess: true,
         datesProcessed,
@@ -206,6 +210,12 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private calculateStartDate(minDate: Date): any {
+    // Handle null/undefined/invalid dates
+    if (!minDate || !dateTimeService.isValid(minDate)) {
+      // Return an invalid DateTime for null/undefined/invalid inputs
+      return new DateTime("invalid-date");
+    }
+
     return dateTimeService.createUTC(minDate).set({
       hour: 0,
       minute: 0,
@@ -323,7 +333,7 @@ export class ForecastEngine implements IForecastEngine {
       await this.loadManualEntriesForDate(currentDate);
 
       // Move to next day
-      currentDate.add({ day: 1 });
+      currentDate.add(1, "day");
     }
 
     forecastLogger.info(

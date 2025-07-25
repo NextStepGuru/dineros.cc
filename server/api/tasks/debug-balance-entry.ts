@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
     accountId,
     startDate: dateTimeService.now().startOf("month").toDate(),
     endDate: dateTimeService.now().add(2, "years").toDate(),
+    logging: { enabled: false },
   };
 
   // Get the cache before running forecast

@@ -63,6 +63,7 @@ describe("ForecastEngine Integration Tests", () => {
       accountId: "test-account-123",
       startDate: dateTimeService.startOf("month").toDate(),
       endDate: dateTimeService.add(12, "months").toDate(),
+      logging: { enabled: false },
     };
 
     // Setup default mock responses
@@ -71,7 +72,7 @@ describe("ForecastEngine Integration Tests", () => {
 
   function setupMockData() {
     // Mock account registers
-    mockDb.accountRegister.findMany.mockImplementation((args) => {
+    mockDb.accountRegister.findMany.mockImplementation((args: any) => {
       return Promise.resolve([
         {
           id: 1,
@@ -216,7 +217,7 @@ describe("ForecastEngine Integration Tests", () => {
     });
 
     // Mock DataPersisterService operations
-    mockDb.registerEntry.updateMany.mockImplementation((args) => {
+    mockDb.registerEntry.updateMany.mockImplementation((args: any) => {
       // Handle different updateMany calls with different where clauses
       if (args?.where?.isProjected === true) {
         return Promise.resolve({ count: 0 });
@@ -330,7 +331,8 @@ describe("ForecastEngine Integration Tests", () => {
           balance: Math.random() * 10000,
           latestBalance: Math.random() * 10000,
           minPayment: 50,
-          statementAt: moment(),
+          statementAt: dateTimeService.now().toDate(),
+          statementIntervalId: 1,
           apr1: 0.15,
           apr1StartAt: new Date(),
           apr2: null,
@@ -343,6 +345,8 @@ describe("ForecastEngine Integration Tests", () => {
           loanTotalYears: 30,
           loanOriginalAmount: 100000,
           loanPaymentSortOrder: i,
+          savingsGoalSortOrder: 1,
+          accountSavingsGoal: null,
           minAccountBalance: 500,
           allowExtraPayment: true,
           isArchived: false,

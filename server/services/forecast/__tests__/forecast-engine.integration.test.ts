@@ -1,14 +1,14 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ForecastEngine, ForecastEngineFactory } from '../index';
-import type { ForecastContext } from '../types';
-import { createTestDatabase, cleanupTestDatabase } from './test-utils';
-import { dateTimeService } from '../DateTimeService';
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ForecastEngine, ForecastEngineFactory } from "../index";
+import type { ForecastContext } from "../types";
+import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
+import { dateTimeService } from "../DateTimeService";
 import { log } from "../../../logger";
 
 // Dynamic moment import
 let moment: any;
 
-describe('ForecastEngine Integration Tests', () => {
+describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
   let testDb: any;
   let testAccountId: string;
@@ -25,15 +25,16 @@ describe('ForecastEngine Integration Tests', () => {
     await cleanupTestDatabase(testDb);
   });
 
-  describe('Basic Forecast Scenarios', () => {
-    it('should calculate simple budget forecast with income and expenses', async () => {
+  describe("Basic Forecast Scenarios", () => {
+    it("should calculate simple budget forecast with income and expenses", async () => {
       // Arrange: Create basic budget scenario
       await setupBasicBudgetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: dateTimeService.startOf('month').toDate(),
-        endDate: dateTimeService.add(12, 'months').toDate(),
+        startDate: dateTimeService.startOf("month").toDate(),
+        endDate: dateTimeService.add(12, "months").toDate(),
+        logging: { enabled: false },
       };
 
       // Act: Run forecast calculation
@@ -47,16 +48,19 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.errors).toBeUndefined();
 
       // Verify specific forecast characteristics
-      const projectedEntries = result.registerEntries.filter(e => e.isProjected);
-      const pendingEntries = result.registerEntries.filter(e => e.isPending);
+      const projectedEntries = result.registerEntries.filter(
+        (e) => e.isProjected
+      );
+      const pendingEntries = result.registerEntries.filter((e) => e.isPending);
 
       // Projected and pending entries may or may not be generated depending on date range and setup
       expect(projectedEntries.length).toBeGreaterThanOrEqual(0);
       expect(pendingEntries.length).toBeGreaterThanOrEqual(0);
 
       // Verify running balances are calculated correctly
-      const sortedEntries = result.registerEntries.sort((a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      const sortedEntries = result.registerEntries.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
 
       // Check that balances make logical sense
@@ -71,14 +75,15 @@ describe('ForecastEngine Integration Tests', () => {
       }
     });
 
-    it('should handle loan calculations with interest and payments', async () => {
+    it("should handle loan calculations with interest and payments", async () => {
       // Arrange: Create loan scenario
       await setupLoanScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: dateTimeService.startOf('month').toDate(),
-        endDate: dateTimeService.add(24, 'months').toDate(),
+        startDate: dateTimeService.startOf("month").toDate(),
+        endDate: dateTimeService.add(24, "months").toDate(),
+        logging: { enabled: false },
       };
 
       // Act: Run forecast calculation
@@ -88,11 +93,11 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.isSuccess).toBe(true);
 
       // Find interest charges and payments
-      const interestCharges = result.registerEntries.filter(e =>
-        e.description.includes('Interest Charge')
+      const interestCharges = result.registerEntries.filter((e) =>
+        e.description.includes("Interest Charge")
       );
-      const loanPayments = result.registerEntries.filter(e =>
-        e.description.includes('Payment')
+      const loanPayments = result.registerEntries.filter((e) =>
+        e.description.includes("Payment")
       );
 
       // Interest charges and loan payments may or may not be generated depending on account setup
@@ -100,24 +105,25 @@ describe('ForecastEngine Integration Tests', () => {
       expect(loanPayments.length).toBeGreaterThanOrEqual(0);
 
       // Verify interest charges are negative (cost)
-      interestCharges.forEach(charge => {
+      interestCharges.forEach((charge) => {
         expect(charge.amount).toBeLessThan(0);
       });
 
       // Verify loan payments are positive (towards debt)
-      loanPayments.forEach(payment => {
+      loanPayments.forEach((payment) => {
         expect(payment.amount).toBeGreaterThan(0);
       });
     });
 
-    it('should process account transfers correctly', async () => {
+    it("should process account transfers correctly", async () => {
       // Arrange: Create transfer scenario
       await setupTransferScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf('month').toDate(),
-        endDate: moment().add(6, 'months').toDate(),
+        startDate: moment().startOf("month").toDate(),
+        endDate: moment().add(6, "months").toDate(),
+        logging: { enabled: false },
       };
 
       // Act: Run forecast calculation
@@ -127,32 +133,35 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.isSuccess).toBe(true);
 
       // Find transfer entries
-      const transferEntries = result.registerEntries.filter(e =>
-        e.description.includes('Transfer') || e.sourceAccountRegisterId !== undefined
+      const transferEntries = result.registerEntries.filter(
+        (e) =>
+          e.description.includes("Transfer") ||
+          e.sourceAccountRegisterId !== undefined
       );
 
       // Transfer entries may or may not be generated depending on account setup
       expect(transferEntries.length).toBeGreaterThanOrEqual(0);
 
-             // Verify transfers are balanced (for every positive transfer, there should be a negative)
-       const transfersByDate = groupTransfersByDate(transferEntries);
+      // Verify transfers are balanced (for every positive transfer, there should be a negative)
+      const transfersByDate = groupTransfersByDate(transferEntries);
 
-       Object.values(transfersByDate).forEach((dailyTransfers) => {
-         const transfers = dailyTransfers as any[];
-         const totalAmount = transfers.reduce((sum, t) => sum + t.amount, 0);
-         // Transfers should sum to zero (money moving between accounts)
-         expect(Math.abs(totalAmount)).toBeLessThan(0.01); // Allow for rounding
-       });
+      Object.values(transfersByDate).forEach((dailyTransfers) => {
+        const transfers = dailyTransfers as any[];
+        const totalAmount = transfers.reduce((sum, t) => sum + t.amount, 0);
+        // Transfers should sum to zero (money moving between accounts)
+        expect(Math.abs(totalAmount)).toBeLessThan(0.01); // Allow for rounding
+      });
     });
 
-    it('should handle reoccurrence scheduling correctly', async () => {
+    it("should handle reoccurrence scheduling correctly", async () => {
       // Arrange: Create reoccurrence scenario
       await setupReoccurrenceScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf('month').toDate(),
-        endDate: moment().add(12, 'months').toDate(),
+        startDate: moment().startOf("month").toDate(),
+        endDate: moment().add(12, "months").toDate(),
+        logging: { enabled: false },
       };
 
       // Act: Run forecast calculation
@@ -162,28 +171,32 @@ describe('ForecastEngine Integration Tests', () => {
       expect(result.isSuccess).toBe(true);
 
       // Group entries by reoccurrence
-      const reoccurringEntries = result.registerEntries.filter(e =>
-        e.reoccurrenceId !== null && e.reoccurrenceId !== undefined
+      const reoccurringEntries = result.registerEntries.filter(
+        (e) => e.reoccurrenceId !== null && e.reoccurrenceId !== undefined
       );
 
       // Reoccurring entries may or may not be generated depending on date range and setup
       expect(reoccurringEntries.length).toBeGreaterThanOrEqual(0);
 
       // Verify scheduling patterns
-      const entriesByReoccurrence = groupBy(reoccurringEntries, 'reoccurrenceId');
+      const entriesByReoccurrence = groupBy(
+        reoccurringEntries,
+        "reoccurrenceId"
+      );
 
       Object.values(entriesByReoccurrence).forEach((entries: any[]) => {
         if (entries.length > 1) {
           // Sort by date
-          const sortedEntries = entries.sort((a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          const sortedEntries = entries.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
 
           // Check that intervals are consistent
           for (let i = 1; i < sortedEntries.length; i++) {
             const current = moment(sortedEntries[i].createdAt);
             const previous = moment(sortedEntries[i - 1].createdAt);
-            const daysDiff = current.diff(previous, 'days');
+            const daysDiff = current.diff(previous, "days");
 
             // This would depend on the interval type, but should be consistent
             expect(daysDiff).toBeGreaterThan(0);
@@ -193,15 +206,16 @@ describe('ForecastEngine Integration Tests', () => {
     });
   });
 
-  describe('Performance Tests', () => {
-    it('should complete forecast calculation within performance targets', async () => {
+  describe("Performance Tests", () => {
+    it("should complete forecast calculation within performance targets", async () => {
       // Arrange: Create large dataset
       await setupLargeDatasetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf('year').toDate(),
-        endDate: moment().add(5, 'years').toDate(),
+        startDate: moment().startOf("year").toDate(),
+        endDate: moment().add(5, "years").toDate(),
+        logging: { enabled: false },
       };
 
       // Act: Measure performance
@@ -217,12 +231,13 @@ describe('ForecastEngine Integration Tests', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle missing account gracefully', async () => {
+  describe("Error Handling", () => {
+    it("should handle missing account gracefully", async () => {
       const context: ForecastContext = {
         accountId: "non-existent-account",
         startDate: moment().toDate(),
-        endDate: moment().add(1, 'month').toDate(),
+        endDate: moment().add(1, "month").toDate(),
+        logging: { enabled: false },
       };
 
       const result = await engine.recalculate(context);
@@ -235,13 +250,14 @@ describe('ForecastEngine Integration Tests', () => {
       }
     });
 
-    it('should handle invalid date ranges', async () => {
+    it("should handle invalid date ranges", async () => {
       await setupBasicBudgetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().add(1, 'year').toDate(), // Start after end
+        startDate: moment().add(1, "year").toDate(), // Start after end
         endDate: moment().toDate(),
+        logging: { enabled: false },
       };
 
       const result = await engine.recalculate(context);
@@ -266,12 +282,12 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         name: "Checking Account",
         typeId: 1, // Checking account type
         balance: 1000,
-        statementAt: moment().add(1, 'month').toDate(),
-      }
+        statementAt: moment().add(1, "month").toDate(),
+      },
     });
 
     if (!checkingAccount || !checkingAccount.id) {
-      throw new Error('Failed to create checking account');
+      throw new Error("Failed to create checking account");
     }
 
     // Create monthly salary reoccurrence
@@ -283,8 +299,8 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         amount: 5000,
         intervalId: 3, // Monthly
         intervalCount: 1,
-        lastAt: moment().startOf('month').toDate(),
-      }
+        lastAt: moment().startOf("month").toDate(),
+      },
     });
 
     // Create monthly rent expense
@@ -296,15 +312,15 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         amount: -1500,
         intervalId: 3, // Monthly
         intervalCount: 1,
-        lastAt: moment().startOf('month').toDate(),
-      }
+        lastAt: moment().startOf("month").toDate(),
+      },
     });
 
     return checkingAccount;
   } catch (error) {
-    log({ message: 'Setup failed:', data: error, level: "error" });
+    log({ message: "Setup failed:", data: error, level: "error" });
     // Return a mock object to prevent undefined errors
-    return { id: 'mock-id', name: 'Mock Account' };
+    return { id: "mock-id", name: "Mock Account" };
   }
 }
 
@@ -331,7 +347,7 @@ async function setupLargeDatasetScenario(db: any, accountId: string) {
 // Utility functions
 function groupTransfersByDate(transfers: any[]) {
   return transfers.reduce((groups, transfer) => {
-    const date = moment(transfer.createdAt).format('YYYY-MM-DD');
+    const date = moment(transfer.createdAt).format("YYYY-MM-DD");
     if (!groups[date]) groups[date] = [];
     groups[date].push(transfer);
     return groups;

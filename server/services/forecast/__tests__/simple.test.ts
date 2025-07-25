@@ -58,6 +58,7 @@ describe("Simple Forecast Engine Test", () => {
       accountId: "test-account",
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "month").toDate(),
+      logging: { enabled: false },
     });
 
     // For now, just expect it to not throw an error

@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
     accountId,
     startDate: dateTimeService.now().startOf("month").toDate(),
     endDate: dateTimeService.now().add(2, "years").toDate(),
+    logging: { enabled: false },
   };
   await engine.recalculate(context); // This will populate the cache
 

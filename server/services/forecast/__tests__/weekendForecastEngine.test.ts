@@ -138,6 +138,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
         accountId: "test-account-123",
         startDate: dateTimeService.now().startOf("month").toDate(),
         endDate: dateTimeService.now().add(2, "years").toDate(),
+        logging: { enabled: false },
       };
 
       // Test that the engine uses the overridden date
@@ -428,15 +429,21 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
 
     it("should handle multiple date changes in sequence", () => {
       // Test Saturday
-      dateTimeService.setNowOverride(dateTimeService.create("2024-01-27T10:00:00Z"));
+      dateTimeService.setNowOverride(
+        dateTimeService.create("2024-01-27T10:00:00Z")
+      );
       expect(dateTimeService.now().format("dddd")).toBe("Saturday");
 
       // Test Sunday
-      dateTimeService.setNowOverride(dateTimeService.create("2024-01-28T10:00:00Z"));
+      dateTimeService.setNowOverride(
+        dateTimeService.create("2024-01-28T10:00:00Z")
+      );
       expect(dateTimeService.now().format("dddd")).toBe("Sunday");
 
       // Test Monday
-      dateTimeService.setNowOverride(dateTimeService.create("2024-01-29T10:00:00Z"));
+      dateTimeService.setNowOverride(
+        dateTimeService.create("2024-01-29T10:00:00Z")
+      );
       expect(dateTimeService.now().format("dddd")).toBe("Monday");
 
       // Clear and verify

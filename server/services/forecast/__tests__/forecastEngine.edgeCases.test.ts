@@ -458,6 +458,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         accountId: "test-account",
         startDate: new Date("2024-01-01"),
         endDate: new Date("2035-01-01"), // 11 years later
+        logging: { enabled: false },
       };
 
       const result = await engine.recalculate(context);
@@ -492,6 +493,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         accountId: "test-account",
         startDate: new Date("2024-01-01"),
         endDate: new Date("2034-01-01"), // Exactly 10 years later
+        logging: { enabled: false },
       };
 
       // Should not throw an error

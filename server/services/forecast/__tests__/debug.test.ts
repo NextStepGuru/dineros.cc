@@ -79,6 +79,7 @@ describe("Debug Forecast Engine Test", () => {
       accountId: "test-account",
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "month").toDate(),
+      logging: { enabled: false },
     });
 
     expect(result.isSuccess).toBe(true);

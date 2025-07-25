@@ -246,6 +246,7 @@ describe("Balance Arithmetic Regression Tests", () => {
           accountId: "test-account",
           startDate: dateTimeService.create().toDate(),
           endDate: dateTimeService.create().add(1, "week").toDate(), // Reduced from 1 month to 1 week
+          logging: { enabled: false },
         });
       } catch (error) {
         forecastLogger.error("Error in recalculate:", error as Error);
@@ -370,6 +371,7 @@ describe("Balance Arithmetic Regression Tests", () => {
       accountId: "test-credit-account",
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "week").toDate(), // Reduced from 1 month to 1 week
+      logging: { enabled: false },
     });
 
     expect(result.isSuccess).toBe(true);
@@ -497,6 +499,7 @@ describe("Balance Arithmetic Regression Tests", () => {
       accountId: "test-complex-account",
       startDate: dateTimeService.create().toDate(),
       endDate: dateTimeService.create().add(1, "week").toDate(), // Reduced from 1 month to 1 week
+      logging: { enabled: false },
     });
 
     expect(result.isSuccess).toBe(true);

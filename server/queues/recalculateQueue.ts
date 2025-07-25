@@ -19,7 +19,7 @@ const processor = async (job: Job<RecalculateJob>) => {
   const context = {
     accountId: job.data.accountId,
     startDate: dateTimeService.now().startOf("month").toDate(),
-    endDate: dateTimeService.now().add(2, "years").toDate(), // Match original forecast range
+    endDate: dateTimeService.now().add(2, "years").toDate(), // Match original forecast rangelogging: { enabled: false },
   };
 
   const result = await engine.recalculate(context);
