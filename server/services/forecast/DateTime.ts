@@ -193,6 +193,11 @@ export class DateTime {
     return this._moment.date();
   }
 
+  // Get day of week (0 = Sunday, 6 = Saturday)
+  day(): number {
+    return this._moment.day();
+  }
+
   // UTC methods
   utc(): DateTime {
     return new DateTime(this._moment.utc());
@@ -206,6 +211,11 @@ export class DateTime {
   // JSON serialization
   toJSON(): string {
     return this._moment.toJSON();
+  }
+
+  // ISO string representation
+  toISOString(): string {
+    return this._moment.toISOString();
   }
 
   // Value for comparison

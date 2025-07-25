@@ -148,11 +148,17 @@ class PlaidSyncService {
       endDate,
     });
 
+    log({
+      message: "Transactions fetched",
+      data: {
+        transactions: transactions.length,
+        plaidAccountIds,
+      },
+      level: "info",
+    });
+
     const accountRegisters = await this.db.accountRegister.findMany({
       where: {
-        plaidId: {
-          in: plaidAccountIds,
-        },
         plaidAccessToken: accessToken,
       },
       include: {
@@ -163,6 +169,14 @@ class PlaidSyncService {
     const accountRegisterMap = new Map(
       accountRegisters.map((ar) => [ar.plaidId, ar])
     );
+
+    log({
+      message: "Account registers fetched",
+      data: {
+        accountRegisters,
+      },
+      level: "debug",
+    });
 
     const transactionData = transactions
       .map((transaction) => {
@@ -179,6 +193,14 @@ class PlaidSyncService {
       })
       .filter((data): data is NonNullable<typeof data> => data !== null);
 
+    log({
+      level: "info",
+      message: "Syncing transactions",
+      data: {
+        transactionData: transactionData.length,
+      },
+    });
+
     if (transactionData.length > 0) {
       await this.db.registerEntry.createMany({
         data: transactionData,
@@ -187,9 +209,7 @@ class PlaidSyncService {
 
       // Trigger recalculate jobs for affected accounts
       const uniqueAccountIds = [
-        ...new Set(
-          transactionData.map((data) => data.accountRegisterId)
-        ),
+        ...new Set(transactionData.map((data) => data.accountRegisterId)),
       ];
 
       for (const accountRegisterId of uniqueAccountIds) {

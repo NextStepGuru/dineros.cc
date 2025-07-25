@@ -279,7 +279,7 @@ export class DateTimeService {
    */
   date(date?: DateTime | Moment | Date | string): number {
     const baseDate = date !== undefined ? new DateTime(date) : this.now();
-    return baseDate.date();
+    return baseDate.date() as number;
   }
 
   /**
@@ -289,6 +289,24 @@ export class DateTimeService {
   setDate(day: number, date?: DateTime | Moment | Date | string): DateTime {
     const baseDate = date !== undefined ? new DateTime(date) : this.now();
     return baseDate.setDate(day);
+  }
+
+  /**
+   * Get the day of the week (0 = Sunday, 6 = Saturday)
+   * If no date is provided, uses the current "now" context
+   */
+  day(date?: DateTime | Moment | Date | string): number {
+    const baseDate = date !== undefined ? new DateTime(date) : this.now();
+    return baseDate.day();
+  }
+
+  /**
+   * Convert to ISO string
+   * If no date is provided, uses the current "now" context
+   */
+  toISOString(date?: DateTime | Moment | Date | string): string {
+    const baseDate = date !== undefined ? new DateTime(date) : this.now();
+    return baseDate.toISOString();
   }
 
   // Legacy methods for backward compatibility
