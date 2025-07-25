@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DataPersisterService } from "../DataPersisterService";
 import { ModernCacheService } from "../ModernCacheService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
 

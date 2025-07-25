@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { dateTimeService } from "../DateTimeService";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "~/types/test-types";
 import { ForecastEngineFactory } from "../index";
 
 // Dynamic moment import

@@ -4,10 +4,10 @@ import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
 import { AccountRegisterService } from "../AccountRegisterService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient, Reoccurrence } from "@prisma/client";
+import type { PrismaClient, Reoccurrence } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "~/types/test-types";
 
 // Dynamic moment import
 let moment: any;
@@ -618,7 +618,10 @@ describe("TransferService", () => {
       vi.clearAllMocks();
 
       // Mock the calculateProjectedBalanceAtDate method to return the expected balance
-      vi.spyOn(service as any, "calculateProjectedBalanceAtDate").mockReturnValue(3000);
+      vi.spyOn(
+        service as any,
+        "calculateProjectedBalanceAtDate"
+      ).mockReturnValue(3000);
 
       await (service as any).processExtraDebtPayment({
         minBalance: 500,

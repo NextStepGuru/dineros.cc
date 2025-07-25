@@ -117,6 +117,10 @@ jobs:
     # For maximum speed, remove 'needs' above to run tests in parallel with builds
     permissions:
       contents: "read"
+    env:
+      NODE_ENV: test
+      RUN_EDGE_CASE_TESTS: true
+      RUN_SLOW_TESTS: true
     steps:
       - uses: actions/checkout@v4
         with:

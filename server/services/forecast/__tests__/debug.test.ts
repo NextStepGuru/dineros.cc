@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ForecastEngineFactory } from "../index";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/types/test-types";
 import { dateTimeService } from "../DateTimeService";
 
 describe("Debug Forecast Engine Test", () => {

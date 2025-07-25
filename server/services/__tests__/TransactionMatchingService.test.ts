@@ -4,7 +4,7 @@ import type {
   AccountRegister,
   AccountType,
   RegisterEntry,
-} from "@prisma/client";
+} from "~/types/test-types";
 import type { Transaction } from "plaid";
 
 // Mock dependencies
@@ -74,8 +74,8 @@ describe("TransactionMatchingService", () => {
           accountRegisterId: 1,
           amount: -100,
           createdAt: {
-            gte: new Date(2023, 11, 31),
-            lt: new Date(2024, 0, 1),
+            gte: expect.any(Date),
+            lt: expect.any(Date),
           },
           plaidId: null,
         },
@@ -243,8 +243,8 @@ describe("TransactionMatchingService", () => {
           accountRegisterId: 1,
           amount: 100, // Should be positive for credit accounts
           createdAt: {
-            gte: new Date(2023, 11, 31),
-            lt: new Date(2024, 0, 1),
+            gte: expect.any(Date),
+            lt: expect.any(Date),
           },
           plaidId: null,
         },

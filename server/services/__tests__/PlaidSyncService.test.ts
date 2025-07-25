@@ -5,7 +5,7 @@ import type {
   AccountRegister,
   AccountType,
   RegisterEntry,
-} from "@prisma/client";
+} from "~/types/test-types";
 import type { Transaction } from "plaid";
 
 // Mock dependencies

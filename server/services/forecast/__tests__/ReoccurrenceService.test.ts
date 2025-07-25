@@ -4,7 +4,7 @@ import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient, Reoccurrence } from "@prisma/client";
+import type { PrismaClient, Reoccurrence } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 
 describe("ReoccurrenceService", () => {

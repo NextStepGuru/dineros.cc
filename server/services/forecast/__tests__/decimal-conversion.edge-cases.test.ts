@@ -1,4 +1,4 @@
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "~/types/test-types";
 import { ModernCacheService } from "../ModernCacheService";
 import { AccountRegisterService } from "../AccountRegisterService";
 import { RegisterEntryService } from "../RegisterEntryService";
