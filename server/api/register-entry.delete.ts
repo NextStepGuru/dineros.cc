@@ -1,5 +1,6 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { z } from "zod";
+import { createError } from "h3";
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";

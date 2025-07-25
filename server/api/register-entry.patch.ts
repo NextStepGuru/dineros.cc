@@ -1,5 +1,6 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import type { H3Event } from "h3";
+import { createError } from "h3";
 import { registerEntrySchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { z } from "zod";

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { dateTimeService } from "~/server/services/forecast";
+import { createError } from "h3";
 
 // Define the schema for the request body
 const skipPost = z.object({

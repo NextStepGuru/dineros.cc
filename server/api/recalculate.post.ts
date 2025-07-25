@@ -1,5 +1,6 @@
 import { recalculateSchema } from "~/schema/zod";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { createError } from "h3";
 import {
   ForecastEngineFactory,
   dateTimeService,

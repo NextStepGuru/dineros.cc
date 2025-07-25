@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '~/types/test-types';
 import { vi } from 'vitest';
 
 // Mock test database setup
