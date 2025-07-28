@@ -194,7 +194,8 @@ model RegisterEntry {
   isProjected             Boolean  @default(false) @map("is_projected")
   isReconciled            Boolean  @default(false) @map("is_reconciled")
   isPending               Boolean  @default(false) @map("is_pending")
-  isCleared               Boolean  @default(false) @map("is_cleared")
+  isCleared               Boolean  @default(false) @map("is_cleared") // the user has cleared the entry from the future register
+  isMatched               Boolean  @default(false) @map("is_matched") // denotes that the entry has been matched to an online transaction
   isBalanceEntry          Boolean  @default(false) @map("is_balance_entry")
   isManualEntry           Boolean  @default(false) @map("is_manual_entry")
   hasBalanceReCalc        Boolean  @default(false) @map("has_balance_re_calc")
