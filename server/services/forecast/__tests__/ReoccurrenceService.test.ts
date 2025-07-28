@@ -120,7 +120,19 @@ describe("ReoccurrenceService", () => {
         amount: 100,
         description: "Test Reoccurrence",
         reoccurrence: expect.objectContaining({
-          lastAt: new Date("2024-01-01"), // Current occurrence date
+          id: 1,
+          accountId: "test-account",
+          accountRegisterId: 1,
+          description: "Test Reoccurrence",
+          amount: 100,
+          intervalId: 3,
+          intervalCount: 1,
+          lastAt: new Date("2024-01-01"),
+          endAt: null,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          transferAccountRegisterId: 2,
+          adjustBeforeIfOnWeekend: false,
         }),
       });
     });
@@ -144,8 +156,21 @@ describe("ReoccurrenceService", () => {
         description: "Test Reoccurrence",
         amount: 100,
         reoccurrence: expect.objectContaining({
-          lastAt: new Date("2024-01-01"), // Current occurrence date
+          id: 1,
+          accountId: "test-account",
+          accountRegisterId: 1,
+          description: "Test Reoccurrence",
+          amount: 100,
+          intervalId: 3,
+          intervalCount: 1,
+          lastAt: new Date("2024-01-01"),
+          endAt: null,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          transferAccountRegisterId: null,
+          adjustBeforeIfOnWeekend: false,
         }),
+        typeId: 9,
       });
     });
 
