@@ -292,11 +292,8 @@ const columns: TableColumn<RegisterEntry>[] = [
       return h(
         "div",
         {
-          class: !row.original.isProjected
-            ? "cursor-pointer font-bold dark:text-white"
-            : "italic",
-          onClick: () =>
-            !row.original.isProjected ? handleTableClick(row.original) : null,
+          class: "cursor-pointer font-bold dark:text-white",
+          onClick: () => handleTableClick(row.original),
         },
         row.getValue("description")
       );

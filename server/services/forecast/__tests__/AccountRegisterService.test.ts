@@ -295,12 +295,12 @@ describe("AccountRegisterService", () => {
           targetAccountRegisterId: 1,
           sourceAccountRegisterId: 2,
           amount: 150,
-          description: "Min Payment to Credit Card",
+          description: "Payment to Credit Card",
           forecastDate: expect.any(Date),
           reoccurrence: expect.objectContaining({
             accountRegisterId: 1,
             amount: expect.any(Object), // Decimal object
-            description: "Min Payment to Credit Card",
+            description: "Payment to Credit Card",
             intervalId: undefined,
             intervalCount: 1,
             id: 0,

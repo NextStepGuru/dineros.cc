@@ -115,12 +115,12 @@ export class AccountRegisterService implements IAccountRegisterService {
           targetAccountRegisterId: accountRegister.id,
           sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
           amount: Number(paymentAmount),
-          description: "Min Payment to Credit Card",
+          description: `Payment to ${accountRegister.name}`,
           forecastDate: forecastDate?.toDate(),
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
-            description: "Min Payment to Credit Card",
+            description: `Payment to ${accountRegister.name}`,
             lastAt: dateTimeService.nowDate(),
             amount: new Decimal(Number(paymentAmount)),
             transferAccountRegisterId: accountRegister.targetAccountRegisterId,
@@ -145,13 +145,13 @@ export class AccountRegisterService implements IAccountRegisterService {
       if (paymentAmount > 0) {
         this.entryService.createEntry({
           accountRegisterId: accountRegister.id,
-          description: "Payment for Loan Account",
+          description: `Payment for ${accountRegister.name}`,
           amount: Number(paymentAmount),
           forecastDate: forecastDate?.toDate(),
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
-            description: "Payment for Loan Account",
+            description: `Payment for ${accountRegister.name}`,
             lastAt: dateTimeService.nowDate(),
             amount: new Decimal(Number(paymentAmount)),
             transferAccountRegisterId: null,
@@ -305,9 +305,9 @@ export class AccountRegisterService implements IAccountRegisterService {
       case 3: // Month
         // For monthly, manually construct the next month's date
         const currentMoment = dateTimeService.create(currentStatementAt);
-        const currentDay = currentMoment.date();
-        const currentMonth = currentMoment.month();
-        const currentYear = currentMoment.year();
+        const currentDay = currentMoment.date() as number;
+        const currentMonth = currentMoment.month() as number;
+        const currentYear = currentMoment.year() as number;
 
         // Calculate next month and year
         let nextMonth = currentMonth + 1;
@@ -320,9 +320,9 @@ export class AccountRegisterService implements IAccountRegisterService {
         // Create the next month's date with the same day
         const nextMonthMoment = dateTimeService
           .create()
-          .year(nextYear)
-          .month(nextMonth)
-          .date(currentDay);
+          .setYear(nextYear)
+          .setMonth(nextMonth)
+          .setDate(currentDay);
         return dateTimeService.toDate(nextMonthMoment);
       case 4: // Year
         // Use moment's add method directly to avoid any wrapper issues
@@ -339,9 +339,9 @@ export class AccountRegisterService implements IAccountRegisterService {
       default:
         // For monthly, manually construct the next month's date
         const currentMomentDefault = dateTimeService.create(currentStatementAt);
-        const currentDayDefault = currentMomentDefault.date();
-        const currentMonthDefault = currentMomentDefault.month();
-        const currentYearDefault = currentMomentDefault.year();
+        const currentDayDefault = currentMomentDefault.date() as number;
+        const currentMonthDefault = currentMomentDefault.month() as number;
+        const currentYearDefault = currentMomentDefault.year() as number;
 
         // Calculate next month and year
         let nextMonthDefault = currentMonthDefault + 1;
@@ -354,9 +354,9 @@ export class AccountRegisterService implements IAccountRegisterService {
         // Create the next month's date with the same day
         const nextMonthMomentDefault = dateTimeService
           .create()
-          .year(nextYearDefault)
-          .month(nextMonthDefault)
-          .date(currentDayDefault);
+          .setYear(nextYearDefault)
+          .setMonth(nextMonthDefault)
+          .setDate(currentDayDefault);
         return dateTimeService.toDate(nextMonthMomentDefault);
     }
   }
