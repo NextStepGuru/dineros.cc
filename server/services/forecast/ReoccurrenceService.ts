@@ -99,6 +99,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           description: reoccurrence.description,
           amount: +reoccurrence.amount,
           reoccurrence: reoccurrenceForEntry,
+          typeId: 9, // Reoccurrence Entry
         });
       }
 

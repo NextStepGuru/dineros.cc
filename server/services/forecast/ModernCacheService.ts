@@ -60,6 +60,7 @@ export type CacheRegisterEntry = {
   reoccurrenceId: number | null;
   amount: number;
   balance: number;
+  typeId: number | null;
   isBalanceEntry: boolean;
   isPending: boolean;
   isCleared: boolean;

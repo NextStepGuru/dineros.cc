@@ -29,6 +29,7 @@ export class TransferService implements ITransferService {
       sourceAccountRegisterId,
       amount: +amount,
       reoccurrence,
+      typeId: 6, // Transfer
     });
 
     // Create entry for source account (sending money)
@@ -38,6 +39,7 @@ export class TransferService implements ITransferService {
       description: fromDescription || `Transfer for ${description}`,
       amount: +amount * -1,
       reoccurrence,
+      typeId: 6, // Transfer
     });
   }
 
@@ -62,6 +64,7 @@ export class TransferService implements ITransferService {
       amount: +amount,
       reoccurrence,
       forecastDate,
+      typeId: 6, // Transfer
     });
 
     // Create entry for source account (sending money)
@@ -72,6 +75,7 @@ export class TransferService implements ITransferService {
       amount: +amount * -1,
       reoccurrence,
       forecastDate,
+      typeId: 6, // Transfer
     });
   }
 

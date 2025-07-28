@@ -256,6 +256,7 @@ export class ForecastEngine implements IForecastEngine {
           isBalanceEntry: entry.isBalanceEntry,
           isPending: entry.isPending, // Preserve isPending status
           manualCreatedAt: entry.createdAt,
+          typeId: entry.typeId, // Preserve typeId from existing entries
         });
       });
     } catch (error) {
@@ -404,6 +405,7 @@ export class ForecastEngine implements IForecastEngine {
         reoccurrenceId: item.reoccurrenceId,
         amount: item.amount,
         balance: item.balance,
+        typeId: item.typeId,
         isCleared: item.isCleared,
         isReconciled: item.isReconciled,
         isProjected: item.isProjected,

@@ -28,6 +28,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       isBalanceEntry = false,
       isManualEntry = false,
       isPending,
+      typeId,
     } = params;
 
     if (params.isBalanceEntry) {
@@ -92,6 +93,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       balance: isBalanceEntry ? numericAmount : balance, // For balance entries, use amount as the opening balance
       createdAt,
       reoccurrenceId: reoccurrence?.id || null,
+      typeId: typeId || null,
       isBalanceEntry,
       isPending: entryIsPending,
       isCleared: false,
@@ -231,6 +233,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       isBalanceEntry: true,
       isManualEntry: false,
       forecastDate: dateTimeService.nowDate(), // Use current date for balance entries
+      typeId: 1, // Balance Entry
     });
     forecastLogger.debug(
       `Balance entry created. Cache now has ${

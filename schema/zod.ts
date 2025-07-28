@@ -181,6 +181,7 @@ export const registerEntrySchema = z.object({
   reoccurrenceId: z.coerce.number().nullable().optional(),
   amount: z.coerce.number(),
   balance: z.coerce.number(),
+  typeId: z.coerce.number().nullable().optional(),
   isProjected: z.boolean().default(false),
   isReconciled: z.boolean().default(false),
   isCleared: z.boolean().default(false),

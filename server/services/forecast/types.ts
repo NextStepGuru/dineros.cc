@@ -124,6 +124,7 @@ export interface CreateEntryParams {
   isBalanceEntry?: boolean;
   isManualEntry?: boolean;
   isPending?: boolean;
+  typeId?: number; // RegisterEntryType ID
 }
 
 export interface TransferParams {

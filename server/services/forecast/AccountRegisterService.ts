@@ -82,6 +82,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegister.targetAccountRegisterId || undefined,
       amount: Math.abs(interest),
       forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
+      typeId: isCreditAccount ? 2 : 3, // Interest Charge (2) or Interest Earned (3)
       reoccurrence: {
         accountId: "",
         accountRegisterId: accountRegister.id,
@@ -148,6 +149,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           description: `Payment for ${accountRegister.name}`,
           amount: Number(paymentAmount),
           forecastDate: forecastDate?.toDate(),
+          typeId: 4, // Loan Payment
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,

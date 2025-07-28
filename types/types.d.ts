@@ -54,6 +54,7 @@ export type RegisterEntry = {
   reoccurrenceId?: number | null;
   amount: number;
   balance: number;
+  typeId?: number | null;
   isCleared: boolean;
   isReconciled: boolean;
   isProjected: boolean;
