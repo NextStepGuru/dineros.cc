@@ -720,7 +720,7 @@ watch(
 const estimatedNetWorth = computed(() => {
   return listStore.getAccountRegisters.reduce((acc, curr) => {
     if (curr.typeId !== 15) {
-      acc += curr.balance;
+      acc += +curr.balance;
     }
 
     return acc;
