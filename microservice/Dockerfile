@@ -33,6 +33,7 @@ RUN corepack enable
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/package.json /app/
 COPY --from=build /app/*.ts /app/
+COPY --from=build /app/*.js /app/
 COPY --from=build /app/routes /app/routes
 COPY --from=build /app/lib /app/lib
 COPY --from=build /app/clients /app/clients
