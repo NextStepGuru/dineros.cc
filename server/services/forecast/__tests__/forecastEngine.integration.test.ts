@@ -425,23 +425,33 @@ describe("ForecastEngine Integration Tests", () => {
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
 
-        for (let i = 1; i < sortedEntries.length; i++) {
-          const current = sortedEntries[i];
-          const previous = sortedEntries[i - 1];
+        // Find the balance entry to get the starting balance
+        const balanceEntry = sortedEntries.find(
+          (entry) => entry.isBalanceEntry
+        );
+        if (!balanceEntry) {
+          throw new Error("No balance entry found in test data");
+        }
 
-          // Skip balance entries as they reset the running balance to their amount
+        // The balance entry should have balance equal to its amount
+        expect(balanceEntry.balance).toBe(balanceEntry.amount);
+
+        // Calculate running balances starting from the balance entry
+        let runningBalance = balanceEntry.balance;
+
+        for (let i = 0; i < sortedEntries.length; i++) {
+          const current = sortedEntries[i];
+
+          // Skip balance entries as they set the initial balance
           if (current.isBalanceEntry) {
-            expect(current.balance).toBe(current.amount);
             continue;
           }
 
-          // For non-balance entries, running balance should equal previous balance + current amount
-          const expectedBalance = previous.balance + current.amount;
+          // For non-balance entries, running balance should equal previous running balance + current amount
+          runningBalance += current.amount;
 
           // Allow for larger rounding differences due to complex calculations
-          expect(Math.abs(current.balance - expectedBalance)).toBeLessThan(
-            1500
-          );
+          expect(Math.abs(current.balance - runningBalance)).toBeLessThan(1500);
         }
       });
     });
