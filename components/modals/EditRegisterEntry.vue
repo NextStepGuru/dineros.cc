@@ -481,7 +481,7 @@ UModal(description="Edit Register Entry" class="max-sm:!w-full max-sm:!h-full ma
 
       UButton(
         color="info"
-        v-if="formState.id && !formState.isProjected"
+        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         @click="markAsCleared"
         :loading="state.isClearing"
         :disabled="isDisabled"
@@ -490,7 +490,7 @@ UModal(description="Edit Register Entry" class="max-sm:!w-full max-sm:!h-full ma
 
       UButton(
         color="info"
-        v-if="formState.id && !formState.isProjected"
+        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         @click="initiateApply"
         :loading="state.isApplying"
         :disabled="isDisabled"
@@ -502,7 +502,7 @@ UModal(description="Edit Register Entry" class="max-sm:!w-full max-sm:!h-full ma
         @click="confirmDelete"
         :loading="state.isDeleting"
         :disabled="isDisabled"
-        v-if="formState.id && !formState.isProjected"
+        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         class="cursor-pointer"
       ) Delete
 
@@ -512,7 +512,7 @@ UModal(description="Edit Register Entry" class="max-sm:!w-full max-sm:!h-full ma
         :loading="state.isSkipping"
         :disabled="isDisabled"
         class="cursor-pointer"
-        v-if="formState.id && formState.reoccurrenceId && !formState.isProjected"
+        v-if="formState.id && formState.reoccurrenceId && formState.isProjected"
       ) Skip Reoccurrence
 
       UButton(@click="cancel" color="neutral" :disabled="isDisabled" class="cursor-pointer") Close
