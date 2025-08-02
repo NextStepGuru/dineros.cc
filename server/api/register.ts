@@ -4,6 +4,7 @@ import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { dateTimeService } from "~/server/services/forecast";
+import { calculateAdjustedBalance } from "../lib/calculateAdjustedBalance";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -137,23 +138,32 @@ export default defineEventHandler(async (event) => {
       take: skip + effectiveTake,
     });
 
-    const pocketBalances = await PrismaDb.accountRegister.aggregate({
+    const pocketBalances = await PrismaDb.accountRegister.findMany({
       where: {
         subAccountRegisterId: accountRegisterId,
       },
-      _sum: {
+      select: {
         balance: true,
       },
     });
 
-    const balance =
-      accountRegister.latestBalance - (pocketBalances._sum.balance || 0);
+    const balance = calculateAdjustedBalance(
+      accountRegister.latestBalance,
+      pocketBalances
+    );
 
     // For quick mode, skip expensive sorting and return basic data
     if (isQuickMode) {
+      // Convert Decimal values to numbers for the sort function
+      const convertedEntries = allRegisterEntries.map((entry) => ({
+        ...entry,
+        amount: Number(entry.amount),
+        balance: Number(entry.balance),
+      }));
+
       // Full mode: expensive but complete processing
       const balanceUpdated = recalculateRunningBalanceAndSort({
-        registerEntries: allRegisterEntries,
+        registerEntries: convertedEntries,
         balance,
         type: accountRegister.type.isCredit ? "credit" : "debit",
       });
@@ -191,9 +201,16 @@ export default defineEventHandler(async (event) => {
       };
     }
 
+    // Convert Decimal values to numbers for the sort function
+    const convertedEntries = allRegisterEntries.map((entry) => ({
+      ...entry,
+      amount: Number(entry.amount),
+      balance: Number(entry.balance),
+    }));
+
     // Full mode: expensive but complete processing
     const balanceUpdated = recalculateRunningBalanceAndSort({
-      registerEntries: allRegisterEntries,
+      registerEntries: convertedEntries,
       balance,
       type: accountRegister.type.isCredit ? "credit" : "debit",
     });

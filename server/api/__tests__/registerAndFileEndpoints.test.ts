@@ -35,6 +35,7 @@ vi.mock("~/server/clients/prismaClient", () => ({
       findUniqueOrThrow: vi.fn(),
       aggregate: vi.fn(),
       findFirstOrThrow: vi.fn(),
+      findMany: vi.fn(),
     },
     registerEntry: {
       findMany: vi.fn(),
@@ -162,6 +163,7 @@ describe("Register and File Upload API Endpoints", () => {
       (prisma.accountRegister.aggregate as any).mockResolvedValue(
         mockPocketBalances
       );
+      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (recalculateRunningBalanceAndSort as any).mockReturnValue(
         mockBalanceUpdated
       );
@@ -200,7 +202,7 @@ describe("Register and File Upload API Endpoints", () => {
       });
       expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
         registerEntries: mockRegisterEntries,
-        balance: 1300, // latestBalance - pocketBalances
+        balance: 1500, // latestBalance - 0 (no pocket balances)
         type: "debit",
       });
       expect(result).toEqual({
@@ -273,6 +275,7 @@ describe("Register and File Upload API Endpoints", () => {
         (prisma.accountRegister.aggregate as any).mockResolvedValue(
           mockPocketBalances
         );
+        (prisma.accountRegister.findMany as any).mockResolvedValue([]);
         (recalculateRunningBalanceAndSort as any).mockReturnValue(
           mockBalanceUpdated
         );
@@ -359,6 +362,7 @@ describe("Register and File Upload API Endpoints", () => {
         (prisma.accountRegister.aggregate as any).mockResolvedValue({
           _sum: { balance: 0 },
         });
+        (prisma.accountRegister.findMany as any).mockResolvedValue([]);
 
         await registerHandler(mockEvent);
 
