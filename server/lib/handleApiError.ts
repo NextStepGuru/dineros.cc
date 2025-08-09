@@ -7,7 +7,7 @@ export const handleApiError = (error: unknown) => {
     log({ message: "Invalid Request Data", data: error, level: "warn" });
     throw createError({
       statusCode: 400,
-      statusMessage: error.errors
+      statusMessage: error.issues
         .map((err) => `${err.path}: ${err.message}`)
         .join(", "),
     });
