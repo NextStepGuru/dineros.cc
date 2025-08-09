@@ -95,6 +95,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: true,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -106,6 +107,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: true,
         isCleared: true,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -117,6 +119,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -127,6 +130,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -138,6 +142,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -149,6 +154,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: true,
       },
@@ -222,6 +228,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: true,
         isCleared: true,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -233,6 +240,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -243,6 +251,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -253,6 +262,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -264,6 +274,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: true,
       },
@@ -322,6 +333,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: true,
         isCleared: true,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -333,6 +345,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -368,6 +381,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: true,
         isCleared: true,
         isManualEntry: false,
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -379,6 +393,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -389,6 +404,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: false,
+        isMatched: false,
         isPending: true,
         isProjected: false,
       },
@@ -413,6 +429,522 @@ describe("recalculateRunningBalanceAndSort", () => {
     // 800 - (-30) = 830, then 830 - (-50) = 880
     expect(pendingBeforeBalance[0].balance).toBe(880); // Jan 16: 880
     expect(pendingBeforeBalance[1].balance).toBe(830); // Jan 17: 830
+  });
+
+  it("should handle manual entries with isMatched=true before balance entry", () => {
+    const balance = 1000;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 1000,
+        balance: 1000,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=true (should go before balance)
+      {
+        amount: -50,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: true,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=false (should go after balance)
+      {
+        amount: -75,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-17"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Regular pending entry (should go after balance)
+      {
+        amount: -100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-18"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(testEntries)),
+      balance,
+      type,
+    });
+
+    const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
+    const entriesBeforeBalance = result.slice(0, balanceEntryIndex);
+    const balanceEntry = result[balanceEntryIndex];
+    const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
+
+    // Should have one manual entry before balance (isMatched=true)
+    expect(entriesBeforeBalance.length).toBe(1);
+    expect(entriesBeforeBalance[0].isManualEntry).toBe(true);
+    expect(entriesBeforeBalance[0].isMatched).toBe(true);
+    expect(entriesBeforeBalance[0].amount).toBe(-50);
+
+    // Balance entry should be present
+    expect(balanceEntry.isBalanceEntry).toBe(true);
+    expect(balanceEntry.balance).toBe(balance);
+
+    // Should have two entries after balance (manual isMatched=false + regular)
+    expect(entriesAfterBalance.length).toBe(2);
+
+    // Find the manual entry with isMatched=false
+    const manualEntryAfterBalance = entriesAfterBalance.find(
+      (r) => r.isManualEntry
+    );
+    expect(manualEntryAfterBalance).toBeDefined();
+    expect(manualEntryAfterBalance!.isMatched).toBe(false);
+    expect(manualEntryAfterBalance!.amount).toBe(-75);
+
+    // Regular entry should also be after balance
+    const regularEntry = entriesAfterBalance.find((r) => !r.isManualEntry);
+    expect(regularEntry).toBeDefined();
+    expect(regularEntry!.amount).toBe(-100);
+
+    // Verify running balance calculations
+    // Entry before balance: 1000 - (-50) = 1050
+    expect(entriesBeforeBalance[0].balance).toBe(1050);
+
+    // Entries after balance should increment from balance
+    expect(entriesAfterBalance[0].balance).toBe(balance - 75); // 925 (manual entry)
+    expect(entriesAfterBalance[1].balance).toBe(balance - 75 - 100); // 825 (regular entry)
+  });
+
+  it("should handle multiple manual entries with mixed isMatched values", () => {
+    const balance = 500;
+    const type = "credit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 500,
+        balance: 500,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=true (before balance)
+      {
+        amount: 25,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: true,
+        isPending: false,
+        isProjected: false,
+      },
+      // Another manual entry with isMatched=true (before balance)
+      {
+        amount: 50,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-17"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: true,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=false (after balance)
+      {
+        amount: 75,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-18"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Another manual entry with isMatched=false (after balance)
+      {
+        amount: 100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-19"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(testEntries)),
+      balance,
+      type,
+    });
+
+    const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
+    const entriesBeforeBalance = result.slice(0, balanceEntryIndex);
+    const balanceEntry = result[balanceEntryIndex];
+    const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
+
+    // Should have 2 manual entries before balance (both isMatched=true)
+    expect(entriesBeforeBalance.length).toBe(2);
+    expect(
+      entriesBeforeBalance.every((r) => r.isManualEntry && r.isMatched)
+    ).toBe(true);
+
+    // Verify chronological order for entries before balance (older first)
+    expect(entriesBeforeBalance[0].amount).toBe(25); // Jan 16 (older)
+    expect(entriesBeforeBalance[1].amount).toBe(50); // Jan 17 (newer)
+
+    // Balance entry should be present
+    expect(balanceEntry.isBalanceEntry).toBe(true);
+    expect(balanceEntry.balance).toBe(balance);
+
+    // Should have 2 manual entries after balance (both isMatched=false)
+    expect(entriesAfterBalance.length).toBe(2);
+    expect(
+      entriesAfterBalance.every((r) => r.isManualEntry && !r.isMatched)
+    ).toBe(true);
+
+    // Verify chronological order for entries after balance (older first)
+    expect(entriesAfterBalance[0].amount).toBe(75); // Jan 18 (older)
+    expect(entriesAfterBalance[1].amount).toBe(100); // Jan 19 (newer)
+
+    // Verify running balance calculations for entries before balance
+    // Working backwards: 500 - 50 = 450, then 450 - 25 = 425
+    expect(entriesBeforeBalance[0].balance).toBe(425); // Jan 16: 425
+    expect(entriesBeforeBalance[1].balance).toBe(450); // Jan 17: 450
+
+    // Verify running balance calculations for entries after balance
+    expect(entriesAfterBalance[0].balance).toBe(balance + 75); // 575
+    expect(entriesAfterBalance[1].balance).toBe(balance + 75 + 100); // 675
+  });
+
+  it("should handle manual entries combined with pending entries", () => {
+    const balance = 800;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 800,
+        balance: 800,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Pending entry that goes before balance (isProjected=0, isPending=1)
+      {
+        amount: -30,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: true,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=true (before balance)
+      {
+        amount: -40,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-17"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: true,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=false (after balance)
+      {
+        amount: -50,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-18"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Regular projected entry (after balance)
+      {
+        amount: -60,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-19"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: true,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(testEntries)),
+      balance,
+      type,
+    });
+
+    const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
+    const entriesBeforeBalance = result.slice(0, balanceEntryIndex);
+    const balanceEntry = result[balanceEntryIndex];
+    const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
+
+    // Should have 2 entries before balance: pending entry + manual entry (isMatched=true)
+    expect(entriesBeforeBalance.length).toBe(2);
+
+    // Find pending and manual entries before balance
+    const pendingBeforeBalance = entriesBeforeBalance.find(
+      (r) => !r.isProjected && r.isPending
+    );
+    const manualBeforeBalance = entriesBeforeBalance.find(
+      (r) => r.isManualEntry && r.isMatched
+    );
+
+    expect(pendingBeforeBalance).toBeDefined();
+    expect(pendingBeforeBalance!.amount).toBe(-30);
+
+    expect(manualBeforeBalance).toBeDefined();
+    expect(manualBeforeBalance!.amount).toBe(-40);
+
+    // Verify chronological order (older first)
+    expect(entriesBeforeBalance[0].amount).toBe(-30); // Jan 16 (pending)
+    expect(entriesBeforeBalance[1].amount).toBe(-40); // Jan 17 (manual matched)
+
+    // Balance entry should be present
+    expect(balanceEntry.isBalanceEntry).toBe(true);
+    expect(balanceEntry.balance).toBe(balance);
+
+    // Should have 2 entries after balance: manual entry (isMatched=false) + projected entry
+    expect(entriesAfterBalance.length).toBe(2);
+
+    const manualAfterBalance = entriesAfterBalance.find(
+      (r) => r.isManualEntry && !r.isMatched
+    );
+    const projectedEntry = entriesAfterBalance.find((r) => r.isProjected);
+
+    expect(manualAfterBalance).toBeDefined();
+    expect(manualAfterBalance!.amount).toBe(-50);
+
+    expect(projectedEntry).toBeDefined();
+    expect(projectedEntry!.amount).toBe(-60);
+
+    // Verify running balance calculations for entries before balance
+    // Working backwards: 800 - (-40) = 840, then 840 - (-30) = 870
+    expect(entriesBeforeBalance[0].balance).toBe(870); // Jan 16 (pending): 870
+    expect(entriesBeforeBalance[1].balance).toBe(840); // Jan 17 (manual): 840
+
+    // Verify running balance calculations for entries after balance
+    expect(entriesAfterBalance[0].balance).toBe(balance - 50); // 750 (manual)
+    expect(entriesAfterBalance[1].balance).toBe(balance - 50 - 60); // 690 (projected)
+  });
+
+  it("should explicitly test manual entry placement - isMatched=false goes after balance", () => {
+    const balance = 1000;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 1000,
+        balance: 1000,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=false (SHOULD go AFTER balance)
+      {
+        amount: -100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false, // This is the key: FALSE means AFTER balance
+        isPending: false,
+        isProjected: false,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: testEntries,
+      balance,
+      type,
+    });
+
+    // Find positions
+    const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
+    const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
+
+    // Manual entry with isMatched=false should come AFTER balance entry
+    expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
+    expect(result[manualEntryIndex].isMatched).toBe(false);
+    expect(result[manualEntryIndex].isManualEntry).toBe(true);
+
+    // Verify the actual order
+    expect(result[balanceIndex].isBalanceEntry).toBe(true);
+    expect(result[manualEntryIndex].amount).toBe(-100);
+  });
+
+  it("should explicitly test manual entry placement - isMatched=true goes before balance", () => {
+    const balance = 1000;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 1000,
+        balance: 1000,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isMatched=true (SHOULD go BEFORE balance)
+      {
+        amount: -100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: true, // This is the key: TRUE means BEFORE balance
+        isPending: false,
+        isProjected: false,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: testEntries,
+      balance,
+      type,
+    });
+
+    // Find positions
+    const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
+    const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
+
+    // Manual entry with isMatched=true should come BEFORE balance entry
+    expect(manualEntryIndex).toBeLessThan(balanceIndex);
+    expect(result[manualEntryIndex].isMatched).toBe(true);
+    expect(result[manualEntryIndex].isManualEntry).toBe(true);
+
+    // Verify the actual order
+    expect(result[manualEntryIndex].amount).toBe(-100);
+    expect(result[balanceIndex].isBalanceEntry).toBe(true);
+  });
+
+  it("should handle manual entries with isPending=true and isMatched=false (regression test)", () => {
+    const balance = 1000;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      // Balance entry
+      {
+        amount: 1000,
+        balance: 1000,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Manual entry with isPending=true and isMatched=false
+      // This should go AFTER balance, not before (regression test for bug)
+      {
+        amount: -100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-16"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false, // FALSE = should go AFTER balance
+        isPending: true, // TRUE = this was causing the bug
+        isProjected: false,
+      },
+      // Regular pending entry (non-manual) should still go before balance
+      {
+        amount: -50,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-17"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: true, // Regular pending entries should go before balance
+        isProjected: false,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: testEntries,
+      balance,
+      type,
+    });
+
+    // Find positions
+    const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
+    const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
+    const regularPendingIndex = result.findIndex(
+      (r) => !r.isManualEntry && r.isPending
+    );
+
+    // Manual entry with isPending=true but isMatched=false should STILL go AFTER balance
+    expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
+    expect(result[manualEntryIndex].isMatched).toBe(false);
+    expect(result[manualEntryIndex].isPending).toBe(true);
+    expect(result[manualEntryIndex].isManualEntry).toBe(true);
+
+    // Regular pending entry should go BEFORE balance
+    expect(regularPendingIndex).toBeLessThan(balanceIndex);
+    expect(result[regularPendingIndex].isPending).toBe(true);
+    expect(result[regularPendingIndex].isManualEntry).toBe(false);
+
+    // Verify the actual order: [regular pending] -> [balance] -> [manual pending unmatched]
+    expect(result[regularPendingIndex].amount).toBe(-50);
+    expect(result[balanceIndex].isBalanceEntry).toBe(true);
+    expect(result[manualEntryIndex].amount).toBe(-100);
   });
 });
 

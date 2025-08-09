@@ -9,8 +9,130 @@ export type PartialRegisterEntry = {
   isPending: boolean;
   isProjected: boolean;
   isManualEntry: boolean;
+  isMatched: boolean;
   isCleared: boolean;
 };
+
+// Clear helper functions to determine entry placement
+const shouldGoBeforeBalance = (entry: PartialRegisterEntry): boolean => {
+  // For manual entries, only consider the isMatched property
+  if (entry.isManualEntry) {
+    return entry.isMatched === true;
+  }
+
+  // For non-manual entries, use the pending condition
+  // Pending entries that aren't projected (real pending transactions) go before balance
+  const pendingCondition = !entry.isProjected && entry.isPending;
+
+  return pendingCondition;
+};
+
+const isCleared = (entry: PartialRegisterEntry): boolean => {
+  return entry.isCleared && !entry.isBalanceEntry;
+};
+
+const isBalance = (entry: PartialRegisterEntry): boolean => {
+  return entry.isBalanceEntry;
+};
+
+// Simple chronological sort with amount tiebreaker
+const sortEntriesChronologically = <T extends PartialRegisterEntry>(
+  entries: T[],
+  type: "credit" | "debit",
+  direction: "oldest-first" | "newest-first" = "oldest-first"
+): T[] => {
+  return [...entries].sort((a, b) => {
+    // Date comparison
+    const aTime = dateTimeService.isAfter(a.createdAt, b.createdAt)
+      ? 1
+      : dateTimeService.isBefore(a.createdAt, b.createdAt)
+      ? -1
+      : 0;
+
+    if (direction === "newest-first") {
+      if (aTime !== 0) return -aTime; // Reverse chronological order
+    } else {
+      if (aTime !== 0) return aTime; // Normal chronological order
+    }
+
+    // If same date, sort by amount (different rules for credit vs debit)
+    const aAmount = +a.amount;
+    const bAmount = +b.amount;
+
+    if (type === "credit") {
+      return aAmount - bAmount; // Ascending for credit
+    } else {
+      return bAmount - aAmount; // Descending for debit
+    }
+  });
+};
+
+// Calculate running balance forward from a starting point
+const calculateForwardBalance = <T extends PartialRegisterEntry>(
+  entries: T[],
+  startingBalance: number
+): T[] => {
+  let runningBalance = startingBalance;
+  return entries.map((entry) => ({
+    ...entry,
+    balance: (runningBalance += +entry.amount),
+  }));
+};
+
+// Calculate running balance backward from a starting point
+const calculateBackwardBalance = <T extends PartialRegisterEntry>(
+  entries: T[],
+  startingBalance: number
+): T[] => {
+  let runningBalance = startingBalance;
+
+  // Work backwards through the entries
+  const entriesWithBalance = [...entries].reverse().map((entry) => {
+    runningBalance -= +entry.amount;
+    return { ...entry, balance: runningBalance };
+  });
+
+  // Return in original order
+  return entriesWithBalance.reverse();
+};
+
+// Calculate cleared entries balance (special case - works backward with negative amounts)
+const calculateClearedBalance = <T extends PartialRegisterEntry>(
+  entries: T[],
+  startingBalance: number,
+  type: "credit" | "debit"
+): T[] => {
+  // Cleared entries need special sorting (oldest first, but different amount rules)
+  const sortedEntries = [...entries].sort((a, b) => {
+    const aTime = dateTimeService.isAfter(a.createdAt, b.createdAt)
+      ? 1
+      : dateTimeService.isBefore(a.createdAt, b.createdAt)
+      ? -1
+      : 0;
+
+    if (aTime !== 0) return aTime; // Oldest first
+
+    // Cleared entries have different amount sorting
+    const aAmount = +a.amount;
+    const bAmount = +b.amount;
+
+    if (type === "credit") {
+      return bAmount - aAmount; // Descending for credit (opposite of normal)
+    } else {
+      return aAmount - bAmount; // Ascending for debit (opposite of normal)
+    }
+  });
+
+  // Calculate balance working backwards with negative amounts
+  let runningBalance = startingBalance;
+  const reversed = [...sortedEntries].reverse().map((entry) => {
+    runningBalance += +entry.amount * -1;
+    return { ...entry, balance: runningBalance };
+  });
+
+  return reversed.reverse();
+};
+
 export const recalculateRunningBalanceAndSort = <
   T extends PartialRegisterEntry = PartialRegisterEntry
 >({
@@ -22,142 +144,72 @@ export const recalculateRunningBalanceAndSort = <
   balance: number;
   type: "credit" | "debit";
 }): T[] => {
+  // Early exit for empty arrays
   if (!registerEntries || registerEntries.length === 0) {
     return [];
   }
 
-  const latestBalance = registerEntries.find((item) => item.isBalanceEntry);
-  if (!latestBalance) {
+  // Find and validate balance entry
+  const balanceEntry = registerEntries.find(isBalance);
+  if (!balanceEntry) {
     return [];
   }
 
-  // Use the override balance argument if provided, otherwise use the balance entry's amount
-  const startingBalance: number =
-    balance !== undefined ? balance : +latestBalance.amount;
+  // Set up the starting balance
+  const startingBalance =
+    balance !== undefined ? balance : +balanceEntry.amount;
+  balanceEntry.balance = startingBalance;
+  balanceEntry.amount = startingBalance;
 
-  latestBalance.balance = startingBalance;
-  latestBalance.amount = startingBalance;
-
-  const clearedEntries = registerEntries.filter(
-    (item) => item.isCleared && !item.isBalanceEntry
+  // Categorize all entries by type
+  const clearedEntries = registerEntries.filter(isCleared);
+  const entriesBeforeBalance = registerEntries.filter(
+    (entry) =>
+      !isCleared(entry) && !isBalance(entry) && shouldGoBeforeBalance(entry)
+  );
+  const entriesAfterBalance = registerEntries.filter(
+    (entry) =>
+      !isCleared(entry) && !isBalance(entry) && !shouldGoBeforeBalance(entry)
   );
 
-  // Split pending entries: those with isProjected=0 and isPending=1 go before balance
-  const pendingEntriesBeforeBalance = registerEntries.filter(
-    (item) =>
-      !(item.isCleared || item.isBalanceEntry) &&
-      !item.isProjected &&
-      item.isPending
+  // Process each category
+  const processedClearedEntries = calculateClearedBalance(
+    clearedEntries,
+    startingBalance,
+    type
   );
 
-  const pendingEntriesAfterBalance = registerEntries.filter(
-    (item) =>
-      !(item.isCleared || item.isBalanceEntry) &&
-      !(!item.isProjected && item.isPending)
+  const sortedEntriesBeforeBalance = sortEntriesChronologically(
+    entriesBeforeBalance,
+    type,
+    "oldest-first"
+  );
+  const processedEntriesBeforeBalance = calculateBackwardBalance(
+    sortedEntriesBeforeBalance,
+    startingBalance
   );
 
-  const returnedData: T[] = [];
-
-  // Sort pending entries that come before balance
-  const sortedPendingBeforeBalance = pendingEntriesBeforeBalance.sort(
-    (a, b) => {
-      if (dateTimeService.isAfter(b.createdAt, a.createdAt)) {
-        return -1;
-      } else if (dateTimeService.isBefore(b.createdAt, a.createdAt)) {
-        return 1;
-      } else {
-        // If createdAt is the same, sort by amount
-        if (type === "credit") {
-          return +a.amount - +b.amount; // Ascending for credit
-        } else {
-          return +b.amount - +a.amount; // Descending for debit
-        }
-      }
-    }
+  const sortedEntriesAfterBalance = sortEntriesChronologically(
+    entriesAfterBalance,
+    type,
+    "oldest-first"
+  );
+  const processedEntriesAfterBalance = calculateForwardBalance(
+    sortedEntriesAfterBalance,
+    startingBalance
   );
 
-  // Calculate running balance for pending entries working backwards from the balance
-  // We need to work backwards from the balance amount to show what balance would be after each transaction
-  let runningBalanceBackwards = startingBalance;
+  // Combine everything in the correct order and add sequence numbers
+  const allEntries = [
+    ...processedClearedEntries,
+    ...processedEntriesBeforeBalance,
+    balanceEntry,
+    ...processedEntriesAfterBalance,
+  ];
 
-  // First, reverse the array to calculate backwards, then reverse it back for display
-  const reversedForCalculation = [...sortedPendingBeforeBalance].reverse();
-
-  // Calculate balances working backwards from the balance entry
-  const pendingWithBalancesReversed = reversedForCalculation.map((item) => {
-    runningBalanceBackwards -= +item.amount;
-    return { ...item, balance: runningBalanceBackwards };
-  });
-
-  // Reverse back to display in correct chronological order
-  const pendingWithBalances = pendingWithBalancesReversed.reverse();
-
-  // Add pending entries before balance to returned data
-  returnedData.push(...pendingWithBalances);
-
-  // The balance entry shows the original balance (this is the actual account balance)
-  latestBalance.balance = startingBalance;
-  latestBalance.amount = startingBalance;
-
-  // Add the balance entry
-  returnedData.push(latestBalance);
-
-  // Start running balance from the starting balance for entries after balance
-  let runningBalance: number = startingBalance;
-
-  // Process pending entries that go after balance
-  const sortedPendingAfterBalance = pendingEntriesAfterBalance
-    .sort((a, b) => {
-      if (dateTimeService.isAfter(b.createdAt, a.createdAt)) {
-        return -1;
-      } else if (dateTimeService.isBefore(b.createdAt, a.createdAt)) {
-        return 1;
-      } else {
-        // If createdAt is the same, sort by amount
-        if (type === "credit") {
-          return +a.amount - +b.amount; // Ascending for credit
-        } else {
-          return +b.amount - +a.amount; // Descending for debit
-        }
-      }
-    })
-    .map((item) => {
-      runningBalance += +item.amount;
-      return { ...item, balance: runningBalance };
-    });
-
-  runningBalance = startingBalance; // Use the override balance or balance entry's amount for cleared entries too
-  const sortedClearedData = clearedEntries
-    .sort((a, b) => {
-      if (dateTimeService.isBefore(b.createdAt, a.createdAt)) {
-        return -1;
-      } else if (dateTimeService.isAfter(b.createdAt, a.createdAt)) {
-        return 1;
-      } else {
-        // If createdAt is the same, sort by amount
-        if (type === "credit") {
-          return +b.amount - +a.amount; // Descending for debit
-        } else {
-          return +a.amount - +b.amount; // Ascending for credit
-        }
-      }
-    })
-    // we have to reverse to calculate balance correctly for cleared entries
-    .reverse()
-    .map((item) => {
-      runningBalance += +item.amount * -1;
-
-      return { ...item, balance: runningBalance };
-    })
-    // then reverse again to sort correctly
-    .reverse();
-
-  // Add pending entries after balance to returned data
-  returnedData.push(...sortedPendingAfterBalance);
-
-  let seq = 0;
-  return [...sortedClearedData, ...returnedData].map((item) => {
-    seq++;
-    return { ...item, seq };
-  });
+  // Add sequence numbers
+  return allEntries.map((entry, index) => ({
+    ...entry,
+    seq: index + 1,
+  }));
 };

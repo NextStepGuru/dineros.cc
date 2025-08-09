@@ -42,6 +42,10 @@ echo -e "${GREEN}📦 Found latest backup: $BACKUP_FILENAME${NC}"
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
 
+# Clean existing files in backup directory
+echo -e "${YELLOW}🧹 Cleaning existing backup files...${NC}"
+rm -rf "$BACKUP_DIR"/*
+
 # Download the latest backup
 echo -e "${YELLOW}⬇️  Downloading backup...${NC}"
 gsutil cp "$LATEST_BACKUP" "$TEMP_DIR/"

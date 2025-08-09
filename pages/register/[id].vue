@@ -85,7 +85,6 @@ const loadInitialEntries = async () => {
   currentSkip.value = 0;
   hasMoreData.value = true;
   tableEntries.value = [];
-
   try {
     const { data } = await useAPI<{
       entries: RegisterEntry[];
@@ -94,7 +93,10 @@ const loadInitialEntries = async () => {
       isPartialLoad: boolean;
       hasMore: boolean;
     }>(() => "/api/register", {
-      key: `register-initial-${accountRegisterId.value}-${selectedTab.value}`,
+      key: `register-initial-${accountRegisterId.value}-${
+        selectedTab.value
+      }-${Date.now()}`,
+      server: false, // Force client-side execution
       query: {
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
@@ -107,7 +109,7 @@ const loadInitialEntries = async () => {
     if (data.value) {
       // Update both accountEntries and tableEntries directly
       accountEntries.value = {
-        entries: data.value.entries || [],
+        entries: [...data.value.entries] || [],
         lowest: data.value.lowest,
         highest: data.value.highest,
         isPartialLoad: data.value.isPartialLoad,
@@ -140,7 +142,10 @@ const loadMoreEntries = async () => {
       isPartialLoad: boolean;
       hasMore: boolean;
     }>(() => "/api/register", {
-      key: `register-more-${accountRegisterId.value}-${selectedTab.value}-${currentSkip.value}`,
+      key: `register-more-${accountRegisterId.value}-${selectedTab.value}-${
+        currentSkip.value
+      }-${Date.now()}`,
+      server: false, // Force client-side execution
       query: {
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
@@ -470,6 +475,8 @@ async function recalcAccount() {
       accountRegisters: number;
     }>(() => "/api/recalculate", {
       method: "POST",
+      key: `recalculate-${Date.now()}`, // Unique key for each call
+      server: false, // Force client-side execution
       body: {
         accountId: currentAccountRegister.value?.accountId,
       },
