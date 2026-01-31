@@ -31,8 +31,9 @@ spec:
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
           args:
             - "--structured-logs"
+            - "--address=0.0.0.0"
             - "--port=3306"
-            - "nextstepguru:us-central1:production-dineros"
+            - "nextstepguru:us-central1:primary-mysql-cluser"
           env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /etc/google-service-account/service-account.json
@@ -61,8 +62,12 @@ spec:
               containerPort: 80
               protocol: TCP
           env:
+            # Must be mysql://USER:PASSWORD@127.0.0.1:3306/production-dineros (proxy in same pod)
             - name: DATABASE_URL
-              value: "mysql://production-dineros:production-dineros@127.0.0.1:3306/production-dineros"
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-secrets
+                  key: DATABASE_URL
             - name: NATS_URL
               value: "nats://nats.nats.svc.cluster.local:4222"
             - name: DEPLOY_ENV
@@ -166,14 +171,14 @@ spec:
             httpGet:
               path: /api/_ah/readiness
               port: 80
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /api/_ah/liveness
               port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 45
+            periodSeconds: 10
       volumes:
         - name: service-account-volume
           secret:
@@ -210,8 +215,9 @@ spec:
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
           args:
             - "--structured-logs"
+            - "--address=0.0.0.0"
             - "--port=3306"
-            - "nextstepguru:us-central1:production-dineros"
+            - "nextstepguru:us-central1:primary-mysql-cluser"
           env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /etc/google-service-account/service-account.json
@@ -241,7 +247,10 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URL
-              value: "mysql://production-dineros:production-dineros@127.0.0.1:3306/production-dineros"
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-secrets
+                  key: DATABASE_URL
             - name: DEPLOY_ENV
               value: "production"
             - name: PORT

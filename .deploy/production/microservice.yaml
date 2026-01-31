@@ -29,8 +29,9 @@ spec:
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
           args:
             - "--structured-logs"
+            - "--address=0.0.0.0"
             - "--port=3306"
-            - "nextstepguru:us-central1:production-dineros"
+            - "nextstepguru:us-central1:primary-mysql-cluser"
           env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /etc/google-service-account/service-account.json
@@ -60,7 +61,10 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URL
-              value: "mysql://production-dineros:production-dineros@127.0.0.1:3306/production-dineros"
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-secrets
+                  key: DATABASE_URL
             - name: DEPLOY_ENV
               value: "production"
             - name: PORT

@@ -25,20 +25,31 @@ export const prisma = globalClient.$extends(
   })
 );
 
-export const initializePrisma = async () => {
-  try {
-    await prisma.$connect();
-    log({
-      message: "Prisma client connected to the database.",
-      level: "debug",
-    });
-  } catch (error) {
-    log({
-      message: "Error connecting Prisma client:",
-      data: error,
-      level: "error",
-    });
+const connectWithRetry = async (
+  maxAttempts = 10,
+  baseMs = 1000
+): Promise<boolean> => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await prisma.$connect();
+      return true;
+    } catch (error) {
+      log({
+        message: attempt === 1 ? "Prisma connect (retrying…)" : "Prisma connect retry",
+        data: { attempt, maxAttempts, error },
+        level: attempt === maxAttempts ? "error" : "warn",
+      });
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, baseMs * Math.pow(2, attempt - 1)));
+      }
+    }
   }
+  return false;
+};
+
+export const initializePrisma = async () => {
+  const ok = await connectWithRetry();
+  if (ok) log({ message: "Prisma client connected to the database.", level: "debug" });
 };
 
 export const closePrisma = async () => {
@@ -53,11 +64,5 @@ export const closePrisma = async () => {
 };
 
 export const isPrismaActive = async () => {
-  try {
-    await prisma.$connect();
-    return true;
-  } catch (error) {
-    log({ message: "isPrismaActive Error", data: error, level: "error" });
-    return false;
-  }
+  return connectWithRetry(5, 2000);
 };
