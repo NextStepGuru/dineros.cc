@@ -25,6 +25,30 @@ spec:
     spec:
       serviceAccountName: dineros
       containers:
+        # Cloud SQL Auth Proxy sidecar: connects to Cloud SQL with SSL; app uses 127.0.0.1:3306
+        # Replace INSTANCE_NAME with your Cloud SQL instance ID if different (gcloud sql instances list)
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+          args:
+            - "--structured-logs"
+            - "--port=3306"
+            - "nextstepguru:us-central1:production-dineros"
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/google-service-account/service-account.json
+          volumeMounts:
+            - name: service-account-volume
+              mountPath: /etc/google-service-account
+              readOnly: true
+          securityContext:
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
         - name: dineros-production-container
           image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:latest
           imagePullPolicy: Always
@@ -38,7 +62,7 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URL
-              value: "mysql://production-dineros:production-dineros@10.127.192.3:3306/production-dineros"
+              value: "mysql://production-dineros:production-dineros@127.0.0.1:3306/production-dineros"
             - name: NATS_URL
               value: "nats://nats.nats.svc.cluster.local:4222"
             - name: DEPLOY_ENV
@@ -182,6 +206,28 @@ spec:
     spec:
       serviceAccountName: dineros
       containers:
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+          args:
+            - "--structured-logs"
+            - "--port=3306"
+            - "nextstepguru:us-central1:production-dineros"
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/google-service-account/service-account.json
+          volumeMounts:
+            - name: service-account-volume
+              mountPath: /etc/google-service-account
+              readOnly: true
+          securityContext:
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
         - name: dineros-microservice-production-container
           image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:latest
           imagePullPolicy: Always
@@ -195,7 +241,7 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URL
-              value: "mysql://production-dineros:production-dineros@10.127.192.3:3306/production-dineros"
+              value: "mysql://production-dineros:production-dineros@127.0.0.1:3306/production-dineros"
             - name: DEPLOY_ENV
               value: "production"
             - name: PORT
