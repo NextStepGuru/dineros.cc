@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 export PROJECT_ID="nextstepguru"
+export REGION="us-central1"
+export REPO="dineros"
 export PROJECT_NAME="dineros-microservice"
 export PROJECT_VERSION="2"
 export DEPLOY_ENV="production"
@@ -20,17 +22,19 @@ else
   echo "Warning: .env file not found. Using default environment variables."
 fi
 
-# Build Docker image with environment variables
-docker build -t gcr.io/$PROJECT_ID/$PROJECT_NAME:$PROJECT_VERSION \
+# Build Docker image with environment variables (Artifact Registry)
+IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$PROJECT_NAME:$PROJECT_VERSION
+docker build -t $IMAGE \
     --build-arg NUXT_UI_PRO_LICENSE=${NUXT_UI_PRO_LICENSE} \
     --build-arg DEPLOY_ENV=${DEPLOY_ENV} \
     --build-arg NODE_ENV=${NODE_ENV:-production} \
     --platform linux/amd64 . || exit 1
 
-docker push gcr.io/$PROJECT_ID/$PROJECT_NAME:$PROJECT_VERSION
+gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+docker push $IMAGE
 
 docker run --env-file .env \
-            -p 3050:3050 gcr.io/$PROJECT_ID/$PROJECT_NAME:$PROJECT_VERSION
+            -p 3050:3050 $IMAGE
 
 # kubectl apply -f .deploy/$DEPLOY_ENV/microservice.yaml
 

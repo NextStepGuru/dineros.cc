@@ -1,16 +1,11 @@
-# GCP setup for this pipeline:
-# 1. Workload Identity: pool + provider already configured (projects/809557179036/.../github-provider).
-# 2. Grant the GitHub Actions service account one of:
-#    - Project-level (first push / create bucket): roles/storage.admin
-#      gcloud projects add-iam-policy-binding nextstepguru \
-#        --member="serviceAccount:github-service-account@nextstepguru.iam.gserviceaccount.com" \
-#        --role="roles/storage.admin"
-#    - Bucket-level only (after gcr bucket exists): roles/storage.legacyBucketWriter on GCR bucket
-#      gcloud storage ls   # then use gs://artifacts.nextstepguru.appspot.com
-#      gcloud storage buckets add-iam-policy-binding gs://artifacts.nextstepguru.appspot.com \
-#        --member="serviceAccount:github-service-account@nextstepguru.iam.gserviceaccount.com" \
-#        --role="roles/storage.legacyBucketWriter"
-# 3. Deploy job also needs GKE: roles/container.developer (or get-gke-credentials compatible role).
+# GCP setup for this pipeline (Artifact Registry, not legacy GCR):
+# 0. Workload Identity principal must be allowed to impersonate the SA:
+#    gcloud iam service-accounts add-iam-policy-binding github-service-account@nextstepguru.iam.gserviceaccount.com \
+#      --project=nextstepguru --role=roles/iam.workloadIdentityUser \
+#      --member="principalSet://iam.googleapis.com/projects/809557179036/locations/global/workloadIdentityPools/github-pool/attribute.repository/NextStepGuru/dineros.cc"
+# 1. Create Artifact Registry repo (one-time): gcloud artifacts repositories create dineros --repository-format=docker --location=us-central1 --description="Dineros images"
+# 2. SA needs roles/artifactregistry.writer (and roles/container.developer for Deploy). GKE node SA needs roles/artifactregistry.reader to pull images.
+# 3. Workload Identity: pool + provider already configured.
 name: Build & Deploy
 
 on:
@@ -40,8 +35,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker gcr.io
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
       - name: Build and push main site
         uses: docker/build-push-action@v6
         with:
@@ -49,8 +44,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            gcr.io/nextstepguru/dineros:latest
-            gcr.io/nextstepguru/dineros:${{ github.sha }}
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:latest
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -94,8 +89,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker gcr.io
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
       - name: Build and push microservice
         uses: docker/build-push-action@v6
         with:
@@ -103,8 +98,8 @@ jobs:
           file: ./microservice/Dockerfile
           push: true
           tags: |
-            gcr.io/nextstepguru/dineros-microservice:latest
-            gcr.io/nextstepguru/dineros-microservice:${{ github.sha }}
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:latest
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -201,6 +196,6 @@ jobs:
           location: "us-central1-a"
       - id: "update-and-deploy"
         run: |
-          sed -i 's/dineros:latest/dineros:${{ github.sha }}/' ./.deploy/production/dineros.yaml
-          sed -i 's/dineros-microservice:latest/dineros-microservice:${{ github.sha }}/' ./.deploy/production/dineros.yaml
+          sed -i 's|dineros:latest|dineros:${{ github.sha }}|g' ./.deploy/production/dineros.yaml
+          sed -i 's|dineros-microservice:latest|dineros-microservice:${{ github.sha }}|g' ./.deploy/production/dineros.yaml
           kubectl apply -f ./.deploy/production/dineros.yaml

@@ -26,7 +26,7 @@ spec:
       serviceAccountName: dineros
       containers:
         - name: dineros-production-container
-          image: gcr.io/nextstepguru/dineros:latest
+          image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: service-account-volume
@@ -183,7 +183,7 @@ spec:
       serviceAccountName: dineros
       containers:
         - name: dineros-microservice-production-container
-          image: gcr.io/nextstepguru/dineros-microservice:latest
+          image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: service-account-volume
