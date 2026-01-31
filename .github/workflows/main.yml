@@ -1,3 +1,16 @@
+# GCP setup for this pipeline:
+# 1. Workload Identity: pool + provider already configured (projects/809557179036/.../github-provider).
+# 2. Grant the GitHub Actions service account one of:
+#    - Project-level (first push / create bucket): roles/storage.admin
+#      gcloud projects add-iam-policy-binding nextstepguru \
+#        --member="serviceAccount:github-service-account@nextstepguru.iam.gserviceaccount.com" \
+#        --role="roles/storage.admin"
+#    - Bucket-level only (after gcr bucket exists): roles/storage.legacyBucketWriter on GCR bucket
+#      gcloud storage ls   # then use gs://artifacts.nextstepguru.appspot.com
+#      gcloud storage buckets add-iam-policy-binding gs://artifacts.nextstepguru.appspot.com \
+#        --member="serviceAccount:github-service-account@nextstepguru.iam.gserviceaccount.com" \
+#        --role="roles/storage.legacyBucketWriter"
+# 3. Deploy job also needs GKE: roles/container.developer (or get-gke-credentials compatible role).
 name: Build & Deploy
 
 on:

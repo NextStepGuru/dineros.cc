@@ -5,6 +5,7 @@
     "plugins": ["@vue/language-plugin-pug"]
   },
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "module": "ESNext"
   }
 }
