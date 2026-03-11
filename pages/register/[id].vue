@@ -8,6 +8,7 @@ import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEn
 const overlay = useOverlay();
 const route = useRoute();
 const selectedTab = ref("future");
+const { todayISOString } = useToday();
 
 definePageMeta({
   path: "/register/:id?",
@@ -368,7 +369,7 @@ function handleAddEntry() {
     cancel: () => modal.close(),
     registerEntry: {
       amount: 0,
-      createdAt: new Date().toISOString().substring(0, 10),
+      createdAt: todayISOString.value,
       accountRegisterId: accountRegisterId.value,
       description: "",
       balance: 0,

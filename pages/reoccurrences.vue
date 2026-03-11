@@ -22,6 +22,7 @@ const stripedTheme = ref({
 
 const overlay = useOverlay();
 const modal = overlay.create(ModalsEditReoccurrence);
+const { todayISOString } = useToday();
 
 function handleTableClick(data: Reoccurrence) {
   const editReoccurrence: ModalReoccurrenceProps = {
@@ -61,7 +62,7 @@ function handleAddReoccurrence() {
       amount: 0,
       intervalId: 0,
       accountRegisterId: 0,
-      lastAt: new Date().toISOString().substring(0, 10) || "",
+      lastAt: todayISOString.value || "",
       endAt: undefined,
       intervalCount: 0,
       adjustBeforeIfOnWeekend: false,

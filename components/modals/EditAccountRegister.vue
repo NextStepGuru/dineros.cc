@@ -28,6 +28,7 @@ const listStore = useListStore();
 
 const props = defineProps<ModelAccountRegisterProps>();
 
+const { today } = useToday();
 const formState = ref<AccountRegister>(props.accountRegister);
 
 const fileInput = ref<any>(null);
@@ -85,7 +86,7 @@ const statementAtString = computed({
     if (value) {
       formState.value.statementAt = new Date(value);
     } else {
-      formState.value.statementAt = new Date();
+      formState.value.statementAt = today.value;
     }
   },
 });
@@ -210,7 +211,7 @@ defineShortcuts({
 </script>
 
 <template lang="pug">
-UModal(description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full max-sm:!max-w-none max-sm:!max-h-none max-sm:!rounded-none")
+UModal(title="Edit Account Register" description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full max-sm:!max-w-none max-sm:!max-h-none max-sm:!rounded-none")
   template(#body)
     UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isSaving" ref="form")
       .flex.space-x-4

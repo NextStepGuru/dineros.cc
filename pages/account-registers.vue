@@ -406,6 +406,7 @@ const overlay = useOverlay();
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const { today } = useToday();
 
 // const stripedTheme = ref({
 //   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
@@ -484,7 +485,7 @@ function handleAddAccountRegister() {
       balance: 0,
       latestBalance: 0,
       minPayment: null,
-      statementAt: new Date(),
+      statementAt: today.value,
       apr1: null,
       apr1StartAt: null,
       apr2: null,

@@ -18,8 +18,6 @@ export class DateTimeService {
 
   private constructor() {
     this._momentInstance = moment;
-    // Hardcoded override - set to July 20th at 11:32pm CDT
-    // this._nowOverride = new DateTime("2025-08-21T00:10:00-05:00");
   }
 
   static getInstance(): DateTimeService {

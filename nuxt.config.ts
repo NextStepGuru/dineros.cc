@@ -14,6 +14,11 @@ const watchIgnore = [
 export default defineNuxtConfig({
   compatibilityDate: "2026-01-31",
   components: true,
+  runtimeConfig: {
+    public: {
+      testDate: process.env.TEST_DATE || "",
+    },
+  },
   devtools: { enabled: process.env.DEPLOY_ENV === "local", vscode: {} },
   experimental: {
     payloadExtraction: false,
