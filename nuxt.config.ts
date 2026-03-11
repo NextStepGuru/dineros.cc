@@ -1,7 +1,34 @@
+const watchIgnore = [
+  "**/node_modules/**",
+  "**/microservice/**",
+  "**/client/**",
+  "**/.git/**",
+  "**/dist/**",
+  "**/.nuxt/**",
+  "**/.output/**",
+  "**/prisma/**",
+  "**/tests/**",
+  "**/.pnpm/**",
+];
+
 export default defineNuxtConfig({
-  compatibilityDate: "2025-01-31",
+  compatibilityDate: "2026-01-31",
   components: true,
   devtools: { enabled: process.env.DEPLOY_ENV === "local", vscode: {} },
+  watchers: {
+    chokidar: {
+      ignored: watchIgnore,
+      usePolling: true,
+      followSymlinks: false,
+    },
+  },
+  nitro: {
+    watchOptions: {
+      ignored: watchIgnore,
+      usePolling: true,
+      followSymlinks: false,
+    },
+  },
   app: {
     head: {
       viewport:
@@ -11,17 +38,9 @@ export default defineNuxtConfig({
   vite: {
     server: {
       watch: {
-        ignored: [
-          "**/node_modules/**",
-          "**/microservice/**",
-          "**/.git/**",
-          "**/dist/**",
-          "**/.nuxt/**",
-          "**/.output/**",
-          "**/prisma/**",
-          "**/tests/**",
-          "**/.pnpm/**",
-        ],
+        ignored: watchIgnore,
+        usePolling: true,
+        followSymlinks: false,
       },
       hmr: {
         overlay: false,

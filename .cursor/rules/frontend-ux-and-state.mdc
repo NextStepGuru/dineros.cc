@@ -1,0 +1,20 @@
+---
+description: UX constraints, toasts, and no native dialogs
+globs: **/*.vue
+alwaysApply: false
+---
+
+# Frontend UX and State
+
+## User Feedback
+
+- **Always use toast messages** for success, error, and informational feedback. Use `useToast()` and `toast.add({ ... })`. Do not use `alert()`, `confirm()`, or `prompt()`.
+- Use consistent toast semantics: `color: "success"` or `color: "error"` (or the project’s existing color taxonomy). Prefer named semantics over raw color names (e.g. "green") for clarity.
+
+## Modals and Overlays
+
+- Use Nuxt UI overlay/modal patterns (e.g. `useOverlay()`) for create/edit flows and confirmations. Modal components live under `components/modals/` with typed props. Use the same toast-based success/error pattern after modal actions.
+
+## Loading and Error State
+
+- For async operations: show loading state (e.g. disabled buttons, spinners) and handle errors with a toast. Check `error.value` for `useAPI` and use try/catch for `$api`; never leave the user without feedback on failure.

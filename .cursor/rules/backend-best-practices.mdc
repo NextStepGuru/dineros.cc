@@ -1,0 +1,26 @@
+---
+description: Backend error handling, data access, queues, and cron
+globs: server/**/*.ts
+alwaysApply: false
+---
+
+# Backend Best Practices
+
+## Error Handling
+
+- Use `handleApiError(error)` from `server/lib/handleApiError.ts` for consistent mapping of Zod, Prisma, and generic errors to H3 responses. It logs and throws for known types; for unknown/null it may return without throwing—ensure handlers either rethrow or return a proper error response so no request is left hanging.
+- Prefer a single pattern per route: either wrap with `withErrorHandler` or use try/catch and call `handleApiError` then rethrow if needed. Avoid double-throw or swallowing errors.
+
+## Data Access
+
+- **Ownership**: Scope reads and writes by user/account where applicable. Use `getUser(event)` and filter by `userId` or budget/account ownership so one user cannot access another’s data.
+- **Prisma**: Use the shared client from `server/clients/prismaClient.ts`. For multi-step writes (e.g. signup), use `PrismaDb.$transaction(...)`. Rely on the existing Prisma field-level encryption extension for sensitive fields; do not bypass it.
+
+## Queues and Cron
+
+- **BullMQ**: Background jobs are enqueued from API routes (e.g. `server/api/tasks/`). Processors live in `server/queues/`. Use `queueManager.addJob(name, data, opts)` with idempotent `jobId` when applicable; set `removeOnComplete` and delays as needed.
+- **Cron**: Scheduled jobs live under `server/cron/`. Cron handlers should enqueue work rather than do heavy processing inline. Use the same queue and error-handling patterns as task endpoints.
+
+## Logging
+
+- Use the structured `log({ message, data, level })` from `server/logger.ts`. Do not use `console.log` or `console.error` in server code; use `log()` with appropriate level and context (e.g. request URL, user id, job id).

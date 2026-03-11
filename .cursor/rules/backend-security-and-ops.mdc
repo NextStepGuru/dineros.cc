@@ -1,0 +1,27 @@
+---
+description: Backend auth surface, cookies, env, and deployment
+globs: server/**/*.ts
+alwaysApply: false
+---
+
+# Backend Security and Operations
+
+## Auth Surface
+
+- **Middleware**: `server/middleware/auth.ts` runs on `/api` and exempts specific routes via `ignoredRoutes`. Do not broaden exemptions (e.g. entire `/api/tasks/*` or `/api/webhook/*`) without explicit security review. Task and webhook endpoints should require either internal/auth token or signed webhook verification.
+- **Webhooks**: Implement proper verification (e.g. signature, secret) for webhook handlers. Do not leave placeholder handlers that only log payloads; either implement verification and logic or document as WIP and restrict access.
+- **Admin/debug**: Endpoints like migrate, sync-all, debug-*, test-* should be gated (e.g. admin role, internal-only, or feature flag). Do not expose them as public unauthenticated routes.
+
+## Cookies and Tokens
+
+- Prefer `httpOnly` and `secure` for auth cookies in production. If the project currently sets auth token with `httpOnly: false` for client-side use, document the tradeoff and avoid expanding token exposure; do not add new JS-accessible auth tokens without justification.
+
+## Environment and Runtime
+
+- **Env**: Validate environment with Zod in `server/envSchema.ts`. In `server/env.ts`, ensure `safeParse` result is checked before exporting; do not export `parsedEnv.data` when `parsedEnv.success` is false. Microservice should use the same pattern.
+- **Node version**: Align Node version across `package.json` engines, Dockerfiles, and CI to avoid runtime drift (main app uses Node 24; microservice uses Node 22; document or unify as needed).
+
+## Deployment and Observability
+
+- Health endpoints: `server/api/_ah/liveness.ts` and `server/api/_ah/readiness.ts` are used for probes; keep them lightweight and dependency-aware.
+- Do not mutate deployment manifests (e.g. with `sed` on image tags) in a way that leaves the repo in an inconsistent state; prefer parameterized or generated manifests for CI.
