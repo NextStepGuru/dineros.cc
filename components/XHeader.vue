@@ -70,40 +70,29 @@ function logout() {
 }
 
 async function pollData() {
-  const { data, error } = await useAPI<{
-    token: string;
-    user?: User | null | undefined;
-    message?: null;
-    errors?: { message: string }[];
-  }>("/api/validate-token");
+  const $api = useNuxtApp().$api as typeof $fetch;
+  try {
+    const data = await $api<{ token: string; user?: User }>("/api/validate-token");
 
-  if (error.value) {
-    toast.add({
-      color: "error",
-      description:
-        error.value.data.errors || error.value?.message || "Login failed.",
-    });
-
-    return;
-  }
-
-  if (data?.value && "token" in data.value) {
-    const token = data.value.token;
-
-    // Store the token in a cookie
-    authTokenCookie.value = token;
-    authStore.setToken(token);
-
-    if (data.value.user) {
-      authStore.setUser(data.value.user);
+    if (data && "token" in data) {
+      const token = data.token;
+      authTokenCookie.value = token;
+      authStore.setToken(token);
+      if (data.user) {
+        authStore.setUser(data.user);
+      }
+    } else {
+      toast.add({
+        color: "error",
+        description: "Invalid login credentials.",
+      });
     }
-  } else {
+  } catch (e: unknown) {
+    const err = e as { data?: { errors?: unknown }; message?: string };
     toast.add({
       color: "error",
-      description: "Invalid login credentials.",
+      description: err?.data?.errors ? String(err.data.errors) : err?.message || "Login failed.",
     });
-
-    return;
   }
 }
 

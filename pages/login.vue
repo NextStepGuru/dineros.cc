@@ -24,6 +24,21 @@ const formState = ref<Partial<LoginSchemaType>>({ email: "", password: "" });
 
 const isSaving = ref(false);
 const tokenChallengeRequired = ref(false);
+const loginFormRef = ref< { submit: () => void } | null>(null);
+
+function onLoginClick() {
+  const form = loginFormRef.value as { submit?: () => void } | null;
+  if (typeof form?.submit === "function") {
+    form.submit();
+  } else {
+    // Fallback: UForm submit event may not fire inside ClientOnly; call handler with current state
+    handleSubmit({ data: { ...formState.value } } as FormSubmitEvent<LoginSchemaType>);
+  }
+}
+
+function onFormError(event: Parameters<typeof handleError>[0]) {
+  handleError(event, toast);
+}
 
 onMounted(() => {
   if (route.query.toast && typeof route.query.toast === "string") {
@@ -43,33 +58,35 @@ const authTokenCookie = useCookie("authToken", {
   path: "/",
 });
 
-// Submit handler - now using testable utilities
+// Submit handler - use $fetch (not useAPI) when already mounted to avoid Nuxt 4 warning
 const handleSubmit = async ({
   data: formData,
 }: FormSubmitEvent<LoginSchemaType>) => {
   try {
     isSaving.value = true;
-    const { data, error } = await useAPI<{
-      token: string;
-      user?: User | null | undefined;
-      message?: null;
-      errors?: { message: string }[];
-    }>(() => "/api/login", {
-      method: "POST",
-      body: formData,
-    });
+    const $api = useNuxtApp().$api as typeof $fetch;
+    let data: LoginResponse | null = null;
+    let err: { value?: { statusCode?: number; data?: unknown } } = { value: undefined };
+    try {
+      data = (await $api("/api/login", {
+        method: "POST",
+        body: formData,
+      })) as LoginResponse;
+    } catch (e: unknown) {
+      err.value = e as { statusCode?: number; data?: unknown };
+    }
 
-    if (error.value) {
+    if (err.value) {
       isSaving.value = false;
       toast.add({
         color: "error",
-        description: formatLoginError(error.value),
+        description: formatLoginError(err.value),
       });
       return;
     }
 
     // Use our testable login response processor
-    const result = processLoginResponse(data?.value as LoginResponse);
+    const result = processLoginResponse(data as LoginResponse);
 
     if (result.success && result.token) {
       // Store the token in a cookie
@@ -80,15 +97,15 @@ const handleSubmit = async ({
         authStore.setUser(result.user);
       }
 
-      // Show success message
-      toast.add({ color: "success", description: "Login successful!" });
-
       // Fetch lists and redirect using testable logic
       await listStore.fetchLists();
+      const budgets = listStore.getBudgets;
       authStore.setBudgetId(listStore.getBudgets[0].id);
-
       const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
-      navigateTo(redirectPath);
+      toast.add({ color: "success", description: "Login successful!" });
+      // Full-page navigation to avoid Nuxt payload client throwing on undefined manifest (prerendered check)
+      window.location.assign(redirectPath);
+      return;
 
     } else if (result.requiresTwoFactor) {
       isSaving.value = false;
@@ -113,11 +130,12 @@ const handleSubmit = async ({
 
 <template lang="pug">
   section(class="flex items-center justify-center min-h-screen")
-    UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
-      template(#header)
-        h2(class="text-xl font-bold text-center") Login to Your Account
+    ClientOnly
+      UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+        template(#header)
+          h2(class="text-xl font-bold text-center") Login to Your Account
 
-      UForm(class="space-y-4" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="handleError($event, toast)" :disabled="isSaving")
+        UForm(ref="loginFormRef" class="space-y-4" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
         template(v-if="tokenChallengeRequired")
           UFormField(label="Code" for="tokenChallenge")
             UInput(
@@ -147,16 +165,23 @@ const handleSubmit = async ({
         UButton(
           color="primary"
           size="lg"
-          type="submit"
+          type="button"
           :disabled="isSaving"
           :loading="isSaving"
+          @click="onLoginClick"
         ) Login
 
-      template(#footer)
-        div(class="text-sm text-center")
-          ul
-            li
-              NuxtLink(to="/signup" class="text-primary-500 hover:underline")  Register
-            li
-              NuxtLink(to="/forgot-password" class="text-primary-500 hover:underline")  Forgot Password
+        template(#footer)
+          div(class="text-sm text-center")
+            ul
+              li
+                NuxtLink(to="/signup" class="text-primary-500 hover:underline")  Register
+              li
+                NuxtLink(to="/forgot-password" class="text-primary-500 hover:underline")  Forgot Password
+      template(#fallback)
+        UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+          template(#header)
+            h2(class="text-xl font-bold text-center") Login to Your Account
+          div(class="flex justify-center py-8")
+            UIcon(name="i-lucide-loader-2" class="animate-spin size-8 text-primary")
 </template>

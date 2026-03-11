@@ -15,6 +15,14 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-01-31",
   components: true,
   devtools: { enabled: process.env.DEPLOY_ENV === "local", vscode: {} },
+  experimental: {
+    payloadExtraction: false,
+    defaults: {
+      nuxtLink: {
+        prefetch: false,
+      },
+    },
+  },
   watchers: {
     chokidar: {
       ignored: watchIgnore,
@@ -55,6 +63,7 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "@nuxt/image",
     "@nuxt/eslint",
+    "./modules/handle-nuxt-path",
     // Only include nuxt-cron if not in test mode
     ...(process.env.NODE_ENV !== "test" ? ["nuxt-cron"] : []),
   ],

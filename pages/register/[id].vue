@@ -18,13 +18,12 @@ definePageMeta({
 const listStore = useListStore();
 const authStore = useAuthStore();
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
   if (route.params.id === "") {
-    navigateTo(
-      `/register/${
-        formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
-      }`
-    );
+    const firstId = formatAccountRegisters(listStore.getAccountRegisters)[0]?.id;
+    if (firstId != null) {
+      await navigateTo(`/register/${firstId}`);
+    }
   }
 });
 
@@ -35,23 +34,23 @@ const accountRegisterId = ref<number>(
 );
 
 // Watch for changes to accountRegisterId and navigate to the new route
-watch(accountRegisterId, (newId) => {
+watch(accountRegisterId, async (newId) => {
   if (newId) {
-    navigateTo(`/register/${newId}`);
+    await navigateTo(`/register/${newId}`);
   }
 });
 
-watch(authStore, () => {
-  const verify = listStore.getAccountRegisters.filter(
+watch(authStore, async () => {
+  const regs = listStore.getAccountRegisters;
+  const verify = regs.filter(
     (item) =>
       item.budgetId === authStore.getBudgetId && item.id === +route.params.id
   );
-  if (!verify.length) {
-    navigateTo(
-      `/register/${
-        formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
-      }`
-    );
+  if (!verify.length && regs.length > 0) {
+    const target = formatAccountRegisters(regs)[0]?.id;
+    if (target != null) {
+      await navigateTo(`/register/${target}`);
+    }
   }
 });
 
@@ -86,17 +85,14 @@ const loadInitialEntries = async () => {
   hasMoreData.value = true;
   tableEntries.value = [];
   try {
-    const { data } = await useAPI<{
+    // use $api (not useAPI) so request resolves; useAPI/useFetch was hanging after nav (Nuxt 4)
+    const data = await (useNuxtApp().$api as typeof $fetch)<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
       isPartialLoad: boolean;
       hasMore: boolean;
-    }>(() => "/api/register", {
-      key: `register-initial-${accountRegisterId.value}-${
-        selectedTab.value
-      }-${Date.now()}`,
-      server: false, // Force client-side execution
+    }>("/api/register", {
       query: {
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
@@ -106,18 +102,18 @@ const loadInitialEntries = async () => {
       },
     });
 
-    if (data.value) {
+    if (data) {
       // Update both accountEntries and tableEntries directly
       accountEntries.value = {
-        entries: [...data.value.entries] || [],
-        lowest: data.value.lowest,
-        highest: data.value.highest,
-        isPartialLoad: data.value.isPartialLoad,
+        entries: [...(data.entries || [])],
+        lowest: data.lowest,
+        highest: data.highest,
+        isPartialLoad: data.isPartialLoad,
       };
 
-      tableEntries.value = data.value.entries ? [...data.value.entries] : [];
-      hasMoreData.value = data.value.hasMore || false;
-      currentSkip.value = data.value.entries?.length || 0;
+      tableEntries.value = data.entries ? [...data.entries] : [];
+      hasMoreData.value = data.hasMore || false;
+      currentSkip.value = data.entries?.length || 0;
 
       // Force table re-render by updating key
       tableKey.value++;
@@ -135,17 +131,13 @@ const loadMoreEntries = async () => {
 
   isLoadingMore.value = true;
   try {
-    const { data } = await useAPI<{
+    const data = await (useNuxtApp().$api as typeof $fetch)<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
       isPartialLoad: boolean;
       hasMore: boolean;
-    }>(() => "/api/register", {
-      key: `register-more-${accountRegisterId.value}-${selectedTab.value}-${
-        currentSkip.value
-      }-${Date.now()}`,
-      server: false, // Force client-side execution
+    }>("/api/register", {
       query: {
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
@@ -155,26 +147,26 @@ const loadMoreEntries = async () => {
       },
     });
 
-    if (data.value && data.value.entries?.length > 0) {
+    if (data?.entries?.length > 0) {
       // Append new entries to existing ones
-      tableEntries.value = [...tableEntries.value, ...data.value.entries];
-      hasMoreData.value = data.value.hasMore || false;
-      currentSkip.value += data.value.entries.length;
+      tableEntries.value = [...tableEntries.value, ...data.entries];
+      hasMoreData.value = data.hasMore || false;
+      currentSkip.value += data.entries.length;
 
       // Update lowest/highest if needed
       if (
-        data.value.lowest &&
+        data.lowest &&
         (!accountEntries.value.lowest ||
-          data.value.lowest.balance < accountEntries.value.lowest.balance)
+          data.lowest.balance < accountEntries.value.lowest.balance)
       ) {
-        accountEntries.value.lowest = data.value.lowest;
+        accountEntries.value.lowest = data.lowest;
       }
       if (
-        data.value.highest &&
+        data.highest &&
         (!accountEntries.value.highest ||
-          data.value.highest.balance > accountEntries.value.highest.balance)
+          data.highest.balance > accountEntries.value.highest.balance)
       ) {
-        accountEntries.value.highest = data.value.highest;
+        accountEntries.value.highest = data.highest;
       }
     } else {
       hasMoreData.value = false;
@@ -505,14 +497,17 @@ async function recalcAccount() {
 
       div(class="ml-auto flex justify-center items-center")
         div(class="text-sm font-medium dark:text-gray-500 mt-2 mr-2 text-nowrap") Selected Account:
-        USelect(
-          v-model="accountRegisterId"
-          size="xs"
-          class="w-full md:w-64 my-0"
-          placeholder="Select an Account"
-          :items="formatAccountRegisters(listStore.getAccountRegisters)"
-          valueKey="id"
-          labelKey="name")
+        ClientOnly
+          USelect(
+            v-model="accountRegisterId"
+            size="xs"
+            class="w-full md:w-64 my-0"
+            placeholder="Select an Account"
+            :items="formatAccountRegisters(listStore.getAccountRegisters)"
+            valueKey="id"
+            labelKey="name")
+          template(#fallback)
+            span(class="w-full md:w-64 my-0 text-sm text-default") {{ formatAccountRegisters(listStore.getAccountRegisters).find((r) => r.id === accountRegisterId)?.name ?? '…' }}
 
     .w-full(class="text-[var(--ui-text-muted)] text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
       span The lowest balance of&nbsp;

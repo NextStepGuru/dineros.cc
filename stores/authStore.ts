@@ -67,8 +67,11 @@ export const useAuthStore = defineStore("authStore", {
             return;
           }
 
-          // Don't set isLoggedIn = true yet, wait for API verification
-          const { data: user, error } = await useAPI<User>("/api/user");
+          // Don't set isLoggedIn = true yet, wait for API verification.
+          // Run on server too so SSR and client agree on auth state (avoids hydration mismatch).
+          const { data: user, error } = await useAPI<User>("/api/user", {
+            server: true,
+          });
 
           if (!error.value && user.value) {
             // Only set logged in if API call succeeded

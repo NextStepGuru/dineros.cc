@@ -97,16 +97,22 @@ export const useListStore = defineStore("listStore", {
     },
     async fetchLists() {
       this.isLoading = true;
-      const { data } = await useAPI<Lists>("/api/lists");
-      if (data.value) {
-        this.setReoccurrences(data.value.reoccurrences);
-        this.setIntervals(data.value.intervals);
-        this.setAccountTypes(data.value.accountTypes);
-        this.setAccountRegisters(data.value.accountRegisters);
-        this.setBudgets(data.value.budgets);
-        this.setAccounts(data.value.accounts);
+      // Use $api (not useAPI) when called after mount to avoid Nuxt 4 useFetch warning
+      try {
+        const data = await (useNuxtApp().$api as typeof $fetch)<Lists>("/api/lists");
+        if (data) {
+          this.setReoccurrences(data.reoccurrences);
+          this.setIntervals(data.intervals);
+          this.setAccountTypes(data.accountTypes);
+          this.setAccountRegisters(data.accountRegisters);
+          this.setBudgets(data.budgets);
+          this.setAccounts(data.accounts);
+        }
+      } catch (e) {
+        throw e;
+      } finally {
+        this.isLoading = false;
       }
-      this.isLoading = false;
     },
     resetList() {
       this.reoccurrences = [];
