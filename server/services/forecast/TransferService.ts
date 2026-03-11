@@ -83,10 +83,19 @@ export class TransferService implements ITransferService {
     sourceAccounts: CacheAccountRegister[],
     targetDate: Date
   ): Promise<void> {
+    const dayOfMonth = new Date(targetDate).getUTCDate();
+    if (dayOfMonth !== 1 && dayOfMonth !== 2 && dayOfMonth !== 3) {
+      return;
+    }
+
     // Log which accounts have extra payment enabled
     const extraPaymentAccounts = sourceAccounts.filter(
       (acc) => acc.allowExtraPayment === true
     );
+    if (extraPaymentAccounts.length === 0) {
+      return;
+    }
+
     if (extraPaymentAccounts.length > 0) {
       forecastLogger.serviceDebug(
         "TransferService",
@@ -210,6 +219,36 @@ export class TransferService implements ITransferService {
     return projectedBalance;
   }
 
+  /**
+   * Minimum projected balance over today and the next 7 days (inclusive).
+   * Used so extra debt payments don't push the account below min balance in the next 7 days.
+   * When todayBalanceOverride is provided, use it for "today" so the lowest balance uses the cache's actual running balance.
+   */
+  private getMinProjectedBalanceOverNext7Days(
+    accountId: number,
+    fromDate: Date,
+    todayBalanceOverride?: number
+  ): number {
+    const from = dateTimeService.createUTC(fromDate);
+    const todayBalance =
+      todayBalanceOverride !== undefined
+        ? todayBalanceOverride
+        : this.calculateProjectedBalanceAtDate(
+            accountId,
+            dateTimeService.toDate(from)
+          );
+    let minBalance = todayBalance;
+    for (let d = 1; d <= 7; d++) {
+      const futureDate = dateTimeService.add(d, "day", from);
+      const projected = this.calculateProjectedBalanceAtDate(
+        accountId,
+        dateTimeService.toDate(futureDate)
+      );
+      if (projected < minBalance) minBalance = projected;
+    }
+    return minBalance;
+  }
+
   private async processExtraDebtPayment({
     minBalance,
     sourceAccountId,
@@ -231,11 +270,43 @@ export class TransferService implements ITransferService {
       return false;
     }
 
-    // Calculate the projected balance at the forecast date
+    // Projected balance at the forecast date (today) - for 7-day lookahead
     const projectedBalance = this.calculateProjectedBalanceAtDate(
       sourceAccountId,
       lastAt
     );
+    const cacheBalanceNow = sourceAccountRegister.balance;
+
+    // Use the lower of projected (sum of entries) and cache (running) so we never assume more than we have (e.g. if some same-day outflows aren't on this register in the sum)
+    const balanceBeforeExtraDebt = Math.min(
+      projectedBalance,
+      cacheBalanceNow
+    );
+    const todayCushion = Math.max(
+      0,
+      balanceBeforeExtraDebt - minBalance
+    );
+
+    // 7-day lookahead: lowest balance over (today, today+1, ..., today+7). Use cache balance for today so the min reflects actual running balance.
+    const minBalanceOver7Days = this.getMinProjectedBalanceOverNext7Days(
+      sourceAccountId,
+      lastAt,
+      balanceBeforeExtraDebt
+    );
+    let remainingAvailableAmount = Math.max(
+      0,
+      minBalanceOver7Days - minBalance
+    );
+    // Hard cap: never allow more than today's cushion so running balance never goes below min
+    remainingAvailableAmount = Math.min(
+      remainingAvailableAmount,
+      todayCushion
+    );
+
+    // Skip entire day if we're already at or below min - don't apply extra debt until balance is above min again
+    if (balanceBeforeExtraDebt < minBalance || remainingAvailableAmount <= 0) {
+      return false;
+    }
 
     forecastLogger.serviceDebug(
       "TransferService",
@@ -288,9 +359,6 @@ export class TransferService implements ITransferService {
       return a.balance - b.balance;
     });
 
-    // Calculate available amount above minimum balance using PROJECTED balance
-    let remainingAvailableAmount = projectedBalance - minBalance;
-
     forecastLogger.serviceDebug(
       "TransferService",
       `Extra debt payment check:`,
@@ -333,11 +401,39 @@ export class TransferService implements ITransferService {
         break; // No more funds available
       }
 
+      // Use only calculated balance (start balance minus what we've already sent) so we never rely on stale cache
+      const currentBalance = balanceBeforeExtraDebt - totalPaymentsMade;
+      const maxFromCurrentBalance = Math.max(0, currentBalance - minBalance);
+      if (maxFromCurrentBalance <= 0) {
+        break; // Already at or below min, stop making payments today
+      }
+
+      const debtBalanceAtDate = this.getLatestDebtBalanceAtOrBeforeDate(
+        debtAccountRegister.id,
+        lastAt,
+        debtAccountRegister.balance
+      );
+      if (debtBalanceAtDate >= 0) {
+        continue;
+      }
+
       let paymentAmount = remainingAvailableAmount;
 
-      // Don't pay more than the debt balance
-      if (paymentAmount > Math.abs(debtAccountRegister.balance)) {
-        paymentAmount = Math.abs(debtAccountRegister.balance);
+      // Don't pay more than the debt amount owed at target date
+      const amountOwed = Math.abs(debtBalanceAtDate);
+      if (paymentAmount > amountOwed) {
+        paymentAmount = amountOwed;
+      }
+
+      // Never send more than (current balance - minBalance) so running balance stays >= min
+      if (paymentAmount > maxFromCurrentBalance) {
+        paymentAmount = maxFromCurrentBalance;
+      }
+
+      // Never exceed today's cushion in total (keeps today's balance >= minBalance)
+      const remainingTodayCushion = Math.max(0, todayCushion - totalPaymentsMade);
+      if (paymentAmount > remainingTodayCushion) {
+        paymentAmount = remainingTodayCushion;
       }
 
       // Skip if no payment needed (debt is already paid off)
@@ -351,7 +447,7 @@ export class TransferService implements ITransferService {
         {
           debtAccountId: debtAccountRegister.id,
           debtAccountName: debtAccountRegister.name,
-          debtBalance: debtAccountRegister.balance,
+          debtBalance: debtBalanceAtDate,
           paymentAmount,
           remainingAvailableAmount,
         }
@@ -402,6 +498,21 @@ export class TransferService implements ITransferService {
     );
 
     return paymentsProcessed > 0;
+  }
+
+  private getLatestDebtBalanceAtOrBeforeDate(
+    accountId: number,
+    targetDate: Date,
+    fallbackBalance: number
+  ): number {
+    const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      if (dateTimeService.isSameOrBefore(entry.createdAt, targetDate)) {
+        return +entry.balance;
+      }
+    }
+    return +fallbackBalance;
   }
 
   findDebtAccounts(): CacheAccountRegister[] {

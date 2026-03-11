@@ -111,12 +111,21 @@ export class ReoccurrenceService implements IReoccurrenceService {
       if (!nextDate) break;
       lastAt = dateTimeService.createUTC(nextDate);
 
-      // Update the reoccurrence in cache
+      // Update the reoccurrence in cache so timeline advances (forecasting can go into future)
+      const nowDate = dateTimeService.nowDate();
       const cachedReoccurrence = this.cache.reoccurrence.findOne({
         id: reoccurrence.id,
       });
       if (cachedReoccurrence) {
-        cachedReoccurrence.lastAt = dateTimeService.toDate(lastAt);
+        cachedReoccurrence.lastAt = dateTimeService.toDate(adjustedLastAt);
+        if (
+          dateTimeService.isSameOrBefore(
+            adjustedLastAt,
+            dateTimeService.createUTC(nowDate)
+          )
+        ) {
+          cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
+        }
         this.cache.reoccurrence.update(cachedReoccurrence);
       }
 
@@ -138,6 +147,16 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
   calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null {
     const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
+    const cached = reoccurrence as CacheReoccurrence;
+    const intervalName = cached.intervalName?.trim().toLowerCase();
+
+    if (intervalName) {
+      if (intervalName === "once") return null;
+      const unit = intervalName as "days" | "weeks" | "months" | "years";
+      return dateTimeService.toDate(
+        dateTimeService.add(reoccurrence.intervalCount, unit, lastAt)
+      );
+    }
 
     switch (reoccurrence.intervalId) {
       case 1: // Daily
@@ -157,7 +176,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           dateTimeService.add(reoccurrence.intervalCount, "years", lastAt)
         );
       case 5: // Once (one-time)
-        return null; // No next occurrence for one-time events
+        return null;
       default:
         throw new Error(`Invalid intervalId: ${reoccurrence.intervalId}`);
     }
@@ -177,12 +196,19 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
   getReoccurrencesDue(maxDate: Date): CacheReoccurrence[] {
     const dueMoment = dateTimeService.createUTC(maxDate);
-    return this.cache.reoccurrence.find((reoccurrence) =>
-      dateTimeService.isSameOrBefore(
-        dateTimeService.createUTC(reoccurrence.lastAt),
-        dueMoment
-      )
-    ) || [];
+    return (
+      this.cache.reoccurrence.find((reoccurrence) => {
+        const nextDate = this.calculateNextOccurrence(reoccurrence);
+        return (
+          nextDate != null &&
+          dateTimeService.isValid(nextDate) &&
+          dateTimeService.isSameOrBefore(
+            dateTimeService.createUTC(nextDate),
+            dueMoment
+          )
+        );
+      }) || []
+    );
   }
 
   isReoccurrenceActive(reoccurrence: Reoccurrence, currentDate: Date): boolean {

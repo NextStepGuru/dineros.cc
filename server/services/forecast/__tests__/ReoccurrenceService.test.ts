@@ -306,6 +306,36 @@ describe("ReoccurrenceService", () => {
       expect(result).toEqual(new Date("2024-04-01"));
     });
 
+    it("should use intervalName over intervalId when present", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-02"),
+          intervalId: 4,
+          intervalCount: 1,
+        }),
+        intervalName: "Month",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-02-02"));
+    });
+
+    it("should handle intervalCount 2 with intervalName", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 3,
+          intervalCount: 2,
+        }),
+        intervalName: "months",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-03-01"));
+    });
+
     describe("weekend adjustment", () => {
       it("should not adjust dates in calculateNextOccurrence - adjustment happens during processing", () => {
         const reoccurrence = createMockReoccurrence({
@@ -396,9 +426,21 @@ describe("ReoccurrenceService", () => {
   describe("getReoccurrencesDue", () => {
     it("should return reoccurrences due before or on max date", () => {
       const reoccurrences = [
-        createMockReoccurrence({ id: 1, lastAt: new Date("2024-01-01") }),
-        createMockReoccurrence({ id: 2, lastAt: new Date("2024-01-15") }),
-        createMockReoccurrence({ id: 3, lastAt: new Date("2024-02-01") }),
+        createMockReoccurrence({
+          id: 1,
+          lastAt: new Date("2024-01-14"),
+          intervalId: 1,
+        }),
+        createMockReoccurrence({
+          id: 2,
+          lastAt: new Date("2024-01-08"),
+          intervalId: 2,
+        }),
+        createMockReoccurrence({
+          id: 3,
+          lastAt: new Date("2024-01-02"),
+          intervalId: 3,
+        }),
       ];
 
       mockCache.reoccurrence.find.mockImplementation((filter: any) => {
@@ -413,8 +455,35 @@ describe("ReoccurrenceService", () => {
 
     it("should filter out reoccurrences with null lastAt", () => {
       const reoccurrences = [
-        createMockReoccurrence({ id: 1, lastAt: new Date("2024-01-01") }),
+        createMockReoccurrence({
+          id: 1,
+          lastAt: new Date("2024-01-14"),
+          intervalId: 1,
+        }),
         createMockReoccurrence({ id: 2, lastAt: null }),
+      ];
+
+      mockCache.reoccurrence.find.mockImplementation((filter: any) => {
+        return reoccurrences.filter(filter);
+      });
+
+      const result = service.getReoccurrencesDue(new Date("2024-01-15"));
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(1);
+    });
+
+    it("should return due reoccurrences when using intervalName", () => {
+      const reoccurrences = [
+        {
+          ...createMockReoccurrence({
+            id: 1,
+            lastAt: new Date("2024-01-14"),
+            intervalId: 4,
+            intervalCount: 1,
+          }),
+          intervalName: "Day",
+        } as ReturnType<typeof createMockReoccurrence> & { intervalName: string },
       ];
 
       mockCache.reoccurrence.find.mockImplementation((filter: any) => {

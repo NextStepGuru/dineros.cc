@@ -40,6 +40,7 @@ describe("Integration Regression Tests", () => {
       reoccurrence: {
         findMany: vi.fn(),
         aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
+        update: vi.fn().mockResolvedValue({}),
       },
       reoccurrenceSkip: {
         findMany: vi.fn().mockResolvedValue([]),
@@ -337,20 +338,24 @@ describe("Integration Regression Tests", () => {
         },
       ];
 
-      // Recurring transfers (to create complex transaction patterns)
+      // Reoccurrences in Prisma shape so DataLoader and engine can use them
       const reoccurrences = [
         {
-          id: "recurring-1",
-          seq: null,
-          budgetId: 1,
-          fromAccountRegisterId: 12,
-          toAccountRegisterId: 11,
-          description: "Monthly Savings Transfer",
+          id: 1,
+          accountId: "test-budget",
+          accountRegisterId: 10,
+          intervalId: 3,
+          intervalCount: 1,
+          lastAt: new Date("2024-12-01"),
+          endAt: null,
           amount: new Decimal("500.00"),
-          intervalId: 3, // Monthly
-          nextDate: dateTimeService.create("2025-01-25"),
-          isActive: true,
-          userId: "test-user",
+          description: "Monthly Savings Transfer",
+          updatedAt: new Date("2024-12-01"),
+          transferAccountRegisterId: null,
+          adjustBeforeIfOnWeekend: false,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          interval: { name: "Month" },
         },
       ];
 

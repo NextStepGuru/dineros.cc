@@ -7,6 +7,7 @@ import type { RegisterEntry } from "../../../types/types";
 import type {
   CacheRegisterEntry,
   CacheAccountRegister,
+  CacheReoccurrence,
 } from "./ModernCacheService";
 
 // Core Domain Types
@@ -91,7 +92,12 @@ export interface ITransferService {
 
 export interface IDataPersisterService {
   convertOldProjectedToPending(accountId?: string): Promise<void>;
-  persistForecastResults(results: CacheRegisterEntry[]): Promise<void>;
+  persistForecastResults(
+    results: CacheRegisterEntry[]
+  ): Promise<Map<string, string>>;
+  persistReoccurrenceLastAt(
+    reoccurrences: CacheReoccurrence[]
+  ): Promise<void>;
   cleanupProjectedEntries(accountId?: string): Promise<void>;
   updateAccountRegisterBalances(accountId: string): Promise<void>;
   updateRegisterEntryBalances(

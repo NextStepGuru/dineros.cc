@@ -25,10 +25,20 @@ export const getAccountRegisterLabel = (
 export const formatDate = (
   dt: string | Date | number | null | undefined
 ): string | undefined => {
+  if (dt == null) return undefined;
   if (typeof dt === "string") {
     const date = new Date(dt);
     const localDate = new Date(date.getTime());
     return localDate.toISOString().split("T")[0];
+  }
+  if (dt instanceof Date) {
+    return dt.toISOString().split("T")[0];
+  }
+  if (typeof dt === "number") {
+    const date = new Date(dt);
+    return Number.isNaN(date.getTime())
+      ? undefined
+      : date.toISOString().split("T")[0];
   }
   return undefined;
 };

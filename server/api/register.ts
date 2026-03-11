@@ -131,9 +131,7 @@ export default defineEventHandler(async (event) => {
           },
         },
       },
-      orderBy: {
-        seq: "asc",
-      },
+      orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
       // Load all records up to skip + take for proper balance calculation
       take: skip + effectiveTake,
     });

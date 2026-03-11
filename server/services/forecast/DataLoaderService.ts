@@ -137,15 +137,18 @@ export class DataLoaderService implements IDataLoaderService {
   private async loadReoccurrences(accountId?: string) {
     const reoccurrences = await this.db.reoccurrence.findMany({
       where: { accountId },
+      include: { interval: { select: { name: true } } },
     });
 
     // Load into cache
     reoccurrences.forEach((item) => {
+      const { interval, ...rest } = item;
       this.cache.reoccurrence.insert({
-        ...item,
+        ...rest,
         amount: Number(item.amount),
         lastAt: item.lastAt,
         endAt: item.endAt ? item.endAt : null,
+        intervalName: interval?.name ?? undefined,
       });
     });
 

@@ -7,9 +7,12 @@ export type CacheReoccurrence = {
   accountId: string;
   accountRegisterId: number;
   intervalId: number;
+  intervalName?: string;
   transferAccountRegisterId: number | null;
   intervalCount: number;
   lastAt: Date | null;
+  /** Last occurrence date on or before "now" (for display/persist; respects interval) */
+  lastRunAt?: Date | null;
   endAt: Date | null;
   amount: number;
   description: string;

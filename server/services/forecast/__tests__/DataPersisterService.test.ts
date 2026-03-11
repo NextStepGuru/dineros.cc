@@ -285,6 +285,110 @@ describe("DataPersisterService", () => {
     });
   });
 
+  describe("persistReoccurrenceLastAt", () => {
+    it("should persist lastRunAt when present and advance by interval until next > now", async () => {
+      dateTimeService.setNowOverride(new Date("2026-04-15T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalName: "Month",
+            intervalCount: 1,
+            lastAt: new Date("2028-01-02"),
+            lastRunAt: new Date("2026-02-02"),
+            endAt: null,
+            amount: 100,
+            description: "Monthly",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        expect(mockDb.reoccurrence.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 1 },
+            data: expect.objectContaining({
+              lastAt: expect.any(Date),
+            }),
+          })
+        );
+        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
+        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-04-02");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should cap future lastAt by stepping back then forward by interval", async () => {
+      dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalName: "Month",
+            intervalCount: 1,
+            lastAt: new Date("2028-03-02"),
+            endAt: null,
+            amount: 100,
+            description: "Monthly",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
+        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-03-02");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should respect intervalCount when advancing", async () => {
+      dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalCount: 2,
+            lastRunAt: new Date("2026-01-01"),
+            lastAt: new Date("2026-01-01"),
+            endAt: null,
+            amount: 100,
+            description: "Every 2 months",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
+        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-03-01");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+  });
+
   describe("updateAccountRegisterBalances", () => {
     it("should update account register balances", async () => {
       const accountId = "test-account";

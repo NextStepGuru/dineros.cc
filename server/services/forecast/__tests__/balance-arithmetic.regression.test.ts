@@ -26,6 +26,7 @@ describe("Balance Arithmetic Regression Tests", () => {
       reoccurrence: {
         findMany: vi.fn(),
         aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: new Date() } }),
+        update: vi.fn().mockResolvedValue({}),
       },
       reoccurrenceSkip: {
         findMany: vi.fn(),
@@ -138,6 +139,7 @@ describe("Balance Arithmetic Regression Tests", () => {
       // Set up in-memory storage for mocks
       const mockAccountRegisters: any[] = [testAccountRegister];
       const mockRegisterEntries: any[] = [...testEntries];
+      const startDate = dateTimeService.create().toDate();
       const mockReoccurrences: any[] = [
         {
           id: 1,
@@ -145,10 +147,16 @@ describe("Balance Arithmetic Regression Tests", () => {
           accountRegisterId: 1,
           description: "Monthly Salary",
           amount: 5000,
-          intervalId: 3, // Monthly
+          intervalId: 3,
           intervalCount: 1,
-          lastAt: dateTimeService.create().toDate(),
+          lastAt: dateTimeService.create().subtract(1, "month").toDate(),
           endAt: null,
+          updatedAt: new Date(),
+          transferAccountRegisterId: null,
+          adjustBeforeIfOnWeekend: false,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          interval: { name: "Month" },
         },
       ];
       const mockReoccurrenceSkips: any[] = [];
@@ -244,8 +252,8 @@ describe("Balance Arithmetic Regression Tests", () => {
       try {
         result = await engine.recalculate({
           accountId: "test-account",
-          startDate: dateTimeService.create().toDate(),
-          endDate: dateTimeService.create().add(1, "week").toDate(), // Reduced from 1 month to 1 week
+          startDate,
+          endDate: dateTimeService.create().add(1, "week").toDate(),
           logging: { enabled: false },
         });
       } catch (error) {

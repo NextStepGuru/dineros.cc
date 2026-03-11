@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IDataPersisterService } from "./types";
-import type { CacheRegisterEntry } from "./ModernCacheService";
+import type {
+  CacheRegisterEntry,
+  CacheReoccurrence,
+} from "./ModernCacheService";
 import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
 import { dateTimeService } from "./DateTimeService";
@@ -14,16 +17,108 @@ export class DataPersisterService implements IDataPersisterService {
     this.rateLimiter = new DatabaseRateLimiter(3);
   }
 
-  async persistForecastResults(results: CacheRegisterEntry[]): Promise<void> {
+  async persistReoccurrenceLastAt(
+    reoccurrences: CacheReoccurrence[]
+  ): Promise<void> {
+    const nowDate = dateTimeService.nowDate();
+    const nowMoment = dateTimeService.createUTC(nowDate);
+    for (const item of reoccurrences) {
+      const lastAtToPersist = this.computeLastRunAtToPersist(item, nowMoment);
+      await this.db.reoccurrence.update({
+        where: { id: item.id },
+        data: {
+          lastAt: lastAtToPersist,
+          updatedAt: item.updatedAt ?? nowDate,
+        },
+      });
+    }
+  }
+
+  /**
+   * Advance lastRunAt by interval; only update (persist a newer date) when that next date is still in the past.
+   * Respects interval (e.g. monthly on the 2nd stays on the 2nd).
+   */
+  private computeLastRunAtToPersist(
+    item: CacheReoccurrence,
+    nowMoment: ReturnType<typeof dateTimeService.createUTC>
+  ): Date | null {
+    const unit = this.getIntervalUnit(item);
+    let current: ReturnType<typeof dateTimeService.createUTC> | null = null;
+    if (item.lastRunAt) {
+      current = dateTimeService.createUTC(item.lastRunAt);
+    } else if (item.lastAt) {
+      const lastAtMoment = dateTimeService.createUTC(item.lastAt);
+      if (dateTimeService.isSameOrBefore(lastAtMoment, nowMoment)) {
+        current = lastAtMoment;
+      } else if (unit) {
+        const count = item.intervalCount || 1;
+        current = lastAtMoment;
+        while (dateTimeService.isAfter(current, nowMoment)) {
+          current = dateTimeService.subtract(count, unit, current);
+        }
+      } else {
+        current = lastAtMoment;
+      }
+    }
+    if (!current) return null;
+    if (!unit) {
+      const d = dateTimeService.toDate(current);
+      return dateTimeService.isAfter(current, nowMoment)
+        ? dateTimeService.toDate(nowMoment)
+        : d;
+    }
+    const count = item.intervalCount || 1;
+    let lastRun = current;
+    let next = dateTimeService.add(count, unit, lastRun);
+    while (dateTimeService.isSameOrBefore(next, nowMoment)) {
+      lastRun = next;
+      next = dateTimeService.add(count, unit, lastRun);
+    }
+    return dateTimeService.toDate(lastRun);
+  }
+
+  private getIntervalUnit(
+    item: CacheReoccurrence
+  ): "days" | "weeks" | "months" | "years" | null {
+    const name = item.intervalName?.trim().toLowerCase();
+    if (name === "once") return null;
+    if (name === "day" || name === "days") return "days";
+    if (name === "week" || name === "weeks") return "weeks";
+    if (name === "month" || name === "months") return "months";
+    if (name === "year" || name === "years") return "years";
+    switch (item.intervalId) {
+      case 1:
+        return "days";
+      case 2:
+        return "weeks";
+      case 3:
+        return "months";
+      case 4:
+        return "years";
+      case 5:
+        return null;
+      default:
+        return "months";
+    }
+  }
+
+  async persistForecastResults(
+    results: CacheRegisterEntry[]
+  ): Promise<Map<string, string>> {
+    const idMap = new Map<string, string>();
     // Generate new IDs for all forecast entries to avoid conflicts, except for balance entries
-    const insertData = results.map((item) => ({
-      ...item,
-      createdAt: dateTimeService.formatDate(
-        dateTimeService.createUTC(item.createdAt),
-        "YYYY-MM-DDTHH:mm:ss.SSS[Z]"
-      ),
-      id: item.isBalanceEntry ? item.id : createId(), // Preserve original IDs for balance entries
-    }));
+    const insertData = results.map((item) => {
+      const newId = item.isBalanceEntry ? item.id : createId();
+      if (!item.isBalanceEntry) idMap.set(item.id, newId);
+      return {
+        ...item,
+        createdAt: dateTimeService.formatDate(
+          dateTimeService.createUTC(item.createdAt),
+          "YYYY-MM-DDTHH:mm:ss.SSS[Z]"
+        ),
+        id: newId,
+      };
+    });
 
     // Use createMany for better performance, fallback to individual creates if needed
     try {
@@ -60,6 +155,7 @@ export class DataPersisterService implements IDataPersisterService {
         `[DataPersisterService] Rate limiter status: ${JSON.stringify(status)}`
       );
     }
+    return idMap;
   }
 
   async updateAccountRegisterBalances(accountId: string): Promise<void> {

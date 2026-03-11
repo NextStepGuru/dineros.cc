@@ -124,6 +124,10 @@ export class ForecastEngine implements IForecastEngine {
         throw error;
       }
 
+      // 7b. Persist updated reoccurrence lastAt so Reoccurring tab shows current dates
+      const reoccurrences = this.cache.reoccurrence.find();
+      await this.dataPersister.persistReoccurrenceLastAt(reoccurrences);
+
       // 8. Calculate running balances and sort entries
       let processedResults = await this.processAccountEntries(
         activeAccountRegisters
@@ -157,7 +161,13 @@ export class ForecastEngine implements IForecastEngine {
       );
 
       // 11. Persist results back to database
-      await this.dataPersister.persistForecastResults(entriesToPersist);
+      const persistIdMap = await this.dataPersister.persistForecastResults(
+        entriesToPersist
+      );
+      for (const e of processedResults) {
+        const newId = persistIdMap.get(e.id);
+        if (newId !== undefined) e.id = newId;
+      }
 
       // 12. Update balance columns for ALL entries (including isPending, manual, etc.)
       await this.dataPersister.updateRegisterEntryBalances(processedResults);
@@ -289,18 +299,18 @@ export class ForecastEngine implements IForecastEngine {
           )}`
         );
       }
-      // Process extra debt payments FIRST to use all available funds
-      const extraPaymentAccounts =
-        this.accountService.getAccountsWithExtraPayments();
-      await this.transferService.processExtraDebtPayments(
-        extraPaymentAccounts,
+      // Process reoccurrences first so same-day debits are in the cache before we consider extra debt/savings
+      const dueReoccurrences = this.reoccurrenceService.getReoccurrencesDue(
         currentDate.toDate()
       );
-
-      // Process savings goals AFTER debt is paid
-      await this.transferService.processSavingsGoals(
-        extraPaymentAccounts,
-        currentDate.toDate()
+      await this.reoccurrenceService.processReoccurrences(
+        dueReoccurrences.map((reoccurrence) => ({
+          ...reoccurrence,
+          amount: new Decimal(reoccurrence.amount),
+          lastAt: reoccurrence.lastAt || dateTimeService.nowDate(),
+          updatedAt: reoccurrence.updatedAt || dateTimeService.nowDate(),
+        })),
+        endDate.toDate()
       );
 
       // Process interest charges for debt accounts (including minimum payments)
@@ -316,18 +326,18 @@ export class ForecastEngine implements IForecastEngine {
         currentDate
       );
 
-      // Process reoccurrences due on this date
-      const dueReoccurrences = this.reoccurrenceService.getReoccurrencesDue(
+      // Process extra debt payments AFTER reoccurrences and interest so projected balance reflects same-day outflows
+      const extraPaymentAccounts =
+        this.accountService.getAccountsWithExtraPayments();
+      await this.transferService.processExtraDebtPayments(
+        extraPaymentAccounts,
         currentDate.toDate()
       );
-      await this.reoccurrenceService.processReoccurrences(
-        dueReoccurrences.map((reoccurrence) => ({
-          ...reoccurrence,
-          amount: new Decimal(reoccurrence.amount),
-          lastAt: reoccurrence.lastAt || new Date(),
-          updatedAt: reoccurrence.updatedAt || new Date(),
-        })),
-        endDate.toDate()
+
+      // Process savings goals AFTER debt is paid
+      await this.transferService.processSavingsGoals(
+        extraPaymentAccounts,
+        currentDate.toDate()
       );
 
       // Load manual entries for this specific date

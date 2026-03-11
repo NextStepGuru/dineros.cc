@@ -162,7 +162,7 @@ const columns: TableColumn<Reoccurrence>[] = [
   },
   {
     accessorKey: "lastAt",
-    header: () => h("div", { class: "text-right" }, "Next Occurrence"),
+    header: () => h("div", { class: "text-right" }, "Last run"),
     cell: ({ row }) => {
       return h(
         "div",
