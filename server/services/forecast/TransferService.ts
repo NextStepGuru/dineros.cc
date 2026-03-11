@@ -408,19 +408,16 @@ export class TransferService implements ITransferService {
         break; // Already at or below min, stop making payments today
       }
 
-      const debtBalanceAtDate = this.getLatestDebtBalanceAtOrBeforeDate(
-        debtAccountRegister.id,
-        lastAt,
-        debtAccountRegister.balance
-      );
-      if (debtBalanceAtDate >= 0) {
+      // O(1) Map lookup — reflects running balance (updated by createEntry; DB-loaded entries don't update it)
+      const freshDebt = this.cache.accountRegister.findById(debtAccountRegister.id);
+      const debtBalance = freshDebt ? +freshDebt.balance : +debtAccountRegister.balance;
+      if (debtBalance >= 0) {
         continue;
       }
+      const amountOwed = Math.abs(debtBalance);
 
       let paymentAmount = remainingAvailableAmount;
 
-      // Don't pay more than the debt amount owed at target date
-      const amountOwed = Math.abs(debtBalanceAtDate);
       if (paymentAmount > amountOwed) {
         paymentAmount = amountOwed;
       }
@@ -447,7 +444,7 @@ export class TransferService implements ITransferService {
         {
           debtAccountId: debtAccountRegister.id,
           debtAccountName: debtAccountRegister.name,
-          debtBalance: debtBalanceAtDate,
+          debtBalance,
           paymentAmount,
           remainingAvailableAmount,
         }
@@ -500,20 +497,6 @@ export class TransferService implements ITransferService {
     return paymentsProcessed > 0;
   }
 
-  private getLatestDebtBalanceAtOrBeforeDate(
-    accountId: number,
-    targetDate: Date,
-    fallbackBalance: number
-  ): number {
-    const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      if (dateTimeService.isSameOrBefore(entry.createdAt, targetDate)) {
-        return +entry.balance;
-      }
-    }
-    return +fallbackBalance;
-  }
 
   findDebtAccounts(): CacheAccountRegister[] {
     return this.cache.accountRegister.find((account) => account.balance < 0);
