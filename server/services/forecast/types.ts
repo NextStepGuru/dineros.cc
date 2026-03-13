@@ -43,6 +43,8 @@ export interface IAccountRegisterService {
     accounts: CacheAccountRegister[],
     forecastDate?: any
   ): Promise<void>;
+  getPendingStatementAtUpdates(): { id: number; statementAt: Date }[];
+  clearPendingStatementAtUpdates(): void;
 }
 
 export interface IReoccurrenceService {
@@ -93,18 +95,39 @@ export interface ITransferService {
   getAccountBalance(accountRegisterId: number): number;
 }
 
+/** Transaction client from prisma.$transaction(async (tx) => ...). Optional; when provided, persister uses it for all DB ops. */
+export type ForecastTransactionClient = Parameters<
+  Parameters<PrismaClient["$transaction"]>[0]
+>[0];
+
 export interface IDataPersisterService {
-  convertOldProjectedToPending(accountId?: string): Promise<void>;
+  convertOldProjectedToPending(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void>;
   persistForecastResults(
-    results: CacheRegisterEntry[]
+    results: CacheRegisterEntry[],
+    tx?: ForecastTransactionClient
   ): Promise<Map<string, string>>;
   persistReoccurrenceLastAt(
-    reoccurrences: CacheReoccurrence[]
+    reoccurrences: CacheReoccurrence[],
+    tx?: ForecastTransactionClient
   ): Promise<void>;
-  cleanupProjectedEntries(accountId?: string): Promise<void>;
-  updateAccountRegisterBalances(accountId: string): Promise<void>;
+  cleanupProjectedEntries(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void>;
+  updateAccountRegisterBalances(
+    accountRegisters: CacheAccountRegister[],
+    tx?: ForecastTransactionClient
+  ): Promise<void>;
   updateRegisterEntryBalances(
-    calculatedEntries: CacheRegisterEntry[]
+    calculatedEntries: CacheRegisterEntry[],
+    tx?: ForecastTransactionClient
+  ): Promise<void>;
+  batchUpdateStatementDates(
+    updates: { id: number; statementAt: Date }[],
+    tx?: ForecastTransactionClient
   ): Promise<void>;
 }
 
@@ -119,6 +142,7 @@ export interface AccountData {
   registerEntries: CacheRegisterEntry[];
   reoccurrences: Reoccurrence[];
   reoccurrenceSkips: any[];
+  minReoccurrenceDate: Date | null;
 }
 
 export interface CreateEntryParams {

@@ -1,8 +1,13 @@
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
-import type { IDataPersisterService } from "./types";
+import type {
+  IDataPersisterService,
+  ForecastTransactionClient,
+} from "./types";
 import type {
   CacheRegisterEntry,
   CacheReoccurrence,
+  CacheAccountRegister,
 } from "./ModernCacheService";
 import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
@@ -13,25 +18,40 @@ export class DataPersisterService implements IDataPersisterService {
   private rateLimiter: DatabaseRateLimiter;
 
   constructor(private db: PrismaClient) {
-    // Limit to 3 concurrent database operations for recalculate
     this.rateLimiter = new DatabaseRateLimiter(3);
   }
 
+  private client(tx?: ForecastTransactionClient): PrismaClient {
+    return (tx ?? this.db) as PrismaClient;
+  }
+
   async persistReoccurrenceLastAt(
-    reoccurrences: CacheReoccurrence[]
+    reoccurrences: CacheReoccurrence[],
+    tx?: ForecastTransactionClient
   ): Promise<void> {
+    if (reoccurrences.length === 0) return;
+
+    const db = this.client(tx);
     const nowDate = dateTimeService.nowDate();
     const nowMoment = dateTimeService.createUTC(nowDate);
-    for (const item of reoccurrences) {
-      const lastAtToPersist = this.computeLastRunAtToPersist(item, nowMoment);
-      await this.db.reoccurrence.update({
-        where: { id: item.id },
-        data: {
-          lastAt: lastAtToPersist,
-          updatedAt: item.updatedAt ?? nowDate,
-        },
-      });
-    }
+
+    const rows = reoccurrences.map((item) => ({
+      id: item.id,
+      lastAt: this.computeLastRunAtToPersist(item, nowMoment),
+      updatedAt: item.updatedAt ?? nowDate,
+    }));
+
+    const lastAtCases = rows.map((r) =>
+      Prisma.sql`WHEN ${r.id} THEN ${r.lastAt}`
+    );
+    const updatedAtCases = rows.map((r) =>
+      Prisma.sql`WHEN ${r.id} THEN ${r.updatedAt}`
+    );
+    const idList = rows.map((r) => Prisma.sql`${r.id}`);
+
+    await (db as PrismaClient).$executeRaw(
+      Prisma.sql`UPDATE reoccurrence SET last_at = CASE id ${Prisma.join(lastAtCases, " ")} END, updated_at = CASE id ${Prisma.join(updatedAtCases, " ")} END WHERE id IN (${Prisma.join(idList)})`
+    );
   }
 
   /**
@@ -103,10 +123,11 @@ export class DataPersisterService implements IDataPersisterService {
   }
 
   async persistForecastResults(
-    results: CacheRegisterEntry[]
+    results: CacheRegisterEntry[],
+    tx?: ForecastTransactionClient
   ): Promise<Map<string, string>> {
+    const db = this.client(tx);
     const idMap = new Map<string, string>();
-    // Generate new IDs for all forecast entries to avoid conflicts, except for balance entries
     const insertData = results.map((item) => {
       const newId = item.isBalanceEntry ? item.id : createId();
       if (!item.isBalanceEntry) idMap.set(item.id, newId);
@@ -120,9 +141,8 @@ export class DataPersisterService implements IDataPersisterService {
       };
     });
 
-    // Use createMany for better performance, fallback to individual creates if needed
     try {
-      await this.db.registerEntry.createMany({
+      await db.registerEntry.createMany({
         data: insertData,
         skipDuplicates: true,
       });
@@ -135,7 +155,7 @@ export class DataPersisterService implements IDataPersisterService {
 
       const operations = insertData.map(
         (item) => () =>
-          this.db.registerEntry
+          db.registerEntry
             .create({
               data: item,
             })
@@ -158,48 +178,52 @@ export class DataPersisterService implements IDataPersisterService {
     return idMap;
   }
 
-  async updateAccountRegisterBalances(accountId: string): Promise<void> {
-    // Get all account registers for this account
-    const accountRegisters = await this.db.accountRegister.findMany({
-      where: { accountId },
-      select: { id: true, balance: true, latestBalance: true },
-    });
+  async updateAccountRegisterBalances(
+    accountRegisters: CacheAccountRegister[],
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    if (accountRegisters.length === 0) return;
 
-    // Update the latestBalance field to match the current balance
-    // This ensures that future recalculations will use the current balance as the opening balance
+    const db = this.client(tx);
+    const caseParts = accountRegisters.map(
+      (r) => Prisma.sql`WHEN ${r.id} THEN ${Number(r.balance)}`
+    );
+    const idList = accountRegisters.map((r) => Prisma.sql`${r.id}`);
+
+    await (db as PrismaClient).$executeRaw(
+      Prisma.sql`UPDATE account_register SET latest_balance = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
+    );
+
     forecastLogger.info(
-      `[DataPersisterService] Updating ${accountRegisters.length} account register balances with rate limiting`
+      `[DataPersisterService] Updated latest_balance for ${accountRegisters.length} account registers (bulk)`
+    );
+  }
+
+  async batchUpdateStatementDates(
+    updates: { id: number; statementAt: Date }[],
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    if (updates.length === 0) return;
+
+    const db = this.client(tx);
+    const caseParts = updates.map(
+      (u) => Prisma.sql`WHEN ${u.id} THEN ${u.statementAt}`
+    );
+    const idList = updates.map((u) => Prisma.sql`${u.id}`);
+
+    await (db as PrismaClient).$executeRaw(
+      Prisma.sql`UPDATE account_register SET statement_at = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
     );
 
-    const updateOperations = accountRegisters.map(
-      (accountRegister) => () =>
-        this.db.accountRegister.update({
-          where: { id: accountRegister.id },
-          data: { latestBalance: accountRegister.balance },
-        })
-    );
-
-    await this.rateLimiter.executeWithLimit(updateOperations);
-
-    const status = this.rateLimiter.getStatus();
-    forecastLogger.debug(
-      `[DataPersisterService] Updated latestBalance for ${
-        accountRegisters.length
-      } account registers. Rate limiter status: ${JSON.stringify(status)}`
+    forecastLogger.info(
+      `[DataPersisterService] Updated statement_at for ${updates.length} account registers (bulk)`
     );
   }
 
   async updateRegisterEntryBalances(
-    calculatedEntries: CacheRegisterEntry[]
+    calculatedEntries: CacheRegisterEntry[],
+    tx?: ForecastTransactionClient
   ): Promise<void> {
-    forecastLogger.info(
-      `[DataPersisterService] Starting balance update for ${calculatedEntries.length} register entries`
-    );
-
-    // Only update entries that definitely exist in the database:
-    // - isPending entries (from Plaid sync)
-    // - isManualEntry entries (user-created)
-    // - isProjected entries that have been converted to pending
     const entriesToUpdate = calculatedEntries.filter(
       (entry) =>
         entry.isPending ||
@@ -207,18 +231,8 @@ export class DataPersisterService implements IDataPersisterService {
         (entry.isProjected && entry.isCleared === false)
     );
 
-    forecastLogger.info(
-      `[DataPersisterService] Found ${entriesToUpdate.length} entries to update balances for`
-    );
+    if (entriesToUpdate.length === 0) return;
 
-    if (entriesToUpdate.length === 0) {
-      forecastLogger.info(
-        `[DataPersisterService] No entries to update balances for`
-      );
-      return;
-    }
-
-    // Group entries by account register ID for batch processing
     const entriesByAccount = entriesToUpdate.reduce((acc, entry) => {
       if (!acc[entry.accountRegisterId]) {
         acc[entry.accountRegisterId] = [];
@@ -227,67 +241,42 @@ export class DataPersisterService implements IDataPersisterService {
       return acc;
     }, {} as Record<number, CacheRegisterEntry[]>);
 
-    // Process each account's entries
-    for (const [accountRegisterId, entries] of Object.entries(
-      entriesByAccount
-    )) {
-      forecastLogger.info(
-        `[DataPersisterService] Updating balances for account register ${accountRegisterId} with ${entries.length} entries`
-      );
-
-      // Sort entries by date and amount for proper balance calculation
-      const sortedEntries = entries.sort((a, b) => {
+    const idBalancePairs: { id: string; balance: number }[] = [];
+    for (const entries of Object.values(entriesByAccount)) {
+      const sorted = [...entries].sort((a, b) => {
         const dateA = dateTimeService.toDate(a.createdAt);
         const dateB = dateTimeService.toDate(b.createdAt);
         const timeDiff = dateA.getTime() - dateB.getTime();
         if (timeDiff !== 0) return timeDiff;
-        return b.amount - a.amount; // Descending by amount for same date
+        return b.amount - a.amount;
       });
-
-      // Calculate running balances
-      let runningBalance = 0;
-      const updateOperations = sortedEntries.map((entry) => {
-        runningBalance += entry.amount;
-        return () =>
-          this.db.registerEntry.update({
-            where: { id: entry.id },
-            data: { balance: runningBalance },
-          });
-      });
-
-      // Verify entries exist before updating
-      const existingEntryIds = await this.db.registerEntry.findMany({
-        where: {
-          id: { in: sortedEntries.map((entry) => entry.id) },
-        },
-        select: { id: true },
-      });
-
-      const existingIds = new Set(existingEntryIds.map((entry) => entry.id));
-      const validUpdateOperations = updateOperations.filter((_, index) =>
-        existingIds.has(sortedEntries[index].id)
-      );
-
-      if (validUpdateOperations.length !== updateOperations.length) {
-        forecastLogger.warn(
-          `[DataPersisterService] Skipping ${
-            updateOperations.length - validUpdateOperations.length
-          } entries that don't exist in database`
-        );
+      let running = 0;
+      for (const entry of sorted) {
+        running += entry.amount;
+        idBalancePairs.push({ id: entry.id, balance: running });
       }
-
-      await this.rateLimiter.executeWithLimit(validUpdateOperations);
     }
 
-    const status = this.rateLimiter.getStatus();
-    forecastLogger.debug(
-      `[DataPersisterService] Updated balances for ${
-        entriesToUpdate.length
-      } entries. Rate limiter status: ${JSON.stringify(status)}`
+    const db = this.client(tx);
+    const caseParts = idBalancePairs.map(
+      (p) => Prisma.sql`WHEN ${p.id} THEN ${p.balance}`
+    );
+    const idList = idBalancePairs.map((p) => Prisma.sql`${p.id}`);
+
+    await (db as PrismaClient).$executeRaw(
+      Prisma.sql`UPDATE register_entry SET balance = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
+    );
+
+    forecastLogger.info(
+      `[DataPersisterService] Updated balance for ${idBalancePairs.length} register entries (bulk)`
     );
   }
 
-  async convertOldProjectedToPending(accountId?: string): Promise<void> {
+  async convertOldProjectedToPending(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    const db = this.client(tx);
     const now = dateTimeService.toDateFromInput(dateTimeService.now());
     forecastLogger.info(
       `[DataPersisterService] Current date for conversion: ${dateTimeService.formatDate(
@@ -296,8 +285,7 @@ export class DataPersisterService implements IDataPersisterService {
       )}`
     );
 
-    // Convert old projected entries to pending
-    const updateResult = await this.db.registerEntry.updateMany({
+    const updateResult = await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -314,8 +302,7 @@ export class DataPersisterService implements IDataPersisterService {
       } projected entries to pending`
     );
 
-    // Convert old manual entries to pending
-    const manualUpdateResult = await this.db.registerEntry.updateMany({
+    const manualUpdateResult = await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -332,8 +319,12 @@ export class DataPersisterService implements IDataPersisterService {
     );
   }
 
-  async cleanupProjectedEntries(accountId?: string): Promise<void> {
-    await this.db.registerEntry.deleteMany({
+  async cleanupProjectedEntries(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    const db = this.client(tx);
+    await db.registerEntry.deleteMany({
       where: {
         ...(accountId && { register: { accountId } }),
         isProjected: true,
@@ -343,8 +334,12 @@ export class DataPersisterService implements IDataPersisterService {
     });
   }
 
-  async cleanupZeroBalanceEntries(accountId?: string): Promise<void> {
-    await this.db.registerEntry.deleteMany({
+  private async cleanupZeroBalanceEntries(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    const db = this.client(tx);
+    await db.registerEntry.deleteMany({
       where: {
         ...(accountId && { register: { accountId } }),
         description: "Latest Balance",
@@ -354,7 +349,11 @@ export class DataPersisterService implements IDataPersisterService {
     });
   }
 
-  async updateEntryStatuses(accountId?: string): Promise<void> {
+  async updateEntryStatuses(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    const db = this.client(tx);
     const now = dateTimeService.toDateFromInput(
       dateTimeService.setDateUnits(dateTimeService.now(), {
         hour: 0,
@@ -364,8 +363,7 @@ export class DataPersisterService implements IDataPersisterService {
       })
     );
 
-    // Update Projected Entries if past current date
-    await this.db.registerEntry.updateMany({
+    await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -376,7 +374,7 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    await this.db.registerEntry.updateMany({
+    await db.registerEntry.updateMany({
       data: { isPending: false },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -387,8 +385,7 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    // Update Manual Entries if past current date to Pending
-    await this.db.registerEntry.updateMany({
+    await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -398,7 +395,7 @@ export class DataPersisterService implements IDataPersisterService {
       },
     });
 
-    await this.db.registerEntry.updateMany({
+    await db.registerEntry.updateMany({
       data: { isPending: false },
       where: {
         ...(accountId && { register: { accountId } }),
@@ -409,8 +406,12 @@ export class DataPersisterService implements IDataPersisterService {
     });
   }
 
-  async cleanupProjectedEntriesByAccount(accountId: number): Promise<void> {
-    await this.db.registerEntry.deleteMany({
+  async cleanupProjectedEntriesByAccount(
+    accountId: number,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
+    const db = this.client(tx);
+    await db.registerEntry.deleteMany({
       where: {
         accountRegisterId: accountId,
         isProjected: true,
@@ -419,37 +420,39 @@ export class DataPersisterService implements IDataPersisterService {
     });
   }
 
-  async performInitialCleanup(accountId?: string): Promise<void> {
+  async performInitialCleanup(
+    accountId?: string,
+    tx?: ForecastTransactionClient,
+    accountRegisterIds?: number[]
+  ): Promise<void> {
+    const db = this.client(tx);
     forecastLogger.info(
       `[DataPersisterService] Performing initial cleanup for account: ${
         accountId || "all"
       }`
     );
 
-    // Convert old projected entries to pending
-    await this.convertOldProjectedToPending(accountId);
+    await this.convertOldProjectedToPending(accountId, tx);
+    await this.cleanupProjectedEntries(accountId, tx);
 
-    // Clean up old projected entries that are still pending
-    await this.cleanupProjectedEntries(accountId);
-
-    // Clean up zero balance entries
     if (accountId) {
-      // Get account register IDs for this account
-      const accountRegisters = await this.db.accountRegister.findMany({
-        where: { accountId },
-        select: { id: true },
-      });
+      const ids =
+        accountRegisterIds ??
+        (await db.accountRegister.findMany({
+          where: { accountId },
+          select: { id: true },
+        })).map((reg) => reg.id);
 
-      const accountRegisterIds = accountRegisters.map((reg) => reg.id);
-
-      await this.db.registerEntry.deleteMany({
-        where: {
-          description: "Latest Balance",
-          accountRegisterId: { in: accountRegisterIds },
-        },
-      });
+      if (ids.length > 0) {
+        await db.registerEntry.deleteMany({
+          where: {
+            description: "Latest Balance",
+            accountRegisterId: { in: ids },
+          },
+        });
+      }
     } else {
-      await this.cleanupZeroBalanceEntries(accountId);
+      await this.cleanupZeroBalanceEntries(accountId, tx);
     }
 
     forecastLogger.info(
@@ -459,15 +462,17 @@ export class DataPersisterService implements IDataPersisterService {
     );
   }
 
-  async performFinalCleanup(accountId?: string): Promise<void> {
+  async performFinalCleanup(
+    accountId?: string,
+    tx?: ForecastTransactionClient
+  ): Promise<void> {
     forecastLogger.info(
       `[DataPersisterService] Performing final cleanup for account: ${
         accountId || "all"
       }`
     );
 
-    // Update entry statuses based on current date
-    await this.updateEntryStatuses(accountId);
+    await this.updateEntryStatuses(accountId, tx);
 
     forecastLogger.info(
       `[DataPersisterService] Final cleanup completed for account: ${

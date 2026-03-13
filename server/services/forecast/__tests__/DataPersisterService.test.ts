@@ -390,32 +390,25 @@ describe("DataPersisterService", () => {
   });
 
   describe("updateAccountRegisterBalances", () => {
-    it("should update account register balances", async () => {
-      const accountId = "test-account";
+    it("should bulk update account register latest_balance from cache", async () => {
       const mockAccountRegisters = [
-        { id: 1, balance: 1000, latestBalance: 800 },
-        { id: 2, balance: 500, latestBalance: 300 },
+        { id: 1, balance: 1000, latestBalance: 800 } as any,
+        { id: 2, balance: 500, latestBalance: 300 } as any,
       ];
 
-      vi.spyOn(mockDb.accountRegister, "findMany").mockResolvedValue(mockAccountRegisters);
-      vi.spyOn(mockDb.accountRegister, "update").mockResolvedValue({});
+      mockDb.$executeRaw = vi.fn().mockResolvedValue(undefined);
 
-      await service.updateAccountRegisterBalances(accountId);
+      await service.updateAccountRegisterBalances(mockAccountRegisters);
 
-      expect(mockDb.accountRegister.findMany).toHaveBeenCalledWith({
-        where: { accountId },
-        select: { id: true, balance: true, latestBalance: true },
-      });
+      expect(mockDb.$executeRaw).toHaveBeenCalledTimes(1);
+    });
 
-      expect(mockDb.accountRegister.update).toHaveBeenCalledTimes(2);
-      expect(mockDb.accountRegister.update).toHaveBeenNthCalledWith(1, {
-        where: { id: 1 },
-        data: { latestBalance: 1000 },
-      });
-      expect(mockDb.accountRegister.update).toHaveBeenNthCalledWith(2, {
-        where: { id: 2 },
-        data: { latestBalance: 500 },
-      });
+    it("should no-op when accountRegisters is empty", async () => {
+      mockDb.$executeRaw = vi.fn();
+
+      await service.updateAccountRegisterBalances([]);
+
+      expect(mockDb.$executeRaw).not.toHaveBeenCalled();
     });
   });
 });

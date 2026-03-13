@@ -10,6 +10,8 @@ import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class AccountRegisterService implements IAccountRegisterService {
+  private _pendingStatementAtUpdates: { id: number; statementAt: Date }[] = [];
+
   constructor(
     private db: PrismaClient,
     private cache: ModernCacheService,
@@ -17,6 +19,14 @@ export class AccountRegisterService implements IAccountRegisterService {
     private entryService: RegisterEntryService,
     private transferService: TransferService
   ) {}
+
+  getPendingStatementAtUpdates(): { id: number; statementAt: Date }[] {
+    return [...this._pendingStatementAtUpdates];
+  }
+
+  clearPendingStatementAtUpdates(): void {
+    this._pendingStatementAtUpdates = [];
+  }
 
   updateBalance(accountId: number, amount: number): void {
     const account = this.cache.accountRegister.findOne({
@@ -246,11 +256,10 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
     if (updated) {
       this.cache.accountRegister.update(accountRegister);
-      // Only persist to database if the comparison date is not in the future
       if (dateTimeService.isSameOrBefore(comparisonDate, today)) {
-        await this.db.accountRegister.update({
-          where: { id: accountRegister.id },
-          data: { statementAt: dateTimeService.toDate(statementAt) },
+        this._pendingStatementAtUpdates.push({
+          id: accountRegister.id,
+          statementAt: dateTimeService.toDate(statementAt),
         });
       }
     }

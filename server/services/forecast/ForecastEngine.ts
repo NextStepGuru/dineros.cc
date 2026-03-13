@@ -59,11 +59,20 @@ export class ForecastEngine implements IForecastEngine {
       // 1. Load data from database into memory cache
       const accountData = await this.dataLoader.loadAccountData(context);
 
-      // 2. Convert old projected entries to pending entries before cleanup
-      await this.dataPersister.convertOldProjectedToPending(context.accountId);
-
-      // 3. Cleanup old projected entries (but NOT pending entries)
-      await this.dataPersister.performInitialCleanup(context.accountId);
+      await this.db.$transaction(async (tx) => {
+        await this.dataPersister.convertOldProjectedToPending(
+          context.accountId,
+          tx
+        );
+        const accountRegisterIds = context.accountId
+          ? accountData.accountRegisters.map((r) => r.id)
+          : undefined;
+        await this.dataPersister.performInitialCleanup(
+          context.accountId,
+          tx,
+          accountRegisterIds
+        );
+      });
 
       // Only use non-archived account registers
       const activeAccountRegisters = accountData.accountRegisters.filter(
@@ -73,11 +82,8 @@ export class ForecastEngine implements IForecastEngine {
       // 4. Create balance entries for all loaded active accounts
       this.accountService.createBalanceEntries(activeAccountRegisters);
 
-      // 5. Get forecast date range
-      const minDate = await this.dataLoader.getMinReoccurrenceDate(
-        context.accountId
-      );
-      // Use context.startDate if provided, otherwise fall back to minDate or current date
+      // 5. Get forecast date range (minReoccurrenceDate from load)
+      const minDate = accountData.minReoccurrenceDate;
       const effectiveStartDate =
         context.startDate || minDate || dateTimeService.nowDate();
       const startDate = this.calculateStartDate(effectiveStartDate);
@@ -115,6 +121,8 @@ export class ForecastEngine implements IForecastEngine {
       // 6. Load existing manual entries into the timeline
       await this.loadExistingEntries(accountData, startDate);
 
+      this.accountService.clearPendingStatementAtUpdates();
+
       // 7. Process forecast day by day
       let datesProcessed = 0;
       try {
@@ -124,22 +132,11 @@ export class ForecastEngine implements IForecastEngine {
         throw error;
       }
 
-      // 7b. Persist updated reoccurrence lastAt so Reoccurring tab shows current dates
-      const reoccurrences = this.cache.reoccurrence.find();
-      await this.dataPersister.persistReoccurrenceLastAt(reoccurrences);
-
       // 8. Calculate running balances and sort entries
       let processedResults = await this.processAccountEntries(
         activeAccountRegisters
       );
 
-      // Balance entries are already created by createBalanceEntries method
-      // No need to create additional ones here
-
-      // 9. Purge all projected entries before persisting new forecast results
-      await this.dataPersister.cleanupProjectedEntries(context.accountId);
-
-      // Debug: Check what we're about to persist
       const balanceEntriesToPersist = processedResults.filter(
         (e) => e.isBalanceEntry
       );
@@ -150,8 +147,6 @@ export class ForecastEngine implements IForecastEngine {
         (e) => e.isPending
       );
 
-      // 10. Filter out manual entries and pending entries to prevent duplication - they already exist in database
-      // Pending entries come from Plaid sync and should not be re-inserted
       const entriesToPersist = processedResults.filter(
         (e) => !e.isManualEntry && !e.isPending
       );
@@ -160,30 +155,54 @@ export class ForecastEngine implements IForecastEngine {
         `Persisting ${entriesToPersist.length} entries (filtered out ${manualEntriesToPersist.length} manual entries and ${pendingEntriesToPersist.length} pending entries to prevent duplication)`
       );
 
-      // 11. Persist results back to database
-      const persistIdMap = await this.dataPersister.persistForecastResults(
-        entriesToPersist
-      );
-      for (const e of processedResults) {
-        const newId = persistIdMap.get(e.id);
-        if (newId !== undefined) e.id = newId;
-      }
+      await this.db.$transaction(async (tx) => {
+        // 7b. Persist updated reoccurrence lastAt
+        const reoccurrences = this.cache.reoccurrence.find();
+        await this.dataPersister.persistReoccurrenceLastAt(reoccurrences, tx);
 
-      // 12. Update balance columns for ALL entries (including isPending, manual, etc.)
-      await this.dataPersister.updateRegisterEntryBalances(processedResults);
+        // 9. Purge all projected entries before persisting new forecast results
+        await this.dataPersister.cleanupProjectedEntries(context.accountId, tx);
 
-      // 13. Update account register latestBalance fields to reflect current balances
-      if (context.accountId) {
-        await this.dataPersister.updateAccountRegisterBalances(
-          context.accountId
+        // 11. Persist results back to database
+        const persistIdMap = await this.dataPersister.persistForecastResults(
+          entriesToPersist,
+          tx
         );
-      }
+        for (const e of processedResults) {
+          const newId = persistIdMap.get(e.id);
+          if (newId !== undefined) e.id = newId;
+        }
 
-      // 14. Update entry statuses based on current date
-      await this.dataPersister.updateEntryStatuses(context.accountId);
+        // 12. Update balance columns for ALL entries
+        await this.dataPersister.updateRegisterEntryBalances(
+          processedResults,
+          tx
+        );
 
-      // 15. Final cleanup
-      await this.dataPersister.performFinalCleanup(context.accountId);
+        // 13. Update account register latestBalance fields (from cache)
+        if (context.accountId && accountData.accountRegisters.length > 0) {
+          await this.dataPersister.updateAccountRegisterBalances(
+            accountData.accountRegisters,
+            tx
+          );
+        }
+
+        const statementAtUpdates =
+          this.accountService.getPendingStatementAtUpdates();
+        if (statementAtUpdates.length > 0) {
+          await this.dataPersister.batchUpdateStatementDates(
+            statementAtUpdates,
+            tx
+          );
+          this.accountService.clearPendingStatementAtUpdates();
+        }
+
+        // 14. Update entry statuses based on current date
+        await this.dataPersister.updateEntryStatuses(context.accountId, tx);
+
+        // 15. Final cleanup
+        await this.dataPersister.performFinalCleanup(context.accountId, tx);
+      });
 
       // 14. Convert results to expected format
       forecastLogger.debug(

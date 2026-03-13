@@ -19,7 +19,7 @@ describe("DataLoaderService", () => {
       },
       reoccurrence: {
         findMany: vi.fn(),
-        aggregate: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
       },
       reoccurrenceSkip: {
         findMany: vi.fn(),
@@ -99,6 +99,7 @@ describe("DataLoaderService", () => {
       expect(result.accountRegisters[0].name).toBe("Checking");
       expect(result.registerEntries[0].description).toBe("Test Entry");
       expect(result.reoccurrences[0].description).toBe("Monthly Salary");
+      expect(result).toHaveProperty("minReoccurrenceDate");
     });
 
     it("should clear cache before loading new data", async () => {
@@ -170,6 +171,7 @@ describe("DataLoaderService", () => {
       expect(result.registerEntries).toEqual([]);
       expect(result.reoccurrences).toEqual([]);
       expect(result.reoccurrenceSkips).toEqual([]);
+      expect(result.minReoccurrenceDate).toBeNull();
     });
 
     it("should filter out cleared entries from register entries", async () => {

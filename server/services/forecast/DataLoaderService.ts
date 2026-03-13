@@ -17,28 +17,22 @@ export class DataLoaderService implements IDataLoaderService {
     this.cache.reoccurrence.clear();
     this.cache.reoccurrenceSkip.clear();
 
-    // Load account registers
-    const accountRegisters = await this.loadAccountRegisters(context.accountId);
+    const [accountRegisters, registerEntries, reoccurrences, reoccurrenceSkips, minReoccurrenceDate] =
+      await Promise.all([
+        this.loadAccountRegisters(context.accountId),
+        this.loadRegisterEntries(context.accountId),
+        this.loadReoccurrences(context.accountId),
+        this.loadReoccurrenceSkips(context.accountId),
+        this.getMinReoccurrenceDate(context.accountId),
+      ]);
 
-    // Load register entries
-    const registerEntries = await this.loadRegisterEntries(context.accountId);
-
-    // Load reoccurrences
-    const reoccurrences = await this.loadReoccurrences(context.accountId);
-
-    // Load reoccurrence skips
-    const reoccurrenceSkips = await this.loadReoccurrenceSkips(
-      context.accountId,
-    );
-
-    const result = {
+    return {
       accountRegisters,
       registerEntries,
       reoccurrences,
       reoccurrenceSkips,
+      minReoccurrenceDate,
     };
-
-    return result;
   }
 
   private async loadAccountRegisters(
