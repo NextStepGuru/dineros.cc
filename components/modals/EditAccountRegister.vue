@@ -115,9 +115,10 @@ async function handleSubmit({
       });
     }
 
+    const payload = { ...formData, latestBalance: formData.balance };
     const responseData = await $api("/api/account-register", {
       method: "POST",
-      body: formData,
+      body: payload,
       onResponseError: () => {
         isSaving.value = false;
       },

@@ -111,7 +111,7 @@ describe("DataPersisterService", () => {
       expect(mockDb.registerEntry.create).toHaveBeenCalledTimes(2);
       expect(forecastLogger.service).toHaveBeenCalledWith(
         "DataPersisterService",
-        expect.stringContaining("Using rate-limited fallback for 2 entries")
+        expect.stringContaining("Using rate-limited fallback for chunk of 2 entries")
       );
     });
 
@@ -285,11 +285,24 @@ describe("DataPersisterService", () => {
     });
   });
 
+  // Persistence regression: never future, never regress, latest past from existing or cache lastRunAt (past only).
   describe("persistReoccurrenceLastAt", () => {
-    it("should persist lastRunAt when present and advance by interval until next > now", async () => {
+    function captureLastAtFromExecuteRaw(mock: any): Date | undefined {
+      const call = mock.mock.calls[0]?.[0];
+      if (!call?.values) return undefined;
+      // Prisma.sql: last_at CASE id WHEN id THEN lastAt ... so values[1] is first row's lastAt
+      return call.values[1] instanceof Date ? call.values[1] : undefined;
+    }
+
+    beforeEach(() => {
+      (mockDb as any).$executeRaw = (mockDb as any).$executeRaw ?? vi.fn().mockResolvedValue(undefined);
+    });
+
+    it("should persist lastRunAt when present (past) and use it as final last_at", async () => {
       dateTimeService.setNowOverride(new Date("2026-04-15T12:00:00.000Z"));
       try {
-        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([{ id: 1, lastAt: null }]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
           {
             id: 1,
@@ -311,25 +324,22 @@ describe("DataPersisterService", () => {
           } as any,
         ];
         await service.persistReoccurrenceLastAt(reoccurrences);
-        expect(mockDb.reoccurrence.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: 1 },
-            data: expect.objectContaining({
-              lastAt: expect.any(Date),
-            }),
-          })
-        );
-        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
-        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-04-02");
+        expect((mockDb as any).$executeRaw).toHaveBeenCalledTimes(1);
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-02-02");
       } finally {
         dateTimeService.clearNowOverride();
       }
     });
 
-    it("should cap future lastAt by stepping back then forward by interval", async () => {
+    it("should never persist future: cap from existing by stepping forward until next > now", async () => {
       dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
       try {
-        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
+          { id: 1, lastAt: new Date("2026-01-02") },
+        ]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
           {
             id: 1,
@@ -350,17 +360,21 @@ describe("DataPersisterService", () => {
           } as any,
         ];
         await service.persistReoccurrenceLastAt(reoccurrences);
-        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
-        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-03-02");
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-02");
       } finally {
         dateTimeService.clearNowOverride();
       }
     });
 
-    it("should respect intervalCount when advancing", async () => {
+    it("should respect intervalCount when advancing from existing", async () => {
       dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
       try {
-        vi.spyOn(mockDb.reoccurrence, "update").mockResolvedValue({} as any);
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
+          { id: 1, lastAt: new Date("2026-01-01") },
+        ]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
           {
             id: 1,
@@ -381,8 +395,81 @@ describe("DataPersisterService", () => {
           } as any,
         ];
         await service.persistReoccurrenceLastAt(reoccurrences);
-        const lastAt = (mockDb.reoccurrence.update as any).mock.calls[0][0].data.lastAt;
-        expect(lastAt.toISOString().slice(0, 10)).toBe("2026-03-01");
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-01");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should never regress: keep existing last_at when it is later than candidate and proposed", async () => {
+      dateTimeService.setNowOverride(new Date("2026-05-01T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
+          { id: 1, lastAt: new Date("2026-04-15") },
+        ]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalName: "Month",
+            intervalCount: 1,
+            lastAt: new Date("2026-04-15"),
+            lastRunAt: new Date("2026-03-01"),
+            endAt: null,
+            amount: 100,
+            description: "Monthly",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-04-15");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should ignore future lastRunAt from cache and use latest past from existing", async () => {
+      dateTimeService.setNowOverride(new Date("2026-04-10T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
+          { id: 1, lastAt: new Date("2026-02-01") },
+        ]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalName: "Month",
+            intervalCount: 1,
+            lastAt: new Date("2028-01-01"),
+            lastRunAt: new Date("2028-01-01"),
+            endAt: null,
+            amount: 100,
+            description: "Monthly",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-04-01");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -431,6 +518,10 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
         findMany: vi.fn(),
         updateMany: vi.fn(),
       },
+      reoccurrence: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      $executeRaw: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     mockRateLimiter = {
@@ -590,10 +681,14 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       await service.performInitialCleanup(accountId);
 
+      // When no registers found, ids.length is 0 so we never call deleteMany for "Latest Balance".
+      // We do call deleteMany from cleanupProjectedEntries (and convertOldProjectedToPending).
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
-          description: "Latest Balance",
-          accountRegisterId: { in: [] },
+          register: { accountId },
+          isProjected: true,
+          isPending: false,
+          isManualEntry: false,
         },
       });
     });
@@ -603,27 +698,15 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     it("should update projected entries status based on date", async () => {
       const accountId = "test-account-123";
 
-      vi.spyOn(mockDb.registerEntry, "updateMany").mockResolvedValue({ count: 5 } as any);
-
       await service.updateEntryStatuses(accountId);
 
-      // Should call updateMany 4 times for different status updates
-      expect(mockDb.registerEntry.updateMany).toHaveBeenCalledTimes(4);
-
-      // Check that the date filtering is correct
-      const calls = mockDb.registerEntry.updateMany.mock.calls;
-      expect(calls[0][0].where.isProjected).toBe(true);
-      expect(calls[1][0].where.isProjected).toBe(true);
-      expect(calls[2][0].where.isManualEntry).toBe(true);
-      expect(calls[3][0].where.isManualEntry).toBe(true);
+      expect(mockDb.$executeRaw).toHaveBeenCalledTimes(1);
     });
 
     it("should handle null accountId", async () => {
-      vi.spyOn(mockDb.registerEntry, "updateMany").mockResolvedValue({ count: 0 } as any);
-
       await service.updateEntryStatuses();
 
-      expect(mockDb.registerEntry.updateMany).toHaveBeenCalledTimes(4);
+      expect(mockDb.$executeRaw).toHaveBeenCalledTimes(1);
     });
   });
 

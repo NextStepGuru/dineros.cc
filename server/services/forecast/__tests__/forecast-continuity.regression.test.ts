@@ -47,6 +47,7 @@ describe("Forecast Continuity Regression Tests", () => {
         findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
+      $executeRaw: vi.fn().mockResolvedValue(undefined),
     };
 
     // Create engine with mocked database

@@ -179,13 +179,7 @@ export class ForecastEngine implements IForecastEngine {
           tx
         );
 
-        // 13. Update account register latestBalance fields (from cache)
-        if (context.accountId && accountData.accountRegisters.length > 0) {
-          await this.dataPersister.updateAccountRegisterBalances(
-            accountData.accountRegisters,
-            tx
-          );
-        }
+        // 13. Do not update account register latest_balance from forecast; user/Plaid are the source of truth.
 
         const statementAtUpdates =
           this.accountService.getPendingStatementAtUpdates();
@@ -335,7 +329,7 @@ export class ForecastEngine implements IForecastEngine {
           lastAt: reoccurrence.lastAt || dateTimeService.nowDate(),
           updatedAt: reoccurrence.updatedAt || dateTimeService.nowDate(),
         })),
-        endDate.toDate()
+        currentDate.toDate()
       );
 
       // Process interest charges for debt accounts (including minimum payments)
@@ -397,9 +391,10 @@ export class ForecastEngine implements IForecastEngine {
     const returnRegisterEntries: CacheRegisterEntry[] = [];
 
     for (const accountRegister of accountRegisters) {
-      const accountEntries = this.cache.registerEntry.find({
+      const accountEntriesAll = this.cache.registerEntry.find({
         accountRegisterId: accountRegister.id,
       });
+      const accountEntries = accountEntriesAll;
       const balanceEntries = accountEntries.filter((e) => e.isBalanceEntry);
 
       // Filter out skipped entries

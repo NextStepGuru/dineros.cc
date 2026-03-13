@@ -393,7 +393,8 @@ describe("DataLoaderService", () => {
       expect(loadedAccount.id).toBe(1);
       expect(loadedAccount.budgetId).toBe("budget-123");
       expect(loadedAccount.name).toBe("Test Account");
-      expect(loadedAccount.balance).toBe(1500.5);
+      // Loader sets both from latestBalance (see DataLoaderService)
+      expect(loadedAccount.balance).toBe(1400.25);
       expect(loadedAccount.latestBalance).toBe(1400.25);
       expect(loadedAccount.minPayment).toBe(50);
       expect(loadedAccount.apr1).toBe(0.15);

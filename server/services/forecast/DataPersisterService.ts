@@ -34,12 +34,66 @@ export class DataPersisterService implements IDataPersisterService {
     const db = this.client(tx);
     const nowDate = dateTimeService.nowDate();
     const nowMoment = dateTimeService.createUTC(nowDate);
+    const existingRows = await db.reoccurrence.findMany({
+      where: { id: { in: reoccurrences.map((r) => r.id) } },
+      select: { id: true, lastAt: true },
+    });
+    const existingById = new Map<number, Date | null>(
+      existingRows.map((r) => [r.id, r.lastAt ?? null])
+    );
 
     const rows = reoccurrences.map((item) => ({
       id: item.id,
-      lastAt: this.computeLastRunAtToPersist(item, nowMoment),
+      description: item.description,
+      intervalId: item.intervalId,
+      intervalCount: item.intervalCount || 1,
+      intervalName: item.intervalName,
+      proposedLastRunAt: item.lastRunAt ?? null,
+      existingLastAt: existingById.get(item.id) ?? null,
       updatedAt: item.updatedAt ?? nowDate,
-    }));
+    })).map((row) => {
+      const candidateFromExisting = this.computeLatestPastRunFromExisting(
+        row.existingLastAt,
+        row.intervalId,
+        row.intervalCount,
+        row.intervalName,
+        nowMoment
+      );
+      const proposedPastRunAt =
+        row.proposedLastRunAt &&
+        dateTimeService.isSameOrBefore(
+          dateTimeService.createUTC(row.proposedLastRunAt),
+          nowMoment
+        )
+          ? row.proposedLastRunAt
+          : null;
+      let finalLastAt = row.existingLastAt;
+      if (
+        candidateFromExisting &&
+        (!finalLastAt ||
+          dateTimeService.isAfter(
+            dateTimeService.createUTC(candidateFromExisting),
+            dateTimeService.createUTC(finalLastAt)
+          ))
+      ) {
+        finalLastAt = candidateFromExisting;
+      }
+      if (
+        proposedPastRunAt &&
+        (!finalLastAt ||
+          dateTimeService.isAfter(
+            dateTimeService.createUTC(proposedPastRunAt),
+            dateTimeService.createUTC(finalLastAt)
+          ))
+      ) {
+        finalLastAt = proposedPastRunAt;
+      }
+      return {
+        id: row.id,
+        lastAt: finalLastAt,
+        updatedAt: row.updatedAt,
+      };
+    });
 
     const lastAtCases = rows.map((r) =>
       Prisma.sql`WHEN ${r.id} THEN ${r.lastAt}`
@@ -54,59 +108,36 @@ export class DataPersisterService implements IDataPersisterService {
     );
   }
 
-  /**
-   * Advance lastRunAt by interval; only update (persist a newer date) when that next date is still in the past.
-   * Respects interval (e.g. monthly on the 2nd stays on the 2nd).
-   */
-  private computeLastRunAtToPersist(
-    item: CacheReoccurrence,
+  private computeLatestPastRunFromExisting(
+    existingLastAt: Date | null,
+    intervalId: number,
+    intervalCount: number,
+    intervalName: string | null | undefined,
     nowMoment: ReturnType<typeof dateTimeService.createUTC>
   ): Date | null {
-    const unit = this.getIntervalUnit(item);
-    let current: ReturnType<typeof dateTimeService.createUTC> | null = null;
-    if (item.lastRunAt) {
-      current = dateTimeService.createUTC(item.lastRunAt);
-    } else if (item.lastAt) {
-      const lastAtMoment = dateTimeService.createUTC(item.lastAt);
-      if (dateTimeService.isSameOrBefore(lastAtMoment, nowMoment)) {
-        current = lastAtMoment;
-      } else if (unit) {
-        const count = item.intervalCount || 1;
-        current = lastAtMoment;
-        while (dateTimeService.isAfter(current, nowMoment)) {
-          current = dateTimeService.subtract(count, unit, current);
-        }
-      } else {
-        current = lastAtMoment;
-      }
-    }
-    if (!current) return null;
-    if (!unit) {
-      const d = dateTimeService.toDate(current);
-      return dateTimeService.isAfter(current, nowMoment)
-        ? dateTimeService.toDate(nowMoment)
-        : d;
-    }
-    const count = item.intervalCount || 1;
-    let lastRun = current;
-    let next = dateTimeService.add(count, unit, lastRun);
-    while (dateTimeService.isSameOrBefore(next, nowMoment)) {
-      lastRun = next;
-      next = dateTimeService.add(count, unit, lastRun);
+    if (!existingLastAt) return null;
+    const unit = this.getIntervalUnit(intervalId, intervalName);
+    if (!unit) return null;
+    let lastRun = dateTimeService.createUTC(existingLastAt);
+    let nextRun = dateTimeService.add(intervalCount || 1, unit, lastRun);
+    while (dateTimeService.isSameOrBefore(nextRun, nowMoment)) {
+      lastRun = nextRun;
+      nextRun = dateTimeService.add(intervalCount || 1, unit, lastRun);
     }
     return dateTimeService.toDate(lastRun);
   }
 
   private getIntervalUnit(
-    item: CacheReoccurrence
+    intervalId: number,
+    intervalName: string | null | undefined
   ): "days" | "weeks" | "months" | "years" | null {
-    const name = item.intervalName?.trim().toLowerCase();
+    const name = intervalName?.trim().toLowerCase();
     if (name === "once") return null;
     if (name === "day" || name === "days") return "days";
     if (name === "week" || name === "weeks") return "weeks";
     if (name === "month" || name === "months") return "months";
     if (name === "year" || name === "years") return "years";
-    switch (item.intervalId) {
+    switch (intervalId) {
       case 1:
         return "days";
       case 2:
@@ -141,39 +172,34 @@ export class DataPersisterService implements IDataPersisterService {
       };
     });
 
-    try {
-      await db.registerEntry.createMany({
-        data: insertData,
-        skipDuplicates: true,
-      });
-    } catch (error) {
-      // Fallback to individual creates if createMany fails
-      forecastLogger.service(
-        "DataPersisterService",
-        `Using rate-limited fallback for ${insertData.length} entries`
-      );
-
-      const operations = insertData.map(
-        (item) => () =>
-          db.registerEntry
-            .create({
-              data: item,
-            })
-            .catch(() => {
-              // Ignore duplicate key errors
-              forecastLogger.service(
-                "DataPersisterService",
-                `Skipped duplicate entry: ${item.id}`
-              );
-            })
-      );
-
-      await this.rateLimiter.executeWithLimit(operations);
-
-      const status = this.rateLimiter.getStatus();
-      forecastLogger.debug(
-        `[DataPersisterService] Rate limiter status: ${JSON.stringify(status)}`
-      );
+    const CHUNK_SIZE = 350;
+    for (let i = 0; i < insertData.length; i += CHUNK_SIZE) {
+      const chunk = insertData.slice(i, i + CHUNK_SIZE);
+      try {
+        await db.registerEntry.createMany({
+          data: chunk,
+          skipDuplicates: true,
+        });
+      } catch {
+        forecastLogger.service(
+          "DataPersisterService",
+          `Using rate-limited fallback for chunk of ${chunk.length} entries`
+        );
+        const operations = chunk.map(
+          (item) => () =>
+            db.registerEntry
+              .create({
+                data: item,
+              })
+              .catch(() => {
+                forecastLogger.service(
+                  "DataPersisterService",
+                  `Skipped duplicate entry: ${item.id}`
+                );
+              })
+        );
+        await this.rateLimiter.executeWithLimit(operations);
+      }
     }
     return idMap;
   }
@@ -251,8 +277,12 @@ export class DataPersisterService implements IDataPersisterService {
         return b.amount - a.amount;
       });
       let running = 0;
+      let minRunning = Number.POSITIVE_INFINITY;
+      let maxRunning = Number.NEGATIVE_INFINITY;
       for (const entry of sorted) {
         running += entry.amount;
+        if (running < minRunning) minRunning = running;
+        if (running > maxRunning) maxRunning = running;
         idBalancePairs.push({ id: entry.id, balance: running });
       }
     }
@@ -363,47 +393,15 @@ export class DataPersisterService implements IDataPersisterService {
       })
     );
 
-    await db.registerEntry.updateMany({
-      data: { isPending: true },
-      where: {
-        ...(accountId && { register: { accountId } }),
-        isCleared: false,
-        isProjected: true,
-        isManualEntry: false,
-        createdAt: { lte: now },
-      },
-    });
-
-    await db.registerEntry.updateMany({
-      data: { isPending: false },
-      where: {
-        ...(accountId && { register: { accountId } }),
-        isCleared: false,
-        isProjected: true,
-        isManualEntry: false,
-        createdAt: { gt: now },
-      },
-    });
-
-    await db.registerEntry.updateMany({
-      data: { isPending: true },
-      where: {
-        ...(accountId && { register: { accountId } }),
-        isCleared: false,
-        isManualEntry: true,
-        createdAt: { lte: now },
-      },
-    });
-
-    await db.registerEntry.updateMany({
-      data: { isPending: false },
-      where: {
-        ...(accountId && { register: { accountId } }),
-        isManualEntry: true,
-        isCleared: false,
-        createdAt: { gt: now },
-      },
-    });
+    if (accountId) {
+      await (db as PrismaClient).$executeRaw(
+        Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`
+      );
+    } else {
+      await (db as PrismaClient).$executeRaw(
+        Prisma.sql`UPDATE register_entry SET is_pending = (created_at <= ${now}) WHERE is_cleared = 0 AND (is_projected = 1 OR is_manual_entry = 1)`
+      );
+    }
   }
 
   async cleanupProjectedEntriesByAccount(

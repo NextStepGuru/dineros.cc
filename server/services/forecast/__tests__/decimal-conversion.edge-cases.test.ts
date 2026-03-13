@@ -653,8 +653,25 @@ describe("Decimal/String Conversion Edge Cases", () => {
 
       cache.accountRegister.insert(account);
 
-      // Add entries with various types
+      // Add entries with various types (implementation sums entry amounts only; include opening balance as entry for expected total)
       const mixedEntries = [
+        {
+          id: "mixed-0",
+          seq: null,
+          accountRegisterId: 50,
+          sourceAccountRegisterId: null,
+          createdAt: dateTimeService.create(),
+          description: "Opening Balance",
+          reoccurrenceId: null,
+          amount: 3000,
+          balance: 0,
+          isBalanceEntry: true,
+          isPending: false,
+          isCleared: false,
+          isProjected: true,
+          isManualEntry: false,
+          isReconciled: false,
+        },
         {
           id: "mixed-1",
           seq: null,

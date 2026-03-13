@@ -197,7 +197,7 @@ describe("Register and File Upload API Endpoints", () => {
             },
           },
         }),
-        orderBy: { seq: "asc" },
+        orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
         take: 100, // Now loading all records up to skip + take
       });
       expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
@@ -285,7 +285,7 @@ describe("Register and File Upload API Endpoints", () => {
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             take: 50, // Quick mode correctly limits to 50
-            orderBy: { seq: "asc" },
+            orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
             where: expect.objectContaining({
               accountRegisterId: 1,
               OR: [
@@ -369,7 +369,7 @@ describe("Register and File Upload API Endpoints", () => {
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             take: 100,
-            orderBy: { seq: "asc" },
+            orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
             where: expect.objectContaining({
               accountRegisterId: 1,
               OR: [

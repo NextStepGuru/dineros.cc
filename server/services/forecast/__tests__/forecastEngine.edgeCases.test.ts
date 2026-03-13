@@ -198,12 +198,14 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       };
 
       const mockAccountService = {
+        initTimelineAccountCaches: vi.fn(),
         getAccountsWithExtraPayments: vi.fn().mockReturnValue([]),
         getInterestBearingAccounts: vi.fn().mockReturnValue([]),
         processInterestCharges: vi.fn(),
       };
 
       const mockReoccurrenceService = {
+        initReoccurrenceSchedule: vi.fn(),
         getReoccurrencesDue: vi.fn().mockReturnValue([]),
         processReoccurrences: vi.fn(),
       };
@@ -227,6 +229,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       };
 
       const mockAccountService = {
+        initTimelineAccountCaches: vi.fn(),
         getAccountsWithExtraPayments: vi.fn().mockReturnValue([]),
         getInterestBearingAccounts: vi.fn().mockReturnValue([]),
         processInterestCharges: vi.fn(),
@@ -234,6 +237,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       };
 
       const mockReoccurrenceService = {
+        initReoccurrenceSchedule: vi.fn(),
         getReoccurrencesDue: vi.fn().mockReturnValue([]),
         processReoccurrences: vi.fn(),
       };
@@ -450,6 +454,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         reoccurrenceSkip: {
           findMany: vi.fn().mockResolvedValue([]),
         },
+        $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+        $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
 
       const engine = new ForecastEngine(mockDb);
@@ -485,6 +491,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         reoccurrenceSkip: {
           findMany: vi.fn().mockResolvedValue([]),
         },
+        $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+        $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
 
       const engine = new ForecastEngine(mockDb);

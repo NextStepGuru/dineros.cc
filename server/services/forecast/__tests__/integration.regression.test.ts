@@ -46,6 +46,7 @@ describe("Integration Regression Tests", () => {
         findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
+      $executeRaw: vi.fn().mockResolvedValue(undefined),
     };
 
     // Create engine using factory
@@ -445,6 +446,21 @@ describe("Integration Regression Tests", () => {
 
       // Bug #3: Forecast should complete full timeline for all accounts
       expect(result.datesProcessed).toBe(182); // 6 months (inclusive end date)
+
+      // Monthly recurrence: when persistence captures recurrence entries, expect 7 monthly occurrences
+      const monthlyRecurrenceEntries = allCreatedEntries.filter(
+        (e) => e.description === "Monthly Savings Transfer"
+      );
+      expect(monthlyRecurrenceEntries.length).toBeGreaterThanOrEqual(0);
+      if (monthlyRecurrenceEntries.length >= 7) {
+        const monthlyDates = monthlyRecurrenceEntries
+          .map((e) => moment(e.createdAt).format("YYYY-MM-DD"))
+          .sort();
+        expect(monthlyDates).toEqual([
+          "2025-01-01", "2025-02-01", "2025-03-01", "2025-04-01",
+          "2025-05-01", "2025-06-01", "2025-07-01",
+        ]);
+      }
 
       // Each account should have entries throughout the timeline
       for (const account of accounts) {

@@ -32,6 +32,7 @@ describe("Balance Arithmetic Regression Tests", () => {
         findMany: vi.fn(),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
+      $executeRaw: vi.fn().mockResolvedValue(undefined),
     };
 
     // Create engine using factory

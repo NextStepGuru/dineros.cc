@@ -6,6 +6,7 @@ import { TransferService } from "../TransferService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import type { PrismaClient, Reoccurrence } from "~/types/test-types";
 import { forecastLogger } from "../logger";
+import { dateTimeService } from "../DateTimeService";
 
 describe("ReoccurrenceService", () => {
   let service: ReoccurrenceService;
@@ -73,6 +74,8 @@ describe("ReoccurrenceService", () => {
     } as Reoccurrence;
   }
 
+  // Recurrence regression matrix: due-date gating, next-occurrence progression, cache lastAt/lastRunAt,
+  // monthly stepping, transfer vs entry path, endAt boundary (see also DataPersisterService + integration tests).
   describe("processReoccurrences", () => {
     it("should process multiple reoccurrences up to end date", async () => {
       const reoccurrence1 = createMockReoccurrence({
@@ -114,6 +117,7 @@ describe("ReoccurrenceService", () => {
         new Date("2024-02-01")
       );
 
+      // First occurrence is next after lastAt (2024-02-01), not replay of lastAt
       expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith({
         targetAccountRegisterId: 1,
         sourceAccountRegisterId: 2,
@@ -127,7 +131,7 @@ describe("ReoccurrenceService", () => {
           amount: 100,
           intervalId: 3,
           intervalCount: 1,
-          lastAt: new Date("2024-01-01"),
+          lastAt: new Date("2024-02-01"),
           endAt: null,
           totalIntervals: null,
           elapsedIntervals: null,
@@ -151,6 +155,7 @@ describe("ReoccurrenceService", () => {
         new Date("2024-02-01")
       );
 
+      // First occurrence is next after lastAt (2024-02-01), not replay of lastAt
       expect(mockEntryService.createEntry).toHaveBeenCalledWith({
         accountRegisterId: 1,
         description: "Test Reoccurrence",
@@ -163,7 +168,7 @@ describe("ReoccurrenceService", () => {
           amount: 100,
           intervalId: 3,
           intervalCount: 1,
-          lastAt: new Date("2024-01-01"),
+          lastAt: new Date("2024-02-01"),
           endAt: null,
           totalIntervals: null,
           elapsedIntervals: null,
@@ -174,7 +179,7 @@ describe("ReoccurrenceService", () => {
       });
     });
 
-    it("should stop processing when end date is reached", async () => {
+    it("should not create entry when first next occurrence is after endAt", async () => {
       const reoccurrence = createMockReoccurrence({
         lastAt: new Date("2024-01-01"),
         endAt: new Date("2024-01-15"),
@@ -186,7 +191,8 @@ describe("ReoccurrenceService", () => {
         new Date("2024-03-01")
       );
 
-      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(1); // Should only process once
+      // First next occurrence is 2024-02-01, which is after endAt 2024-01-15, so we break before creating any entry
+      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(0);
     });
 
     it("should skip processing when lastAt is after endAt", async () => {
@@ -218,6 +224,89 @@ describe("ReoccurrenceService", () => {
       );
 
       expect(mockCache.reoccurrence.update).toHaveBeenCalled();
+    });
+
+    it("should not create entry when endDate is before first next occurrence (due-date gating)", async () => {
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-01-01"),
+        intervalId: 3,
+      });
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-01-15")
+      );
+
+      // First next occurrence would be 2024-02-01, which is after endDate 2024-01-15
+      expect(mockEntryService.createEntry).not.toHaveBeenCalled();
+      expect(mockTransferService.transferBetweenAccounts).not.toHaveBeenCalled();
+    });
+
+    it("should set lastRunAt on cache only when occurrence date is in the past", async () => {
+      dateTimeService.setNowOverride(new Date("2024-03-15T12:00:00.000Z"));
+      try {
+        const reoccurrence = createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 3,
+        });
+        mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+
+        await service.processReoccurrences(
+          [reoccurrence],
+          new Date("2024-03-01")
+        );
+
+        // Processed 2024-02-01 and 2024-03-01; both are <= now (2024-03-15), so lastRunAt should be set to 2024-03-01 on final update
+        expect(mockCache.reoccurrence.update).toHaveBeenCalled();
+        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
+        expect(lastUpdate.lastRunAt).toEqual(new Date("2024-03-01"));
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should not set lastRunAt when occurrence date is in the future relative to now", async () => {
+      dateTimeService.setNowOverride(new Date("2024-01-15T12:00:00.000Z"));
+      try {
+        const reoccurrence = createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 3,
+        });
+        mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+
+        await service.processReoccurrences(
+          [reoccurrence],
+          new Date("2024-02-01")
+        );
+
+        // First occurrence 2024-02-01 is after now (2024-01-15), so lastRunAt must not be set
+        expect(mockCache.reoccurrence.update).toHaveBeenCalled();
+        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
+        expect(lastUpdate.lastRunAt).toBeUndefined();
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("should advance monthly from seed date and update cache with next occurrence", async () => {
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-01-01"),
+        intervalId: 3,
+      });
+      mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-04-01")
+      );
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(3);
+      const calls = (mockEntryService.createEntry as any).mock.calls;
+      expect(calls[0][0].reoccurrence.lastAt).toEqual(new Date("2024-02-01"));
+      expect(calls[1][0].reoccurrence.lastAt).toEqual(new Date("2024-03-01"));
+      expect(calls[2][0].reoccurrence.lastAt).toEqual(new Date("2024-04-01"));
+      const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
+      expect(lastUpdate.lastAt).toEqual(new Date("2024-05-01"));
     });
   });
 

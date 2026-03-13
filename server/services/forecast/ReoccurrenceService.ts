@@ -41,14 +41,19 @@ export class ReoccurrenceService implements IReoccurrenceService {
     reoccurrence: Reoccurrence,
     endDate: Date,
   ): Promise<void> {
-    let lastAt: any = dateTimeService.createUTC(reoccurrence.lastAt);
-    const originalLastAt = lastAt ? dateTimeService.clone(lastAt) : null;
+    if (!reoccurrence.lastAt) {
+      return;
+    }
+    const firstNextDate = this.calculateNextOccurrence(reoccurrence);
+    if (!firstNextDate) {
+      return;
+    }
+    let nextAt: any = dateTimeService.createUTC(firstNextDate);
     let occurrenceCount = 0;
 
     if (
-      !lastAt ||
       (reoccurrence.endAt &&
-        dateTimeService.isAfter(lastAt, reoccurrence.endAt))
+        dateTimeService.isAfter(nextAt, reoccurrence.endAt))
     ) {
       return;
     }
@@ -59,19 +64,19 @@ export class ReoccurrenceService implements IReoccurrenceService {
         reoccurrence.description
       }) from ${dateTimeService.format(
         "YYYY-MM-DD",
-        lastAt,
+        nextAt,
       )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`,
     );
 
     // Process all due occurrences up to endDate
     while (
-      lastAt &&
-      dateTimeService.isSameOrBefore(lastAt, dateTimeService.createUTC(endDate))
+      nextAt &&
+      dateTimeService.isSameOrBefore(nextAt, dateTimeService.createUTC(endDate))
     ) {
       // Only process if not past endAt
       if (
         reoccurrence.endAt &&
-        dateTimeService.isAfter(lastAt, reoccurrence.endAt)
+        dateTimeService.isAfter(nextAt, reoccurrence.endAt)
       ) {
         break;
       }
@@ -79,7 +84,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       occurrenceCount++;
 
       // Apply weekend adjustment to the current occurrence date if enabled
-      let adjustedLastAt = dateTimeService.clone(lastAt);
+      let adjustedLastAt = dateTimeService.clone(nextAt);
       if (reoccurrence.adjustBeforeIfOnWeekend) {
         adjustedLastAt = this.adjustDateIfWeekend(adjustedLastAt);
       }
@@ -112,10 +117,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Advance to next occurrence
       const nextDate = this.calculateNextOccurrence({
         ...reoccurrence,
-        lastAt: dateTimeService.toDate(lastAt),
+        lastAt: dateTimeService.toDate(nextAt),
       });
       if (!nextDate) break;
-      lastAt = dateTimeService.createUTC(nextDate);
+      nextAt = dateTimeService.createUTC(nextDate);
 
       // Update the reoccurrence in cache so timeline advances (forecasting can go into future)
       const nowDate = dateTimeService.nowDate();
@@ -123,7 +128,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         id: reoccurrence.id,
       });
       if (cachedReoccurrence) {
-        cachedReoccurrence.lastAt = dateTimeService.toDate(adjustedLastAt);
+        cachedReoccurrence.lastAt = dateTimeService.toDate(nextAt);
         if (
           dateTimeService.isSameOrBefore(
             adjustedLastAt,
@@ -224,10 +229,6 @@ export class ReoccurrenceService implements IReoccurrenceService {
   }
 
   getReoccurrencesDue(maxDate: Date): CacheReoccurrence[] {
-    if (this._scheduleByDate.size > 0) {
-      const dateStr = dateTimeService.format("YYYY-MM-DD", maxDate);
-      return this._scheduleByDate.get(dateStr) ?? [];
-    }
     const dueMoment = dateTimeService.createUTC(maxDate);
     return (
       this.cache.reoccurrence.find((reoccurrence) => {

@@ -154,51 +154,54 @@ describe("ForecastEngine Integration Tests", () => {
     });
 
     it("should handle reoccurrence scheduling correctly", async () => {
-      // Arrange: Create reoccurrence scenario
       await setupReoccurrenceScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf("month").toDate(),
-        endDate: moment().add(12, "months").toDate(),
+        startDate: new Date("2024-02-01"),
+        endDate: new Date("2024-05-01"),
         logging: { enabled: false },
       };
 
-      // Act: Run forecast calculation
       const result = await engine.recalculate(context);
 
-      // Assert: Verify reoccurrence results
       expect(result.isSuccess).toBe(true);
 
-      // Group entries by reoccurrence
       const reoccurringEntries = result.registerEntries.filter(
-        (e) => e.reoccurrenceId !== null && e.reoccurrenceId !== undefined
+        (e) => e.reoccurrenceId != null
       );
 
-      // Reoccurring entries may or may not be generated depending on date range and setup
-      expect(reoccurringEntries.length).toBeGreaterThanOrEqual(0);
+      expect(reoccurringEntries.length).toBeGreaterThanOrEqual(2);
 
-      // Verify scheduling patterns
       const entriesByReoccurrence = groupBy(
         reoccurringEntries,
         "reoccurrenceId"
       );
+      const monthlyEntries = Object.values(entriesByReoccurrence).flat().filter(
+        (e: any) => e.description === "Monthly 401k"
+      );
+      expect(monthlyEntries.length).toBeGreaterThanOrEqual(2);
+      const monthlyMonths = [...new Set(
+        monthlyEntries.map((e: any) => moment(e.createdAt).format("YYYY-MM"))
+      )].sort();
+      expect(monthlyMonths).toContain("2024-02");
+      if (monthlyMonths.length >= 4) {
+        expect(monthlyMonths).toContain("2024-03");
+        expect(monthlyMonths).toContain("2024-04");
+        expect(monthlyMonths).toContain("2024-05");
+      }
 
       Object.values(entriesByReoccurrence).forEach((entries: any[]) => {
         if (entries.length > 1) {
-          // Sort by date
-          const sortedEntries = entries.sort(
-            (a, b) =>
+          const sortedEntries = [...entries].sort(
+            (a: any, b: any) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
-
-          // Check that intervals are consistent
           for (let i = 1; i < sortedEntries.length; i++) {
-            const current = moment(sortedEntries[i].createdAt);
-            const previous = moment(sortedEntries[i - 1].createdAt);
-            const daysDiff = current.diff(previous, "days");
-
-            // This would depend on the interval type, but should be consistent
+            const daysDiff = moment(sortedEntries[i].createdAt).diff(
+              moment(sortedEntries[i - 1].createdAt),
+              "days"
+            );
             expect(daysDiff).toBeGreaterThan(0);
           }
         }
@@ -335,8 +338,40 @@ async function setupTransferScenario(db: any, accountId: string) {
 }
 
 async function setupReoccurrenceScenario(db: any, accountId: string) {
-  // Implementation for reoccurrence test scenario
-  // Create various reoccurrence types (daily, weekly, monthly, yearly)
+  const reg = await db.accountRegister.create({
+    data: {
+      accountId,
+      name: "Savings",
+      typeId: 1,
+      balance: 0,
+      statementAt: new Date("2024-06-01"),
+    },
+  });
+  if (!reg?.id) return reg;
+
+  await db.reoccurrence.create({
+    data: {
+      accountId,
+      accountRegisterId: reg.id,
+      description: "Monthly 401k",
+      amount: 500,
+      intervalId: 3,
+      intervalCount: 1,
+      lastAt: new Date("2024-01-01"),
+    },
+  });
+  await db.reoccurrence.create({
+    data: {
+      accountId,
+      accountRegisterId: reg.id,
+      description: "Weekly Save",
+      amount: 50,
+      intervalId: 2,
+      intervalCount: 1,
+      lastAt: new Date("2024-01-01"),
+    },
+  });
+  return reg;
 }
 
 async function setupLargeDatasetScenario(db: any, accountId: string) {

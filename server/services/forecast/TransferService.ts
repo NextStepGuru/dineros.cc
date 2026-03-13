@@ -9,6 +9,8 @@ import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class TransferService implements ITransferService {
+  private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
+
   constructor(
     private cache: ModernCacheService,
     private entryService: RegisterEntryService,
@@ -150,7 +152,8 @@ export class TransferService implements ITransferService {
     const excessAmount = balanceToUse - +account.minAccountBalance;
 
     // Use any excess amount above minimum balance (no artificial minimum required)
-    const finalEligible = isEligible && excessAmount > 0;
+    const finalEligible =
+      isEligible && excessAmount > TransferService.MONEY_EPSILON;
 
     if (account.allowExtraPayment === true) {
       forecastLogger.serviceDebug(
@@ -195,7 +198,17 @@ export class TransferService implements ITransferService {
     accountId: number,
     targetDate: Date,
   ): number {
-    return getProjectedBalanceAtDate(this.cache, accountId, targetDate);
+    const targetEpoch = new Date(targetDate).setUTCHours(23, 59, 59, 999);
+    const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
+    const ledgerProjected = entries
+      .filter((e) => (e.createdAt as Moment).valueOf() <= targetEpoch)
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const legacyProjected = getProjectedBalanceAtDate(
+      this.cache,
+      accountId,
+      targetDate,
+    );
+    return ledgerProjected;
   }
 
   /**
@@ -207,11 +220,8 @@ export class TransferService implements ITransferService {
     fromDate: Date,
     todayBalanceOverride?: number,
   ): number {
-    const account = this.cache.accountRegister.findOne({ id: accountId });
-    if (!account) return todayBalanceOverride ?? 0;
-
     const from = new Date(fromDate);
-    const dayEndEpochs: number[] = [];
+    let minBalance = Number.POSITIVE_INFINITY;
     for (let d = 0; d <= 7; d++) {
       const day = new Date(
         Date.UTC(
@@ -220,36 +230,15 @@ export class TransferService implements ITransferService {
           from.getUTCDate() + d,
         ),
       );
-      dayEndEpochs.push(day.getTime() + 86400000 - 1);
-    }
-
-    const entries = this.cache.registerEntry
-      .find({ accountRegisterId: accountId })
-      .filter((e) => !e.isBalanceEntry)
-      .map((e) => ({
-        epoch: (e.createdAt as Moment).valueOf(),
-        amount: +e.amount,
-      }));
-    entries.sort((a, b) => a.epoch - b.epoch);
-
-    let running = +account.latestBalance;
-    let idx = 0;
-    let minBalance =
-      todayBalanceOverride !== undefined ? todayBalanceOverride : running;
-    for (let d = 0; d <= 7; d++) {
-      const dayEnd = dayEndEpochs[d];
-      if (dayEnd === undefined) continue;
-      while (idx < entries.length) {
-        const ent = entries[idx];
-        if (!ent || ent.epoch > dayEnd) break;
-        running += ent.amount;
-        idx++;
-      }
-      const balanceAtDay =
+      const balanceAtDay = this.calculateProjectedBalanceAtDate(accountId, day);
+      const effectiveBalance =
         d === 0 && todayBalanceOverride !== undefined
-          ? todayBalanceOverride
-          : running;
-      if (balanceAtDay < minBalance) minBalance = balanceAtDay;
+          ? Math.min(todayBalanceOverride, balanceAtDay)
+          : balanceAtDay;
+      if (effectiveBalance < minBalance) minBalance = effectiveBalance;
+    }
+    if (!Number.isFinite(minBalance)) {
+      return todayBalanceOverride ?? 0;
     }
     return minBalance;
   }
@@ -300,7 +289,10 @@ export class TransferService implements ITransferService {
     remainingAvailableAmount = Math.min(remainingAvailableAmount, todayCushion);
 
     // Skip entire day if we're already at or below min - don't apply extra debt until balance is above min again
-    if (balanceBeforeExtraDebt < minBalance || remainingAvailableAmount <= 0) {
+    if (
+      balanceBeforeExtraDebt < minBalance ||
+      remainingAvailableAmount <= TransferService.MONEY_EPSILON
+    ) {
       return false;
     }
 
@@ -366,7 +358,7 @@ export class TransferService implements ITransferService {
     );
 
     // Ensure we don't transfer if it would bring the source account below minimum
-    if (remainingAvailableAmount <= 0) {
+    if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
       forecastLogger.serviceDebug(
         "TransferService",
         `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`,
@@ -388,14 +380,14 @@ export class TransferService implements ITransferService {
 
     // Pay debts in priority order until all available funds are used
     for (const debtAccountRegister of sortedDebtAccounts) {
-      if (remainingAvailableAmount <= 0) {
+      if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
         break; // No more funds available
       }
 
       // Use only calculated balance (start balance minus what we've already sent) so we never rely on stale cache
       const currentBalance = balanceBeforeExtraDebt - totalPaymentsMade;
       const maxFromCurrentBalance = Math.max(0, currentBalance - minBalance);
-      if (maxFromCurrentBalance <= 0) {
+      if (maxFromCurrentBalance <= TransferService.MONEY_EPSILON) {
         break; // Already at or below min, stop making payments today
       }
 
@@ -432,7 +424,7 @@ export class TransferService implements ITransferService {
       }
 
       // Skip if no payment needed (debt is already paid off)
-      if (paymentAmount <= 0) {
+      if (paymentAmount <= TransferService.MONEY_EPSILON) {
         continue;
       }
 
@@ -474,6 +466,13 @@ export class TransferService implements ITransferService {
           adjustBeforeIfOnWeekend: false,
         },
       });
+      const sourceAfterTransfer = this.cache.accountRegister.findById(
+        sourceAccountRegister.id,
+      );
+      const projectedAfterTransfer = this.calculateProjectedBalanceAtDate(
+        sourceAccountRegister.id,
+        lastAt,
+      );
 
       // Update remaining available amount
       remainingAvailableAmount -= paymentAmount;
@@ -491,6 +490,7 @@ export class TransferService implements ITransferService {
         originalAvailableAmount: projectedBalance - minBalance,
       },
     );
+    const finalSource = this.cache.accountRegister.findById(sourceAccountId);
 
     return paymentsProcessed > 0;
   }

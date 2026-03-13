@@ -17,14 +17,22 @@ export class DataLoaderService implements IDataLoaderService {
     this.cache.reoccurrence.clear();
     this.cache.reoccurrenceSkip.clear();
 
-    const [accountRegisters, registerEntries, reoccurrences, reoccurrenceSkips, minReoccurrenceDate] =
+    const [accountRegisters, registerEntries, reoccurrences, reoccurrenceSkips] =
       await Promise.all([
         this.loadAccountRegisters(context.accountId),
         this.loadRegisterEntries(context.accountId),
         this.loadReoccurrences(context.accountId),
         this.loadReoccurrenceSkips(context.accountId),
-        this.getMinReoccurrenceDate(context.accountId),
       ]);
+
+    const minReoccurrenceDate = (() => {
+      const dates = reoccurrences
+        .map((r) => r.lastAt)
+        .filter((d): d is NonNullable<typeof d> => d != null);
+      return dates.length
+        ? new Date(Math.min(...dates.map((d) => d.getTime())))
+        : null;
+    })();
 
     return {
       accountRegisters,

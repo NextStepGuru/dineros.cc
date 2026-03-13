@@ -38,6 +38,8 @@ const mockDb = {
   reoccurrenceSkip: {
     findMany: vi.fn(),
   },
+  $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+  $executeRaw: vi.fn().mockResolvedValue(undefined),
 } as any;
 
 describe("ForecastEngine Integration Tests", () => {
@@ -48,11 +50,13 @@ describe("ForecastEngine Integration Tests", () => {
     moment = (await import("moment")).default;
     vi.clearAllMocks();
 
-    // Reset the global mockDb
+    // Reset the global mockDb (skip $transaction/$executeRaw to avoid mockReset on non-vi functions)
     Object.keys(mockDb).forEach((key) => {
+      if (key === "$transaction" || key === "$executeRaw") return;
       Object.keys(mockDb[key]).forEach((method) => {
-        if (typeof mockDb[key][method] === "function") {
-          mockDb[key][method].mockReset();
+        const fn = mockDb[key][method];
+        if (typeof fn === "function" && typeof fn.mockReset === "function") {
+          fn.mockReset();
         }
       });
     });

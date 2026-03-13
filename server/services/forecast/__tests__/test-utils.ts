@@ -34,10 +34,22 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       deleteMany: vi.fn(),
     },
     reoccurrence: {
-      create: vi.fn(),
+      create: vi.fn().mockImplementation(async (data: any) => {
+        const row = {
+          ...data.data,
+          id: data.data.id ?? reoccurrences.length + 1,
+          interval: { name: data.data.intervalId === 3 ? "Month" : data.data.intervalId === 2 ? "Week" : data.data.intervalId === 1 ? "Day" : "Month" },
+        };
+        reoccurrences.push(row);
+        return row;
+      }),
       findMany: vi.fn().mockImplementation(async (query: any) => {
         if (query?.where?.accountId) {
           return reoccurrences.filter(r => r.accountId === query.where.accountId);
+        }
+        if (query?.where?.id?.in) {
+          const ids = query.where.id.in;
+          return reoccurrences.filter(r => ids.includes(r.id));
         }
         return reoccurrences;
       }),
@@ -90,7 +102,7 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
-    // Add missing tables that DataLoaderService might need
+    $executeRaw: vi.fn().mockResolvedValue(undefined),
     $transaction: vi.fn((callback) => callback(mockDb)),
   } as any;
 
