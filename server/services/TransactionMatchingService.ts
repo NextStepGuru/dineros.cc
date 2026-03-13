@@ -6,6 +6,7 @@ import type {
 } from "@prisma/client";
 import type { Transaction } from "plaid";
 import { log } from "~/server/logger";
+import { dateTimeService } from "./forecast/DateTimeService";
 
 export interface TransactionMatchResult {
   isMatched: boolean;
@@ -50,23 +51,17 @@ class TransactionMatchingService {
     accountRegisterId: number,
     formattedAmount: number
   ): Promise<RegisterEntry | null> {
-    const transactionDate = new Date(transaction.date);
+    const dt = dateTimeService.parseInput(transaction.date);
+    const dayStart = dateTimeService.startOfDay(dt).toDate();
+    const dayEnd = dateTimeService.startOfDay(dateTimeService.add(1, "day", dt)).toDate();
 
     return await this.db.registerEntry.findFirst({
       where: {
         accountRegisterId,
         amount: formattedAmount,
         createdAt: {
-          gte: new Date(
-            transactionDate.getFullYear(),
-            transactionDate.getMonth(),
-            transactionDate.getDate()
-          ),
-          lt: new Date(
-            transactionDate.getFullYear(),
-            transactionDate.getMonth(),
-            transactionDate.getDate() + 1
-          ),
+          gte: dayStart,
+          lt: dayEnd,
         },
         plaidId: null, // Only match manual entries
       },
@@ -82,11 +77,9 @@ class TransactionMatchingService {
     formattedAmount: number,
     dayRange: number = DEFAULT_FUZZY_DAY_RANGE
   ): Promise<RegisterEntry | null> {
-    const transactionDate = new Date(transaction.date);
-    const daysBefore = new Date(transactionDate);
-    daysBefore.setDate(daysBefore.getDate() - dayRange);
-    const daysAfter = new Date(transactionDate);
-    daysAfter.setDate(daysAfter.getDate() + dayRange);
+    const dt = dateTimeService.parseInput(transaction.date);
+    const daysBefore = dateTimeService.subtract(dayRange, "day", dt).toDate();
+    const daysAfter = dateTimeService.add(dayRange, "day", dt).toDate();
 
     const result = await this.db.registerEntry.findFirst({
       where: {
@@ -220,7 +213,9 @@ class TransactionMatchingService {
 
     // Update date if it was a fuzzy match
     if (matchType === "fuzzy") {
-      updateData.createdAt = new Date(transaction.date);
+      updateData.createdAt = dateTimeService.toDate(
+        dateTimeService.parseInput(transaction.date),
+      );
     }
 
     return await this.db.registerEntry.update({

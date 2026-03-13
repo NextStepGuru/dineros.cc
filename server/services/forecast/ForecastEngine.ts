@@ -210,10 +210,7 @@ export class ForecastEngine implements IForecastEngine {
         registerEntries: finalResults,
         accountRegisters: accountData.accountRegisters.map((acc) => ({
           ...acc,
-          statementAt:
-            typeof acc.statementAt === "string"
-              ? new Date(acc.statementAt)
-              : acc.statementAt,
+          statementAt: dateTimeService.toDate(acc.statementAt),
         })) as any[], // TODO: Fix type mapping for AccountRegister
         isSuccess: true,
         datesProcessed,
@@ -373,9 +370,8 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private async loadManualEntriesForDate(date: any): Promise<void> {
-    const d = dateTimeService.toDate(date);
-    const dayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).getTime();
-    const dayEnd = dayStart + 86400000;
+    const dayStart = dateTimeService.startOfDay(date).valueOf();
+    const dayEnd = dateTimeService.startOfDay(dateTimeService.add(1, "day", date)).valueOf();
     this.cache.registerEntry.find(
       (entry) =>
         entry.isManualEntry === true &&

@@ -288,7 +288,7 @@ describe("ReoccurrenceService", () => {
       }
     });
 
-    it("should advance monthly from seed date and update cache with next occurrence", async () => {
+    it("should advance monthly from seed date and update cache with last processed occurrence", async () => {
       const reoccurrence = createMockReoccurrence({
         lastAt: new Date("2024-01-01"),
         intervalId: 3,
@@ -306,7 +306,7 @@ describe("ReoccurrenceService", () => {
       expect(calls[1][0].reoccurrence.lastAt).toEqual(new Date("2024-03-01"));
       expect(calls[2][0].reoccurrence.lastAt).toEqual(new Date("2024-04-01"));
       const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
-      expect(lastUpdate.lastAt).toEqual(new Date("2024-05-01"));
+      expect(lastUpdate.lastAt).toEqual(new Date("2024-04-01"));
     });
   });
 

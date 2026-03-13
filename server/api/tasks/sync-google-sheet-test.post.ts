@@ -197,7 +197,7 @@ function formatDataForSheets(registerData: {
 
   // Data rows
   const rows = entries.map((entry) => [
-    new Date(entry.createdAt).toLocaleDateString(),
+    dateTimeService.formatInTimezone(entry.createdAt, "UTC", "YYYY-MM-DD"),
     entry.description,
     entry.amount,
     entry.balance,
@@ -214,7 +214,7 @@ function formatDataForSheets(registerData: {
       lowest?.balance || "N/A",
       "",
       lowest?.createdAt
-        ? new Date(lowest.createdAt).toLocaleDateString()
+        ? dateTimeService.formatInTimezone(lowest.createdAt, "UTC", "YYYY-MM-DD")
         : "N/A",
     ],
     [
@@ -222,11 +222,11 @@ function formatDataForSheets(registerData: {
       highest?.balance || "N/A",
       "",
       highest?.createdAt
-        ? new Date(highest.createdAt).toLocaleDateString()
+        ? dateTimeService.formatInTimezone(highest.createdAt, "UTC", "YYYY-MM-DD")
         : "N/A",
     ],
     ["Total Entries:", entries.length],
-    ["Last Updated:", dateTimeService.nowDate().toLocaleString()],
+    ["Last Updated:", dateTimeService.formatInTimezone(dateTimeService.now(), "UTC", "YYYY-MM-DD HH:mm:ss")],
   ];
 
   return [headers, ...rows, ...summaryRows];

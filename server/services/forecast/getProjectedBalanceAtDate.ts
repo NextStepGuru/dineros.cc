@@ -1,5 +1,6 @@
 import type { Moment } from "moment";
 import type { ModernCacheService } from "./ModernCacheService";
+import { dateTimeService } from "./DateTimeService";
 
 /**
  * Shared projected balance at a date: latestBalance + sum of non-balance entries with createdAt <= target date.
@@ -13,7 +14,7 @@ export function getProjectedBalanceAtDate(
   const account = cache.accountRegister.findOne({ id: accountId });
   if (!account) return 0;
 
-  const targetEpoch = new Date(targetDate).setUTCHours(23, 59, 59, 999);
+  const targetEpoch = dateTimeService.endOfDay(targetDate).valueOf();
   const entries = cache.registerEntry.find({
     accountRegisterId: accountId,
   });

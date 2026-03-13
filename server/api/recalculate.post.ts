@@ -1,4 +1,4 @@
-import { recalculateSchema } from "~/schema/zod";
+import { z } from "zod";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { createError } from "h3";
 import {
@@ -7,10 +7,20 @@ import {
 } from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
 
+const replaySchema = z.object({
+  accountRegisterId: z.coerce.number().optional(),
+  accountId: z.string().optional(),
+  fixedNow: z.string().optional(),
+  timezone: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { accountId } = recalculateSchema.parse(body);
+    const { accountId, fixedNow, timezone, startDate, endDate } =
+      replaySchema.parse(body);
 
     if (!accountId) {
       throw createError({
@@ -19,16 +29,34 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Run recalculation immediately instead of using queue
     const engine = ForecastEngineFactory.create(prisma);
-    const context = {
+
+    const buildContext = () => ({
       accountId,
-      startDate: dateTimeService.now().startOf("month").toDate(),
-      endDate: dateTimeService.now().add(2, "years").toDate(),
+      startDate: startDate
+        ? dateTimeService.toDate(dateTimeService.parseInput(startDate))
+        : dateTimeService.now().startOf("month").toDate(),
+      endDate: endDate
+        ? dateTimeService.toDate(dateTimeService.parseInput(endDate))
+        : dateTimeService.now().add(2, "years").toDate(),
       logging: { enabled: false },
+    });
+
+    const runRecalc = async () => {
+      const context = buildContext();
+      return engine.recalculate(context);
     };
 
-    const result = await engine.recalculate(context);
+    const result =
+      fixedNow != null && fixedNow !== ""
+        ? await dateTimeService.withRunContext(
+            {
+              fixedNow,
+              timezone: timezone ?? "UTC",
+            },
+            runRecalc,
+          )
+        : await runRecalc();
 
     if (!result.isSuccess) {
       throw createError({

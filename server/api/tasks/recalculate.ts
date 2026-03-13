@@ -52,19 +52,40 @@ export default defineEventHandler(async (event) => {
   let totalAccountRegisters = 0;
   let failedAccounts = [];
 
+  const fixedNow = (query.fixedNow as string) ?? undefined;
+  const timezone = (query.timezone as string) ?? "UTC";
+  const startDateParam = (query.startDate as string) ?? undefined;
+  const endDateParam = (query.endDate as string) ?? undefined;
+
+  const buildContext = (accountId: string) => ({
+    accountId,
+    startDate:
+      startDateParam != null && startDateParam !== ""
+        ? dateTimeService.toDate(dateTimeService.parseInput(startDateParam))
+        : dateTimeService.now().startOf("month").toDate(),
+    endDate:
+      endDateParam != null && endDateParam !== ""
+        ? dateTimeService.toDate(dateTimeService.parseInput(endDateParam))
+        : dateTimeService.now().add(MAX_YEARS, "years").toDate(),
+    logging: { enabled: false },
+  });
+
   for (const account of accountsToProcess) {
     try {
-      // Create a fresh engine instance for each account to prevent cache pollution
       const engine = ForecastEngineFactory.create(prisma);
 
-      const context = {
-        accountId: account.accountId,
-        startDate: dateTimeService.now().startOf("month").toDate(),
-        endDate: dateTimeService.now().add(MAX_YEARS, "years").toDate(),
-        logging: { enabled: false },
+      const runRecalc = async () => {
+        const context = buildContext(account.accountId);
+        return engine.recalculate(context);
       };
 
-      const result = await engine.recalculate(context);
+      const result =
+        fixedNow != null && fixedNow !== ""
+          ? await dateTimeService.withRunContext(
+              { fixedNow, timezone },
+              runRecalc,
+            )
+          : await runRecalc();
 
       if (result.isSuccess) {
         // Calculate entry breakdowns

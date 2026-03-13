@@ -29,9 +29,11 @@ export class DataLoaderService implements IDataLoaderService {
       const dates = reoccurrences
         .map((r) => r.lastAt)
         .filter((d): d is NonNullable<typeof d> => d != null);
-      return dates.length
-        ? new Date(Math.min(...dates.map((d) => d.getTime())))
-        : null;
+      if (dates.length === 0) return null;
+      const minEpoch = Math.min(
+        ...dates.map((d) => dateTimeService.createUTC(d).valueOf()),
+      );
+      return dateTimeService.fromEpoch(minEpoch).toDate();
     })();
 
     return {
@@ -92,13 +94,13 @@ export class DataLoaderService implements IDataLoaderService {
         loanOriginalAmount: reg.loanOriginalAmount
           ? Number(reg.loanOriginalAmount)
           : null,
-        minAccountBalance: reg.minAccountBalance
+        minAccountBalance: reg.minAccountBalance != null
           ? Number(reg.minAccountBalance)
-          : null,
+          : 0,
         accountSavingsGoal: reg.accountSavingsGoal
           ? Number(reg.accountSavingsGoal)
           : null,
-        statementAt: dateTimeService.createUTC(reg.statementAt),
+        statementAt: dateTimeService.createUTC(reg.statementAt).toDate(),
       }),
     );
 
@@ -128,7 +130,7 @@ export class DataLoaderService implements IDataLoaderService {
       ...entry,
       amount: Number(entry.amount),
       balance: Number(entry.balance),
-      createdAt: dateTimeService.createUTC(entry.createdAt),
+      createdAt: dateTimeService.createUTC(entry.createdAt).toMoment(),
     }));
 
     // Insert into cache (this was missing!)
@@ -169,7 +171,10 @@ export class DataLoaderService implements IDataLoaderService {
     reoccurrenceSkips.forEach((item) => {
       this.cache.reoccurrenceSkip.insert({
         ...item,
-        skippedAt: dateTimeService.format("YYYY-MM-DD", item.skippedAt),
+        skippedAt:
+          item.skippedAt != null
+            ? dateTimeService.format("YYYY-MM-DD", item.skippedAt)
+            : "",
       });
     });
 

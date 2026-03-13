@@ -603,14 +603,13 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       await service.updateRegisterEntryBalances(mockEntries);
 
-      expect(mockRateLimiter.executeWithLimit).toHaveBeenCalled();
-      expect(mockRateLimiter.getStatus).toHaveBeenCalled();
+      expect(mockDb.$executeRaw).toHaveBeenCalled();
     });
 
     it("should handle empty entries array", async () => {
       await service.updateRegisterEntryBalances([]);
 
-      expect(mockRateLimiter.executeWithLimit).not.toHaveBeenCalled();
+      expect(mockDb.$executeRaw).not.toHaveBeenCalled();
     });
 
     it("should handle entries with invalid accountRegisterId", async () => {
@@ -643,7 +642,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       await service.updateRegisterEntryBalances(mockEntries);
 
-      expect(mockRateLimiter.executeWithLimit).toHaveBeenCalled();
+      expect(mockDb.$executeRaw).toHaveBeenCalled();
     });
   });
 

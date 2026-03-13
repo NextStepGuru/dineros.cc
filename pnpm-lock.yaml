@@ -56,6 +56,9 @@ importers:
       moment-precise-range-plugin:
         specifier: ^1.3.0
         version: 1.3.0(moment@2.30.1)
+      moment-timezone:
+        specifier: ^0.6.0
+        version: 0.6.0
       nuxt-cron:
         specifier: ^1.8.0
         version: 1.8.0(magicast@0.5.1)
@@ -5424,6 +5427,9 @@ packages:
     resolution: {integrity: sha512-JZiuEK3XqsBQ6W2eoDhZSpc3bPZqMW4OMPmZId24oyngkHD5ixvgKFBicO6wgfYeURWaISOpGU27KFRMl1qN+Q==}
     peerDependencies:
       moment: '>=2.9.0'
+
+  moment-timezone@0.6.0:
+    resolution: {integrity: sha512-ldA5lRNm3iJCWZcBCab4pnNL3HSZYXVb/3TYr75/1WCTWYuTqYUb5f/S384pncYjJ88lbO8Z4uPDvmoluHJc8Q==}
 
   moment@2.30.1:
     resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
@@ -13061,6 +13067,10 @@ snapshots:
   mocked-exports@0.1.1: {}
 
   moment-precise-range-plugin@1.3.0(moment@2.30.1):
+    dependencies:
+      moment: 2.30.1
+
+  moment-timezone@0.6.0:
     dependencies:
       moment: 2.30.1
 

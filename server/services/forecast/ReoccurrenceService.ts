@@ -115,9 +115,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
       }
 
       // Advance to next occurrence
+      const processedNominalDate = dateTimeService.toDate(nextAt);
       const nextDate = this.calculateNextOccurrence({
         ...reoccurrence,
-        lastAt: dateTimeService.toDate(nextAt),
+        lastAt: processedNominalDate,
       });
       if (!nextDate) break;
       nextAt = dateTimeService.createUTC(nextDate);
@@ -128,7 +129,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         id: reoccurrence.id,
       });
       if (cachedReoccurrence) {
-        cachedReoccurrence.lastAt = dateTimeService.toDate(nextAt);
+        cachedReoccurrence.lastAt = processedNominalDate;
         if (
           dateTimeService.isSameOrBefore(
             adjustedLastAt,

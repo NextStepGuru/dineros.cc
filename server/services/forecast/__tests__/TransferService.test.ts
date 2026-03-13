@@ -226,6 +226,7 @@ describe("TransferService", () => {
           id: 1,
           allowExtraPayment: true,
           balance: 2000,
+          latestBalance: 2000,
           minAccountBalance: 500,
         }),
         createMockAccount({
@@ -522,6 +523,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 2000,
+        latestBalance: 2000,
         allowExtraPayment: true,
         minAccountBalance: 500,
       });
@@ -582,6 +584,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 2000,
+        latestBalance: 2000,
         minAccountBalance: 500,
       });
 
@@ -619,6 +622,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 3000,
+        latestBalance: 3000,
         minAccountBalance: 500, // Ensure this matches the test parameter
       });
 
@@ -693,6 +697,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 2000,
+        latestBalance: 2000,
         minAccountBalance: 500,
       });
 
@@ -1019,6 +1024,7 @@ describe("TransferService", () => {
       const sourceAccount = createMockAccount({
         id: 1,
         balance: 2000,
+        latestBalance: 2000,
         minAccountBalance: 500,
       });
 
@@ -1091,6 +1097,7 @@ describe("TransferService", () => {
     const sourceAccount = createMockAccount({
       id: 1,
       balance: 3000,
+      latestBalance: 3000,
       minAccountBalance: 500,
     });
 

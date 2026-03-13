@@ -131,7 +131,9 @@ export default defineEventHandler(async (event: H3Event) => {
           balance: accountRegister.balance ?? 0,
           isBalanceEntry: true,
           description: "Initial Balance",
-          createdAt: accountRegister.statementAt || new Date(),
+          createdAt: accountRegister.statementAt
+            ? dateTimeService.toDate(accountRegister.statementAt)
+            : dateTimeService.nowDate(),
         },
       });
     }

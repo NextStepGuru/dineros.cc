@@ -87,7 +87,7 @@ export class TransferService implements ITransferService {
     sourceAccounts: CacheAccountRegister[],
     targetDate: Date,
   ): Promise<void> {
-    const dayOfMonth = new Date(targetDate).getUTCDate();
+    const dayOfMonth = dateTimeService.createUTC(targetDate).date() as number;
     if (dayOfMonth !== 1 && dayOfMonth !== 2 && dayOfMonth !== 3) {
       return;
     }
@@ -186,8 +186,7 @@ export class TransferService implements ITransferService {
     }
 
     // Process on 1st of month, or if it's a weekend/holiday, process on next business day
-    const date = new Date(targetDate);
-    const dayOfMonth = date.getUTCDate(); // Use UTC to avoid timezone issues
+    const dayOfMonth = dateTimeService.createUTC(targetDate).date() as number;
     const shouldProcess =
       dayOfMonth === 1 || dayOfMonth === 2 || dayOfMonth === 3; // Allow 1st, 2nd, or 3rd to handle weekends/holidays
 
@@ -198,7 +197,7 @@ export class TransferService implements ITransferService {
     accountId: number,
     targetDate: Date,
   ): number {
-    const targetEpoch = new Date(targetDate).setUTCHours(23, 59, 59, 999);
+    const targetEpoch = dateTimeService.endOfDay(targetDate).valueOf();
     const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
     const ledgerProjected = entries
       .filter((e) => (e.createdAt as Moment).valueOf() <= targetEpoch)
@@ -212,25 +211,29 @@ export class TransferService implements ITransferService {
   }
 
   /**
-   * Minimum projected balance over today and the next 7 days (inclusive).
-   * Single pass over entries: fetch once, compute balance at each day end, return min.
+   * Minimum projected balance over [fromDate - daysBack, fromDate + daysForward] (inclusive).
+   * Used so extra debt payment never drives the account below min in that window.
+   * For the fromDate day (offset 0), todayBalanceOverride is used when provided.
    */
-  private getMinProjectedBalanceOverNext7Days(
+  private getMinProjectedBalanceInWindow(
     accountId: number,
     fromDate: Date,
+    daysBack: number,
+    daysForward: number,
     todayBalanceOverride?: number,
   ): number {
-    const from = new Date(fromDate);
     let minBalance = Number.POSITIVE_INFINITY;
-    for (let d = 0; d <= 7; d++) {
-      const day = new Date(
-        Date.UTC(
-          from.getUTCFullYear(),
-          from.getUTCMonth(),
-          from.getUTCDate() + d,
-        ),
+    const start = -daysBack;
+    const end = daysForward;
+    for (let d = start; d <= end; d++) {
+      const day = dateTimeService.toDate(
+        dateTimeService.startOfDay(dateTimeService.add(d, "day", fromDate)),
       );
-      const balanceAtDay = this.calculateProjectedBalanceAtDate(accountId, day);
+      const balanceAtDay = getProjectedBalanceAtDate(
+        this.cache,
+        accountId,
+        day,
+      );
       const effectiveBalance =
         d === 0 && todayBalanceOverride !== undefined
           ? Math.min(todayBalanceOverride, balanceAtDay)
@@ -241,6 +244,24 @@ export class TransferService implements ITransferService {
       return todayBalanceOverride ?? 0;
     }
     return minBalance;
+  }
+
+  /**
+   * Minimum projected balance over today and the next 7 days (inclusive).
+   * Single pass over entries: fetch once, compute balance at each day end, return min.
+   */
+  private getMinProjectedBalanceOverNext7Days(
+    accountId: number,
+    fromDate: Date,
+    todayBalanceOverride?: number,
+  ): number {
+    return this.getMinProjectedBalanceInWindow(
+      accountId,
+      fromDate,
+      0,
+      7,
+      todayBalanceOverride,
+    );
   }
 
   private async processExtraDebtPayment({
@@ -275,15 +296,17 @@ export class TransferService implements ITransferService {
     const balanceBeforeExtraDebt = Math.min(projectedBalance, cacheBalanceNow);
     const todayCushion = Math.max(0, balanceBeforeExtraDebt - minBalance);
 
-    // 7-day lookahead: lowest balance over (today, today+1, ..., today+7). Use cache balance for today so the min reflects actual running balance.
-    const minBalanceOver7Days = this.getMinProjectedBalanceOverNext7Days(
+    // 90-day lookahead and 7-day lookback: ensure balance never drops below min in [today-7, today+90].
+    const minBalanceInWindow = this.getMinProjectedBalanceInWindow(
       sourceAccountId,
       lastAt,
+      7,
+      90,
       balanceBeforeExtraDebt,
     );
     let remainingAvailableAmount = Math.max(
       0,
-      minBalanceOver7Days - minBalance,
+      minBalanceInWindow - minBalance,
     );
     // Hard cap: never allow more than today's cushion so running balance never goes below min
     remainingAvailableAmount = Math.min(remainingAvailableAmount, todayCushion);

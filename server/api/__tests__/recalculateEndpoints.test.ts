@@ -131,7 +131,6 @@ describe("Recalculate API Endpoints", () => {
         accountRegisters: 2,
       });
 
-      expect(mockRecalculateSchema.parse).toHaveBeenCalledWith(mockBody);
       expect(mockEngineFactory.create).toHaveBeenCalledWith(mockPrisma);
       expect(mockEngine.recalculate).toHaveBeenCalledWith({
         accountId: "account-123",
@@ -154,11 +153,10 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle null account ID", async () => {
-      const mockEvent = { body: { accountId: null } } as any;
-      const mockBody = { accountId: null };
+      const mockEvent = {} as any;
+      const mockBody = {};
 
       (global as any).readBody.mockResolvedValue(mockBody);
-      mockRecalculateSchema.parse.mockReturnValue({ accountId: null });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
         "HTTP 400: Account ID is required to recalculate account balances"
@@ -199,17 +197,11 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle schema validation errors", async () => {
-      const mockEvent = { body: { invalidField: "value" } } as any;
-      const mockBody = { invalidField: "value" };
+      const mockEvent = {} as any;
 
-      (global as any).readBody.mockResolvedValue(mockBody);
-      mockRecalculateSchema.parse.mockImplementation(() => {
-        throw new Error("Invalid schema");
-      });
+      (global as any).readBody.mockResolvedValue(123);
 
-      await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Invalid schema"
-      );
+      await expect(recalculatePostHandler(mockEvent)).rejects.toThrow();
       expect(mockHandleApiError).toHaveBeenCalled();
     });
 

@@ -5,9 +5,14 @@ import moment, {
   type MomentSetObject,
 } from "moment";
 
+/** Full ISO datetime with Z or offset - required to avoid ambiguous local interpretation */
+const HAS_EXPLICIT_OFFSET = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
+/** Date-only YYYY-MM-DD; safe to interpret in a given timezone. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
- * Custom DateTime class that wraps moment functionality
- * Provides a cleaner interface and can be used globally
+ * Custom DateTime class that wraps moment functionality.
+ * Use DateTimeService for all server-side datetime to respect run context and UTC boundaries.
  */
 export class DateTime {
   private _moment: Moment;
@@ -33,6 +38,26 @@ export class DateTime {
 
   static parse(dateString: string, format: string): DateTime {
     return new DateTime(moment(dateString, format));
+  }
+
+  /**
+   * Parse as UTC only. Use for boundary normalization; avoids local timezone interpretation.
+   */
+  static parseUTC(input: string | Date): DateTime {
+    const m = moment.utc(input);
+    return new DateTime(m.isValid() ? m : moment.invalid());
+  }
+
+  /**
+   * True if full datetime string has explicit timezone (Z or offset). Reject ambiguous at boundaries.
+   */
+  static hasExplicitOffset(value: string): boolean {
+    return HAS_EXPLICIT_OFFSET.test(value.trim());
+  }
+
+  /** Date-only YYYY-MM-DD; safe to interpret in a given timezone when timezone is provided. */
+  static isDateOnly(value: string): boolean {
+    return DATE_ONLY.test(value.trim());
   }
 
   // Conversion methods
@@ -201,6 +226,20 @@ export class DateTime {
   // UTC methods
   utc(): DateTime {
     return new DateTime(this._moment.utc());
+  }
+
+  /**
+   * Start of day in UTC (00:00:00.000). Use for canonical day boundaries.
+   */
+  startOfDayUTC(): DateTime {
+    return new DateTime(this._moment.clone().utc().startOf("day"));
+  }
+
+  /**
+   * End of day in UTC (23:59:59.999). Use for canonical day boundaries.
+   */
+  endOfDayUTC(): DateTime {
+    return new DateTime(this._moment.clone().utc().endOf("day"));
   }
 
   // String representation

@@ -4,16 +4,24 @@ import moment, {
   type unitOfTime,
   type MomentSetObject,
 } from "moment";
+import "moment-timezone";
 import { DateTime } from "./DateTime";
 
+export interface RunContext {
+  /** Fixed "now" (ISO with offset or UTC). */
+  fixedNow: DateTime | Moment | Date | string;
+  /** IANA timezone for formatting and for interpreting date-only inputs (e.g. America/New_York). */
+  timezone: string;
+}
+
 /**
- * Centralized date/time service that can be overridden for testing
- * This allows us to control the "now" time in tests and ensure consistent behavior
- * All datetime operations respect the global override when set
+ * Centralized date/time service. Single source of "now" and all datetime operations.
+ * Use run context for deterministic replay (fixed now + timezone). Canonical model: UTC instants; timezone only at boundaries.
  */
 export class DateTimeService {
   private static _instance: DateTimeService | null = null;
   private _nowOverride: DateTime | null = null;
+  private _timezoneOverride: string | null = null;
   private _momentInstance: typeof moment;
 
   private constructor() {
@@ -54,10 +62,34 @@ export class DateTimeService {
   }
 
   /**
+   * Set run context (fixed now + IANA timezone) for deterministic replay.
+   */
+  setRunContext(ctx: RunContext): void {
+    this._nowOverride = new DateTime(ctx.fixedNow);
+    this._timezoneOverride = ctx.timezone;
+  }
+
+  /**
+   * Run fn with a temporary run context; restores previous state after.
+   */
+  withRunContext<T>(ctx: RunContext, fn: () => T): T {
+    const prevOverride = this._nowOverride?.clone() ?? null;
+    const prevTz = this._timezoneOverride;
+    try {
+      this.setRunContext(ctx);
+      return fn();
+    } finally {
+      this._nowOverride = prevOverride;
+      this._timezoneOverride = prevTz;
+    }
+  }
+
+  /**
    * Clear the time override, returning to using actual current time
    */
   clearNowOverride(): void {
     this._nowOverride = null;
+    this._timezoneOverride = null;
   }
 
   /**
@@ -72,6 +104,74 @@ export class DateTimeService {
    */
   getOverride(): DateTime | null {
     return this._nowOverride?.clone() || null;
+  }
+
+  /**
+   * Current run timezone (IANA) when set via setRunContext; null otherwise.
+   */
+  getRunTimezone(): string | null {
+    return this._timezoneOverride;
+  }
+
+  /**
+   * Parse API/job input to a UTC DateTime. Rejects ambiguous datetime strings (no Z or offset).
+   * For date-only (YYYY-MM-DD), pass timezone to interpret in that zone; otherwise UTC midnight.
+   */
+  parseInput(value: string, timezone?: string): DateTime {
+    const trimmed = value.trim();
+    if (DateTime.isDateOnly(trimmed)) {
+      const tz = timezone ?? this._timezoneOverride ?? "UTC";
+      const m = this._momentInstance.tz(trimmed + " 00:00:00", "YYYY-MM-DD HH:mm:ss", tz);
+      return new DateTime(m.isValid() ? m.utc() : this._momentInstance.invalid());
+    }
+    if (!DateTime.hasExplicitOffset(trimmed)) {
+      throw new Error(
+        `DateTimeService.parseInput: ambiguous datetime (missing Z or offset). Use ISO with timezone: ${trimmed}`
+      );
+    }
+    return new DateTime(this._momentInstance.utc(trimmed));
+  }
+
+  /**
+   * Start of day in UTC (00:00:00.000). Canonical day boundary.
+   */
+  startOfDay(date?: DateTime | Moment | Date | string): DateTime {
+    const base = date !== undefined ? new DateTime(date) : this.now();
+    return base.utc().startOfDayUTC();
+  }
+
+  /**
+   * End of day in UTC (23:59:59.999). Canonical day boundary.
+   */
+  endOfDay(date?: DateTime | Moment | Date | string): DateTime {
+    const base = date !== undefined ? new DateTime(date) : this.now();
+    return base.utc().endOfDayUTC();
+  }
+
+  /**
+   * Format a UTC instant in a specific timezone (IANA). Use at output boundaries only.
+   */
+  formatInTimezone(
+    date: DateTime | Moment | Date | string,
+    timezone: string,
+    format: string
+  ): string {
+    const m = date instanceof DateTime ? date.toMoment() : this._momentInstance(date);
+    return m.utc().tz(timezone).format(format);
+  }
+
+  /**
+   * Ensure a DateTime is in UTC (clone and convert). Alias for createUTC for clarity at boundaries.
+   */
+  toUTC(date: DateTime | Moment | Date | string): DateTime {
+    return this.createUTC(date);
+  }
+
+  /**
+   * Create a DateTime from UTC epoch milliseconds. Use for converting numeric bounds to Date/DateTime without direct Date constructor.
+   */
+  fromEpoch(ms: number): DateTime {
+    return new DateTime(this._momentInstance.utc(ms));
   }
 
   // Context-aware methods that always use the current "now" context

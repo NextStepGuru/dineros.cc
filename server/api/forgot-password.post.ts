@@ -33,9 +33,7 @@ export default defineEventHandler(async (event: H3Event) => {
       where: { id: lookupUser.id },
       data: {
         resetCode: token,
-        resetPasswordAt: new Date(
-          dateTimeService.nowDate().getTime() + 5 * 60 * 1000
-        ),
+        resetPasswordAt: dateTimeService.add(5, "minute").toDate(),
       },
     });
 

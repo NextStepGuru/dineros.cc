@@ -84,7 +84,7 @@ describe('Reoccurrence API Endpoints', () => {
         adjustBeforeIfOnWeekend: false,
         description: 'Monthly Salary',
         amount: 5000,
-        lastAt: new Date('2024-01-01'),
+        lastAt: '2024-01-01',
         endAt: null,
       };
 
@@ -93,8 +93,9 @@ describe('Reoccurrence API Endpoints', () => {
         accountId: 'account-123',
       };
 
-                   const mockCreatedReoccurrence = {
+      const mockCreatedReoccurrence = {
         ...mockBody,
+        lastAt: new Date('2024-01-01'),
         id: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -159,8 +160,8 @@ describe('Reoccurrence API Endpoints', () => {
         adjustBeforeIfOnWeekend: true,
         description: 'Updated Salary',
         amount: 6000,
-        lastAt: new Date('2024-01-15'),
-        endAt: new Date('2024-12-31'),
+        lastAt: '2024-01-15',
+        endAt: '2024-12-31',
       };
 
       const mockAccountRegister = {
@@ -170,6 +171,8 @@ describe('Reoccurrence API Endpoints', () => {
 
       const mockUpdatedReoccurrence = {
         ...mockBody,
+        lastAt: new Date('2024-01-15'),
+        endAt: new Date('2024-12-31'),
         createdAt: new Date(),
         updatedAt: new Date(),
       };

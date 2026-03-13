@@ -16,13 +16,17 @@ export default defineNitroPlugin(() => {
     });
     return;
   }
-  dateTimeService.setNowOverride(parsed);
+  const timezone = process.env.TEST_TIMEZONE?.trim() || "UTC";
+  dateTimeService.setRunContext({
+    fixedNow: parsed,
+    timezone,
+  });
   const formatted = dateTimeService.format(
     "YYYY-MM-DD HH:mm:ss",
-    dateTimeService.now().utc()
+    dateTimeService.now().utc(),
   );
   log({
-    message: `TEST_DATE set (UTC): ${formatted} UTC`,
+    message: `TEST_DATE set (UTC): ${formatted}, timezone: ${timezone}`,
     level: "info",
   });
 });

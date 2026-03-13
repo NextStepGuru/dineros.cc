@@ -108,18 +108,12 @@ describe("Recalculate POST API Endpoint", () => {
       errors: null,
     };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
     const { prisma } = await import("~/server/clients/prismaClient");
 
-    // Set up mocks properly
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockReturnValue({
-      accountId: "account123",
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
     (mockEngine.recalculate as any).mockResolvedValue(mockResult);
 
@@ -144,16 +138,10 @@ describe("Recalculate POST API Endpoint", () => {
     const mockEvent = {};
     const mockBody = {};
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
-
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockImplementation(() => {
-      throw new Error("accountId is required");
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-      "accountId is required"
+      "Account ID is required"
     );
   });
 
@@ -161,16 +149,10 @@ describe("Recalculate POST API Endpoint", () => {
     const mockEvent = {};
     const mockBody = { accountId: "" };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
-
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockImplementation(() => {
-      throw new Error("accountId cannot be empty");
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-      "accountId cannot be empty"
+      "Account ID is required"
     );
   });
 
@@ -184,16 +166,11 @@ describe("Recalculate POST API Endpoint", () => {
       errors: ["Database connection failed", "Invalid account data"],
     };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
 
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockReturnValue({
-      accountId: "account123",
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
     (mockEngine.recalculate as any).mockResolvedValue(mockResult);
 
@@ -206,16 +183,11 @@ describe("Recalculate POST API Endpoint", () => {
     const mockEvent = {};
     const mockBody = { accountId: "account123" };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
 
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockReturnValue({
-      accountId: "account123",
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
     (mockEngine.recalculate as any).mockRejectedValue(
       new Error("Engine recalculation failed")
@@ -228,19 +200,9 @@ describe("Recalculate POST API Endpoint", () => {
 
   it("should handle schema validation errors", async () => {
     const mockEvent = {};
-    const mockBody = { invalidField: "value" };
+    (global as any).readBody.mockResolvedValue(123);
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
-
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockImplementation(() => {
-      throw new Error("Invalid schema");
-    });
-
-    await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-      "Invalid schema"
-    );
+    await expect(recalculatePostHandler(mockEvent)).rejects.toThrow();
   });
 
   it("should use correct date range for recalculation", async () => {
@@ -256,17 +218,11 @@ describe("Recalculate POST API Endpoint", () => {
       errors: null,
     };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
-    const { prisma } = await import("~/server/clients/prismaClient");
 
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockReturnValue({
-      accountId: "account123",
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
     (mockEngine.recalculate as any).mockResolvedValue(mockResult);
 
@@ -305,17 +261,11 @@ describe("Recalculate POST API Endpoint", () => {
       errors: null,
     };
 
-    const { readBody } = await import("h3");
-    const { recalculateSchema } = await import("~/schema/zod");
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
-    const { prisma } = await import("~/server/clients/prismaClient");
 
-    (readBody as any).mockResolvedValue(mockBody);
-    (recalculateSchema.parse as any).mockReturnValue({
-      accountId: "account123",
-    });
+    (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
     (mockEngine.recalculate as any).mockResolvedValue(mockResult);
 

@@ -63,7 +63,7 @@ class PlaidSyncService {
       accountRegisterId: accountRegister.id,
       amount: formattedAmount,
       balance: 0,
-      createdAt: new Date(transaction.date),
+      createdAt: dateTimeService.toDate(dateTimeService.parseInput(transaction.date)),
       description: formattedName,
       isProjected: false,
       isPending: true,
@@ -378,9 +378,14 @@ class PlaidSyncService {
     // Process each access token separately
     for (const accessToken in plaidAccounts) {
       try {
-        const startDate = plaidAccounts[accessToken]
-          .map((a) => a.plaidLastSyncAt)
-          .reduce((a, b) => new Date(Math.min(a.getTime(), b.getTime())));
+        const startDate = (() => {
+          const dates = plaidAccounts[accessToken].map((a) => a.plaidLastSyncAt);
+          if (dates.length === 0) return dateTimeService.nowDate();
+          const minEpoch = Math.min(
+            ...dates.map((d) => dateTimeService.createUTC(d).valueOf()),
+          );
+          return dateTimeService.fromEpoch(minEpoch).toDate();
+        })();
 
         const syncResult = await this.syncAllTransactions({
           accessToken,

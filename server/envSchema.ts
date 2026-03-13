@@ -17,6 +17,7 @@ const envSchema = z.object({
   NUXT_UI_PRO_LICENSE: z.string(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally
   TEST_DATE: z.string().optional(),
+  TEST_TIMEZONE: z.string().optional(),
 });
 
 export default envSchema;

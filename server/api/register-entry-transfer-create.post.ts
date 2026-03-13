@@ -101,7 +101,7 @@ export default defineEventHandler(async (event: H3Event) => {
         });
       });
 
-    const entryDate = new Date(createdAt);
+    const entryDate = dateTimeService.toDate(dateTimeService.parseInput(createdAt));
 
     // Determine if entries should be pending based on date
     const isPending = dateTimeService

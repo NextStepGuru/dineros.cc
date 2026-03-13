@@ -4,6 +4,7 @@ import { reoccurrenceSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
+import { dateTimeService } from "~/server/services/forecast/DateTimeService";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -38,6 +39,18 @@ export default defineEventHandler(async (event: H3Event) => {
       },
     });
 
+    const toDateString = (v: string | Date): string =>
+      typeof v === "string" ? v : v instanceof Date ? v.toISOString() : String(v);
+    const parsedLastAt = lastAt
+      ? dateTimeService.toDate(
+          dateTimeService.parseInput(toDateString(lastAt)),
+        )
+      : null;
+    const parsedEndAt = endAt
+      ? dateTimeService.toDate(
+          dateTimeService.parseInput(toDateString(endAt)),
+        )
+      : null;
     const reoccurrence = await PrismaDb.reoccurrence.upsert({
       create: {
         accountId,
@@ -47,8 +60,8 @@ export default defineEventHandler(async (event: H3Event) => {
         adjustBeforeIfOnWeekend,
         description,
         amount,
-        lastAt: lastAt ? new Date(lastAt) : null,
-        endAt: endAt ? new Date(endAt) : null,
+        lastAt: parsedLastAt,
+        endAt: parsedEndAt,
       },
       update: {
         accountId,
@@ -58,8 +71,8 @@ export default defineEventHandler(async (event: H3Event) => {
         adjustBeforeIfOnWeekend,
         description,
         amount,
-        lastAt: lastAt ? new Date(lastAt) : null,
-        endAt: endAt ? new Date(endAt) : null,
+        lastAt: parsedLastAt,
+        endAt: parsedEndAt,
       },
       where: {
         id,
