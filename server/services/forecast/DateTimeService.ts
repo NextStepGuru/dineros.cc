@@ -3,8 +3,7 @@ import moment, {
   type DurationInputArg2,
   type unitOfTime,
   type MomentSetObject,
-} from "moment";
-import "moment-timezone";
+} from "moment-timezone";
 import { DateTime } from "./DateTime";
 
 export interface RunContext {

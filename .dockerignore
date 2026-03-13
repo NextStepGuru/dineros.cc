@@ -71,16 +71,18 @@ Thumbs.db
 # Git
 .git/
 .gitignore
+.gitattributes
 
-# TypeScript
-types/
-*.d.ts
+# Cursor / agent / local tooling (not needed in image)
+.cursor/
+.pre-commit-config.yaml
+.nvmrc
+scripts/
 
 # Development dependencies and configs
 .eslintrc*
 .prettierrc*
 .editorconfig
-tsconfig.json
 vitest.config.*
 jest.config.*
 
