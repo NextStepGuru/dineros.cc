@@ -35,3 +35,4 @@ output.txt
 coverage/
 *.json
 playwright-report/index.html
+/.docker-build-cache

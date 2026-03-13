@@ -29,7 +29,7 @@ parse_mysql_url() {
     local url=$1
     # Remove mysql:// prefix
     url=${url#mysql://}
-    
+
     # Extract user:password@host:port/database
     if [[ $url =~ ^([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/(.+)$ ]]; then
         DB_USER="${BASH_REMATCH[1]}"
@@ -37,7 +37,7 @@ parse_mysql_url() {
         DB_HOST="${BASH_REMATCH[3]}"
         DB_PORT="${BASH_REMATCH[5]:-3306}"
         DB_NAME="${BASH_REMATCH[6]}"
-        
+
         # URL decode the password only if it contains encoded characters
         if [[ "$DB_PASS" =~ % ]]; then
             DB_PASS=$(url_decode "$DB_PASS")
@@ -54,32 +54,32 @@ dump_database() {
     local env_upper=$(echo "$env" | tr '[:lower:]' '[:upper:]')
     local url_var="DINEROS_${env_upper}_DATABASE_URL"
     local url="${!url_var}"
-    
+
     if [ -z "$url" ]; then
         echo -e "${RED}❌ Environment variable $url_var is not set${NC}"
         exit 1
     fi
-    
+
     echo -e "${BLUE}📥 Parsing $env database URL...${NC}" >&2
     parse_mysql_url "$url"
-    
+
     # Check if Cloud SQL Proxy is being used (override host)
     if [ -n "$CLOUD_SQL_PROXY_HOST" ]; then
         echo -e "${BLUE}🔀 Using Cloud SQL Proxy at $CLOUD_SQL_PROXY_HOST${NC}" >&2
         DB_HOST="$CLOUD_SQL_PROXY_HOST"
         DB_PORT="${CLOUD_SQL_PROXY_PORT:-3306}"
     fi
-    
+
     # Debug output (hide password)
     echo -e "${BLUE}   Host: $DB_HOST${NC}" >&2
     echo -e "${BLUE}   Port: $DB_PORT${NC}" >&2
     echo -e "${BLUE}   User: $DB_USER${NC}" >&2
     echo -e "${BLUE}   Database: $DB_NAME${NC}" >&2
-    
+
     local dump_file="/tmp/dineros-${env}-$(date +%Y%m%d-%H%M%S).sql"
-    
+
     echo -e "${YELLOW}💾 Dumping $env database ($DB_NAME) from $DB_HOST:$DB_PORT...${NC}" >&2
-    
+
     # Build mysqldump command with SSL support for production databases
     local mysqldump_cmd=(
         mysqldump
@@ -93,12 +93,12 @@ dump_database() {
         --set-gtid-purged=OFF
         --databases "$DB_NAME"
     )
-    
+
     # Add SSL options for remote connections (Google Cloud SQL requires SSL)
     local ssl_ca="${MYSQL_SSL_CA:-$HOME/mysql-server/server-ca.pem}"
     local ssl_cert="${MYSQL_SSL_CERT:-$HOME/mysql-server/client-cert.pem}"
     local ssl_key="${MYSQL_SSL_KEY:-$HOME/mysql-server/client-key.pem}"
-    
+
     if [ "$env" = "production" ] || [ "$env" = "staging" ]; then
         # Use SSL certificates if available
         if [ -f "$ssl_ca" ]; then
@@ -116,7 +116,7 @@ dump_database() {
             mysqldump_cmd+=(--ssl-ca=)
         fi
     fi
-    
+
     # Test connection first
     echo -e "${BLUE}🔍 Testing connection...${NC}" >&2
     local test_output
@@ -137,7 +137,7 @@ dump_database() {
     test_output=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" $ssl_opts -e "SELECT 1" 2>&1)
     local test_exit=$?
     unset MYSQL_PWD
-    
+
     # Check both exit code and error messages (MySQL sometimes returns 0 even on auth failure)
     local has_error=0
     if [ $test_exit -ne 0 ]; then
@@ -145,13 +145,13 @@ dump_database() {
     elif echo "$test_output" | grep -qiE "ERROR|Access denied"; then
         has_error=1
     fi
-    
+
     if [ $has_error -eq 1 ]; then
         echo -e "${RED}❌ Cannot connect to database${NC}" >&2
         echo -e "${YELLOW}Error details:${NC}" >&2
         echo "$test_output" | grep -vE "Using a password|WARNING" | head -5 >&2
         echo "" >&2
-        
+
         # Check if this looks like a Google Cloud SQL instance
         if [[ "$DB_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$test_output" =~ "Access denied" ]]; then
             echo -e "${YELLOW}💡 This appears to be a Google Cloud SQL instance. Options:${NC}" >&2
@@ -171,15 +171,15 @@ dump_database() {
         fi
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ Connection successful${NC}" >&2
-    
+
     # Use password via MYSQL_PWD environment variable (more secure than -p)
     export MYSQL_PWD="$DB_PASS"
     "${mysqldump_cmd[@]}" > "$dump_file"
     local dump_exit=$?
     unset MYSQL_PWD
-    
+
     if [ $dump_exit -eq 0 ]; then
         echo -e "${GREEN}✅ Database dumped successfully to $dump_file${NC}" >&2
         echo "$dump_file"
@@ -193,23 +193,23 @@ dump_database() {
 restore_database() {
     local dump_file=$1
     local source_db_name=$2  # Database name from the dump
-    
+
     # Local database configuration (from docker-compose defaults)
     local LOCAL_HOST="${MYSQL_HOST:-localhost}"
     local LOCAL_PORT="${MYSQL_PORT:-3306}"
     local LOCAL_USER="${MYSQL_USER:-dineros}"
     local LOCAL_PASS="${MYSQL_PASSWORD:-dineros}"
     local LOCAL_DB="${MYSQL_DATABASE:-dineros}"
-    
+
     echo -e "${YELLOW}🔄 Restoring to local database ($LOCAL_DB) at $LOCAL_HOST:$LOCAL_PORT...${NC}"
-    
+
     # Check if local MySQL is accessible (force TCP protocol, not socket)
     if ! MYSQL_PWD="$LOCAL_PASS" mysql --protocol=TCP -h "$LOCAL_HOST" -P "$LOCAL_PORT" -u "$LOCAL_USER" -e "SELECT 1" &>/dev/null; then
         echo -e "${RED}❌ Cannot connect to local MySQL. Make sure docker-compose is running.${NC}"
         echo -e "${YELLOW}💡 Try: docker-compose up -d mysql${NC}"
         exit 1
     fi
-    
+
     # Restore the dump (force TCP protocol)
     # Replace database name in dump file if it differs from local database name
     local temp_dump="$dump_file.tmp"
@@ -223,7 +223,7 @@ restore_database() {
         MYSQL_PWD="$LOCAL_PASS" mysql --protocol=TCP -h "$LOCAL_HOST" -P "$LOCAL_PORT" -u "$LOCAL_USER" < "$dump_file"
         local restore_exit=$?
     fi
-    
+
     if [ $restore_exit -eq 0 ]; then
         echo -e "${GREEN}✅ Database restored successfully${NC}"
     else
