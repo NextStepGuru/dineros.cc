@@ -5,7 +5,10 @@ import { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
 export class DataLoaderService implements IDataLoaderService {
-  constructor(private db: PrismaClient, private cache: ModernCacheService) {}
+  constructor(
+    private db: PrismaClient,
+    private cache: ModernCacheService,
+  ) {}
 
   async loadAccountData(context: ForecastContext): Promise<AccountData> {
     // Clear existing cache
@@ -25,7 +28,7 @@ export class DataLoaderService implements IDataLoaderService {
 
     // Load reoccurrence skips
     const reoccurrenceSkips = await this.loadReoccurrenceSkips(
-      context.accountId
+      context.accountId,
     );
 
     const result = {
@@ -39,7 +42,7 @@ export class DataLoaderService implements IDataLoaderService {
   }
 
   private async loadAccountRegisters(
-    accountId?: string
+    accountId?: string,
   ): Promise<CacheAccountRegister[]> {
     const accountRegisters = await this.db.accountRegister.findMany({
       where: { accountId },
@@ -78,7 +81,7 @@ export class DataLoaderService implements IDataLoaderService {
     const lokiAccountRegisters: CacheAccountRegister[] = accountRegisters.map(
       (reg) => ({
         ...reg,
-        balance: Number(reg.balance),
+        balance: Number(reg.latestBalance),
         latestBalance: Number(reg.latestBalance),
         minPayment: reg.minPayment ? Number(reg.minPayment) : null,
         apr1: reg.apr1 ? Number(reg.apr1) : null,
@@ -94,7 +97,7 @@ export class DataLoaderService implements IDataLoaderService {
           ? Number(reg.accountSavingsGoal)
           : null,
         statementAt: dateTimeService.createUTC(reg.statementAt),
-      })
+      }),
     );
 
     // Load into cache

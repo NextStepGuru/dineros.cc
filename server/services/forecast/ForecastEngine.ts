@@ -289,6 +289,12 @@ export class ForecastEngine implements IForecastEngine {
       )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
     );
 
+    this.reoccurrenceService.initReoccurrenceSchedule(
+      dateTimeService.toDate(startDate),
+      dateTimeService.toDate(endDate)
+    );
+    this.accountService.initTimelineAccountCaches();
+
     while (currentDate.isSameOrBefore(endDate)) {
       dayCount++;
       if (dayCount % 100 === 0) {
@@ -354,18 +360,16 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private async loadManualEntriesForDate(date: any): Promise<void> {
-    // This would load manual entries that were created for this specific date
-    // Implementation depends on how manual entries are stored
-    // For now, we'll use the cache to find existing entries for this date
-    const entries = this.cache.registerEntry.find(
+    const d = dateTimeService.toDate(date);
+    const dayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).getTime();
+    const dayEnd = dayStart + 86400000;
+    this.cache.registerEntry.find(
       (entry) =>
         entry.isManualEntry === true &&
-        dateTimeService.isSameOrBefore(entry.createdAt, date) &&
-        dateTimeService.isSameOrAfter(entry.createdAt, date)
+        (entry.createdAt as { valueOf(): number }).valueOf() >= dayStart &&
+        (entry.createdAt as { valueOf(): number }).valueOf() < dayEnd
     );
-
-    // These entries should already be in the cache from the initial load
-    // So this step might be redundant in the current implementation
+    // Entries are already in cache from initial load; no-op for now
   }
 
   private async processAccountEntries(

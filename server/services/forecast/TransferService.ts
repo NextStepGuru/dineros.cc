@@ -1,3 +1,4 @@
+import type { Moment } from "moment";
 import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
 import { Decimal } from "@prisma/client/runtime/library";
@@ -5,11 +6,12 @@ import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
+import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class TransferService implements ITransferService {
   constructor(
     private cache: ModernCacheService,
-    private entryService: RegisterEntryService
+    private entryService: RegisterEntryService,
   ) {}
 
   transferBetweenAccounts(params: TransferParams): void {
@@ -44,7 +46,7 @@ export class TransferService implements ITransferService {
   }
 
   transferBetweenAccountsWithDate(
-    params: TransferParams & { forecastDate: Date }
+    params: TransferParams & { forecastDate: Date },
   ): void {
     const {
       targetAccountRegisterId,
@@ -81,7 +83,7 @@ export class TransferService implements ITransferService {
 
   async processExtraDebtPayments(
     sourceAccounts: CacheAccountRegister[],
-    targetDate: Date
+    targetDate: Date,
   ): Promise<void> {
     const dayOfMonth = new Date(targetDate).getUTCDate();
     if (dayOfMonth !== 1 && dayOfMonth !== 2 && dayOfMonth !== 3) {
@@ -90,7 +92,7 @@ export class TransferService implements ITransferService {
 
     // Log which accounts have extra payment enabled
     const extraPaymentAccounts = sourceAccounts.filter(
-      (acc) => acc.allowExtraPayment === true
+      (acc) => acc.allowExtraPayment === true,
     );
     if (extraPaymentAccounts.length === 0) {
       return;
@@ -105,14 +107,14 @@ export class TransferService implements ITransferService {
           name: acc.name,
           balance: acc.balance,
           minBalance: acc.minAccountBalance,
-        }))
+        })),
       );
     }
 
     for (const sourceAccount of sourceAccounts) {
       const shouldProcess = this.shouldProcessExtraDebtPaymentOnDate(
         sourceAccount,
-        targetDate
+        targetDate,
       );
 
       if (shouldProcess) {
@@ -127,14 +129,14 @@ export class TransferService implements ITransferService {
 
   private shouldProcessExtraDebtPayment(
     account: CacheAccountRegister,
-    targetDate?: Date
+    targetDate?: Date,
   ): boolean {
     // If targetDate is provided, calculate projected balance at that date
     let balanceToUse = account.balance;
     if (targetDate) {
       balanceToUse = this.calculateProjectedBalanceAtDate(
         account.id,
-        targetDate
+        targetDate,
       );
     }
 
@@ -164,7 +166,7 @@ export class TransferService implements ITransferService {
           isEligible,
           finalEligible,
           targetDate: targetDate?.toISOString().split("T")[0] || "N/A",
-        }
+        },
       );
     }
 
@@ -173,7 +175,7 @@ export class TransferService implements ITransferService {
 
   private shouldProcessExtraDebtPaymentOnDate(
     account: CacheAccountRegister,
-    targetDate: Date
+    targetDate: Date,
   ): boolean {
     // First check basic eligibility using projected balance at target date
     if (!this.shouldProcessExtraDebtPayment(account, targetDate)) {
@@ -191,60 +193,63 @@ export class TransferService implements ITransferService {
 
   private calculateProjectedBalanceAtDate(
     accountId: number,
-    targetDate: Date
+    targetDate: Date,
   ): number {
-    // Get the account's initial balance from cache
-    const account = this.cache.accountRegister.findOne({ id: accountId });
-    if (!account) return 0;
-
-    // Get all entries for this account up to the target date
-    const entries = this.cache.registerEntry
-      .find({
-        accountRegisterId: accountId,
-      })
-      .filter((entry) =>
-        dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
-      );
-
-    // Start with the initial balance and add all entries up to target date
-    let projectedBalance = account.latestBalance;
-
-    // Add up all entries up to the target date (excluding balance entries)
-    for (const entry of entries) {
-      if (!entry.isBalanceEntry) {
-        projectedBalance = +projectedBalance + +entry.amount;
-      }
-    }
-
-    return projectedBalance;
+    return getProjectedBalanceAtDate(this.cache, accountId, targetDate);
   }
 
   /**
    * Minimum projected balance over today and the next 7 days (inclusive).
-   * Used so extra debt payments don't push the account below min balance in the next 7 days.
-   * When todayBalanceOverride is provided, use it for "today" so the lowest balance uses the cache's actual running balance.
+   * Single pass over entries: fetch once, compute balance at each day end, return min.
    */
   private getMinProjectedBalanceOverNext7Days(
     accountId: number,
     fromDate: Date,
-    todayBalanceOverride?: number
+    todayBalanceOverride?: number,
   ): number {
-    const from = dateTimeService.createUTC(fromDate);
-    const todayBalance =
-      todayBalanceOverride !== undefined
-        ? todayBalanceOverride
-        : this.calculateProjectedBalanceAtDate(
-            accountId,
-            dateTimeService.toDate(from)
-          );
-    let minBalance = todayBalance;
-    for (let d = 1; d <= 7; d++) {
-      const futureDate = dateTimeService.add(d, "day", from);
-      const projected = this.calculateProjectedBalanceAtDate(
-        accountId,
-        dateTimeService.toDate(futureDate)
+    const account = this.cache.accountRegister.findOne({ id: accountId });
+    if (!account) return todayBalanceOverride ?? 0;
+
+    const from = new Date(fromDate);
+    const dayEndEpochs: number[] = [];
+    for (let d = 0; d <= 7; d++) {
+      const day = new Date(
+        Date.UTC(
+          from.getUTCFullYear(),
+          from.getUTCMonth(),
+          from.getUTCDate() + d,
+        ),
       );
-      if (projected < minBalance) minBalance = projected;
+      dayEndEpochs.push(day.getTime() + 86400000 - 1);
+    }
+
+    const entries = this.cache.registerEntry
+      .find({ accountRegisterId: accountId })
+      .filter((e) => !e.isBalanceEntry)
+      .map((e) => ({
+        epoch: (e.createdAt as Moment).valueOf(),
+        amount: +e.amount,
+      }));
+    entries.sort((a, b) => a.epoch - b.epoch);
+
+    let running = +account.latestBalance;
+    let idx = 0;
+    let minBalance =
+      todayBalanceOverride !== undefined ? todayBalanceOverride : running;
+    for (let d = 0; d <= 7; d++) {
+      const dayEnd = dayEndEpochs[d];
+      if (dayEnd === undefined) continue;
+      while (idx < entries.length) {
+        const ent = entries[idx];
+        if (!ent || ent.epoch > dayEnd) break;
+        running += ent.amount;
+        idx++;
+      }
+      const balanceAtDay =
+        d === 0 && todayBalanceOverride !== undefined
+          ? todayBalanceOverride
+          : running;
+      if (balanceAtDay < minBalance) minBalance = balanceAtDay;
     }
     return minBalance;
   }
@@ -265,7 +270,7 @@ export class TransferService implements ITransferService {
     if (!sourceAccountRegister) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Extra debt payment: Source account ${sourceAccountId} not found`
+        `Extra debt payment: Source account ${sourceAccountId} not found`,
       );
       return false;
     }
@@ -273,35 +278,26 @@ export class TransferService implements ITransferService {
     // Projected balance at the forecast date (today) - for 7-day lookahead
     const projectedBalance = this.calculateProjectedBalanceAtDate(
       sourceAccountId,
-      lastAt
+      lastAt,
     );
     const cacheBalanceNow = sourceAccountRegister.balance;
 
     // Use the lower of projected (sum of entries) and cache (running) so we never assume more than we have (e.g. if some same-day outflows aren't on this register in the sum)
-    const balanceBeforeExtraDebt = Math.min(
-      projectedBalance,
-      cacheBalanceNow
-    );
-    const todayCushion = Math.max(
-      0,
-      balanceBeforeExtraDebt - minBalance
-    );
+    const balanceBeforeExtraDebt = Math.min(projectedBalance, cacheBalanceNow);
+    const todayCushion = Math.max(0, balanceBeforeExtraDebt - minBalance);
 
     // 7-day lookahead: lowest balance over (today, today+1, ..., today+7). Use cache balance for today so the min reflects actual running balance.
     const minBalanceOver7Days = this.getMinProjectedBalanceOverNext7Days(
       sourceAccountId,
       lastAt,
-      balanceBeforeExtraDebt
+      balanceBeforeExtraDebt,
     );
     let remainingAvailableAmount = Math.max(
       0,
-      minBalanceOver7Days - minBalance
+      minBalanceOver7Days - minBalance,
     );
     // Hard cap: never allow more than today's cushion so running balance never goes below min
-    remainingAvailableAmount = Math.min(
-      remainingAvailableAmount,
-      todayCushion
-    );
+    remainingAvailableAmount = Math.min(remainingAvailableAmount, todayCushion);
 
     // Skip entire day if we're already at or below min - don't apply extra debt until balance is above min again
     if (balanceBeforeExtraDebt < minBalance || remainingAvailableAmount <= 0) {
@@ -318,33 +314,28 @@ export class TransferService implements ITransferService {
         projectedBalanceAtDate: projectedBalance,
         targetDate: lastAt.toISOString().split("T")[0],
         minBalance,
-      }
+      },
     );
 
     // Find the highest priority debt account (lowest balance, highest sort order)
-    const allAccounts = this.cache.accountRegister.find({});
     const debtAccounts = this.cache.accountRegister.find(
-      (account) => account.balance < 0
+      (account) => account.balance < 0,
     ); // Must be negative (debt)
 
     forecastLogger.serviceDebug(
       "TransferService",
       `Extra debt payment account search:`,
       {
-        totalAccounts: allAccounts.length,
         debtAccounts: debtAccounts.length,
         sourceAccountId: sourceAccountRegister.id,
         sourceAccountBalance: sourceAccountRegister.accountId,
-        allAccountBalances: allAccounts
-          .map((a) => ({ id: a.id, name: a.name, balance: a.balance }))
-          .slice(0, 10),
-      }
+      },
     );
 
     if (debtAccounts.length === 0) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Extra debt payment: No debt accounts found`
+        `Extra debt payment: No debt accounts found`,
       );
       return false;
     }
@@ -371,14 +362,14 @@ export class TransferService implements ITransferService {
         totalAvailableAmount: remainingAvailableAmount,
         debtAccountsFound: sortedDebtAccounts.length,
         date: lastAt.toISOString().split("T")[0],
-      }
+      },
     );
 
     // Ensure we don't transfer if it would bring the source account below minimum
     if (remainingAvailableAmount <= 0) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`
+        `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`,
       );
       return false;
     }
@@ -387,7 +378,7 @@ export class TransferService implements ITransferService {
     if (projectedBalance <= 0) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`
+        `Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`,
       );
       return false;
     }
@@ -409,8 +400,12 @@ export class TransferService implements ITransferService {
       }
 
       // O(1) Map lookup — reflects running balance (updated by createEntry; DB-loaded entries don't update it)
-      const freshDebt = this.cache.accountRegister.findById(debtAccountRegister.id);
-      const debtBalance = freshDebt ? +freshDebt.balance : +debtAccountRegister.balance;
+      const freshDebt = this.cache.accountRegister.findById(
+        debtAccountRegister.id,
+      );
+      const debtBalance = freshDebt
+        ? +freshDebt.balance
+        : +debtAccountRegister.balance;
       if (debtBalance >= 0) {
         continue;
       }
@@ -428,7 +423,10 @@ export class TransferService implements ITransferService {
       }
 
       // Never exceed today's cushion in total (keeps today's balance >= minBalance)
-      const remainingTodayCushion = Math.max(0, todayCushion - totalPaymentsMade);
+      const remainingTodayCushion = Math.max(
+        0,
+        todayCushion - totalPaymentsMade,
+      );
       if (paymentAmount > remainingTodayCushion) {
         paymentAmount = remainingTodayCushion;
       }
@@ -447,7 +445,7 @@ export class TransferService implements ITransferService {
           debtBalance,
           paymentAmount,
           remainingAvailableAmount,
-        }
+        },
       );
 
       // Execute the transfer with the correct forecast date
@@ -491,12 +489,11 @@ export class TransferService implements ITransferService {
         paymentsProcessed,
         remainingAvailableAmount,
         originalAvailableAmount: projectedBalance - minBalance,
-      }
+      },
     );
 
     return paymentsProcessed > 0;
   }
-
 
   findDebtAccounts(): CacheAccountRegister[] {
     return this.cache.accountRegister.find((account) => account.balance < 0);
@@ -504,7 +501,7 @@ export class TransferService implements ITransferService {
 
   findExtraPaymentAccounts(): CacheAccountRegister[] {
     return this.cache.accountRegister.find(
-      (account) => account.allowExtraPayment
+      (account) => account.allowExtraPayment,
     );
   }
 
@@ -519,13 +516,13 @@ export class TransferService implements ITransferService {
    */
   async processSavingsGoals(
     sourceAccounts: CacheAccountRegister[],
-    targetDate: Date
+    targetDate: Date,
   ): Promise<void> {
     forecastLogger.service(
       "TransferService",
       `Processing savings goals for date: ${
         targetDate.toISOString().split("T")[0]
-      }`
+      }`,
     );
 
     // Check if there are any debt accounts with negative balances
@@ -534,14 +531,14 @@ export class TransferService implements ITransferService {
     if (debtAccounts.length > 0) {
       forecastLogger.service(
         "TransferService",
-        `Skipping savings goals - ${debtAccounts.length} debt accounts still have balances`
+        `Skipping savings goals - ${debtAccounts.length} debt accounts still have balances`,
       );
       return;
     }
 
     forecastLogger.service(
       "TransferService",
-      `All debt paid! Processing savings goals...`
+      `All debt paid! Processing savings goals...`,
     );
 
     // Process each source account that allows extra payments
@@ -574,7 +571,7 @@ export class TransferService implements ITransferService {
     if (!sourceAccountRegister) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Savings goal: Source account ${sourceAccountId} not found`
+        `Savings goal: Source account ${sourceAccountId} not found`,
       );
       return false;
     }
@@ -582,7 +579,7 @@ export class TransferService implements ITransferService {
     // Calculate the projected balance at the forecast date
     const projectedBalance = this.calculateProjectedBalanceAtDate(
       sourceAccountId,
-      targetDate
+      targetDate,
     );
 
     forecastLogger.serviceDebug(
@@ -595,20 +592,17 @@ export class TransferService implements ITransferService {
         projectedBalanceAtDate: projectedBalance,
         targetDate: targetDate.toISOString().split("T")[0],
         minBalance: sourceAccountRegister.minAccountBalance,
-      }
+      },
     );
 
-    // Find all savings goal accounts (accounts with accountSavingsGoal set)
-    const allAccounts = this.cache.accountRegister.find({});
     const savingsGoalAccounts = this.cache.accountRegister.find(
-      (account) => (account.accountSavingsGoal ?? 0) > 0
+      (account) => (account.accountSavingsGoal ?? 0) > 0,
     );
 
     forecastLogger.serviceDebug(
       "TransferService",
       `Savings goal account search:`,
       {
-        totalAccounts: allAccounts.length,
         savingsGoalAccountsCount: savingsGoalAccounts.length,
         sourceAccountId: sourceAccountRegister.id,
         sourceAccountBalance: sourceAccountRegister.balance,
@@ -619,13 +613,13 @@ export class TransferService implements ITransferService {
           savingsGoal: a.accountSavingsGoal,
           savingsGoalSortOrder: a.savingsGoalSortOrder,
         })),
-      }
+      },
     );
 
     if (savingsGoalAccounts.length === 0) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Savings goal: No savings goal accounts found`
+        `Savings goal: No savings goal accounts found`,
       );
       return false;
     }

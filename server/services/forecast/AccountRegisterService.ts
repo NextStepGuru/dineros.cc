@@ -7,6 +7,7 @@ import { LoanCalculatorService } from "./LoanCalculatorService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
 import { dateTimeService } from "./DateTimeService";
+import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class AccountRegisterService implements IAccountRegisterService {
   constructor(
@@ -53,9 +54,10 @@ export class AccountRegisterService implements IAccountRegisterService {
   ): Promise<void> {
     // Calculate projected balance at the statement date for more accurate interest calculation
     const statementDate = forecastDate?.toDate() || dateTimeService.nowDate();
-    const projectedBalance = this.calculateProjectedBalanceAtDate(
+    const projectedBalance = getProjectedBalanceAtDate(
+      this.cache,
       accountRegister.id,
-      statementDate
+      dateTimeService.toDate(statementDate)
     );
 
     const interest = await this.loanCalculator.calculateInterestForAccount(
@@ -172,39 +174,6 @@ export class AccountRegisterService implements IAccountRegisterService {
 
     // Update statement date to next cycle
     await this.updateStatementDate(accountRegister, forecastDate);
-  }
-
-  private calculateProjectedBalanceAtDate(
-    accountId: number,
-    targetDate: Date
-  ): number {
-    const account = this.cache.accountRegister.findOne({
-      id: accountId,
-    });
-
-    if (!account) {
-      return 0;
-    }
-
-    // Get all entries for this account up to the target date
-    const entries = this.cache.registerEntry
-      .find({
-        accountRegisterId: accountId,
-      })
-      .filter(
-        (entry) =>
-          !entry.isBalanceEntry &&
-          dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
-      )
-      .sort((a, b) => dateTimeService.diff(a.createdAt, b.createdAt));
-
-    // Start with the account's latest balance
-    let balance = account.latestBalance;
-    for (const entry of entries) {
-      balance += entry.amount;
-    }
-
-    return balance;
   }
 
   async updateStatementDates(
@@ -363,6 +332,22 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
   }
 
+  /** Cached at timeline start to avoid full account scans every day. */
+  private _cachedInterestAccounts: CacheAccountRegister[] | null = null;
+  private _cachedExtraPaymentAccounts: CacheAccountRegister[] | null = null;
+
+  /** Call once at timeline start so getInterestBearingAccounts/getAccountsWithExtraPayments are O(1). */
+  initTimelineAccountCaches(): void {
+    this._cachedInterestAccounts = this.cache.accountRegister.find(
+      (account) =>
+        account.balance !== 0 &&
+        (account.targetAccountRegisterId !== null || account.typeId === 2)
+    );
+    this._cachedExtraPaymentAccounts = this.cache.accountRegister.find({
+      allowExtraPayment: true,
+    });
+  }
+
   getAccountsByType(typeId: number): CacheAccountRegister[] {
     return this.cache.accountRegister.find({
       typeId: typeId,
@@ -370,20 +355,20 @@ export class AccountRegisterService implements IAccountRegisterService {
   }
 
   getInterestBearingAccounts(): CacheAccountRegister[] {
-    const allAccounts = this.cache.accountRegister.find({});
-
-    // Include accounts that either have a target account (for payments)
-    // OR are savings accounts (typeId 2) that can earn interest directly
-    const interestAccounts = this.cache.accountRegister.find(
+    if (this._cachedInterestAccounts !== null) {
+      return this._cachedInterestAccounts;
+    }
+    return this.cache.accountRegister.find(
       (account) =>
         account.balance !== 0 &&
         (account.targetAccountRegisterId !== null || account.typeId === 2)
     );
-
-    return interestAccounts;
   }
 
   getAccountsWithExtraPayments(): CacheAccountRegister[] {
+    if (this._cachedExtraPaymentAccounts !== null) {
+      return this._cachedExtraPaymentAccounts;
+    }
     return this.cache.accountRegister.find({
       allowExtraPayment: true,
     });

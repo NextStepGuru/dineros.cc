@@ -1,6 +1,9 @@
 import type { PrismaClient, Reoccurrence } from "@prisma/client";
 import type { IReoccurrenceService, CreateEntryParams } from "./types";
-import type { CacheAccountRegister, CacheReoccurrence } from "./ModernCacheService";
+import type {
+  CacheAccountRegister,
+  CacheReoccurrence,
+} from "./ModernCacheService";
 import { Decimal } from "@prisma/client/runtime/library";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
@@ -9,22 +12,25 @@ import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 
 export class ReoccurrenceService implements IReoccurrenceService {
+  /** Pre-scheduled reoccurrences by ISO date string (YYYY-MM-DD). Built once at timeline start; O(1) lookup per day. */
+  private _scheduleByDate: Map<string, CacheReoccurrence[]> = new Map();
+
   constructor(
     private db: PrismaClient,
     private cache: ModernCacheService,
     private entryService: RegisterEntryService,
-    private transferService: TransferService
+    private transferService: TransferService,
   ) {}
 
   async processReoccurrences(
     reoccurrences: Reoccurrence[],
-    endDate: Date
+    endDate: Date,
   ): Promise<void> {
     forecastLogger.service(
       "ReoccurrenceService",
       `Processing ${
         reoccurrences.length
-      } reoccurrences up to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
+      } reoccurrences up to ${dateTimeService.format("YYYY-MM-DD", endDate)}`,
     );
     for (const reoccurrence of reoccurrences) {
       await this.processReoccurrence(reoccurrence, endDate);
@@ -33,7 +39,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
   private async processReoccurrence(
     reoccurrence: Reoccurrence,
-    endDate: Date
+    endDate: Date,
   ): Promise<void> {
     let lastAt: any = dateTimeService.createUTC(reoccurrence.lastAt);
     const originalLastAt = lastAt ? dateTimeService.clone(lastAt) : null;
@@ -53,8 +59,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
         reoccurrence.description
       }) from ${dateTimeService.format(
         "YYYY-MM-DD",
-        lastAt
-      )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`
+        lastAt,
+      )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`,
     );
 
     // Process all due occurrences up to endDate
@@ -121,7 +127,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         if (
           dateTimeService.isSameOrBefore(
             adjustedLastAt,
-            dateTimeService.createUTC(nowDate)
+            dateTimeService.createUTC(nowDate),
           )
         ) {
           cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
@@ -133,7 +139,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       if (occurrenceCount > 1000) {
         forecastLogger.error(
           "ReoccurrenceService",
-          `Too many occurrences for reoccurrence ${reoccurrence.id}, stopping`
+          `Too many occurrences for reoccurrence ${reoccurrence.id}, stopping`,
         );
         break;
       }
@@ -141,7 +147,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
     forecastLogger.serviceDebug(
       "ReoccurrenceService",
-      `Processed ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`
+      `Processed ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`,
     );
   }
 
@@ -154,26 +160,26 @@ export class ReoccurrenceService implements IReoccurrenceService {
       if (intervalName === "once") return null;
       const unit = intervalName as "days" | "weeks" | "months" | "years";
       return dateTimeService.toDate(
-        dateTimeService.add(reoccurrence.intervalCount, unit, lastAt)
+        dateTimeService.add(reoccurrence.intervalCount, unit, lastAt),
       );
     }
 
     switch (reoccurrence.intervalId) {
       case 1: // Daily
         return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "days", lastAt)
+          dateTimeService.add(reoccurrence.intervalCount, "days", lastAt),
         );
       case 2: // Weekly
         return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "weeks", lastAt)
+          dateTimeService.add(reoccurrence.intervalCount, "weeks", lastAt),
         );
       case 3: // Monthly
         return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt)
+          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt),
         );
       case 4: // Yearly
         return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "years", lastAt)
+          dateTimeService.add(reoccurrence.intervalCount, "years", lastAt),
         );
       case 5: // Once (one-time)
         return null;
@@ -189,12 +195,39 @@ export class ReoccurrenceService implements IReoccurrenceService {
       return dateTimeService.subtract(2, "days", date);
     } else if (dayOfWeek === 6) {
       // Saturday - move to Friday
-              return dateTimeService.subtract(1, "days", date);
+      return dateTimeService.subtract(1, "days", date);
     }
     return date;
   }
 
+  /**
+   * Build schedule once before the timeline loop. Maps each date string to reoccurrences whose first due date is that day.
+   */
+  initReoccurrenceSchedule(startDate: Date, endDate: Date): void {
+    this._scheduleByDate = new Map();
+    const endMoment = dateTimeService.createUTC(endDate);
+    const reoccurrences = this.cache.reoccurrence.find({});
+    for (const reoccurrence of reoccurrences) {
+      const nextDate = this.calculateNextOccurrence(reoccurrence);
+      if (
+        nextDate == null ||
+        !dateTimeService.isValid(nextDate) ||
+        dateTimeService.isAfter(dateTimeService.createUTC(nextDate), endMoment)
+      ) {
+        continue;
+      }
+      const dateStr = dateTimeService.format("YYYY-MM-DD", nextDate);
+      const list = this._scheduleByDate.get(dateStr) ?? [];
+      list.push(reoccurrence);
+      this._scheduleByDate.set(dateStr, list);
+    }
+  }
+
   getReoccurrencesDue(maxDate: Date): CacheReoccurrence[] {
+    if (this._scheduleByDate.size > 0) {
+      const dateStr = dateTimeService.format("YYYY-MM-DD", maxDate);
+      return this._scheduleByDate.get(dateStr) ?? [];
+    }
     const dueMoment = dateTimeService.createUTC(maxDate);
     return (
       this.cache.reoccurrence.find((reoccurrence) => {
@@ -204,7 +237,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           dateTimeService.isValid(nextDate) &&
           dateTimeService.isSameOrBefore(
             dateTimeService.createUTC(nextDate),
-            dueMoment
+            dueMoment,
           )
         );
       }) || []
@@ -229,10 +262,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
   filterActiveReoccurrences(
     reoccurrences: Reoccurrence[],
-    currentDate: Date
+    currentDate: Date,
   ): Reoccurrence[] {
     return reoccurrences.filter((reoccurrence) =>
-      this.isReoccurrenceActive(reoccurrence, currentDate)
+      this.isReoccurrenceActive(reoccurrence, currentDate),
     );
   }
 

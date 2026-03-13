@@ -32,6 +32,7 @@ export interface IDataLoaderService {
 }
 
 export interface IAccountRegisterService {
+  initTimelineAccountCaches(): void;
   updateBalance(accountId: number, amount: number): void;
   getAccount(accountId: number): CacheAccountRegister | null;
   processInterestCharges(
@@ -45,11 +46,13 @@ export interface IAccountRegisterService {
 }
 
 export interface IReoccurrenceService {
+  initReoccurrenceSchedule(startDate: Date, endDate: Date): void;
   processReoccurrences(
     reoccurrences: Reoccurrence[],
     endDate: Date
   ): Promise<void>;
   calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null;
+  getReoccurrencesDue(maxDate: Date): CacheReoccurrence[];
 }
 
 export interface ForecastLoggingConfig {
