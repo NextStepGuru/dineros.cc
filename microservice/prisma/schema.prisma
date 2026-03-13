@@ -120,7 +120,7 @@ model AccountRegister {
   accountId               String    @map("account_id")
   typeId                  Int       @map("type_id") @db.UnsignedInt
   budgetId                Int       @map("budget_id") @db.UnsignedInt
-  name                    String
+  name                    String    @db.VarChar(500) /// @encrypted
   balance                 Decimal   @default(0) @db.Decimal(19, 2)
   creditLimit             Decimal?  @map("credit_limit") @db.Decimal(19, 2)
   latestBalance           Decimal   @default(0) @map("latest_balance") @db.Decimal(19, 2)
@@ -144,8 +144,8 @@ model AccountRegister {
   minAccountBalance       Decimal   @default(0) @map("min_account_balance") @db.Decimal(19, 2)
   allowExtraPayment       Boolean   @default(false) @map("allow_extra_payment")
   isArchived              Boolean   @default(false) @map("is_archived")
-  plaidId                 String?   @map("plaid_id") /// @encrypted
-  plaidAccessToken        String?   @map("plaid_access_token") /// @encrypted
+  plaidId                 String?   @map("plaid_id") @db.VarChar(500) /// @encrypted
+  plaidAccessToken        String?   @map("plaid_access_token") @db.VarChar(500) /// @encrypted
   plaidAccessTokenHash    String?   @map("plaid_access_token_hash") @db.VarChar(128) /// @encryption:hash(plaidAccessToken)?algorithm=sha512
   plaidIdHash             String?   @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
   plaidJson               Json?     @map("plaid_json")
@@ -183,7 +183,7 @@ model RegisterEntry {
   createdAt               DateTime @map("created_at")
   referenceId             String?
   checkNo                 String?
-  description             String
+  description             String    @db.VarChar(1500) /// @encrypted
   reoccurrenceId          Int?     @map("reoccurrence_id") @db.UnsignedInt
   amount                  Decimal  @db.Decimal(19, 2)
   balance                 Decimal  @db.Decimal(19, 2)

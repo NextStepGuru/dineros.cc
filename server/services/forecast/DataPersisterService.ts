@@ -372,7 +372,7 @@ export class DataPersisterService implements IDataPersisterService {
     await db.registerEntry.deleteMany({
       where: {
         ...(accountId && { register: { accountId } }),
-        description: "Latest Balance",
+        isBalanceEntry: true,
         amount: 0,
         isProjected: false,
       },
@@ -444,7 +444,7 @@ export class DataPersisterService implements IDataPersisterService {
       if (ids.length > 0) {
         await db.registerEntry.deleteMany({
           where: {
-            description: "Latest Balance",
+            isBalanceEntry: true,
             accountRegisterId: { in: ids },
           },
         });
@@ -509,7 +509,7 @@ export class DataPersisterService implements IDataPersisterService {
       this.db.registerEntry.count({
         where: {
           ...(accountId && { register: { accountId } }),
-          description: "Latest Balance",
+          isBalanceEntry: true,
         },
       }),
     ]);

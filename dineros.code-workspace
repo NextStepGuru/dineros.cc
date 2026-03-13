@@ -1,8 +1,8 @@
 {
   "folders": [
     {
-      "path": "."
-    }
+      "path": ".",
+    },
   ],
   "settings": {
     "cSpell.words": [
@@ -11,7 +11,7 @@
       "nuxi",
       "nuxthub",
       "roadmaps",
-      "Tokenomics"
+      "Tokenomics",
     ],
     "eslint.enable": true,
     "eslint.validate": [
@@ -19,23 +19,23 @@
       "javascriptreact",
       "typescript",
       "typescriptreact",
-      "vue"
+      "vue",
     ],
     "eslint.workingDirectories": [
       {
-        "mode": "auto"
-      }
+        "mode": "auto",
+      },
     ],
     "eslint.experimental.useFlatConfig": true,
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit"
+      "source.fixAll.eslint": "explicit",
     },
     "files.associations": {
-      "*.vue": "vue"
+      "*.vue": "vue",
     },
     "emmet.includeLanguages": {
       "vue": "html",
-      "pug": "html"
+      "pug": "html",
     },
     "pug.format.enable": true,
     "pug.beautify.enable": true,
@@ -50,7 +50,8 @@
     "pug.beautify.trailingComma": "none",
     "pug.beautify.bracketSameLine": false,
     "volar.codeLens.pugTools": true,
-    "volar.takeOverMode.enabled": true
+    "volar.takeOverMode.enabled": true,
+    "prisma.pinToPrisma6": true,
   },
   "extensions": {
     "recommendations": [
@@ -61,7 +62,7 @@
       "esbenp.prettier-vscode",
       "ms-vscode.vscode-json",
       "ms-vscode.vscode-eslint",
-      "ms-vscode.vscode-pug"
-    ]
-  }
+      "ms-vscode.vscode-pug",
+    ],
+  },
 }

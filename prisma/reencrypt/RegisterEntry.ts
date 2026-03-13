@@ -39,6 +39,7 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
       },
       select: {
         id: true,
+        description: true,
         plaidId: true
       }
     })
@@ -50,6 +51,7 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
         id: record.id
       },
       data: {
+        description: record.description,
         plaidId: record.plaidId
       }
     })
@@ -62,6 +64,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  * {
  *   "cursor": "id",
  *   "fields": {
+ *     "description": {
+ *       "encrypt": true,
+ *       "strictDecryption": false
+ *     },
  *     "plaidId": {
  *       "encrypt": true,
  *       "strictDecryption": false,

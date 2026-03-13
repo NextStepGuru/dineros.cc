@@ -5,9 +5,10 @@
  *
  * 1. User: each user dev-{id}@local.dev; password from
  *    RESTORE_DEV_PASSWORD or "dev".
- * 2. AccountRegister: nulls Plaid fields (plaid_id, plaid_access_token, etc.)
- *    so reads/updates no longer trigger decryption errors; Plaid links must be
- *    re-linked locally. Skipped if table/columns missing (e.g. older restore).
+ * 2. Null Plaid encrypted columns (account_register, register_entry) so updates don't fail on production ciphertext.
+ * 3. AccountRegister: sets name to Register-{id} (encrypted with local key).
+ * 4. RegisterEntry: sets description to "Entry {id}" (encrypted with local key).
+ *    Skipped if table/column missing (e.g. older restore).
  */
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
@@ -53,25 +54,64 @@ async function main() {
     `Reset email/password for ${sortedIds.length} user(s). Login with dev@local.dev / ${password} (or dev-{id}@local.dev for additional users).`
   );
 
-  // Null Plaid-related encrypted columns on account_register so decryption is never needed.
-  // Schema: AccountRegister @@map("account_register"), plaidId->plaid_id, plaidAccessToken->plaid_access_token, etc.
+  // Clear Plaid encrypted columns first so updates below don't trigger decryption of production ciphertext.
   try {
-    const ar = await prisma.$executeRaw`
+    await prisma.$executeRaw`
       UPDATE account_register
       SET plaid_id = NULL, plaid_access_token = NULL,
           plaid_access_token_hash = NULL, plaid_id_hash = NULL
     `;
-    console.log(
-      `Cleared Plaid encrypted fields on account_register: ${ar} row(s). Re-link Plaid in local if needed.`
-    );
+    await prisma.$executeRaw`
+      UPDATE register_entry SET plaid_id = NULL, plaid_id_hash = NULL
+    `;
+    console.log("Cleared Plaid encrypted fields on account_register and register_entry.");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("Unknown column") || msg.includes("doesn't exist")) {
-      console.log("Skipped clearing account_register Plaid fields (columns or table missing).");
+      console.log("Skipped clearing Plaid fields (columns or table missing).");
     } else {
       throw e;
     }
   }
+
+  const registers = await prisma.accountRegister.findMany({
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  for (const r of registers) {
+    await prisma.accountRegister.update({
+      where: { id: r.id },
+      data: { name: `Register-${r.id}` },
+    });
+  }
+  if (registers.length > 0) {
+    console.log(`Reset name for ${registers.length} account register(s) to Register-{id}.`);
+  }
+
+  try {
+    const entries = await prisma.registerEntry.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    for (const e of entries) {
+      await prisma.registerEntry.update({
+        where: { id: e.id },
+        data: { description: `Entry ${e.id}` },
+      });
+    }
+    if (entries.length > 0) {
+      console.log(`Reset description for ${entries.length} register entry(ies) to "Entry {id}".`);
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("Unknown column") || msg.includes("doesn't exist")) {
+      console.log("Skipped resetting register_entry description (column or table missing).");
+    } else {
+      throw e;
+    }
+  }
+
+  console.log("Re-link Plaid in local if needed.");
 }
 
 main()
