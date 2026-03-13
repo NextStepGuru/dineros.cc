@@ -278,7 +278,7 @@ describe('Core API Endpoints', () => {
         },
         orderBy: [
           { lastAt: "asc" },
-          { description: "asc" },
+          { id: "asc" },
         ],
       });
 
@@ -428,7 +428,7 @@ describe('Core API Endpoints', () => {
         expect.objectContaining({
           orderBy: [
             { lastAt: "asc" },
-            { description: "asc" },
+            { id: "asc" },
           ],
         })
       );

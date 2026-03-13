@@ -253,7 +253,7 @@ model Reoccurrence {
   totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
   elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
   amount                    Decimal   @db.Decimal(19, 2)
-  description               String
+  description               String   @db.VarChar(1500) /// @encrypted
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   account  Account            @relation(fields: [accountId], references: [id])

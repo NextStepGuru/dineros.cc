@@ -228,7 +228,7 @@ describe("DataPersisterService", () => {
       expect(mockDb.registerEntry.count).toHaveBeenNthCalledWith(4, {
         where: {
           register: { accountId },
-          description: "Latest Balance",
+          isBalanceEntry: true,
         },
       });
     });
@@ -664,9 +664,10 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
         select: { id: true },
       });
 
-      expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
+      // First call: cleanupProjectedEntries; second: balance entries
+      expect(mockDb.registerEntry.deleteMany).toHaveBeenNthCalledWith(2, {
         where: {
-          description: "Latest Balance",
+          isBalanceEntry: true,
           accountRegisterId: { in: [1, 2] },
         },
       });
@@ -768,7 +769,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       expect(mockDb.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: {
-          description: "Latest Balance",
+          isBalanceEntry: true,
           amount: 0,
           isProjected: false,
         },

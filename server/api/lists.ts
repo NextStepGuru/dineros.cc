@@ -20,12 +20,8 @@ export default defineEventHandler(async (event) => {
         },
       },
       orderBy: [
-        {
-          lastAt: "asc",
-        },
-        {
-          description: "asc",
-        },
+        { lastAt: "asc" },
+        { id: "asc" },
       ],
     });
 
