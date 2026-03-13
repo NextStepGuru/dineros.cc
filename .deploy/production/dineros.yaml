@@ -4,7 +4,7 @@ metadata:
   name: dineros-production-deployment
   labels:
     app: dineros-production
-  namespace: gs-services
+  namespace: dineros
 spec:
   selector:
     matchLabels:
@@ -302,7 +302,7 @@ metadata:
   name: dineros-production-service
   labels:
     app: dineros-production
-  namespace: gs-services
+  namespace: dineros
 spec:
   selector:
     app: dineros-production
@@ -327,7 +327,7 @@ metadata:
   labels:
     app: dineros-production
   name: dineros-production-ingress
-  namespace: gs-services
+  namespace: dineros
 spec:
   rules:
     - host: dineros.cc

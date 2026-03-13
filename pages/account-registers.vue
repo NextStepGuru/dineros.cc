@@ -42,44 +42,77 @@ function handleDragStart(event: DragEvent, index: number) {
   }
 }
 
-// Touch event handlers for mobile
+// Touch event handlers for mobile (long-press to drag, short tap to click)
 function handleTouchStart(event: TouchEvent, index: number) {
-  event.preventDefault();
-  draggedIndex.value = index;
-  isDragging.value = true;
+  if (event.touches.length > 1) return;
 
-  // Store initial touch position
   const touch = event.touches[0];
+  touchStartTime.value = Date.now();
+  touchStartX.value = touch.clientX;
   touchStartY.value = touch.clientY;
   touchStartIndex.value = index;
+  pendingTapRow.value = draggableAccountRegisters.value[index];
+  pendingTapSubRow.value = null;
 
-  // Check if this parent has pocket accounts
-  const parentAccount = draggableAccountRegisters.value[index];
-  const pocketAccounts = listStore.getAccountRegisters.filter(
-    (f) => f.subAccountRegisterId === parentAccount.id
-  );
-
-  // Store pocket accounts info for group dragging
-  if (pocketAccounts.length > 0) {
-    draggedPocketGroup.value = {
-      parentId: parentAccount.id,
-      pocketAccounts: pocketAccounts,
-    };
-  } else {
-    draggedPocketGroup.value = null;
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
   }
+
+  longPressTimer.value = setTimeout(() => {
+    longPressTimer.value = null;
+    isDragging.value = true;
+    draggedIndex.value = index;
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+
+    const parentAccount = draggableAccountRegisters.value[index];
+    const pocketAccounts = listStore.getAccountRegisters.filter(
+      (f) => f.subAccountRegisterId === parentAccount.id
+    );
+    if (pocketAccounts.length > 0) {
+      draggedPocketGroup.value = {
+        parentId: parentAccount.id,
+        pocketAccounts: pocketAccounts,
+      };
+    } else {
+      draggedPocketGroup.value = null;
+    }
+  }, LONG_PRESS_MS);
 }
 
 function handleTouchMove(event: TouchEvent, index: number) {
-  if (!isDragging.value || draggedIndex.value === null) return;
+  if (event.touches.length > 1) {
+    if (longPressTimer.value != null) {
+      clearTimeout(longPressTimer.value);
+      longPressTimer.value = null;
+    }
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+    return;
+  }
+
+  if (!isDragging.value || draggedIndex.value === null) {
+    const touch = event.touches[0];
+    const dx = touch.clientX - touchStartX.value;
+    const dy = touch.clientY - touchStartY.value;
+    if (dx * dx + dy * dy > TAP_MOVE_THRESHOLD_PX * TAP_MOVE_THRESHOLD_PX) {
+      if (longPressTimer.value != null) {
+        clearTimeout(longPressTimer.value);
+        longPressTimer.value = null;
+      }
+      pendingTapRow.value = null;
+      pendingTapSubRow.value = null;
+    }
+    return;
+  }
 
   event.preventDefault();
   const touch = event.touches[0];
   const currentY = touch.clientY;
   const deltaY = currentY - touchStartY.value;
 
-  // Calculate which row we're hovering over
-  const rowHeight = 60; // Approximate row height
+  const rowHeight = 60;
   const newIndex = Math.max(
     0,
     Math.min(
@@ -89,42 +122,61 @@ function handleTouchMove(event: TouchEvent, index: number) {
   );
 
   if (newIndex !== dragOverIndex.value) {
-    // Check if we're dragging a parent account
     const draggedParent = draggableAccountRegisters.value[draggedIndex.value];
-
-    // If dragging a parent, only allow dropping on other parent accounts
     if (!draggedParent.subAccountRegisterId) {
       const targetParent = draggableAccountRegisters.value[newIndex];
-
-      // Only show drop zone if target is also a parent account
       if (!targetParent.subAccountRegisterId) {
         dragOverIndex.value = newIndex;
       }
     } else {
-      // If dragging a pocket account, allow normal pocket-to-pocket dropping
       dragOverIndex.value = newIndex;
     }
   }
 }
 
 function handleTouchEnd(event: TouchEvent, index: number) {
-  if (!isDragging.value || draggedIndex.value === null) return;
-
-  event.preventDefault();
-
-  if (
-    dragOverIndex.value !== null &&
-    draggedIndex.value !== dragOverIndex.value
-  ) {
-    handleDrop(null as any, dragOverIndex.value);
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
   }
 
-  // Reset state
-  draggedPocketGroup.value = null;
-  draggedIndex.value = null;
-  isDragging.value = false;
-  dragOverIndex.value = null;
+  if (isDragging.value && draggedIndex.value !== null) {
+    event.preventDefault();
+
+    if (
+      dragOverIndex.value !== null &&
+      draggedIndex.value !== dragOverIndex.value
+    ) {
+      handleDrop(null as any, dragOverIndex.value);
+    }
+
+    draggedPocketGroup.value = null;
+    draggedIndex.value = null;
+    isDragging.value = false;
+    dragOverIndex.value = null;
+    touchStartY.value = 0;
+    touchStartIndex.value = 0;
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+    return;
+  }
+
+  const row = draggableAccountRegisters.value[index];
+  if (
+    pendingTapRow.value != null &&
+    pendingTapRow.value.id === row.id &&
+    Date.now() - touchStartTime.value < LONG_PRESS_MS
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleTableClick(pendingTapRow.value);
+  }
+
+  pendingTapRow.value = null;
+  pendingTapSubRow.value = null;
   touchStartY.value = 0;
+  touchStartX.value = 0;
+  touchStartTime.value = 0;
   touchStartIndex.value = 0;
 }
 
@@ -227,19 +279,34 @@ function handlePocketDrop(
   dragOverIndex.value = null;
 }
 
-// Pocket touch event handlers
+// Pocket touch event handlers (long-press to drag, short tap to click)
 function handlePocketTouchStart(
   event: TouchEvent,
   subRow: AccountRegister,
   parentId: number
 ) {
-  event.preventDefault();
-  draggedIndex.value = `sub-${subRow.id}`;
-  isDragging.value = true;
+  if (event.touches.length > 1) return;
 
   const touch = event.touches[0];
+  touchStartTime.value = Date.now();
+  touchStartX.value = touch.clientX;
   touchStartY.value = touch.clientY;
   touchStartIndex.value = subRow.id;
+  pendingTapRow.value = null;
+  pendingTapSubRow.value = subRow;
+
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
+  }
+
+  longPressTimer.value = setTimeout(() => {
+    longPressTimer.value = null;
+    isDragging.value = true;
+    draggedIndex.value = `sub-${subRow.id}`;
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+  }, LONG_PRESS_MS);
 }
 
 function handlePocketTouchMove(
@@ -247,7 +314,30 @@ function handlePocketTouchMove(
   subRow: AccountRegister,
   parentId: number
 ) {
-  if (!isDragging.value || draggedIndex.value === null) return;
+  if (event.touches.length > 1) {
+    if (longPressTimer.value != null) {
+      clearTimeout(longPressTimer.value);
+      longPressTimer.value = null;
+    }
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+    return;
+  }
+
+  if (!isDragging.value || draggedIndex.value === null) {
+    const touch = event.touches[0];
+    const dx = touch.clientX - touchStartX.value;
+    const dy = touch.clientY - touchStartY.value;
+    if (dx * dx + dy * dy > TAP_MOVE_THRESHOLD_PX * TAP_MOVE_THRESHOLD_PX) {
+      if (longPressTimer.value != null) {
+        clearTimeout(longPressTimer.value);
+        longPressTimer.value = null;
+      }
+      pendingTapRow.value = null;
+      pendingTapSubRow.value = null;
+    }
+    return;
+  }
 
   event.preventDefault();
   const touch = event.touches[0];
@@ -280,60 +370,84 @@ function handlePocketTouchEnd(
   subRow: AccountRegister,
   parentId: number
 ) {
-  if (!isDragging.value || draggedIndex.value === null) return;
-
-  event.preventDefault();
-
-  if (
-    dragOverIndex.value !== null &&
-    draggedIndex.value !== dragOverIndex.value
-  ) {
-    const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
-    const dropPocketId = parseInt(dragOverIndex.value.replace("sub-", ""));
-
-    const pocketAccounts = listStore.getAccountRegisters
-      .filter((f) => f.subAccountRegisterId === parentId)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-
-    const draggedPocketIndex = pocketAccounts.findIndex(
-      (p) => p.id === draggedPocketId
-    );
-    const dropPocketIndex = pocketAccounts.findIndex(
-      (p) => p.id === dropPocketId
-    );
-
-    if (draggedPocketIndex !== -1 && dropPocketIndex !== -1) {
-      const reorderedPockets = [...pocketAccounts];
-      const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
-      reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
-
-      const updatedPockets = reorderedPockets.map((item, index) => {
-        const updatedItem = { ...item };
-
-        switch (activeSortMode.value) {
-          case "loan":
-            updatedItem.loanPaymentSortOrder = index;
-            break;
-          case "savings":
-            updatedItem.savingsGoalSortOrder = index;
-            break;
-          default:
-            updatedItem.sortOrder = index;
-            break;
-        }
-
-        return updatedItem;
-      });
-
-      handlePocketDragEnd(updatedPockets);
-    }
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
   }
 
-  // Reset state
-  draggedIndex.value = null;
-  isDragging.value = false;
-  dragOverIndex.value = null;
+  if (isDragging.value && draggedIndex.value !== null) {
+    event.preventDefault();
+
+    if (
+      dragOverIndex.value !== null &&
+      draggedIndex.value !== dragOverIndex.value
+    ) {
+      const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
+      const dropPocketId = parseInt(dragOverIndex.value.replace("sub-", ""));
+
+      const pocketAccounts = listStore.getAccountRegisters
+        .filter((f) => f.subAccountRegisterId === parentId)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      const draggedPocketIndex = pocketAccounts.findIndex(
+        (p) => p.id === draggedPocketId
+      );
+      const dropPocketIndex = pocketAccounts.findIndex(
+        (p) => p.id === dropPocketId
+      );
+
+      if (draggedPocketIndex !== -1 && dropPocketIndex !== -1) {
+        const reorderedPockets = [...pocketAccounts];
+        const [draggedItem] = reorderedPockets.splice(draggedPocketIndex, 1);
+        reorderedPockets.splice(dropPocketIndex, 0, draggedItem);
+
+        const updatedPockets = reorderedPockets.map((item, index) => {
+          const updatedItem = { ...item };
+
+          switch (activeSortMode.value) {
+            case "loan":
+              updatedItem.loanPaymentSortOrder = index;
+              break;
+            case "savings":
+              updatedItem.savingsGoalSortOrder = index;
+              break;
+            default:
+              updatedItem.sortOrder = index;
+              break;
+          }
+
+          return updatedItem;
+        });
+
+        handlePocketDragEnd(updatedPockets);
+      }
+    }
+
+    draggedIndex.value = null;
+    isDragging.value = false;
+    dragOverIndex.value = null;
+    touchStartY.value = 0;
+    touchStartIndex.value = 0;
+    pendingTapRow.value = null;
+    pendingTapSubRow.value = null;
+    return;
+  }
+
+  if (
+    pendingTapSubRow.value != null &&
+    pendingTapSubRow.value.id === subRow.id &&
+    Date.now() - touchStartTime.value < LONG_PRESS_MS
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleTableClick(pendingTapSubRow.value);
+  }
+
+  pendingTapRow.value = null;
+  pendingTapSubRow.value = null;
   touchStartY.value = 0;
+  touchStartX.value = 0;
+  touchStartTime.value = 0;
   touchStartIndex.value = 0;
 }
 
@@ -532,8 +646,16 @@ const isDragging = ref(false);
 const dragOverIndex = ref<number | null>(null);
 
 // Touch state for mobile
+const LONG_PRESS_MS = 450;
+const TAP_MOVE_THRESHOLD_PX = 10;
+
 const touchStartY = ref(0);
+const touchStartX = ref(0);
+const touchStartTime = ref(0);
 const touchStartIndex = ref(0);
+const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const pendingTapRow = ref<AccountRegister | null>(null);
+const pendingTapSubRow = ref<AccountRegister | null>(null);
 
 // Pocket group dragging state
 const draggedPocketGroup = ref<{
@@ -694,6 +816,13 @@ defineShortcuts({
   },
 });
 
+onBeforeUnmount(() => {
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
+  }
+});
+
 const globalFilter = ref("");
 
 const filteredAccountRegisters = computed(() => {
@@ -779,7 +908,7 @@ const estimatedNetWorth = computed(() => {
               @touchstart="handleTouchStart($event, index)"
               @touchmove="handleTouchMove($event, index)"
               @touchend="handleTouchEnd($event, index)"
-              style="touch-action: none;"
+              style="touch-action: pan-y;"
             )
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
                 a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
@@ -814,7 +943,7 @@ const estimatedNetWorth = computed(() => {
                 @touchstart="handlePocketTouchStart($event, subRow, row.id)"
                 @touchmove="handlePocketTouchMove($event, subRow, row.id)"
                 @touchend="handlePocketTouchEnd($event, subRow, row.id)"
-                style="touch-action: none;")
+                style="touch-action: pan-y;")
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
                   a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-green-600 dark:hover:text-green-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-green-600 dark:hover:text-green-400 text-lg sm:text-base")

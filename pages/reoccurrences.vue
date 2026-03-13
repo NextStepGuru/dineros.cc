@@ -3,6 +3,7 @@ import type { TableColumn } from "@nuxt/ui";
 
 import { ModalsEditReoccurrence } from "#components";
 import {
+  formatAccountRegisters,
   formatDate,
   getAccountRegisterLabel,
   getIntervalLabel,
@@ -46,6 +47,13 @@ function handleTableClick(data: Reoccurrence) {
 }
 
 function handleAddReoccurrence() {
+  const accountRegisters = formatAccountRegisters(listStore.getAccountRegisters);
+  const firstAccountRegisterId = accountRegisters[0]?.id ?? 0;
+  const monthInterval = listStore.getIntervals.find((i) =>
+    /month/i.test(i.name)
+  );
+  const defaultIntervalId = monthInterval?.id ?? 0;
+
   const addReoccurrence: ModalReoccurrenceProps = {
     title: `Add Reoccurrence`,
     description: "",
@@ -60,11 +68,11 @@ function handleAddReoccurrence() {
       accountId: listStore.getAccounts?.[0]?.id,
       description: "",
       amount: 0,
-      intervalId: 0,
-      accountRegisterId: 0,
+      intervalId: defaultIntervalId,
+      accountRegisterId: firstAccountRegisterId,
       lastAt: todayISOString.value || "",
       endAt: undefined,
-      intervalCount: 0,
+      intervalCount: 1,
       adjustBeforeIfOnWeekend: false,
     },
   };

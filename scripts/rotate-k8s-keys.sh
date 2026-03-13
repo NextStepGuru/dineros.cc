@@ -2,7 +2,7 @@
 
 # Configuration
 SECRET_NAME="production-db-secrets" # Name of the Kubernetes secret
-NAMESPACE="gs-services"             # Kubernetes namespace
+NAMESPACE="dineros"                 # Kubernetes namespace (updated from gs-services)
 MAX_KEYS=5                          # Maximum number of decryption keys to maintain
 
 # Fetch the current Kubernetes secret
