@@ -260,12 +260,12 @@ DUMP_FILE=$(dump_database "$ENV")
 # Restore to local
 restore_database "$DUMP_FILE" "$SOURCE_DB_NAME"
 
-# Reset encrypted User email/password so login works with local DB_ENCRYPTION_KEY
-echo -e "${YELLOW}🔐 Resetting encrypted user fields for local login...${NC}"
-if (cd "$(dirname "$0")/.." && pnpm run reset-encrypted-users); then
-    echo -e "${GREEN}✅ User passwords reset. Log in with dev@local.dev / dev (or RESTORE_DEV_PASSWORD).${NC}"
+# Reset/re-encrypt encrypted fields so local app works with local DB_ENCRYPTION_KEY
+echo -e "${YELLOW}🔐 Updating encrypted fields for local (re-encrypt or overwrite)...${NC}"
+if (cd "$(dirname "$0")/.." && RESTORE_FROM_ENV="$ENV" pnpm run reset-encrypted-users); then
+    echo -e "${GREEN}✅ Encrypted fields updated. Log in with dev@local.dev / dev (or RESTORE_DEV_PASSWORD).${NC}"
 else
-    echo -e "${YELLOW}⚠️  Could not reset users (ensure .env has DATABASE_URL and DB_ENCRYPTION_KEY). Run: pnpm run reset-encrypted-users${NC}"
+    echo -e "${YELLOW}⚠️  Could not update encrypted fields (ensure .env has DATABASE_URL and DB_ENCRYPTION_KEY). Run: pnpm run reset-encrypted-users${NC}"
 fi
 
 # Optionally clean up dump file

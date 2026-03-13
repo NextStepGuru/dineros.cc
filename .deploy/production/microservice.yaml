@@ -4,7 +4,7 @@ metadata:
   name: dineros-microservice-production-deployment
   labels:
     app: dineros-microservice-production
-  namespace: gs-services
+  namespace: dineros
 spec:
   selector:
     matchLabels:

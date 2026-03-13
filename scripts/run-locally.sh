@@ -6,7 +6,7 @@ export REPO="dineros"
 export PROJECT_NAME="dineros-microservice"
 export PROJECT_VERSION="2"
 export DEPLOY_ENV="production"
-export NAMESPACE="gs-services"
+export NAMESPACE="dineros"
 
 # Change to project root directory
 cd "$(dirname "$0")/.."
