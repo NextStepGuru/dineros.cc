@@ -700,6 +700,265 @@ describe("Register Entry API Endpoints", () => {
     });
   });
 
+  describe("POST /api/register-entry-transfer", () => {
+    let registerEntryTransferHandler: any;
+
+    beforeEach(async () => {
+      const module = await import("../register-entry-transfer.post");
+      registerEntryTransferHandler = module.default;
+    });
+
+    it("should successfully transfer register entry to target account", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: "entry-123",
+        accountRegisterId: 1,
+        targetAccountRegisterId: 2,
+      };
+
+      const mockOriginalEntry = {
+        id: "entry-123",
+        description: "Transfer",
+        amount: 100,
+        createdAt: new Date("2024-01-01"),
+        reoccurrenceId: null,
+        plaidId: null,
+        plaidJson: null,
+        register: { accountId: "account-123" },
+      };
+
+      const mockTransferEntry = {
+        id: "entry-new",
+        accountRegisterId: 2,
+        description: "Transfer",
+        amount: 100,
+      };
+      const mockUpdatedOriginal = { id: "entry-123", isCleared: true };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { addRecalculateJob } = await import(
+        "~/server/clients/queuesClient"
+      );
+      const { registerEntrySchema } = await import("~/schema/zod");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any)
+        .mockResolvedValueOnce(mockOriginalEntry);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue({
+        accountId: "target-account-id",
+      });
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+        const mockTx = {
+          registerEntry: {
+            create: vi.fn().mockResolvedValue(mockTransferEntry),
+            update: vi.fn().mockResolvedValue(mockUpdatedOriginal),
+          },
+          accountRegister: {
+            update: vi.fn().mockResolvedValue({}),
+          },
+        };
+        return await callback(mockTx);
+      });
+      (registerEntrySchema.parse as any)
+        .mockReturnValueOnce(mockUpdatedOriginal)
+        .mockReturnValueOnce(mockTransferEntry);
+
+      const result = await registerEntryTransferHandler(mockEvent);
+
+      expect(result).toEqual({
+        originalEntry: mockUpdatedOriginal,
+        transferEntry: mockTransferEntry,
+        message: "Transfer completed successfully",
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "account-123",
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "target-account-id",
+      });
+    });
+
+    it("should return 401 when user has no permission to source entry", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: "entry-123",
+        accountRegisterId: 1,
+        targetAccountRegisterId: 2,
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+        new Error("Not found")
+      );
+      (handleApiError as any).mockImplementation((err: any) => {
+        throw err;
+      });
+
+      await expect(registerEntryTransferHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+
+    it("should reject when source and target account registers are the same", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        registerEntryId: "entry-123",
+        accountRegisterId: 1,
+        targetAccountRegisterId: 1,
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (handleApiError as any).mockImplementation((err: any) => {
+        throw err;
+      });
+
+      await expect(registerEntryTransferHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/register-entry-transfer-create", () => {
+    let registerEntryTransferCreateHandler: any;
+
+    beforeEach(async () => {
+      const module = await import("../register-entry-transfer-create.post");
+      registerEntryTransferCreateHandler = module.default;
+    });
+
+    it("should successfully create transfer entries in source and target", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        sourceAccountRegisterId: 1,
+        targetAccountRegisterId: 2,
+        amount: 500,
+        description: "Transfer out",
+        createdAt: "2024-01-15",
+      };
+
+      const mockSourceRegister = {
+        id: 1,
+        accountId: "account-1",
+        name: "Checking",
+      };
+      const mockTargetRegister = {
+        id: 2,
+        accountId: "account-2",
+        name: "Savings",
+      };
+      const mockSourceEntry = { id: "src-entry", amount: -500 };
+      const mockTargetEntry = { id: "tgt-entry", amount: 500 };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { addRecalculateJob } = await import(
+        "~/server/clients/queuesClient"
+      );
+      const { registerEntrySchema } = await import("~/schema/zod");
+      const { dateTimeService } = await import("~/server/services/forecast");
+
+      (dateTimeService.toDate as any) = vi.fn().mockReturnValue(new Date("2024-01-15"));
+      (dateTimeService.parseInput as any) = vi.fn().mockReturnValue(new Date("2024-01-15"));
+      (dateTimeService.createUTC as any) = vi.fn().mockReturnThis();
+      (dateTimeService.createUTC().set as any) = vi.fn().mockReturnThis();
+      (dateTimeService.createUTC().set().isSameOrBefore as any) = vi.fn().mockReturnValue(true);
+      (dateTimeService.now as any) = vi.fn().mockReturnValue({ utc: vi.fn().mockReturnThis(), set: vi.fn().mockReturnThis() });
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.accountRegister.findFirstOrThrow as any)
+        .mockResolvedValueOnce(mockSourceRegister)
+        .mockResolvedValueOnce(mockTargetRegister);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+        const mockTx = {
+          registerEntry: {
+            create: vi
+              .fn()
+              .mockResolvedValueOnce(mockSourceEntry)
+              .mockResolvedValueOnce(mockTargetEntry),
+          },
+        };
+        return await callback(mockTx);
+      });
+      (registerEntrySchema.parse as any)
+        .mockReturnValueOnce(mockSourceEntry)
+        .mockReturnValueOnce(mockTargetEntry);
+
+      const result = await registerEntryTransferCreateHandler(mockEvent);
+
+      expect(result).toEqual({
+        sourceEntry: mockSourceEntry,
+        targetEntry: mockTargetEntry,
+        message: "Transfer created successfully",
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: "account-1" });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: "account-2" });
+    });
+
+    it("should reject when source and target account registers are the same", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        sourceAccountRegisterId: 1,
+        targetAccountRegisterId: 1,
+        amount: 100,
+        description: "X",
+        createdAt: "2024-01-01",
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (handleApiError as any).mockImplementation((err: any) => {
+        throw err;
+      });
+
+      await expect(
+        registerEntryTransferCreateHandler(mockEvent)
+      ).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+
+    it("should return 400 when user has no permission to source account", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        sourceAccountRegisterId: 1,
+        targetAccountRegisterId: 2,
+        amount: 100,
+        description: "X",
+        createdAt: "2024-01-01",
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
+        new Error("Not found")
+      );
+      (handleApiError as any).mockImplementation((err: any) => {
+        throw err;
+      });
+
+      await expect(
+        registerEntryTransferCreateHandler(mockEvent)
+      ).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
   describe("Cross-endpoint Integration", () => {
     it("should use consistent error handling across all register entry endpoints", async () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");

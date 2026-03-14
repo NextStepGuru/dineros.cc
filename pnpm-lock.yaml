@@ -65,9 +65,6 @@ importers:
       nuxt-cron:
         specifier: ^1.8.0
         version: 1.8.0(magicast@0.5.1)
-      nuxt-lodash:
-        specifier: ^2.5.3
-        version: 2.5.3(magicast@0.5.1)
       ofetch:
         specifier: ^1.5.1
         version: 1.5.1
@@ -92,6 +89,9 @@ importers:
       vuedraggable:
         specifier: ^4.1.0
         version: 4.1.0(vue@3.5.30(typescript@5.8.3))
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@47ng/cloak':
         specifier: ^1.2.0
@@ -270,9 +270,6 @@ importers:
       winston:
         specifier: ^3.19.0
         version: 3.19.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
 packages:
 
@@ -5569,9 +5566,6 @@ packages:
 
   nuxt-cron@1.8.0:
     resolution: {integrity: sha512-XgNdounfdXNHOVlYTFDhc28yerwBP7+MP4Tk8GmC6GkxWo3nCWZ/pmqpan+tCmVVhUn6ltpe5KSCChWgl5P3kg==}
-
-  nuxt-lodash@2.5.3:
-    resolution: {integrity: sha512-LCJ40tGQTHkfk8rQoGqtb0mFgRVt8U+pc3S352DsI39yF3olqgxlsm28wdJMIcWHuxLgf5X+DwxmZhrAHXNS5g==}
 
   nuxt@4.4.2:
     resolution: {integrity: sha512-iWVFpr/YEqVU/CenqIHMnIkvb2HE/9f+q8oxZ+pj2et+60NljGRClCgnmbvGPdmNFE0F1bEhoBCYfqbDOCim3Q==}
@@ -13202,14 +13196,6 @@ snapshots:
       '@nuxt/kit': 3.21.0(magicast@0.5.1)
       cron: 3.5.0
       fast-glob: 3.3.3
-    transitivePeerDependencies:
-      - magicast
-
-  nuxt-lodash@2.5.3(magicast@0.5.1):
-    dependencies:
-      '@nuxt/kit': 3.21.0(magicast@0.5.1)
-      '@types/lodash-es': 4.17.12
-      lodash-es: 4.17.23
     transitivePeerDependencies:
       - magicast
 

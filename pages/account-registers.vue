@@ -3,9 +3,11 @@ import type { TableColumn } from "@nuxt/ui";
 import type { AccountRegister } from "~/types/types";
 import { useListStore } from "../stores/listStore";
 import { getAccountTypeLabel } from "~/lib/utils";
-import { ModalsEditAccountRegister } from "#components";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
-import VueDraggable from "vuedraggable";
+
+const ModalsEditAccountRegister = defineAsyncComponent(
+  () => import("~/components/modals/EditAccountRegister.vue")
+);
 
 definePageMeta({
   middleware: "auth",

@@ -70,6 +70,8 @@ model UserAccount {
   user    User    @relation(fields: [userId], references: [id])
   account Account @relation(fields: [accountId], references: [id])
 
+  @@index([userId])
+  @@index([userId, accountId])
   @@map("user_account")
 }
 
@@ -164,6 +166,7 @@ model AccountRegister {
   reoccurrences Reoccurrence[]
   children      AccountRegister[] @relation("ar_children")
 
+  @@index([accountId, isArchived])
   @@map("account_register")
 }
 
@@ -211,6 +214,7 @@ model RegisterEntry {
   type         RegisterEntryType? @relation(fields: [typeId], references: [id])
 
   @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
+  @@index([accountRegisterId, isCleared, isProjected, isManualEntry])
   @@map("register_entry")
 }
 
@@ -262,6 +266,8 @@ model Reoccurrence {
   entries  RegisterEntry[]
   skips    ReoccurrenceSkip[]
 
+  @@index([accountId])
+  @@index([accountId, lastAt])
   @@map("reoccurrence")
 }
 

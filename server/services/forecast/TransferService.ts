@@ -26,12 +26,21 @@ export class TransferService implements ITransferService {
       fromDescription,
     } = params;
 
+    // Cap transfer to debt account so payment never exceeds balance
+    let effectiveAmount = +amount;
+    const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
+    if (targetForCap && +targetForCap.balance < 0) {
+      const amountOwed = Math.abs(+targetForCap.balance);
+      if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
+    }
+    if (effectiveAmount <= TransferService.MONEY_EPSILON) return;
+
     // Create entry for target account (receiving money)
     this.entryService.createEntry({
       accountRegisterId: targetAccountRegisterId,
       description,
       sourceAccountRegisterId,
-      amount: +amount,
+      amount: effectiveAmount,
       reoccurrence,
       typeId: 6, // Transfer
     });
@@ -41,7 +50,7 @@ export class TransferService implements ITransferService {
       accountRegisterId: sourceAccountRegisterId,
       sourceAccountRegisterId: targetAccountRegisterId,
       description: fromDescription || `Transfer for ${description}`,
-      amount: +amount * -1,
+      amount: effectiveAmount * -1,
       reoccurrence,
       typeId: 6, // Transfer
     });
@@ -60,12 +69,21 @@ export class TransferService implements ITransferService {
       forecastDate,
     } = params;
 
+    // Cap transfer to debt account so payment never exceeds balance
+    let effectiveAmount = +amount;
+    const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
+    if (targetForCap && +targetForCap.balance < 0) {
+      const amountOwed = Math.abs(+targetForCap.balance);
+      if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
+    }
+    if (effectiveAmount <= TransferService.MONEY_EPSILON) return;
+
     // Create entry for target account (receiving money)
     this.entryService.createEntry({
       accountRegisterId: targetAccountRegisterId,
       description,
       sourceAccountRegisterId,
-      amount: +amount,
+      amount: effectiveAmount,
       reoccurrence,
       forecastDate,
       typeId: 6, // Transfer
@@ -76,7 +94,7 @@ export class TransferService implements ITransferService {
       accountRegisterId: sourceAccountRegisterId,
       sourceAccountRegisterId: targetAccountRegisterId,
       description: fromDescription || `Transfer for ${description}`,
-      amount: +amount * -1,
+      amount: effectiveAmount * -1,
       reoccurrence,
       forecastDate,
       typeId: 6, // Transfer

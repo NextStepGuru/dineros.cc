@@ -65,6 +65,7 @@ vi.mock('~/server/clients/prismaClient', () => ({
     account: {
       findMany: vi.fn(),
     },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -440,6 +441,51 @@ describe('Core API Endpoints', () => {
           },
         })
       );
+    });
+  });
+
+  describe('GET /api/countries', () => {
+    let countriesHandler: any;
+
+    beforeEach(async () => {
+      const module = await import('../countries.get');
+      countriesHandler = module.default;
+    });
+
+    it('should return active countries with id, name, code, code3', async () => {
+      const mockCountries = [
+        { id: 1, name: 'United States', code: 'US', code3: 'USA' },
+        { id: 2, name: 'Canada', code: 'CA', code3: 'CAN' },
+      ];
+
+      const { prisma } = await import('~/server/clients/prismaClient');
+      (prisma.$queryRaw as any).mockResolvedValue(mockCountries);
+
+      const result = await countriesHandler({});
+
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(result).toEqual(mockCountries);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty('id');
+      expect(result[0]).toHaveProperty('name');
+      expect(result[0]).toHaveProperty('code');
+      expect(result[0]).toHaveProperty('code3');
+    });
+
+    it('should return empty array when no active countries', async () => {
+      const { prisma } = await import('~/server/clients/prismaClient');
+      (prisma.$queryRaw as any).mockResolvedValue([]);
+
+      const result = await countriesHandler({});
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw 500 when database fails', async () => {
+      const { prisma } = await import('~/server/clients/prismaClient');
+      (prisma.$queryRaw as any).mockRejectedValue(new Error('Connection refused'));
+
+      await expect(countriesHandler({})).rejects.toThrow(/Failed to fetch countries|500/);
     });
   });
 

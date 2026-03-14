@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { TableColumn } from "@nuxt/ui";
 
-import { ModalsEditReoccurrence } from "#components";
 import {
   formatAccountRegisters,
   formatDate,
   getAccountRegisterLabel,
   getIntervalLabel,
 } from "~/lib/utils";
+
+const ModalsEditReoccurrence = defineAsyncComponent(
+  () => import("~/components/modals/EditReoccurrence.vue")
+);
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 

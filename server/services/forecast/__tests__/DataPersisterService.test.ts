@@ -704,8 +704,16 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
     });
 
     it("should handle null accountId", async () => {
+      vi.spyOn(mockDb.accountRegister, "findMany").mockResolvedValue([
+        { accountId: "acc-1" },
+      ]);
+
       await service.updateEntryStatuses();
 
+      expect(mockDb.accountRegister.findMany).toHaveBeenCalledWith({
+        select: { accountId: true },
+        distinct: ["accountId"],
+      });
       expect(mockDb.$executeRaw).toHaveBeenCalledTimes(1);
     });
   });

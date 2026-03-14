@@ -261,12 +261,12 @@ describe("AccountRegisterService", () => {
         forecastDate
       );
 
-      // Should create interest charge entry
+      // Should create interest charge entry (signed amount so running balance is correct)
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           accountRegisterId: 1,
           description: "Interest Charge",
-          amount: 75, // Absolute value
+          amount: -75, // Negative for credit account (increases debt)
           sourceAccountRegisterId: 2,
           forecastDate: expect.any(Date),
           reoccurrence: expect.objectContaining({

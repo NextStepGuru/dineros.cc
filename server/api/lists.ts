@@ -7,62 +7,40 @@ export default defineEventHandler(async (event) => {
   try {
     const user = getUser(event);
 
-    const reoccurrences = await PrismaDb.reoccurrence.findMany({
-      where: {
-        account: {
-          is: {
-            userAccounts: {
-              some: {
-                userId: user.userId,
-              },
-            },
+    const userAccountFilter = {
+      account: {
+        is: {
+          userAccounts: {
+            some: { userId: user.userId },
           },
         },
       },
-      orderBy: [
-        { lastAt: "asc" },
-        { id: "asc" },
-      ],
-    });
+    };
 
-    const budgets = await PrismaDb.budget.findMany({
-      where: {
-        isArchived: false,
-        userId: user.userId,
-      },
-    });
-
-    const intervals = await PrismaDb.interval.findMany({});
-
-    const accountTypes = await PrismaDb.accountType.findMany({});
-
-    const accountRegisters = await PrismaDb.accountRegister.findMany({
-      where: {
-        isArchived: false,
-        account: {
-          is: {
-            userAccounts: {
-              some: {
-                userId: user.userId,
-              },
-            },
+    const [reoccurrences, budgets, intervals, accountTypes, accountRegisters, accounts] =
+      await Promise.all([
+        PrismaDb.reoccurrence.findMany({
+          where: userAccountFilter,
+          orderBy: [{ lastAt: "asc" }, { id: "asc" }],
+        }),
+        PrismaDb.budget.findMany({
+          where: { isArchived: false, userId: user.userId },
+        }),
+        PrismaDb.interval.findMany({}),
+        PrismaDb.accountType.findMany({}),
+        PrismaDb.accountRegister.findMany({
+          where: {
+            isArchived: false,
+            ...userAccountFilter,
           },
-        },
-      },
-      orderBy: {
-        sortOrder: "asc",
-      },
-    });
-
-    const accounts = await PrismaDb.account.findMany({
-      where: {
-        userAccounts: {
-          some: {
-            userId: user.userId,
+          orderBy: { sortOrder: "asc" },
+        }),
+        PrismaDb.account.findMany({
+          where: {
+            userAccounts: { some: { userId: user.userId } },
           },
-        },
-      },
-    });
+        }),
+      ]);
 
     return {
       reoccurrences,

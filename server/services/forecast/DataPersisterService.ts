@@ -398,9 +398,16 @@ export class DataPersisterService implements IDataPersisterService {
         Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`
       );
     } else {
-      await (db as PrismaClient).$executeRaw(
-        Prisma.sql`UPDATE register_entry SET is_pending = (created_at <= ${now}) WHERE is_cleared = 0 AND (is_projected = 1 OR is_manual_entry = 1)`
-      );
+      const accountRows = await db.accountRegister.findMany({
+        select: { accountId: true },
+        distinct: ["accountId"],
+      });
+      const rows = Array.isArray(accountRows) ? accountRows : [];
+      for (const { accountId: id } of rows) {
+        await (db as PrismaClient).$executeRaw(
+          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${id}`
+        );
+      }
     }
   }
 

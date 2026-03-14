@@ -312,10 +312,14 @@ describe("Register and File Upload API Endpoints", () => {
           balance: 1500, // latestBalance - 0 (null pocket balances)
           type: "credit",
         });
+        // Credit register API caps running balance at 0 (never show positive when payments exceed)
+        const expectedEntries = [
+          { ...mockBalanceUpdated[0], balance: 0 },
+        ];
         expect(result).toEqual({
-          entries: mockBalanceUpdated,
-          lowest: mockBalanceUpdated[0],
-          highest: mockBalanceUpdated[0],
+          entries: expectedEntries,
+          lowest: expectedEntries[0],
+          highest: expectedEntries[0],
           skip: 0,
           focusedAt: expect.any(Date),
           take: 50,

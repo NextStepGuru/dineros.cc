@@ -86,13 +86,14 @@ export class AccountRegisterService implements IAccountRegisterService {
     const description = isCreditAccount ? "Interest Charge" : "Interest Earned";
     const intervalId = accountRegister.statementIntervalId;
 
-    // Create interest entry
+    // Create interest entry with signed amount so running balance is correct for both
+    // cleared and non-cleared paths (credit = negative = increases debt when added)
     this.entryService.createEntry({
       accountRegisterId: accountRegister.id,
       description: description,
       sourceAccountRegisterId:
         accountRegister.targetAccountRegisterId || undefined,
-      amount: Math.abs(interest),
+      amount: Number(interest),
       forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
       typeId: isCreditAccount ? 2 : 3, // Interest Charge (2) or Interest Earned (3)
       reoccurrence: {

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
 import type { TableColumn } from "@nuxt/ui";
-import { ModalsEditRegisterEntry } from "#components";
 import type { RegisterEntry } from "~/types/types";
+
+const ModalsEditRegisterEntry = defineAsyncComponent(
+  () => import("~/components/modals/EditRegisterEntry.vue")
+);
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 
 const overlay = useOverlay();

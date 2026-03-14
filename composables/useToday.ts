@@ -1,16 +1,10 @@
-function parseAsUTC(s: string): Date {
-  const trimmed = s.trim();
-  if (!trimmed) return new Date();
-  const withZ = /Z|[+-]\d{2}:?\d{2}$/.test(trimmed) ? trimmed : `${trimmed}Z`;
-  const d = new Date(withZ);
-  return Number.isNaN(d.getTime()) ? new Date() : d;
-}
+import { getTodayFromTestDate } from "~/lib/getTodayFromTestDate";
 
 export function useToday() {
   const config = useRuntimeConfig();
   const testDateStr = config.public.testDate as string | undefined;
   const today = computed(() => {
-    if (testDateStr) return parseAsUTC(testDateStr);
+    if (testDateStr) return getTodayFromTestDate(testDateStr).today;
     return new Date();
   });
   const todayISOString = computed(() =>

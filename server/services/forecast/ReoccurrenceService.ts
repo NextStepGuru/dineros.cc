@@ -95,12 +95,56 @@ export class ReoccurrenceService implements IReoccurrenceService {
         lastAt: dateTimeService.toDate(adjustedLastAt),
       };
 
+      // For debt accounts, cap payment to current balance so payments never exceed balance
+      let effectiveAmount = Number(reoccurrence.amount);
+      let skipBecauseDebtPaidOff = false;
+      const targetAccountForCap = this.cache.accountRegister?.findOne?.({
+        id: reoccurrence.accountRegisterId,
+      });
+      if (targetAccountForCap && [3, 4, 5, 99].includes(targetAccountForCap.typeId)) {
+        const amountOwed = Math.abs(+targetAccountForCap.balance);
+        if (amountOwed <= 0.005) {
+          effectiveAmount = 0;
+          skipBecauseDebtPaidOff = true; // Skip: debt already paid off
+        } else if (effectiveAmount > amountOwed) {
+          effectiveAmount = amountOwed;
+        }
+      }
+      if (skipBecauseDebtPaidOff) {
+        // Advance to next occurrence without creating an entry
+        const processedNominalDate = dateTimeService.toDate(nextAt);
+        const nextDate = this.calculateNextOccurrence({
+          ...reoccurrence,
+          lastAt: processedNominalDate,
+        });
+        if (!nextDate) break;
+        nextAt = dateTimeService.createUTC(nextDate);
+        const nowDate = dateTimeService.nowDate();
+        const cachedReoccurrence = this.cache.reoccurrence.findOne({
+          id: reoccurrence.id,
+        });
+        if (cachedReoccurrence) {
+          cachedReoccurrence.lastAt = processedNominalDate;
+          if (
+            dateTimeService.isSameOrBefore(
+              adjustedLastAt,
+              dateTimeService.createUTC(nowDate),
+            )
+          ) {
+            cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
+          }
+          this.cache.reoccurrence.update(cachedReoccurrence);
+        }
+        if (occurrenceCount > 1000) break;
+        continue;
+      }
+
       // Create the entry for this occurrence
       if (reoccurrence.transferAccountRegisterId) {
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: reoccurrence.accountRegisterId,
           sourceAccountRegisterId: reoccurrence.transferAccountRegisterId,
-          amount: Number(reoccurrence.amount),
+          amount: effectiveAmount,
           description: reoccurrence.description,
           reoccurrence: reoccurrenceForEntry,
         });
@@ -108,7 +152,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         this.entryService.createEntry({
           accountRegisterId: reoccurrence.accountRegisterId,
           description: reoccurrence.description,
-          amount: +reoccurrence.amount,
+          amount: effectiveAmount,
           reoccurrence: reoccurrenceForEntry,
           typeId: 9, // Reoccurrence Entry
         });

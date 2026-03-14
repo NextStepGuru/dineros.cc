@@ -83,6 +83,33 @@ describe('Server Library Functions', () => {
       });
     });
 
+    it('should handle PrismaClientInitializationError with 503', () => {
+      const initError = Object.assign(new Error('Connection refused'), {
+        name: 'PrismaClientInitializationError',
+      });
+
+      expect(() => handleApiError(initError)).toThrow(/503|Service temporarily unavailable/);
+
+      expect(mockCreateError).toHaveBeenCalledWith({
+        statusCode: 503,
+        statusMessage: 'Service temporarily unavailable. Please try again later.',
+      });
+    });
+
+    it('should handle Prisma errors by name (PrismaClientKnownRequestError)', () => {
+      const prismaError = Object.assign(new Error('Record not found'), {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2025',
+      });
+
+      expect(() => handleApiError(prismaError)).toThrow('HTTP 500: Database operation failed');
+
+      expect(mockCreateError).toHaveBeenCalledWith({
+        statusCode: 500,
+        statusMessage: 'Database operation failed',
+      });
+    });
+
     it('should handle generic Error instances', () => {
       const genericError = new Error('Something went wrong');
 
@@ -300,6 +327,43 @@ describe('Server Library Functions', () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE "mixed_data"'),
         ...values.flat()
+      );
+    });
+  });
+
+  describe('withErrorHandler', () => {
+    it('should return handler result when handler succeeds', async () => {
+      const { withErrorHandler } = await import('../withErrorHandler');
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const wrapped = withErrorHandler(handler);
+      const mockEvent = {
+        node: { req: { url: '/api/test', method: 'GET' } },
+      };
+      const result = await wrapped(mockEvent as any);
+      expect(handler).toHaveBeenCalledWith(mockEvent);
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('should log and call handleApiError when handler throws', async () => {
+      const { log } = await import('~/server/logger');
+      const { withErrorHandler } = await import('../withErrorHandler');
+      const err = new Error('Handler failed');
+      const handler = vi.fn().mockRejectedValue(err);
+      const wrapped = withErrorHandler(handler);
+      const mockEvent = {
+        node: { req: { url: '/api/login', method: 'POST' } },
+      };
+      await expect(wrapped(mockEvent as any)).rejects.toThrow();
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'API error caught by global handler',
+          level: 'error',
+          data: expect.objectContaining({
+            error: 'Handler failed',
+            url: '/api/login',
+            method: 'POST',
+          }),
+        })
       );
     });
   });

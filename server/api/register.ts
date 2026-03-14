@@ -150,21 +150,40 @@ export default defineEventHandler(async (event) => {
       pocketBalances
     );
 
+    // Legacy: credit account Interest Charge entries were stored as positive; correct at read time so running balance and sums are correct
+    const toAmount = (entry: { amount: unknown; typeId?: number | null; description?: string }) => {
+      const n = Number(entry.amount);
+      const isLegacyInterest =
+        accountRegister.type.isCredit &&
+        n > 0 &&
+        (entry.typeId === 2 || entry.description === "Interest Charge");
+      if (isLegacyInterest) return -n;
+      return n;
+    };
+
     // For quick mode, skip expensive sorting and return basic data
     if (isQuickMode) {
       // Convert Decimal values to numbers for the sort function
       const convertedEntries = allRegisterEntries.map((entry) => ({
         ...entry,
-        amount: Number(entry.amount),
+        amount: toAmount(entry),
         balance: Number(entry.balance),
       }));
 
       // Full mode: expensive but complete processing
-      const balanceUpdated = recalculateRunningBalanceAndSort({
+      let balanceUpdated = recalculateRunningBalanceAndSort({
         registerEntries: convertedEntries,
         balance,
         type: accountRegister.type.isCredit ? "credit" : "debit",
       });
+
+      // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
+      if (accountRegister.type.isCredit) {
+        balanceUpdated = balanceUpdated.map((entry: { balance: number; [k: string]: unknown }) => ({
+          ...entry,
+          balance: Number(entry.balance) > 0 ? 0 : entry.balance,
+        }));
+      }
 
       // For pagination, return only the requested slice
       const paginatedEntries = balanceUpdated.slice(skip, skip + effectiveTake);
@@ -199,19 +218,27 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    // Convert Decimal values to numbers for the sort function
+    // Convert Decimal values to numbers for the sort function (toAmount corrects legacy interest sign for credit)
     const convertedEntries = allRegisterEntries.map((entry) => ({
       ...entry,
-      amount: Number(entry.amount),
+      amount: toAmount(entry),
       balance: Number(entry.balance),
     }));
 
     // Full mode: expensive but complete processing
-    const balanceUpdated = recalculateRunningBalanceAndSort({
+    let balanceUpdated = recalculateRunningBalanceAndSort({
       registerEntries: convertedEntries,
       balance,
       type: accountRegister.type.isCredit ? "credit" : "debit",
     });
+
+    // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
+    if (accountRegister.type.isCredit) {
+      balanceUpdated = balanceUpdated.map((entry: { balance: number; [k: string]: unknown }) => ({
+        ...entry,
+        balance: Number(entry.balance) > 0 ? 0 : entry.balance,
+      }));
+    }
 
     // For pagination, return only the requested slice
     const paginatedEntries = balanceUpdated.slice(skip, skip + effectiveTake);

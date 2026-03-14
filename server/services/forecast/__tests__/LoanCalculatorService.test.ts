@@ -735,13 +735,14 @@ describe("LoanCalculatorService", () => {
 
   describe("shouldProcessInterest", () => {
     it("should return true when all conditions are met on statement date", () => {
+      const statementDate = dateTimeService.create("2024-01-15");
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment(),
+        statementAt: statementDate,
       });
 
-      const result = service.shouldProcessInterest(account);
+      const result = service.shouldProcessInterest(account, statementDate);
 
       expect(result).toBe(true); // Implementation processes interest on statement date
     });
@@ -853,13 +854,14 @@ describe("LoanCalculatorService", () => {
     });
 
     it("should handle NaN balance gracefully", () => {
+      const statementDate = dateTimeService.create("2024-01-15");
       const account = createMockAccount({
         apr1: 0.05,
         balance: NaN,
-        statementAt: moment(),
+        statementAt: statementDate,
       });
 
-      const result = service.shouldProcessInterest(account);
+      const result = service.shouldProcessInterest(account, statementDate);
 
       expect(result).toBe(true); // NaN balance is still considered non-zero, so interest is processed
     });
@@ -939,13 +941,14 @@ describe("LoanCalculatorService", () => {
     });
 
     it("should handle negative balance gracefully", () => {
+      const statementDate = dateTimeService.create("2024-01-15");
       const account = createMockAccount({
         apr1: 0.05,
         balance: -1000,
-        statementAt: moment(),
+        statementAt: statementDate,
       });
 
-      const result = service.shouldProcessInterest(account);
+      const result = service.shouldProcessInterest(account, statementDate);
 
       expect(result).toBe(true); // Negative balance is still considered non-zero, so interest is processed
     });

@@ -7,6 +7,40 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+// Lazy-load tab components so Plaid and other heavy deps load only when tab is selected
+const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
+  "/edit-profile/profile": defineAsyncComponent(
+    () => import("~/components/profile/EditProfileTab.vue")
+  ),
+  "/edit-profile/password": defineAsyncComponent(
+    () => import("~/components/profile/ChangePasswordTab.vue")
+  ),
+  "/edit-profile/sync-accounts": defineAsyncComponent(
+    () => import("~/components/profile/SyncAccountsTab.vue")
+  ),
+  "/edit-profile/two-factor-auth": defineAsyncComponent(
+    () => import("~/components/profile/TwoFactorAuthTab.vue")
+  ),
+  "/edit-profile/admin-settings": defineAsyncComponent(
+    () => import("~/components/profile/AdminSettingsTab.vue")
+  ),
+  "/edit-profile/debug-tools": defineAsyncComponent(
+    () => import("~/components/profile/DebugToolsTab.vue")
+  ),
+};
+
+const currentTabComponent = computed(() => {
+  const path = route.path;
+  if (
+    (path === "/edit-profile/admin-settings" ||
+      path === "/edit-profile/debug-tools") &&
+    authStore.getUser?.id !== 1
+  ) {
+    return null;
+  }
+  return tabComponents[path] ?? null;
+});
+
 // Define available tabs
 const navigationItems = computed(() => {
   const baseItems = [
@@ -92,13 +126,7 @@ div(class="container mx-auto px-4 py-8")
       class="w-full max-w-2xl justify-center"
     )
 
-  // Tab Content
+  // Tab Content (lazy-loaded per tab)
   div(class="flex justify-center")
-    ProfileEditProfileTab(v-if="route.path === '/edit-profile/profile'")
-    ProfileChangePasswordTab(v-if="route.path === '/edit-profile/password'")
-    ProfileSyncAccountsTab(v-if="route.path === '/edit-profile/sync-accounts'")
-    ProfileTwoFactorAuthTab(v-if="route.path === '/edit-profile/two-factor-auth'")
-    // Admin tabs (only visible to userId = 1)
-    ProfileAdminSettingsTab(v-if="route.path === '/edit-profile/admin-settings' && authStore.getUser?.id === 1")
-    ProfileDebugToolsTab(v-if="route.path === '/edit-profile/debug-tools' && authStore.getUser?.id === 1")
+    component(:is="currentTabComponent" v-if="currentTabComponent")
 </template>

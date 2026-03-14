@@ -64,8 +64,9 @@ vi.mock("h3", () => h3Mocks);
 //   vi.restoreAllMocks();
 // });
 
-// Mock Nuxt utilities
-vi.mock("#imports", () => ({}));
+// Mock Nuxt utilities (defineStore so store modules can load in tests)
+import { defineStore } from "pinia";
+vi.mock("#imports", () => ({ defineStore }));
 
 // Mock crypto module for RSA service tests
 vi.mock("crypto", async (importOriginal) => {

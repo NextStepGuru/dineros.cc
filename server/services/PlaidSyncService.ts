@@ -162,36 +162,48 @@ class PlaidSyncService {
     accessToken: string;
     plaidAccountIds: string[];
   }): Promise<AccountBase[]> {
-    const accounts = await this.client.accountsGet({
-      access_token: accessToken,
-      options: { account_ids: [...plaidAccountIds] },
-    });
-
-    const accountList = accounts.data.accounts;
-
-    for (const account of accountList) {
-      const accountRegister = await this.db.accountRegister.findFirst({
-        where: { plaidId: account.account_id, plaidAccessToken: accessToken },
+    const [accountsResponse, accountRegisters] = await Promise.all([
+      this.client.accountsGet({
+        access_token: accessToken,
+        options: { account_ids: [...plaidAccountIds] },
+      }),
+      this.db.accountRegister.findMany({
+        where: {
+          plaidId: { in: plaidAccountIds },
+          plaidAccessToken: accessToken,
+        },
         select: {
           id: true,
-          type: true,
+          plaidId: true,
+          type: { select: { isCredit: true } },
         },
-      });
+      }),
+    ]);
 
-      if (accountRegister) {
+    const accountList = accountsResponse.data.accounts;
+    const registerByPlaidId = new Map(
+      accountRegisters.map((r) => [r.plaidId, r])
+    );
+    const now = dateTimeService.nowDate();
+
+    await Promise.all(
+      accountList.map((account) => {
+        const accountRegister = registerByPlaidId.get(account.account_id);
+        if (!accountRegister) return Promise.resolve();
+
         const latestBalance = accountRegister.type.isCredit
           ? parseFloat(account.balances.current?.toString() || "0") * -1
           : parseFloat(account.balances.available?.toString() || "0");
 
-        await this.db.accountRegister.updateMany({
+        return this.db.accountRegister.updateMany({
           where: { plaidId: account.account_id },
           data: {
             latestBalance,
-            plaidBalanceLastSyncAt: dateTimeService.nowDate(),
+            plaidBalanceLastSyncAt: now,
           },
         });
-      }
-    }
+      })
+    );
 
     return accountList;
   }
