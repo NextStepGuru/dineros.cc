@@ -186,23 +186,98 @@ const columns: TableColumn<Reoccurrence>[] = [
 
 const globalFilter = ref("");
 const isRecalculating = ref(false);
+const sectionEl = ref<HTMLElement | null>(null);
+const controlsEl = ref<HTMLElement | null>(null);
+const tableHostEl = ref<HTMLElement | null>(null);
+const tableViewportMaxHeight = ref(
+  "calc(100dvh - var(--ui-header-height) - 12rem)"
+);
+
+let tableResizeObserver: ResizeObserver | null = null;
+let tableViewportFrameId: number | null = null;
+
+function updateTableViewportMaxHeight() {
+  if (!tableHostEl.value) return;
+
+  if (tableViewportFrameId != null) {
+    cancelAnimationFrame(tableViewportFrameId);
+  }
+
+  tableViewportFrameId = requestAnimationFrame(() => {
+    const tableTop = tableHostEl.value?.getBoundingClientRect().top ?? 0;
+    const bottomSpacing = 16;
+    const available = Math.max(
+      220,
+      Math.floor(window.innerHeight - tableTop - bottomSpacing)
+    );
+    tableViewportMaxHeight.value = `${available}px`;
+  });
+}
+
+onMounted(async () => {
+  await nextTick();
+  updateTableViewportMaxHeight();
+  window.addEventListener("resize", updateTableViewportMaxHeight);
+
+  tableResizeObserver = new ResizeObserver(() => {
+    updateTableViewportMaxHeight();
+  });
+
+  if (sectionEl.value) {
+    tableResizeObserver.observe(sectionEl.value);
+  }
+  if (controlsEl.value) {
+    tableResizeObserver.observe(controlsEl.value);
+  }
+});
+
+watch(
+  () => listStore.getIsListsLoading,
+  async () => {
+    await nextTick();
+    updateTableViewportMaxHeight();
+  }
+);
+
+watch(
+  () => listStore.getReoccurrences.length,
+  async () => {
+    await nextTick();
+    updateTableViewportMaxHeight();
+  }
+);
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateTableViewportMaxHeight);
+
+  if (tableResizeObserver) {
+    tableResizeObserver.disconnect();
+    tableResizeObserver = null;
+  }
+
+  if (tableViewportFrameId != null) {
+    cancelAnimationFrame(tableViewportFrameId);
+    tableViewportFrameId = null;
+  }
+});
 </script>
 
 <template lang="pug">
-  section(class="m-4")
-    div(class="w-full flex mb-6")
+  section(ref="sectionEl" class="m-4")
+    div(ref="controlsEl" class="w-full flex mb-6")
       UButton(color="info" size="sm" class="mr-4" @click="handleAddReoccurrence") Add
       UButton(color="warning" size="sm" class="mr-4" @click="handleRecalculate" :loading="isRecalculating" :disabled="isRecalculating") {{ isRecalculating ? 'Recalculating...' : 'Recalc' }}
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search")
 
-    UTable(
-      class="flex-1 max-h-[calc(100vh-270px)]"
-      v-model:global-filter="globalFilter"
-      :data="listStore.getReoccurrences"
-      :columns="columns"
-      sticky
-      :ui="stripedTheme"
-      :loading="listStore.getIsListsLoading"
-      loading-color="primary"
-      loading-animation="carousel")
+    div(ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
+      UTable(
+        class="h-full"
+        v-model:global-filter="globalFilter"
+        :data="listStore.getReoccurrences"
+        :columns="columns"
+        sticky
+        :ui="stripedTheme"
+        :loading="listStore.getIsListsLoading"
+        loading-color="primary"
+        loading-animation="carousel")
 </template>

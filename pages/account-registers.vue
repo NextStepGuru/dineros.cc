@@ -818,14 +818,33 @@ defineShortcuts({
   },
 });
 
-onBeforeUnmount(() => {
-  if (longPressTimer.value != null) {
-    clearTimeout(longPressTimer.value);
-    longPressTimer.value = null;
-  }
-});
-
 const globalFilter = ref("");
+const accountRegistersSectionEl = ref<HTMLElement | null>(null);
+const accountRegistersTableViewportEl = ref<HTMLElement | null>(null);
+const accountRegistersViewportMaxHeight = ref(
+  "calc(100dvh - var(--ui-header-height) - 12rem)"
+);
+let accountRegistersResizeObserver: ResizeObserver | null = null;
+let accountRegistersViewportFrameId: number | null = null;
+
+function updateAccountRegistersViewportMaxHeight() {
+  if (!accountRegistersTableViewportEl.value) return;
+
+  if (accountRegistersViewportFrameId != null) {
+    cancelAnimationFrame(accountRegistersViewportFrameId);
+  }
+
+  accountRegistersViewportFrameId = requestAnimationFrame(() => {
+    const tableTop =
+      accountRegistersTableViewportEl.value?.getBoundingClientRect().top ?? 0;
+    const bottomSpacing = 16;
+    const available = Math.max(
+      220,
+      Math.floor(window.innerHeight - tableTop - bottomSpacing)
+    );
+    accountRegistersViewportMaxHeight.value = `${available}px`;
+  });
+}
 
 const filteredAccountRegisters = computed(() => {
   const filterText = globalFilter.value.toLowerCase();
@@ -858,10 +877,41 @@ const estimatedNetWorth = computed(() => {
     return acc;
   }, 0);
 });
+
+onMounted(async () => {
+  await nextTick();
+  updateAccountRegistersViewportMaxHeight();
+  window.addEventListener("resize", updateAccountRegistersViewportMaxHeight);
+
+  accountRegistersResizeObserver = new ResizeObserver(() => {
+    updateAccountRegistersViewportMaxHeight();
+  });
+
+  if (accountRegistersSectionEl.value) {
+    accountRegistersResizeObserver.observe(accountRegistersSectionEl.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (longPressTimer.value != null) {
+    clearTimeout(longPressTimer.value);
+    longPressTimer.value = null;
+  }
+
+  window.removeEventListener("resize", updateAccountRegistersViewportMaxHeight);
+  if (accountRegistersResizeObserver) {
+    accountRegistersResizeObserver.disconnect();
+    accountRegistersResizeObserver = null;
+  }
+  if (accountRegistersViewportFrameId != null) {
+    cancelAnimationFrame(accountRegistersViewportFrameId);
+    accountRegistersViewportFrameId = null;
+  }
+});
 </script>
 
 <template lang="pug">
-  section(class="m-4")
+  section(ref="accountRegistersSectionEl" class="m-4")
     // Sort mode tabs
     div(class="mb-4")
       div(class="flex space-x-1 frog-surface-elevated rounded-lg p-1")
@@ -881,7 +931,7 @@ const estimatedNetWorth = computed(() => {
     .w-full(class="text-muted text-right")
       span Your estimated net worth
       b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
-    div(class="relative overflow-auto flex-1 max-h-[calc(100vh-270px)] w-full")
+    div(ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
       table(class="w-full min-w-full text-xs sm:text-sm")
         thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented) sticky top-0 inset-x-0 bg-(--ui-bg)/75 z-1 backdrop-blur w-full")
           tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")

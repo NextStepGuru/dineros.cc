@@ -172,11 +172,67 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+  Lint:
+    runs-on: ubuntu-latest
+    name: Lint
+    permissions:
+      contents: "read"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.0"
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run linter
+        run: pnpm lint
+
+  PreCommit:
+    runs-on: ubuntu-latest
+    name: Pre-commit Security Checks
+    permissions:
+      contents: "read"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+      - name: Run pre-commit hooks
+        run: |
+          pre-commit run --all-files --verbose
+
   Deploy:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Deploy
-    needs: [Build1, Build2, Test]
+    needs: [Build1, Build2, Test, Lint, PreCommit]
     permissions:
       contents: "read"
       id-token: "write"

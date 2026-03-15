@@ -5,8 +5,20 @@
 
 set -e
 
+# Find trufflehog command (check PATH first, then macOS-specific location)
+if command -v trufflehog &> /dev/null; then
+  TRUFFLEHOG_CMD="trufflehog"
+elif command -v trufflehog3 &> /dev/null; then
+  TRUFFLEHOG_CMD="trufflehog3"
+elif [ -f "/opt/homebrew/bin/trufflehog" ]; then
+  TRUFFLEHOG_CMD="/opt/homebrew/bin/trufflehog"
+else
+  echo "Error: trufflehog not found. Please install trufflehog or trufflehog3."
+  exit 1
+fi
+
 # Run scan and extract file locations with secrets
-/opt/homebrew/bin/trufflehog filesystem . -x .trufflehog_excludes.txt --no-update --no-verification 2>/dev/null | \
+$TRUFFLEHOG_CMD filesystem . -x .trufflehog_excludes.txt --no-update --no-verification 2>/dev/null | \
 awk '
 /^File:/ {
     if (current_file != "") {

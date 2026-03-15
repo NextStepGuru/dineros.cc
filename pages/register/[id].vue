@@ -183,10 +183,11 @@ const loadMoreEntries = async () => {
 };
 
 // Handle scroll events for infinite scrolling
-const handleScroll = () => {
-  if (!tableRef.value) return;
-
-  const tableElement = tableRef.value.$el;
+const handleScroll = (event?: Event) => {
+  const tableElement =
+    (event?.target as HTMLElement | null) ??
+    registerTableViewportEl.value ??
+    tableRef.value?.$el;
   if (!tableElement) return;
 
   const scrollTop = tableElement.scrollTop;
@@ -252,21 +253,29 @@ const isLoading = computed(
 
 // Add scroll event listener when table is mounted
 onMounted(() => {
-  if (tableRef.value) {
-    const tableElement = tableRef.value.$el;
-    if (tableElement) {
-      tableElement.addEventListener("scroll", handleScroll);
-    }
+  updateRegisterTableViewportMaxHeight();
+  window.addEventListener("resize", updateRegisterTableViewportMaxHeight);
+  registerResizeObserver = new ResizeObserver(() => {
+    updateRegisterTableViewportMaxHeight();
+  });
+  if (registerSectionEl.value) {
+    registerResizeObserver.observe(registerSectionEl.value);
+  }
+  if (registerTabsEl.value) {
+    registerResizeObserver.observe(registerTabsEl.value);
   }
 });
 
 // Clean up scroll event listener
 onUnmounted(() => {
-  if (tableRef.value) {
-    const tableElement = tableRef.value.$el;
-    if (tableElement) {
-      tableElement.removeEventListener("scroll", handleScroll);
-    }
+  window.removeEventListener("resize", updateRegisterTableViewportMaxHeight);
+  if (registerResizeObserver) {
+    registerResizeObserver.disconnect();
+    registerResizeObserver = null;
+  }
+  if (registerViewportFrameId != null) {
+    cancelAnimationFrame(registerViewportFrameId);
+    registerViewportFrameId = null;
   }
 });
 
@@ -458,6 +467,49 @@ defineShortcuts({
 const globalFilter = ref("");
 const tableRef = ref();
 const isRecalcAccountLoading = ref(false);
+const registerSectionEl = ref<HTMLElement | null>(null);
+const registerTableViewportEl = ref<HTMLElement | null>(null);
+const registerTabsEl = ref<HTMLElement | null>(null);
+const registerTableViewportMaxHeight = ref(
+  "calc(100dvh - var(--ui-header-height) - 12rem)"
+);
+let registerResizeObserver: ResizeObserver | null = null;
+let registerViewportFrameId: number | null = null;
+
+function updateRegisterTableViewportMaxHeight() {
+  if (!registerTableViewportEl.value) return;
+
+  if (registerViewportFrameId != null) {
+    cancelAnimationFrame(registerViewportFrameId);
+  }
+
+  registerViewportFrameId = requestAnimationFrame(() => {
+    const tableTop = registerTableViewportEl.value?.getBoundingClientRect().top ?? 0;
+    const tabsHeight = registerTabsEl.value?.offsetHeight ?? 0;
+    const bottomSpacing = 16;
+    const available = Math.max(
+      220,
+      Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing)
+    );
+    registerTableViewportMaxHeight.value = `${available}px`;
+  });
+}
+
+watch(
+  [accountRegisterId, selectedTab],
+  async () => {
+    await nextTick();
+    updateRegisterTableViewportMaxHeight();
+  }
+);
+
+watch(
+  () => tableEntries.value.length,
+  async () => {
+    await nextTick();
+    updateRegisterTableViewportMaxHeight();
+  }
+);
 
 async function recalcAccount() {
   if (isRecalcAccountLoading.value) return; // Prevent multiple simultaneous calls
@@ -491,7 +543,7 @@ async function recalcAccount() {
 </script>
 
 <template lang="pug">
-  section.mx-4
+  section.mx-4(ref="registerSectionEl")
     .flex(class="flex-col mt-4  md:flex-row md:space-x-4")
       div(class="w-full flex")
         UButton(color="info" size="sm" class="mr-4" @click="handleAddEntry") Add
@@ -524,7 +576,7 @@ async function recalcAccount() {
     .w-full(class="text-muted text-right" v-else="") &nbsp;
 
     //- Skeleton loading state
-    div(v-if="isLoading && tableEntries.length === 0" class="flex-1 max-h-[calc(100vh-200px)] overflow-hidden")
+    div(v-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden" :style="{ maxHeight: registerTableViewportMaxHeight }")
       //- Table header skeleton
       div(class="flex border-b frog-border p-4")
         div(class="flex-1")
@@ -547,20 +599,19 @@ async function recalcAccount() {
         div(class="flex-1 text-right")
           USkeleton(class="h-4 w-16 ml-auto")
 
-    UTable(
-      ref="tableRef"
-      v-else-if="tableEntries.length > 0"
-      :key="tableKey"
-      class="flex-1 max-h-[calc(100vh-200px)]"
-      :data="tableEntries"
-      sticky
-      v-model:globalFilter="globalFilter"
-      :ui="stripedTheme"
-      :columns="columns"
-      :loading="accountEntriesStatus === 'pending'"
-      loading-color="primary"
-      loading-animation="carousel"
-      @scroll="handleScroll")
+    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 overflow-auto" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
+      UTable(
+        ref="tableRef"
+        :key="tableKey"
+        class="h-full"
+        :data="tableEntries"
+        sticky
+        v-model:globalFilter="globalFilter"
+        :ui="stripedTheme"
+        :columns="columns"
+        :loading="accountEntriesStatus === 'pending'"
+        loading-color="primary"
+        loading-animation="carousel")
 
     // div(v-if="isLoadingMore" class="flex justify-center items-center py-4")
       USpinner(size="sm" color="primary")
@@ -570,7 +621,7 @@ async function recalcAccount() {
       span No more entries to load
 
     //- Tabs
-    ul.flex.space-x-2(class="-mt-1 ml-5 mb-5")
+    ul.flex.space-x-2(ref="registerTabsEl" class="-mt-1 ml-5 mb-5")
       //- Future Tab
       li
         button(:class="isSelectedTab('future')" @click="selectedTab = 'future'") Future
