@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import type { IForecastEngine, ForecastContext, ForecastResult } from "./types";
 import type { RegisterEntry } from "../../../types/types";
 import type { CacheRegisterEntry } from "./ModernCacheService";
@@ -14,7 +15,7 @@ import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { DateTime } from "./DateTime";
-import { Decimal } from "@prisma/client/runtime/library";
+const { Prisma } = prismaPkg;
 
 export class ForecastEngine implements IForecastEngine {
   private cache: ModernCacheService;
@@ -317,7 +318,7 @@ export class ForecastEngine implements IForecastEngine {
       await this.reoccurrenceService.processReoccurrences(
         dueReoccurrences.map((reoccurrence) => ({
           ...reoccurrence,
-          amount: new Decimal(reoccurrence.amount),
+          amount: new Prisma.Decimal(reoccurrence.amount),
           lastAt: reoccurrence.lastAt || dateTimeService.nowDate(),
           updatedAt: reoccurrence.updatedAt || dateTimeService.nowDate(),
         })),

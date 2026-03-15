@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
-import type { Decimal } from "@prisma/client/runtime/library";
+import type { Prisma } from "@prisma/client";
 import type { Moment } from "moment";
+
+type Decimal = Prisma.Decimal;
 
 // Type-safe data structures
 export type CacheReoccurrence = {

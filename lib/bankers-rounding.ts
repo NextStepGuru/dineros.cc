@@ -1,5 +1,7 @@
 import bankersRounding from "bankers-rounding";
-import { Decimal } from "@prisma/client/runtime/library";
+import prismaPkg from "@prisma/client";
+
+const { Prisma } = prismaPkg;
 
 /**
  * Bankers Rounding Utility for Financial Calculations
@@ -11,7 +13,7 @@ import { Decimal } from "@prisma/client/runtime/library";
  * consistent and accurate financial calculations.
  */
 
-export type MonetaryValue = number | string | Decimal;
+export type MonetaryValue = number | string | Prisma.Decimal;
 
 /**
  * Rounds a monetary value using bankers rounding to 2 decimal places
@@ -34,9 +36,9 @@ export function roundToCents(value: MonetaryValue): number {
  * @param value - The value to convert
  * @returns A Decimal with 2 decimal places
  */
-export function toMonetaryDecimal(value: MonetaryValue): Decimal {
+export function toMonetaryDecimal(value: MonetaryValue): Prisma.Decimal {
   const rounded = roundToCents(value);
-  return new Decimal(rounded.toFixed(2));
+  return new Prisma.Decimal(rounded.toFixed(2));
 }
 
 /**

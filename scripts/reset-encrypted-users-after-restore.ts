@@ -13,12 +13,14 @@
  */
 import dotenv from "dotenv";
 import prismaPkg from "@prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
+import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
 import { migrate } from "../prisma/reencrypt";
 import HashService from "../server/services/HashService";
 
-const { PrismaClient } = prismaPkg;
+const { PrismaClient, Prisma } = prismaPkg;
 
 dotenv.config();
 
@@ -29,8 +31,7 @@ if (!localKey) {
 }
 
 const restoreFromEnv =
-  process.env.RESTORE_FROM_ENV ||
-  (process.argv[2] as string | undefined);
+  process.env.RESTORE_FROM_ENV || (process.argv[2] as string | undefined);
 const sourceKey =
   restoreFromEnv &&
   (restoreFromEnv === "staging" || restoreFromEnv === "production")
@@ -41,15 +42,22 @@ const sourceKey =
 
 const useReencryptPath = Boolean(sourceKey);
 
-const decryptionKeys = useReencryptPath
-  ? [sourceKey!, localKey]
-  : [localKey];
+const decryptionKeys = useReencryptPath ? [sourceKey!, localKey] : [localKey];
 
-const prisma = new PrismaClient().$extends(
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error("DATABASE_URL is required. Set it in .env.");
+  process.exit(1);
+}
+
+const adapter = new PrismaMariaDb(databaseUrl);
+
+const prisma = new PrismaClient({ adapter }).$extends(
   fieldEncryptionExtension({
+    dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: localKey,
     decryptionKeys,
-  })
+  }),
 );
 
 // Fun common names for fallback overwrite (and post–re-encrypt user reset). Cycle by index so all get a fun name.
@@ -325,7 +333,7 @@ async function resetUserEmailsAndPasswords(): Promise<void> {
     });
   }
   console.log(
-    `Reset email/password for ${sortedIds.length} user(s). Login with dev@local.dev / ${password} (or alice@local.dev, bob@local.dev, etc.).`
+    `Reset email/password for ${sortedIds.length} user(s). Login with dev@local.dev / ${password} (or alice@local.dev, bob@local.dev, etc.).`,
   );
 }
 
@@ -339,7 +347,9 @@ async function clearPlaidColumns(): Promise<void> {
     await prisma.$executeRaw`
       UPDATE register_entry SET plaid_id = NULL, plaid_id_hash = NULL
     `;
-    console.log("Cleared Plaid encrypted fields on account_register and register_entry.");
+    console.log(
+      "Cleared Plaid encrypted fields on account_register and register_entry.",
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("Unknown column") || msg.includes("doesn't exist")) {
@@ -365,7 +375,7 @@ async function fallbackOverwrite(): Promise<void> {
       });
     }
     console.log(
-      `Reset ${sorted.length} user(s) to fun dev emails (dev@local.dev, alice@local.dev, ...).`
+      `Reset ${sorted.length} user(s) to fun dev emails (dev@local.dev, alice@local.dev, ...).`,
     );
   }
 
@@ -395,7 +405,9 @@ async function fallbackOverwrite(): Promise<void> {
       });
     }
     if (entries.length > 0) {
-      console.log(`Reset ${entries.length} register entry(ies) to fun descriptions.`);
+      console.log(
+        `Reset ${entries.length} register entry(ies) to fun descriptions.`,
+      );
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -418,7 +430,9 @@ async function fallbackOverwrite(): Promise<void> {
       });
     }
     if (reoccurrences.length > 0) {
-      console.log(`Reset ${reoccurrences.length} reoccurrence(s) to fun descriptions.`);
+      console.log(
+        `Reset ${reoccurrences.length} reoccurrence(s) to fun descriptions.`,
+      );
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -441,17 +455,17 @@ async function main() {
 
   if (useReencryptPath) {
     console.log(
-      `Re-encrypting with source key (${restoreFromEnv}); then resetting user emails for local login.`
+      `Re-encrypting with source key (${restoreFromEnv}); then resetting user emails for local login.`,
     );
     await migrate(prisma as PrismaClientType, (p) =>
       console.info(
-        `${p.model.padEnd(15)} ${Math.round((100 * p.processed) / p.totalCount)}% ${p.processed}/${p.totalCount}`
-      )
+        `${p.model.padEnd(15)} ${Math.round((100 * p.processed) / p.totalCount)}% ${p.processed}/${p.totalCount}`,
+      ),
     );
     await resetUserEmailsAndPasswords();
   } else {
     console.log(
-      "Source encryption key not set (DINEROS_STAGING_DB_ENCRYPTION_KEY or DINEROS_PRODUCTION_DB_ENCRYPTION_KEY). Using fallback overwrite with fun placeholder names."
+      "Source encryption key not set (DINEROS_STAGING_DB_ENCRYPTION_KEY or DINEROS_PRODUCTION_DB_ENCRYPTION_KEY). Using fallback overwrite with fun placeholder names.",
     );
     await fallbackOverwrite();
   }

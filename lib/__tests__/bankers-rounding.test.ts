@@ -18,7 +18,9 @@ import {
   minMoney,
   sumMoney,
 } from "../bankers-rounding";
-import { Decimal } from "@prisma/client/runtime/library";
+import prismaPkg from "@prisma/client";
+
+const { Prisma } = prismaPkg;
 
 describe("Bankers Rounding Utility", () => {
   describe("roundToCents", () => {
@@ -47,8 +49,8 @@ describe("Bankers Rounding Utility", () => {
     });
 
     it("should handle Decimal inputs", () => {
-      expect(roundToCents(new Decimal("2.125"))).toBe(2.12);
-      expect(roundToCents(new Decimal("10.555"))).toBe(10.56);
+      expect(roundToCents(new Prisma.Decimal("2.125"))).toBe(2.12);
+      expect(roundToCents(new Prisma.Decimal("10.555"))).toBe(10.56);
     });
 
     it("should throw error for invalid inputs", () => {
@@ -61,13 +63,13 @@ describe("Bankers Rounding Utility", () => {
     it("should convert to Decimal with proper precision", () => {
       const result = toMonetaryDecimal(2.125);
       expect(result.toString()).toBe("2.12");
-      expect(result).toBeInstanceOf(Decimal);
+      expect(result).toBeInstanceOf(Prisma.Decimal);
     });
 
     it("should handle various input types", () => {
       expect(toMonetaryDecimal(10.555).toString()).toBe("10.56");
       expect(toMonetaryDecimal("10.555").toString()).toBe("10.56");
-      expect(toMonetaryDecimal(new Decimal("10.555")).toString()).toBe("10.56");
+      expect(toMonetaryDecimal(new Prisma.Decimal("10.555")).toString()).toBe("10.56");
     });
   });
 
@@ -80,7 +82,7 @@ describe("Bankers Rounding Utility", () => {
 
     it("should handle mixed input types", () => {
       expect(addMoney("10.125", 5.125)).toBe(15.25);
-      expect(addMoney(new Decimal("10.11"), "5.22")).toBe(15.33);
+      expect(addMoney(new Prisma.Decimal("10.11"), "5.22")).toBe(15.33);
     });
   });
 
@@ -182,7 +184,7 @@ describe("Bankers Rounding Utility", () => {
     it("should validate monetary values correctly", () => {
       expect(isValidMonetaryValue(10.5)).toBe(true);
       expect(isValidMonetaryValue("10.50")).toBe(true);
-      expect(isValidMonetaryValue(new Decimal("10.50"))).toBe(true);
+      expect(isValidMonetaryValue(new Prisma.Decimal("10.50"))).toBe(true);
       expect(isValidMonetaryValue(0)).toBe(true);
       expect(isValidMonetaryValue(-10.5)).toBe(true);
     });
@@ -200,7 +202,7 @@ describe("Bankers Rounding Utility", () => {
     it("should normalize valid values", () => {
       expect(normalizeMonetaryValue(10.125)).toBe(10.12);
       expect(normalizeMonetaryValue("10.125")).toBe(10.12);
-      expect(normalizeMonetaryValue(new Decimal("10.125"))).toBe(10.12);
+      expect(normalizeMonetaryValue(new Prisma.Decimal("10.125"))).toBe(10.12);
     });
 
     it("should throw error for invalid values", () => {
@@ -250,7 +252,7 @@ describe("Bankers Rounding Utility", () => {
     });
 
     it("should handle mixed types", () => {
-      expect(sumMoney([10.125, "5.125", new Decimal("2.50")])).toBe(17.75);
+      expect(sumMoney([10.125, "5.125", new Prisma.Decimal("2.50")])).toBe(17.75);
     });
   });
 

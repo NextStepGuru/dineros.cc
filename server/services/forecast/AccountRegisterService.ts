@@ -1,13 +1,15 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IAccountRegisterService } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
-import { Decimal } from "@prisma/client/runtime/library";
+import prismaPkg from "@prisma/client";
 import { ModernCacheService } from "./ModernCacheService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
+
+const { Prisma } = prismaPkg;
 
 export class AccountRegisterService implements IAccountRegisterService {
   private _pendingStatementAtUpdates: { id: number; statementAt: Date }[] = [];
@@ -111,7 +113,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         accountRegisterId: accountRegister.id,
         description: accountRegister.name,
         lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-        amount: new Decimal(Math.abs(interest)),
+        amount: new Prisma.Decimal(Math.abs(interest)),
         transferAccountRegisterId: accountRegister.targetAccountRegisterId,
         intervalId: intervalId,
         intervalCount: 1,
@@ -146,7 +148,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             accountRegisterId: accountRegister.id,
             description: `Payment to ${accountRegister.name}`,
             lastAt: dateTimeService.nowDate(),
-            amount: new Decimal(Number(paymentAmount)),
+            amount: new Prisma.Decimal(Number(paymentAmount)),
             transferAccountRegisterId: accountRegister.targetAccountRegisterId,
             intervalId: intervalId,
             intervalCount: 1,
@@ -178,7 +180,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             accountRegisterId: accountRegister.id,
             description: `Payment for ${accountRegister.name}`,
             lastAt: dateTimeService.nowDate(),
-            amount: new Decimal(Number(paymentAmount)),
+            amount: new Prisma.Decimal(Number(paymentAmount)),
             transferAccountRegisterId: null,
             intervalId: intervalId,
             intervalCount: 1,

@@ -51,7 +51,7 @@
     "pug.beautify.bracketSameLine": false,
     "volar.codeLens.pugTools": true,
     "volar.takeOverMode.enabled": true,
-    "prisma.pinToPrisma6": true,
+    "prisma.pinToPrisma6": false,
   },
   "extensions": {
     "recommendations": [

@@ -1,4 +1,5 @@
 import prismaPkg from "@prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { accounts } from "./backup/accounts";
 import { accountRegisters } from "./backup/accountRegisters";
 import { users } from "./backup/users";
@@ -256,13 +257,22 @@ const countries = [
 ];
 
 import { fieldEncryptionExtension } from "prisma-field-encryption";
+import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
 import dotenv from "dotenv";
 dotenv.config();
 
-const { PrismaClient } = prismaPkg;
+const { PrismaClient, Prisma } = prismaPkg;
+const databaseUrl = process.env.DATABASE_URL;
 
-export const prisma = new PrismaClient().$extends(
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required for Prisma initialization.");
+}
+
+const adapter = new PrismaMariaDb(databaseUrl);
+
+export const prisma = new PrismaClient({ adapter }).$extends(
   fieldEncryptionExtension({
+    dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
     decryptionKeys: process.env.DB_DECRYPTION_KEYS?.split(",") || [],
   })

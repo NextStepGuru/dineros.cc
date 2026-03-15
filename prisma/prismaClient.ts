@@ -1,9 +1,18 @@
 import prismaPkg from "@prisma/client";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
+import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
 import { log } from "../server/logger";
 
-const { PrismaClient } = prismaPkg;
+const { PrismaClient, Prisma } = prismaPkg;
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required for Prisma initialization.");
+}
+
+const adapter = new PrismaMariaDb(databaseUrl);
 
 export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)
@@ -19,10 +28,12 @@ const dbDecryptionKeyValues = getDbDecryptionKeyValues();
 
 export const globalClient = new PrismaClient({
   log: ["error"],
+  adapter,
 });
 
 export const prisma = globalClient.$extends(
   fieldEncryptionExtension({
+    dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
     decryptionKeys: dbDecryptionKeyValues,
   })

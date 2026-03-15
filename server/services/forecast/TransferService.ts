@@ -1,12 +1,14 @@
 import type { Moment } from "moment";
 import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
-import { Decimal } from "@prisma/client/runtime/library";
+import prismaPkg from "@prisma/client";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
+
+const { Prisma } = prismaPkg;
 
 export class TransferService implements ITransferService {
   private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
@@ -491,7 +493,7 @@ export class TransferService implements ITransferService {
           accountRegisterId: debtAccountRegister.id,
           description: `Extra debt payment from ${sourceAccountRegister.name}`,
           lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-          amount: new Decimal(Number(paymentAmount)),
+          amount: new Prisma.Decimal(Number(paymentAmount)),
           transferAccountRegisterId:
             debtAccountRegister.targetAccountRegisterId,
           intervalId: 3,
