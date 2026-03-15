@@ -36,3 +36,5 @@ coverage/
 *.json
 playwright-report/index.html
 /.docker-build-cache
+/.pnpm-store
+/node-compile-cache

@@ -5,11 +5,34 @@ import { migrate as migrateUser } from './User'
 import { migrate as migrateAccountRegister } from './AccountRegister'
 import { migrate as migrateRegisterEntry } from './RegisterEntry'
 import { migrate as migrateReoccurrence } from './Reoccurrence'
-import type { ProgressReportCallback } from './progressReport'
-import { defaultProgressReport } from './progressReport'
 
-export type { ProgressReport, ProgressReportCallback } from './progressReport'
-export { defaultProgressReport } from './progressReport'
+export interface ProgressReport {
+  model: string
+  processed: number
+  totalCount: number
+  performance: number
+}
+
+export type ProgressReportCallback = (
+  progress: ProgressReport
+) => void | Promise<void>
+
+export const defaultProgressReport: ProgressReportCallback = ({
+  model,
+  totalCount,
+  processed,
+  performance
+}) => {
+  const length = totalCount.toString().length
+  const pct = Math.round((100 * processed) / totalCount)
+    .toString()
+    .padStart(3)
+  console.info(
+    `${model.padEnd(15)} ${pct}% processed ${processed
+      .toString()
+      .padStart(length)} / ${totalCount} (took ${performance.toFixed(2)}ms)`
+  )
+}
 
 // --
 
