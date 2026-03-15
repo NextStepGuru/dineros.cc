@@ -953,4 +953,85 @@ describe("LoanCalculatorService", () => {
       expect(result).toBe(true); // Negative balance is still considered non-zero, so interest is processed
     });
   });
+
+  describe("APR boundary timing", () => {
+    it("uses APR2 when statement date is exactly APR2 start instant", async () => {
+      const account = createMockAccount({
+        statementAt: new Date("2024-01-01T00:00:00.000Z"),
+        apr1: 0.12,
+        apr2: 0.18,
+        apr2StartAt: new Date("2024-01-01T00:00:00.000Z"),
+        apr3: null,
+        apr3StartAt: null,
+        typeId: 4,
+      });
+
+      const result = await service.calculateInterestForAccount(account);
+      expect(result).toBe(-14.9);
+    });
+
+    it("uses APR1 when statement date is before APR2 start instant", async () => {
+      const account = createMockAccount({
+        statementAt: new Date("2023-12-31T23:59:00.000Z"),
+        apr1: 0.12,
+        apr2: 0.18,
+        apr2StartAt: new Date("2024-01-01T00:00:00.000Z"),
+        apr3: null,
+        apr3StartAt: null,
+        typeId: 4,
+      });
+
+      const result = await service.calculateInterestForAccount(account);
+      expect(result).toBe(-9.91);
+    });
+
+    it("treats offset-equivalent instants as APR2 active", async () => {
+      const account = createMockAccount({
+        statementAt: new Date("2024-01-01T05:00:00.000Z"),
+        apr1: 0.12,
+        apr2: 0.18,
+        apr2StartAt: new Date("2024-01-01T00:00:00-05:00"),
+        apr3: null,
+        apr3StartAt: null,
+        typeId: 4,
+      });
+
+      const result = await service.calculateInterestForAccount(account);
+      expect(result).toBe(-14.9);
+    });
+  });
+
+  describe("statement interval interest day-count expectations", () => {
+    it("uses 365-day basis for yearly statement interval", async () => {
+      const account = createMockAccount({
+        balance: 1000,
+        apr1: 0.12,
+        apr2: null,
+        apr2StartAt: null,
+        apr3: null,
+        apr3StartAt: null,
+        statementIntervalId: 4,
+        typeId: 4,
+      });
+
+      const result = await service.calculateInterestForAccount(account);
+      expect(result).toBeCloseTo(-127.47, 2);
+    });
+
+    it("keeps intervalId 5 on default 30-day basis (current behavior)", async () => {
+      const account = createMockAccount({
+        balance: 1000,
+        apr1: 0.12,
+        apr2: null,
+        apr2StartAt: null,
+        apr3: null,
+        apr3StartAt: null,
+        statementIntervalId: 5,
+        typeId: 4,
+      });
+
+      const result = await service.calculateInterestForAccount(account);
+      expect(result).toBe(-9.91);
+    });
+  });
 });

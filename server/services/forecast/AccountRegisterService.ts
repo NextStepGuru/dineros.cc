@@ -11,14 +11,24 @@ import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class AccountRegisterService implements IAccountRegisterService {
   private _pendingStatementAtUpdates: { id: number; statementAt: Date }[] = [];
+  private cache: ModernCacheService;
+  private loanCalculator: LoanCalculatorService;
+  private entryService: RegisterEntryService;
+  private transferService: TransferService;
 
   constructor(
-    private db: PrismaClient,
-    private cache: ModernCacheService,
-    private loanCalculator: LoanCalculatorService,
-    private entryService: RegisterEntryService,
-    private transferService: TransferService
-  ) {}
+    db: PrismaClient,
+    cache: ModernCacheService,
+    loanCalculator: LoanCalculatorService,
+    entryService: RegisterEntryService,
+    transferService: TransferService
+  ) {
+    void db;
+    this.cache = cache;
+    this.loanCalculator = loanCalculator;
+    this.entryService = entryService;
+    this.transferService = transferService;
+  }
 
   getPendingStatementAtUpdates(): { id: number; statementAt: Date }[] {
     return [...this._pendingStatementAtUpdates];
@@ -271,19 +281,21 @@ export class AccountRegisterService implements IAccountRegisterService {
     statementIntervalId: number
   ): any {
     switch (statementIntervalId) {
-      case 1: // Day
+      case 1: { // Day
         // Use moment's add method directly to avoid any wrapper issues
         const dailyMoment = dateTimeService.create(currentStatementAt);
         const dailyNextDay = dailyMoment.add(1, "day");
 
         return dailyNextDay;
-      case 2: // Week
+      }
+      case 2: { // Week
         // Use moment's add method directly to avoid any wrapper issues
         const weeklyMoment = dateTimeService.create(currentStatementAt);
         const weeklyNextDay = weeklyMoment.add(1, "week");
 
         return weeklyNextDay;
-      case 3: // Month
+      }
+      case 3: { // Month
         // For monthly, manually construct the next month's date
         const currentMoment = dateTimeService.create(currentStatementAt);
         const currentDay = currentMoment.date() as number;
@@ -305,19 +317,22 @@ export class AccountRegisterService implements IAccountRegisterService {
           .setMonth(nextMonth)
           .setDate(currentDay);
         return dateTimeService.toDate(nextMonthMoment);
-      case 4: // Year
+      }
+      case 4: { // Year
         // Use moment's add method directly to avoid any wrapper issues
         const yearlyMoment = dateTimeService.create(currentStatementAt);
         const yearlyNextDay = yearlyMoment.add(1, "year");
 
         return yearlyNextDay;
-      case 5: // Once (one-time)
+      }
+      case 5: { // Once (one-time)
         // Use moment's add method directly to avoid any wrapper issues
         const onceMoment = dateTimeService.create(currentStatementAt);
         const onceNextDay = onceMoment.add(1, "year"); // Default to yearly for one-time
 
         return onceNextDay;
-      default:
+      }
+      default: {
         // For monthly, manually construct the next month's date
         const currentMomentDefault = dateTimeService.create(currentStatementAt);
         const currentDayDefault = currentMomentDefault.date() as number;
@@ -339,6 +354,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           .setMonth(nextMonthDefault)
           .setDate(currentDayDefault);
         return dateTimeService.toDate(nextMonthMomentDefault);
+      }
     }
   }
 

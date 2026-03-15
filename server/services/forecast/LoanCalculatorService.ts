@@ -9,7 +9,6 @@ import {
   roundToCents,
   calculateCompoundInterest,
   calculatePercentage,
-  divideMoney,
   multiplyMoney,
   maxMoney,
   absoluteMoney,
@@ -33,7 +32,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
 
         try {
           return roundToCents(loan.totalInterest);
-        } catch (error) {
+        } catch {
           // Fallback to percentage calculation
           return calculatePercentage(balance, apr);
         }
@@ -82,8 +81,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       interest = this.calculateInterestByInterval(
         apr,
         balanceToUse,
-        accountRegister.statementIntervalId,
-        accountRegister.typeId
+        accountRegister.statementIntervalId
       );
 
       forecastLogger.debug("DEBUG: interest before sign adjustment =", interest);
@@ -110,8 +108,7 @@ export class LoanCalculatorService implements ILoanCalculatorService {
   private calculateInterestByInterval(
     apr: number,
     balance: number,
-    statementIntervalId: number,
-    typeId: number
+    statementIntervalId: number
   ): number {
     // Calculate daily interest rate (use regular division, not divideMoney for small rates)
     const dailyRate = apr / 365;

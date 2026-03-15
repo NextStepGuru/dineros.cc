@@ -550,7 +550,7 @@ describe("ReoccurrenceService", () => {
       expect(result).toEqual(new Date("2024-01-08"));
     });
 
-    it("handles One-Time intervalName without throwing", () => {
+    it("falls back to intervalId for unsupported intervalName values", () => {
       const reoccurrence = {
         ...createMockReoccurrence({
           lastAt: new Date("2024-01-01"),
@@ -562,8 +562,27 @@ describe("ReoccurrenceService", () => {
 
       const result = service.calculateNextOccurrence(reoccurrence);
 
-      expect(result).toBeInstanceOf(Date);
-      expect(dateTimeService.isValid(result)).toBe(true);
+      expect(result).toBeNull();
+    });
+
+    it("returns null when intervalCount is zero", () => {
+      const reoccurrence = createMockReoccurrence({
+        intervalId: 2,
+        intervalCount: 0,
+      });
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+      expect(result).toBeNull();
+    });
+
+    it("returns null when intervalCount is negative", () => {
+      const reoccurrence = createMockReoccurrence({
+        intervalId: 2,
+        intervalCount: -1,
+      });
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+      expect(result).toBeNull();
     });
 
     it("trims intervalName whitespace", () => {

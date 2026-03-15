@@ -1,10 +1,6 @@
 import type { PrismaClient, Reoccurrence } from "@prisma/client";
-import type { IReoccurrenceService, CreateEntryParams } from "./types";
-import type {
-  CacheAccountRegister,
-  CacheReoccurrence,
-} from "./ModernCacheService";
-import { Decimal } from "@prisma/client/runtime/library";
+import type { IReoccurrenceService } from "./types";
+import type { CacheReoccurrence } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
@@ -14,13 +10,20 @@ import { dateTimeService } from "./DateTimeService";
 export class ReoccurrenceService implements IReoccurrenceService {
   /** Pre-scheduled reoccurrences by ISO date string (YYYY-MM-DD). Built once at timeline start; O(1) lookup per day. */
   private _scheduleByDate: Map<string, CacheReoccurrence[]> = new Map();
+  private cache: ModernCacheService;
+  private entryService: RegisterEntryService;
+  private transferService: TransferService;
 
   constructor(
-    private db: PrismaClient,
-    private cache: ModernCacheService,
-    private entryService: RegisterEntryService,
-    private transferService: TransferService,
-  ) {}
+    _db: PrismaClient,
+    cache: ModernCacheService,
+    entryService: RegisterEntryService,
+    transferService: TransferService,
+  ) {
+    this.cache = cache;
+    this.entryService = entryService;
+    this.transferService = transferService;
+  }
 
   async processReoccurrences(
     reoccurrences: Reoccurrence[],
@@ -51,13 +54,6 @@ export class ReoccurrenceService implements IReoccurrenceService {
     let nextAt: any = dateTimeService.createUTC(firstNextDate);
     let occurrenceCount = 0;
 
-    if (
-      reoccurrence.endAt &&
-      dateTimeService.isAfter(nextAt, reoccurrence.endAt)
-    ) {
-      return;
-    }
-
     forecastLogger.serviceDebug(
       "ReoccurrenceService",
       `Processing reoccurrence ${reoccurrence.id} (${
@@ -73,21 +69,21 @@ export class ReoccurrenceService implements IReoccurrenceService {
       nextAt &&
       dateTimeService.isSameOrBefore(nextAt, dateTimeService.createUTC(endDate))
     ) {
-      // Only process if not past endAt
-      if (
-        reoccurrence.endAt &&
-        dateTimeService.isAfter(nextAt, reoccurrence.endAt)
-      ) {
-        break;
-      }
-
-      occurrenceCount++;
-
       // Apply weekend adjustment to the current occurrence date if enabled
       let adjustedLastAt = dateTimeService.clone(nextAt);
       if (reoccurrence.adjustBeforeIfOnWeekend) {
         adjustedLastAt = this.adjustDateIfWeekend(adjustedLastAt);
       }
+
+      // endAt boundary is evaluated against the effective (possibly adjusted) occurrence date
+      if (
+        reoccurrence.endAt &&
+        dateTimeService.isAfter(adjustedLastAt, reoccurrence.endAt)
+      ) {
+        break;
+      }
+
+      occurrenceCount++;
 
       // Create a reoccurrence object with the adjusted date for entry creation
       const reoccurrenceForEntry = {
@@ -205,14 +201,33 @@ export class ReoccurrenceService implements IReoccurrenceService {
     );
   }
 
-  calculateNextOccurrence(reoccurrence: Reoccurrence): Date | null {
+  calculateNextOccurrence(reoccurrence: any): Date | null {
+    if (!reoccurrence?.lastAt) return null;
+    if (reoccurrence.intervalCount <= 0) return null;
     const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
-    const cached = reoccurrence as CacheReoccurrence;
+    const cached = reoccurrence as { intervalName?: string };
     const intervalName = cached.intervalName?.trim().toLowerCase();
 
     if (intervalName) {
       if (intervalName === "once") return null;
-      const unit = intervalName as "days" | "weeks" | "months" | "years";
+      const intervalNameToUnit: Record<string, "days" | "weeks" | "months" | "years"> = {
+        day: "days",
+        days: "days",
+        week: "weeks",
+        weeks: "weeks",
+        month: "months",
+        months: "months",
+        year: "years",
+        years: "years",
+      };
+      const unit = intervalNameToUnit[intervalName];
+      if (!unit) {
+        // Fallback to intervalId when intervalName is unsupported.
+        return this.calculateNextOccurrence({
+          ...reoccurrence,
+          intervalName: undefined,
+        } as Reoccurrence);
+      }
       return dateTimeService.toDate(
         dateTimeService.add(reoccurrence.intervalCount, unit, lastAt),
       );
@@ -296,6 +311,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
 
   isReoccurrenceActive(reoccurrence: Reoccurrence, currentDate: Date): boolean {
     const current = dateTimeService.createUTC(currentDate);
+    if (!reoccurrence.lastAt) return false;
     const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
 
     // Check if reoccurrence has ended

@@ -2,7 +2,6 @@ import type {
   AccountRegister,
   AccountType,
   PrismaClient,
-  RegisterEntry,
 } from "@prisma/client";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import type { AccountBase, Transaction } from "plaid";
@@ -14,12 +13,8 @@ import {
   addPlaidBalanceSyncJob,
   addRecalculateJob,
 } from "~/server/clients/queuesClient";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
 import { dateTimeService } from "./forecast/DateTimeService";
-import TransactionMatchingService, {
-  type TransactionMatchResult,
-} from "./TransactionMatchingService";
+import TransactionMatchingService from "./TransactionMatchingService";
 
 const DAYS_REQUESTED = 3;
 

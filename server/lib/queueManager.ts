@@ -1,20 +1,22 @@
+/* eslint-disable no-unused-vars */
 import type { JobsOptions } from "bullmq";
 import type Redis from "ioredis";
 import { dateTimeService } from "../services/forecast/DateTimeService";
 
 interface QueueConfig {
   name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  processor: (job: any) => Promise<void>;
+  processor: (...args: unknown[]) => Promise<void>;
 }
 
 class QueueManager {
-  queues: Map<string, any> = new Map();
-  workers: Map<string, any> = new Map();
+  queues: Map<string, unknown> = new Map();
+  workers: Map<string, unknown> = new Map();
   connection: Redis | null;
   isTestMode: boolean;
+  queueConfigs: QueueConfig[];
 
-  constructor(private queueConfigs: QueueConfig[], connection: Redis) {
+  constructor(queueConfigs: QueueConfig[], connection: Redis) {
+    this.queueConfigs = queueConfigs;
     this.connection = connection;
     this.isTestMode = process.env.NODE_ENV === "test";
 
@@ -51,7 +53,7 @@ class QueueManager {
         name: queueName,
         data,
         opts,
-      } as any);
+      } as const);
     }
 
     const queue = this.queues.get(queueName);

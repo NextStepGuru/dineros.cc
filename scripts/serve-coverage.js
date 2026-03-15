@@ -13,7 +13,7 @@ function ensureCoverageExists() {
     console.log("Coverage directory not found. Generating coverage...");
     try {
       execSync("npm run test:coverage", { stdio: "inherit" });
-    } catch (error) {
+    } catch {
       console.error(
         'Failed to generate coverage. Please run "npm run test:coverage" manually.'
       );

@@ -750,4 +750,107 @@ describe("AccountRegisterService", () => {
       expect(mockEntryService.createBalanceEntry).not.toHaveBeenCalled();
     });
   });
+
+  describe("calculateNextStatementDate month-end edge cases", () => {
+    const utcYmd = (date: any) =>
+      dateTimeService.createUTC(date).format("YYYY-MM-DD");
+
+    it("shows Jan 31 monthly overflow behavior in non-leap year (current gotcha)", () => {
+      dateTimeService.setNowOverride("2023-01-01T00:00:00.000Z");
+      try {
+        const next = (service as any).calculateNextStatementDate(
+          dateTimeService.create("2023-01-31T00:00:00.000Z"),
+          3
+        );
+        expect(utcYmd(next)).toBe("2023-03-03");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("shows Jan 31 monthly overflow behavior in leap year (current gotcha)", () => {
+      dateTimeService.setNowOverride("2024-01-01T00:00:00.000Z");
+      try {
+        const next = (service as any).calculateNextStatementDate(
+          dateTimeService.create("2024-01-31T00:00:00.000Z"),
+          3
+        );
+        expect(utcYmd(next)).toBe("2024-03-02");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("keeps Nov 30 -> Dec 30 for monthly statements", () => {
+      dateTimeService.setNowOverride("2024-01-01T00:00:00.000Z");
+      try {
+        const next = (service as any).calculateNextStatementDate(
+          dateTimeService.create("2024-11-30T00:00:00.000Z"),
+          3
+        );
+        expect(utcYmd(next)).toBe("2024-12-30");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("handles Mar 31 monthly statement by moving to Apr 30", () => {
+      dateTimeService.setNowOverride("2024-01-01T00:00:00.000Z");
+      try {
+        const next = (service as any).calculateNextStatementDate(
+          dateTimeService.create("2024-03-31T00:00:00.000Z"),
+          3
+        );
+        expect(utcYmd(next)).toBe("2024-04-30");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
+
+    it("shows multi-cycle monthly drift from Jan 31 (current behavior)", () => {
+      const first = (service as any).calculateNextStatementDate(
+        dateTimeService.create("2024-01-31T00:00:00.000Z"),
+        3
+      );
+      const second = (service as any).calculateNextStatementDate(first, 3);
+      const third = (service as any).calculateNextStatementDate(second, 3);
+
+      expect(utcYmd(first)).toBe("2024-03-01");
+      expect(utcYmd(second)).toBe("2024-04-01");
+      expect(utcYmd(third)).toBe("2024-05-01");
+    });
+
+    it("shows multi-cycle monthly drift from Jan 30 (current behavior)", () => {
+      const first = (service as any).calculateNextStatementDate(
+        dateTimeService.create("2024-01-30T00:00:00.000Z"),
+        3
+      );
+      const second = (service as any).calculateNextStatementDate(first, 3);
+
+      expect(utcYmd(first)).toBe("2024-02-29");
+      expect(utcYmd(second)).toBe("2024-03-29");
+    });
+
+    it("advances yearly statement from leap day anchor (current behavior)", () => {
+      const first = (service as any).calculateNextStatementDate(
+        dateTimeService.create("2024-02-29T00:00:00.000Z"),
+        4
+      );
+      const second = (service as any).calculateNextStatementDate(first, 4);
+
+      expect(utcYmd(first)).toBe("2025-03-01");
+      expect(utcYmd(second)).toBe("2026-03-01");
+    });
+
+    it("keeps intervalId 5 on yearly cadence (current once behavior)", () => {
+      const first = (service as any).calculateNextStatementDate(
+        dateTimeService.create("2024-01-15T00:00:00.000Z"),
+        5
+      );
+      const second = (service as any).calculateNextStatementDate(first, 5);
+
+      expect(utcYmd(first)).toBe("2025-01-15");
+      expect(utcYmd(second)).toBe("2026-01-15");
+    });
+  });
 });

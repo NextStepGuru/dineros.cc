@@ -6,14 +6,19 @@ import type {
 } from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { recalculateRunningBalanceAndSort } from "../../../lib/sort";
-import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";
 import { dateTimeService } from "./DateTimeService";
 import { forecastLogger } from "./logger";
 
 export class RegisterEntryService implements IRegisterEntryService {
-  constructor(private db: PrismaClient, private cache: ModernCacheService) {}
+  private db: PrismaClient;
+  private cache: ModernCacheService;
+
+  constructor(db: PrismaClient, cache: ModernCacheService) {
+    this.db = db;
+    this.cache = cache;
+  }
 
   createEntry(params: CreateEntryParams): void {
     const {
@@ -61,7 +66,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       forecastDate ||
       (isManualEntry && manualCreatedAt
         ? manualCreatedAt
-        : reoccurrence?.lastAt);
+        : reoccurrence?.lastAt) ||
+      dateTimeService.nowDate();
 
     const createdAt = dateTimeService.set(
       isBalanceEntry
@@ -73,7 +79,7 @@ export class RegisterEntryService implements IRegisterEntryService {
           }
         : { hour: 0, minute: 0, second: 0, milliseconds: 0 },
       dateTimeService.createUTC(entryDate)
-    );
+    ).toMoment();
 
     // Use passed isPending value if available, otherwise calculate it based on date
     const calculatedIsPending = dateTimeService.isSameOrBefore(
@@ -171,10 +177,10 @@ export class RegisterEntryService implements IRegisterEntryService {
 
     // Sort entries by date and amount (descending for same date)
     const sortedEntries = recalculateRunningBalanceAndSort({
-      registerEntries: entries,
+      registerEntries: entries as unknown as any[],
       balance: initialBalance,
       type: accountType,
-    });
+    }) as unknown as CacheRegisterEntry[];
 
     return sortedEntries;
   }

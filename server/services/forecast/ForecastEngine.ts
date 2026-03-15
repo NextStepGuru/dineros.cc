@@ -10,8 +10,7 @@ import { RegisterEntryService } from "./RegisterEntryService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { TransferService } from "./TransferService";
 import { DataPersisterService } from "./DataPersisterService";
-import { MAX_YEARS, IS_CREDIT_TYPE_IDS } from "../../../consts";
-import { createId } from "@paralleldrive/cuid2";
+import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { DateTime } from "./DateTime";
@@ -119,7 +118,7 @@ export class ForecastEngine implements IForecastEngine {
       }
 
       // 6. Load existing manual entries into the timeline
-      await this.loadExistingEntries(accountData, startDate);
+      await this.loadExistingEntries(accountData);
 
       this.accountService.clearPendingStatementAtUpdates();
 
@@ -137,9 +136,6 @@ export class ForecastEngine implements IForecastEngine {
         activeAccountRegisters
       );
 
-      const balanceEntriesToPersist = processedResults.filter(
-        (e) => e.isBalanceEntry
-      );
       const manualEntriesToPersist = processedResults.filter(
         (e) => e.isManualEntry
       );
@@ -254,8 +250,7 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private async loadExistingEntries(
-    accountData: any,
-    startDate: any
+    accountData: any
   ): Promise<void> {
     try {
       // Load ALL existing entries (including isPending from Plaid) to ensure accurate balance calculations
@@ -391,11 +386,6 @@ export class ForecastEngine implements IForecastEngine {
         accountRegisterId: accountRegister.id,
       });
       const accountEntries = accountEntriesAll;
-      const balanceEntries = accountEntries.filter((e) => e.isBalanceEntry);
-
-      // Filter out skipped entries
-      const filteredEntries =
-        this.entryService.filterSkippedEntries(accountEntries);
 
       // Calculate running balances and sort
       const accountType = IS_CREDIT_TYPE_IDS.includes(accountRegister.typeId)

@@ -13,7 +13,6 @@ export default defineEventHandler(async (event: H3Event) => {
     const multiPartFormData = await readMultipartFormData(event);
 
     if (multiPartFormData) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const structuredData: Record<string, any> = {};
       for (const part of multiPartFormData) {
         if (part.name) {

@@ -7,12 +7,12 @@ import {
   getAccountRegisterLabel,
   getIntervalLabel,
 } from "~/lib/utils";
+import type { Reoccurrence } from "~/types/types";
+import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 
 const ModalsEditReoccurrence = defineAsyncComponent(
   () => import("~/components/modals/EditReoccurrence.vue")
 );
-import type { Reoccurrence } from "~/types/types";
-import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 
 definePageMeta({
   middleware: "auth",

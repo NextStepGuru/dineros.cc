@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     const { accountRegisterId } = disconnectSchema.parse(body);
 
     // Verify user has access to this account register
-    const accountRegister = await prisma.accountRegister.findFirstOrThrow({
+    await prisma.accountRegister.findFirstOrThrow({
       where: {
         id: accountRegisterId,
         account: {

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import type { Decimal } from "@prisma/client/runtime/library";
 import type { Moment } from "moment";
 
@@ -227,7 +228,9 @@ class ModernCollection<T extends { id: number | string }>
     // Try to use indexes for faster queries
     const entries = Object.entries(query);
     if (entries.length === 1) {
-      const [field, value] = entries[0];
+      const firstEntry = entries[0];
+      if (!firstEntry) return [];
+      const [field, value] = firstEntry;
       const index = this.indexes.get(field);
       if (index && typeof value !== "object") {
         const ids = index.get(value) || new Set();
@@ -245,7 +248,7 @@ class ModernCollection<T extends { id: number | string }>
 
   findOne(query: Partial<T> | ((item: T) => boolean)): T | null {
     const results = this.find(query);
-    return results.length > 0 ? results[0] : null;
+    return results.length > 0 ? (results[0] ?? null) : null;
   }
 
   findById(id: number | string): T | null {

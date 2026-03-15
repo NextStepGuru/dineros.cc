@@ -10,11 +10,13 @@ import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 export class TransferService implements ITransferService {
   private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
+  private cache: ModernCacheService;
+  private entryService: RegisterEntryService;
 
-  constructor(
-    private cache: ModernCacheService,
-    private entryService: RegisterEntryService,
-  ) {}
+  constructor(cache: ModernCacheService, entryService: RegisterEntryService) {
+    this.cache = cache;
+    this.entryService = entryService;
+  }
 
   transferBetweenAccounts(params: TransferParams): void {
     const {
@@ -220,11 +222,6 @@ export class TransferService implements ITransferService {
     const ledgerProjected = entries
       .filter((e) => (e.createdAt as Moment).valueOf() <= targetEpoch)
       .reduce((sum, e) => sum + Number(e.amount), 0);
-    const legacyProjected = getProjectedBalanceAtDate(
-      this.cache,
-      accountId,
-      targetDate,
-    );
     return ledgerProjected;
   }
 
@@ -507,14 +504,6 @@ export class TransferService implements ITransferService {
           adjustBeforeIfOnWeekend: false,
         },
       });
-      const sourceAfterTransfer = this.cache.accountRegister.findById(
-        sourceAccountRegister.id,
-      );
-      const projectedAfterTransfer = this.calculateProjectedBalanceAtDate(
-        sourceAccountRegister.id,
-        lastAt,
-      );
-
       // Update remaining available amount
       remainingAvailableAmount -= paymentAmount;
       totalPaymentsMade += paymentAmount;
@@ -531,8 +520,6 @@ export class TransferService implements ITransferService {
         originalAvailableAmount: projectedBalance - minBalance,
       },
     );
-    const finalSource = this.cache.accountRegister.findById(sourceAccountId);
-
     return paymentsProcessed > 0;
   }
 

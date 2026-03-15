@@ -7,9 +7,6 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { dateTimeService } from "~/server/services/forecast";
 import { log } from "../../logger";
 
-// Google Sheets API configuration
-const GOOGLE_SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
-
 // Schema for the request body
 const syncGoogleSheetSchema = z.object({
   accountRegisterId: z.coerce.number().min(1),

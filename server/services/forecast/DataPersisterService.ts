@@ -16,8 +16,10 @@ import { forecastLogger } from "./logger";
 
 export class DataPersisterService implements IDataPersisterService {
   private rateLimiter: DatabaseRateLimiter;
+  private db: PrismaClient;
 
-  constructor(private db: PrismaClient) {
+  constructor(db: PrismaClient) {
+    this.db = db;
     this.rateLimiter = new DatabaseRateLimiter(3);
   }
 

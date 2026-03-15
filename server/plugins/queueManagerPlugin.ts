@@ -1,1 +1,1 @@
-export default defineNitroPlugin(async (nitro) => {});
+export default defineNitroPlugin(async () => {});

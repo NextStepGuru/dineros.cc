@@ -2,11 +2,11 @@
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
 import type { TableColumn } from "@nuxt/ui";
 import type { RegisterEntry } from "~/types/types";
+import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
   () => import("~/components/modals/EditRegisterEntry.vue")
 );
-import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 
 const overlay = useOverlay();
 const route = useRoute();

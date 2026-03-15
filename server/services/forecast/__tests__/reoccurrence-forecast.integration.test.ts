@@ -331,4 +331,111 @@ describe("Reoccurrence + Forecast integration", () => {
     const created = dateTimeService.createUTC(targetEntry!.createdAt);
     expect(created.day()).toBe(5); // Friday
   });
+
+  it("handles month-end monthly recurrence dates across six months", async () => {
+    const checking = await db.accountRegister.create({
+      data: account({ id: 81, name: "Month End", balance: 3000, latestBalance: 3000 }),
+    });
+
+    await db.reoccurrence.create({
+      data: {
+        accountId,
+        accountRegisterId: checking.id,
+        description: "Month End Pay",
+        amount: 100,
+        intervalId: 3,
+        intervalCount: 1,
+        lastAt: new Date("2024-01-31T00:00:00.000Z"),
+        endAt: null,
+        adjustBeforeIfOnWeekend: false,
+      },
+    });
+
+    const result = await runForecast("2024-01-31", "2024-07-31");
+
+    expect(result.isSuccess).toBe(true);
+    const dates = result.registerEntries
+      .filter(
+        (entry) =>
+          entry.accountRegisterId === checking.id &&
+          entry.description === "Month End Pay",
+      )
+      .map((entry) => entry.createdAt.slice(0, 10))
+      .sort();
+
+    expect(dates).toEqual([
+      "2024-02-29",
+      "2024-03-29",
+      "2024-04-29",
+      "2024-05-29",
+      "2024-06-29",
+      "2024-07-29",
+    ]);
+  });
+
+  it("applies weekend adjustment at month boundary (Saturday March 1 -> Friday Feb 28)", async () => {
+    const checking = await db.accountRegister.create({
+      data: account({ id: 91, name: "Checking", balance: 1500, latestBalance: 1500 }),
+    });
+
+    await db.reoccurrence.create({
+      data: {
+        accountId,
+        accountRegisterId: checking.id,
+        description: "Boundary Weekend",
+        amount: -75,
+        intervalId: 2,
+        intervalCount: 1,
+        lastAt: new Date("2025-02-22T00:00:00.000Z"),
+        endAt: null,
+        adjustBeforeIfOnWeekend: true,
+      },
+    });
+
+    const result = await runForecast("2025-02-22", "2025-03-01");
+
+    expect(result.isSuccess).toBe(true);
+    const entry = result.registerEntries.find(
+      (row) =>
+        row.accountRegisterId === checking.id &&
+        row.description === "Boundary Weekend",
+    );
+    expect(entry).toBeDefined();
+    const created = dateTimeService.createUTC(entry!.createdAt);
+    expect(created.day()).toBe(5);
+    expect(created.format("YYYY-MM-DD")).toBe("2025-02-28");
+  });
+
+  it("returns zero timeline processing when startDate is after endDate", async () => {
+    await db.accountRegister.create({
+      data: account({ id: 101, name: "Range Account", balance: 1000, latestBalance: 1000 }),
+    });
+
+    const result = await runForecast("2025-03-10", "2025-03-01");
+
+    expect(result.isSuccess).toBe(true);
+    expect(result.datesProcessed).toBe(0);
+  });
+
+  it("accepts exactly 10-year forecast range", async () => {
+    await db.accountRegister.create({
+      data: account({ id: 102, name: "10y Account", balance: 1000, latestBalance: 1000 }),
+    });
+
+    const result = await runForecast("2024-01-01", "2034-01-01");
+
+    expect(result.isSuccess).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  it("keeps current behavior for 10 years + 1 day range", async () => {
+    await db.accountRegister.create({
+      data: account({ id: 103, name: "10y+1d Account", balance: 1000, latestBalance: 1000 }),
+    });
+
+    const result = await runForecast("2024-01-01", "2034-01-02");
+
+    expect(result.isSuccess).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
 });

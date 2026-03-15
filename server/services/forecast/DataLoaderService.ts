@@ -5,10 +5,13 @@ import { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
 export class DataLoaderService implements IDataLoaderService {
-  constructor(
-    private db: PrismaClient,
-    private cache: ModernCacheService,
-  ) {}
+  private db: PrismaClient;
+  private cache: ModernCacheService;
+
+  constructor(db: PrismaClient, cache: ModernCacheService) {
+    this.db = db;
+    this.cache = cache;
+  }
 
   async loadAccountData(context: ForecastContext): Promise<AccountData> {
     // Clear existing cache

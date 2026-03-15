@@ -1,6 +1,5 @@
 import type { H3Event } from "h3";
 import { createError } from "h3";
-import { log } from "../logger";
 import { postmarkClient } from "../clients/postmarkClient";
 import HashService from "../services/HashService";
 import { passwordAndCodeSchema } from "~/schema/zod";

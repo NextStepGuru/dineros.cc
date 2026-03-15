@@ -1,13 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
 
 type ConvertTupleTypes<T extends unknown[], ConvertTo> = T extends [
-  infer _First,
+  unknown,
   ...infer Rest
 ]
   ? [ConvertTo, ...ConvertTupleTypes<Rest, ConvertTo>]
   : [];
 
-type FieldsType<T extends unknown[]> = T extends [infer _First, ...infer Rest]
+type FieldsType<T extends unknown[]> = T extends [unknown, ...infer Rest]
   ? ConvertTupleTypes<Rest, string>
   : [];
 

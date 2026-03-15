@@ -1,5 +1,4 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
-import { z } from "zod";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import HashService from "../services/HashService";
 import { log } from "../logger";

@@ -1,11 +1,9 @@
 import { defineEventHandler, setResponseStatus, setCookie } from "h3";
-import { z } from "zod";
 import { publicProfileSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import env from "../env";
 import JwtService from "../services/JwtService";
-import { log } from "../logger";
 import { handleApiError } from "~/server/lib/handleApiError";
 
 export default defineEventHandler(async (event) => {

@@ -18,16 +18,12 @@ async function loginHandler(event: any) {
   let email: string;
   let password: string;
   let tokenChallenge: string | undefined;
-  try {
-    const parsed = loginSchema
-      .extend({ tokenChallenge: z.string().optional() })
-      .parse(body);
-    email = parsed.email;
-    password = parsed.password;
-    tokenChallenge = parsed.tokenChallenge;
-  } catch (parseErr) {
-    throw parseErr;
-  }
+  const parsed = loginSchema
+    .extend({ tokenChallenge: z.string().optional() })
+    .parse(body);
+  email = parsed.email;
+  password = parsed.password;
+  tokenChallenge = parsed.tokenChallenge;
 
   // Find user by email
   const lookup = await PrismaDb.user.findFirst({
