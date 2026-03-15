@@ -79,7 +79,7 @@ export class RegisterEntryService implements IRegisterEntryService {
           }
         : { hour: 0, minute: 0, second: 0, milliseconds: 0 },
       dateTimeService.createUTC(entryDate)
-    ).toMoment();
+    ).toDate();
 
     // Use passed isPending value if available, otherwise calculate it based on date
     const calculatedIsPending = dateTimeService.isSameOrBefore(

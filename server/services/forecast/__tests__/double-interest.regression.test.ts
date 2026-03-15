@@ -9,8 +9,7 @@ import { TransferService } from "../TransferService";
 import { dateTimeService } from "../DateTimeService";
 import type { CacheAccountRegister } from "../ModernCacheService";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 /**
  * Regression tests for Bug #2: Double Interest Calculation
@@ -27,7 +26,6 @@ describe("Double Interest Calculation Regression Tests", () => {
   let mockDb: any;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     // Reset cache
     cache = new ModernCacheService();
 
@@ -246,9 +244,12 @@ describe("Double Interest Calculation Regression Tests", () => {
 
       // Assert: Statement date should advance to next month
       const updatedAccount = cache.accountRegister.findOne({ id: 5 });
-      expect(updatedAccount?.statementAt.format("YYYY-MM-DD")).toBe(
-        "2025-02-15"
-      );
+      expect(
+        dateTimeService.format(
+          "YYYY-MM-DD",
+          dateTimeService.createUTC(updatedAccount?.statementAt as any)
+        )
+      ).toBe("2025-02-15");
     });
 
     it("should calculate next statement date correctly for different intervals", async () => {
@@ -305,9 +306,12 @@ describe("Double Interest Calculation Regression Tests", () => {
         const updatedAccount = cache.accountRegister.findOne({
           id: testCase.intervalId + 10,
         });
-        expect(updatedAccount?.statementAt.format("YYYY-MM-DD")).toBe(
-          testCase.expected
-        );
+        expect(
+          dateTimeService.format(
+            "YYYY-MM-DD",
+            dateTimeService.createUTC(updatedAccount?.statementAt as any)
+          )
+        ).toBe(testCase.expected);
       }
     });
   });
@@ -368,7 +372,7 @@ describe("Double Interest Calculation Regression Tests", () => {
           }
         }
 
-        currentDate.add(1, "day");
+        currentDate = currentDate.add(1, "day");
       }
 
       // Assert: Should process exactly once per month

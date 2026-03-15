@@ -5,8 +5,7 @@ import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import { dateTimeService } from "../DateTimeService";
 import { log } from "../../../logger";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
@@ -14,7 +13,6 @@ describe("ForecastEngine Integration Tests", () => {
   let testAccountId: string;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     // Setup test database with sample data
     testDb = await createTestDatabase();
     engine = ForecastEngineFactory.create(testDb);
@@ -158,8 +156,8 @@ describe("ForecastEngine Integration Tests", () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: new Date("2024-02-01"),
-        endDate: new Date("2024-05-01"),
+        startDate: new Date("2024-02-01T00:00:00.000Z"),
+        endDate: new Date("2024-05-01T00:00:00.000Z"),
         logging: { enabled: false },
       };
 
@@ -347,7 +345,7 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
       name: "Savings",
       typeId: 1,
       balance: 0,
-      statementAt: new Date("2024-06-01"),
+      statementAt: new Date("2024-06-01T00:00:00.000Z"),
     },
   });
   if (!reg?.id) return reg;
@@ -360,7 +358,7 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
       amount: 500,
       intervalId: 3,
       intervalCount: 1,
-      lastAt: new Date("2024-01-01"),
+      lastAt: new Date("2024-01-01T00:00:00.000Z"),
     },
   });
   await db.reoccurrence.create({
@@ -371,7 +369,7 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
       amount: 50,
       intervalId: 2,
       intervalCount: 1,
-      lastAt: new Date("2024-01-01"),
+      lastAt: new Date("2024-01-01T00:00:00.000Z"),
     },
   });
   return reg;

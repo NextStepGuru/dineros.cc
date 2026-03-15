@@ -1,4 +1,3 @@
-import type { Moment } from "moment";
 import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
 import prismaPkg from "@prisma/client";
@@ -222,7 +221,10 @@ export class TransferService implements ITransferService {
     const targetEpoch = dateTimeService.endOfDay(targetDate).valueOf();
     const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
     const ledgerProjected = entries
-      .filter((e) => (e.createdAt as Moment).valueOf() <= targetEpoch)
+      .filter((e) => {
+        const entryEpoch = dateTimeService.toDate(e.createdAt as any).getTime();
+        return Number.isFinite(entryEpoch) && entryEpoch <= targetEpoch;
+      })
       .reduce((sum, e) => sum + Number(e.amount), 0);
     return ledgerProjected;
   }

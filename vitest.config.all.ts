@@ -8,7 +8,7 @@ export default defineConfig({
 
     // Capture stderr output
     reporters: ["verbose"],
-    onConsoleLog(log, type) {
+    onConsoleLog(_log, _type) {
       // Capture stderr logs
     },
 

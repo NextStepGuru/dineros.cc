@@ -234,11 +234,16 @@ restore_database() {
 
 # Main script
 if [ $# -eq 0 ]; then
-    echo -e "${RED}Usage: $0 [staging|production]${NC}"
+    echo -e "${RED}Usage: $0 [staging|production] [--identical]${NC}"
+    echo -e "  --identical  Restore an exact copy (skip re-encrypt). Use production DB_ENCRYPTION_KEY in .env to read data."
     exit 1
 fi
 
 ENV=$1
+RESTORE_IDENTICAL=0
+if [ "$2" = "--identical" ]; then
+    RESTORE_IDENTICAL=1
+fi
 
 if [ "$ENV" != "staging" ] && [ "$ENV" != "production" ]; then
     echo -e "${RED}❌ Invalid environment. Use 'staging' or 'production'${NC}"
@@ -246,6 +251,9 @@ if [ "$ENV" != "staging" ] && [ "$ENV" != "production" ]; then
 fi
 
 echo -e "${GREEN}🚀 Starting database dump and restore process for $ENV...${NC}"
+if [ $RESTORE_IDENTICAL -eq 1 ]; then
+    echo -e "${YELLOW}   Mode: identical copy (no re-encrypt). Set DB_ENCRYPTION_KEY to $ENV key in .env to use.${NC}"
+fi
 
 # Get source database name before dumping
 env_upper=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
@@ -260,12 +268,16 @@ DUMP_FILE=$(dump_database "$ENV")
 # Restore to local
 restore_database "$DUMP_FILE" "$SOURCE_DB_NAME"
 
-# Reset/re-encrypt encrypted fields so local app works with local DB_ENCRYPTION_KEY
-echo -e "${YELLOW}🔐 Updating encrypted fields for local (re-encrypt or overwrite)...${NC}"
-if (cd "$(dirname "$0")/.." && RESTORE_FROM_ENV="$ENV" pnpm run reset-encrypted-users); then
-    echo -e "${GREEN}✅ Encrypted fields updated. Log in with dev@local.dev / dev (or RESTORE_DEV_PASSWORD).${NC}"
+# Reset/re-encrypt encrypted fields so local app works with local DB_ENCRYPTION_KEY (unless --identical)
+if [ $RESTORE_IDENTICAL -eq 1 ]; then
+    echo -e "${BLUE}🔐 Skipping re-encrypt (identical copy). Set DB_ENCRYPTION_KEY to $ENV key in .env to read data.${NC}"
 else
-    echo -e "${YELLOW}⚠️  Could not update encrypted fields (ensure .env has DATABASE_URL and DB_ENCRYPTION_KEY). Run: pnpm run reset-encrypted-users${NC}"
+    echo -e "${YELLOW}🔐 Updating encrypted fields for local (re-encrypt or overwrite)...${NC}"
+    if (cd "$(dirname "$0")/.." && RESTORE_FROM_ENV="$ENV" pnpm run reset-encrypted-users); then
+        echo -e "${GREEN}✅ Encrypted fields updated. Log in with dev@local.dev / dev (or RESTORE_DEV_PASSWORD).${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not update encrypted fields (ensure .env has DATABASE_URL and DB_ENCRYPTION_KEY). Run: pnpm run reset-encrypted-users${NC}"
+    fi
 fi
 
 # Optionally clean up dump file

@@ -1,6 +1,5 @@
 /* eslint-disable no-unused-vars */
 import type { Prisma } from "@prisma/client";
-import type { Moment } from "moment";
 
 type Decimal = Prisma.Decimal;
 
@@ -61,7 +60,7 @@ export type CacheRegisterEntry = {
   seq: number | null;
   accountRegisterId: number;
   sourceAccountRegisterId: number | null;
-  createdAt: Moment;
+  createdAt: Date;
   description: string;
   reoccurrenceId: number | null;
   amount: number;

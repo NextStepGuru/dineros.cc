@@ -25,6 +25,12 @@ export const getDbDecryptionKeyValues = (): string[] => {
 };
 
 const dbDecryptionKeyValues = getDbDecryptionKeyValues();
+if (
+  process.env.DB_ENCRYPTION_KEY &&
+  !dbDecryptionKeyValues.includes(process.env.DB_ENCRYPTION_KEY)
+) {
+  dbDecryptionKeyValues.push(process.env.DB_ENCRYPTION_KEY);
+}
 
 export const globalClient = new PrismaClient({
   log: ["error"],

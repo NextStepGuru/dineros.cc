@@ -1,7 +1,7 @@
 export const log = ({
-  message,
-  data,
-  level = "debug",
+  message: _message,
+  data: _data,
+  level: _level = "debug",
 }: {
   message: string;
   data?: unknown;

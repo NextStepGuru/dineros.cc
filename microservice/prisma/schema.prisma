@@ -70,6 +70,8 @@ model UserAccount {
   user    User    @relation(fields: [userId], references: [id])
   account Account @relation(fields: [accountId], references: [id])
 
+  @@index([userId])
+  @@index([userId, accountId])
   @@map("user_account")
 }
 
@@ -126,6 +128,7 @@ model AccountRegister {
   latestBalance           Decimal   @default(0) @map("latest_balance") @db.Decimal(19, 2)
   minPayment              Decimal?  @map("min_payment") @db.Decimal(19, 2)
   statementAt             DateTime  @map("statement_at")
+  statementIntervalId     Int       @default(3) @map("statement_interval_id") @db.UnsignedInt
   apr1                    Decimal?  @db.Decimal(7, 5)
   apr1StartAt             DateTime? @map("apr1_start_at")
   apr2                    Decimal?  @db.Decimal(7, 5)
@@ -153,14 +156,17 @@ model AccountRegister {
   plaidBalanceLastSyncAt  DateTime? @map("plaid_balance_last_sync_at")
   updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  budget        Budget            @relation(fields: [budgetId], references: [id])
-  type          AccountType       @relation(fields: [typeId], references: [id])
-  account       Account           @relation(fields: [accountId], references: [id])
-  reoccurrences Reoccurrence[]
+  budget   Budget           @relation(fields: [budgetId], references: [id])
+  type     AccountType      @relation(fields: [typeId], references: [id])
+  account  Account          @relation(fields: [accountId], references: [id])
+  interval Interval         @relation(fields: [statementIntervalId], references: [id])
+  parent   AccountRegister? @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+
   entries       RegisterEntry[]
-  parent        AccountRegister?  @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+  reoccurrences Reoccurrence[]
   children      AccountRegister[] @relation("ar_children")
 
+  @@index([accountId, isArchived])
   @@map("account_register")
 }
 
@@ -183,7 +189,7 @@ model RegisterEntry {
   createdAt               DateTime @map("created_at")
   referenceId             String?
   checkNo                 String?
-  description             String    @db.VarChar(1500) /// @encrypted
+  description             String   @db.VarChar(1500) /// @encrypted
   reoccurrenceId          Int?     @map("reoccurrence_id") @db.UnsignedInt
   amount                  Decimal  @db.Decimal(19, 2)
   balance                 Decimal  @db.Decimal(19, 2)
@@ -191,10 +197,16 @@ model RegisterEntry {
   isProjected             Boolean  @default(false) @map("is_projected")
   isReconciled            Boolean  @default(false) @map("is_reconciled")
   isPending               Boolean  @default(false) @map("is_pending")
-  isCleared               Boolean  @default(false) @map("is_cleared")
+  isCleared               Boolean  @default(false) @map("is_cleared") // the user has cleared the entry from the future register
+  isMatched               Boolean  @default(false) @map("is_matched") // denotes that the entry has been matched to an online transaction
   isBalanceEntry          Boolean  @default(false) @map("is_balance_entry")
   isManualEntry           Boolean  @default(false) @map("is_manual_entry")
   hasBalanceReCalc        Boolean  @default(false) @map("has_balance_re_calc")
+  plaidId                 String?  @map("plaid_id") @db.VarChar(500) /// @encrypted
+  plaidIdHash             String?  @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
+  plaidJson               Json?    @map("plaid_json")
+  categoryId              String?  @map("category_id")
+  memo                    String?  @db.VarChar(500)
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
 
   register     AccountRegister    @relation(fields: [accountRegisterId], references: [id])
@@ -202,6 +214,7 @@ model RegisterEntry {
   type         RegisterEntryType? @relation(fields: [typeId], references: [id])
 
   @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
+  @@index([accountRegisterId, isCleared, isProjected, isManualEntry])
   @@map("register_entry")
 }
 
@@ -244,7 +257,7 @@ model Reoccurrence {
   totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
   elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
   amount                    Decimal   @db.Decimal(19, 2)
-  description               String
+  description               String   @db.VarChar(1500) /// @encrypted
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   account  Account            @relation(fields: [accountId], references: [id])
@@ -253,6 +266,8 @@ model Reoccurrence {
   entries  RegisterEntry[]
   skips    ReoccurrenceSkip[]
 
+  @@index([accountId])
+  @@index([accountId, lastAt])
   @@map("reoccurrence")
 }
 
@@ -286,7 +301,8 @@ model Interval {
   name      String
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  reoccurrences Reoccurrence[]
+  reoccurrences   Reoccurrence[]
+  AccountRegister AccountRegister[]
 
   @@map("interval")
 }

@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createPinia, setActivePinia, defineStore } from "pinia";
-
-(globalThis as any).defineStore = defineStore;
-const authStoreModule = await import("../authStore");
-(globalThis as any).useAuthStore = authStoreModule.useAuthStore;
-const { useListStore } = await import("../listStore");
-const useAuthStore = authStoreModule.useAuthStore;
 import type {
   Reoccurrence,
   Interval,
@@ -14,6 +8,12 @@ import type {
   Budget,
   Account,
 } from "~/types/types";
+
+(globalThis as any).defineStore = defineStore;
+const authStoreModule = await import("../authStore");
+(globalThis as any).useAuthStore = authStoreModule.useAuthStore;
+const { useListStore } = await import("../listStore");
+const useAuthStore = authStoreModule.useAuthStore;
 
 vi.stubGlobal("useNuxtApp", vi.fn(() => ({ $api: vi.fn() })));
 

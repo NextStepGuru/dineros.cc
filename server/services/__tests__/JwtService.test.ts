@@ -2,6 +2,11 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
 import { generateKeyPairSync } from "crypto";
 
+// Import modules after mocks
+import JwtService from "../JwtService";
+import RsaService from "../RsaService";
+import { prisma } from "~/server/clients/prismaClient";
+
 // Mock prisma client (used by both JwtService and RsaService)
 vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
@@ -28,11 +33,6 @@ vi.mock("../RsaService", () => {
     })),
   };
 });
-
-// Import modules after mocks
-import JwtService from "../JwtService";
-import RsaService from "../RsaService";
-import { prisma } from "~/server/clients/prismaClient";
 
 describe("JwtService", () => {
   let jwtService: JwtService;

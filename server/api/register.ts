@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
                   isPending: false,
                   isProjected: false,
                   isCleared: false,
-                  createdAt: { lte: dateTimeService.nowDate() },
+                  createdAt: { lte: focusedAt },
                 },
               ],
             }
@@ -105,7 +105,7 @@ export default defineEventHandler(async (event) => {
                   isPending: false,
                   isProjected: false,
                   isCleared: false,
-                  createdAt: { lte: dateTimeService.nowDate() },
+                  createdAt: { lte: focusedAt },
                 },
               ],
             }

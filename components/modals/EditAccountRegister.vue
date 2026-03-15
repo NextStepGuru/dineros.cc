@@ -29,7 +29,51 @@ const listStore = useListStore();
 const props = defineProps<ModelAccountRegisterProps>();
 
 const { today } = useToday();
-const formState = ref<AccountRegister>(props.accountRegister);
+
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed =
+    typeof value === "number" ? value : Number.parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeAccountRegisterState(
+  accountRegister: AccountRegister
+): AccountRegister {
+  return {
+    ...accountRegister,
+    typeId: toNullableNumber(accountRegister.typeId) ?? 0,
+    budgetId: toNullableNumber(accountRegister.budgetId) ?? 0,
+    subAccountRegisterId: toNullableNumber(accountRegister.subAccountRegisterId),
+    balance: toNullableNumber(accountRegister.balance) ?? 0,
+    latestBalance: toNullableNumber(accountRegister.latestBalance) ?? 0,
+    minPayment: toNullableNumber(accountRegister.minPayment),
+    statementIntervalId: toNullableNumber(accountRegister.statementIntervalId),
+    apr1: toNullableNumber(accountRegister.apr1),
+    apr2: toNullableNumber(accountRegister.apr2),
+    apr3: toNullableNumber(accountRegister.apr3),
+    targetAccountRegisterId: toNullableNumber(
+      accountRegister.targetAccountRegisterId
+    ),
+    loanPaymentsPerYear: toNullableNumber(accountRegister.loanPaymentsPerYear),
+    loanTotalYears: toNullableNumber(accountRegister.loanTotalYears),
+    loanOriginalAmount: toNullableNumber(accountRegister.loanOriginalAmount),
+    sortOrder: toNullableNumber(accountRegister.sortOrder) ?? 0,
+    loanPaymentSortOrder:
+      toNullableNumber(accountRegister.loanPaymentSortOrder) ?? 0,
+    savingsGoalSortOrder:
+      toNullableNumber(accountRegister.savingsGoalSortOrder) ?? 0,
+    accountSavingsGoal: toNullableNumber(accountRegister.accountSavingsGoal),
+    minAccountBalance: toNullableNumber(accountRegister.minAccountBalance) ?? 0,
+  };
+}
+
+const formState = ref<AccountRegister>(
+  normalizeAccountRegisterState(props.accountRegister)
+);
 
 const fileInput = ref<any>(null);
 
@@ -92,9 +136,7 @@ const statementAtString = computed({
 });
 
 watch(props, () => {
-  formState.value = {
-    ...props.accountRegister,
-  };
+  formState.value = normalizeAccountRegisterState(props.accountRegister);
 });
 
 async function handleSubmit({

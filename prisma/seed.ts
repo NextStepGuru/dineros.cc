@@ -14,6 +14,10 @@ import { reoccurrenceSkips } from "./backup/reoccurrenceSkips";
 import { registerEntry } from "./backup/registerEntry";
 import HashService from "../server/services/HashService";
 import { log } from "../server/logger";
+
+import { fieldEncryptionExtension } from "prisma-field-encryption";
+import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
+import dotenv from "dotenv";
 // Countries data
 const countries = [
   { id: 4, name: "Afghanistan", code: "AF", code3: "AFG" },
@@ -255,14 +259,29 @@ const countries = [
   { id: 887, name: "Yemen", code: "YE", code3: "YEM" },
   { id: 894, name: "Zambia", code: "ZM", code3: "ZMB" },
 ];
-
-import { fieldEncryptionExtension } from "prisma-field-encryption";
-import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
-import dotenv from "dotenv";
 dotenv.config();
 
 const { PrismaClient, Prisma } = prismaPkg;
 const databaseUrl = process.env.DATABASE_URL;
+
+const getDbDecryptionKeyValues = (): string[] => {
+  const keys = Object.keys(process.env)
+    .filter(
+      (key) =>
+        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS"
+    )
+    .map((key) => process.env[key]!)
+    .filter((value) => value !== undefined);
+
+  if (
+    process.env.DB_ENCRYPTION_KEY &&
+    !keys.includes(process.env.DB_ENCRYPTION_KEY)
+  ) {
+    keys.push(process.env.DB_ENCRYPTION_KEY);
+  }
+
+  return keys;
+};
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required for Prisma initialization.");
@@ -274,7 +293,7 @@ export const prisma = new PrismaClient({ adapter }).$extends(
   fieldEncryptionExtension({
     dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
-    decryptionKeys: process.env.DB_DECRYPTION_KEYS?.split(",") || [],
+    decryptionKeys: getDbDecryptionKeyValues(),
   })
 );
 

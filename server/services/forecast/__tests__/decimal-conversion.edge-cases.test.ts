@@ -84,6 +84,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
       // Assert: Should convert to number and perform arithmetic
       const updatedAccount = cache.accountRegister.findOne({ id: 1 });
       expect(typeof updatedAccount?.balance).toBe("number");
+      // eslint-disable-next-line no-loss-of-precision -- testing high-precision decimal handling
       expect(updatedAccount?.balance).toBeCloseTo(12345.6789123456789, 8);
 
       // Should not concatenate as string
@@ -660,7 +661,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
           seq: null,
           accountRegisterId: 50,
           sourceAccountRegisterId: null,
-          createdAt: dateTimeService.create(),
+          createdAt: dateTimeService.create().toDate(),
           description: "Opening Balance",
           reoccurrenceId: null,
           amount: 3000,
@@ -677,7 +678,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
           seq: null,
           accountRegisterId: 50,
           sourceAccountRegisterId: null,
-          createdAt: dateTimeService.create(),
+          createdAt: dateTimeService.create().toDate(),
           description: "Decimal Entry",
           reoccurrenceId: null,
           amount: new Decimal("250.75") as any,
@@ -694,7 +695,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
           seq: null,
           accountRegisterId: 50,
           sourceAccountRegisterId: null,
-          createdAt: dateTimeService.create(),
+          createdAt: dateTimeService.create().toDate(),
           description: "Number Entry",
           reoccurrenceId: null,
           amount: -150.25, // Regular number
@@ -711,7 +712,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
           seq: null,
           accountRegisterId: 50,
           sourceAccountRegisterId: null,
-          createdAt: dateTimeService.create(),
+          createdAt: dateTimeService.create().toDate(),
           description: "String Entry",
           reoccurrenceId: null,
           amount: "75.99" as any, // String number

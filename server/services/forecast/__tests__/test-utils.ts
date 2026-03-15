@@ -1,8 +1,13 @@
 import type { PrismaClient } from '~/types/test-types';
 import { vi } from 'vitest';
 
+const FIXED_TEST_DATE = new Date('2024-01-01T00:00:00.000Z');
+const FIXED_TEST_ISO = FIXED_TEST_DATE.toISOString();
+let nextSyntheticId = 1;
+
 // Mock test database setup
 export async function createTestDatabase(): Promise<PrismaClient> {
+  nextSyntheticId = 1;
   // In a real implementation, this would set up a test database
   // For now, we'll return a mock that can be used in tests
 
@@ -18,7 +23,10 @@ export async function createTestDatabase(): Promise<PrismaClient> {
   const mockDb = {
     accountRegister: {
       create: vi.fn().mockImplementation(async (data: any) => {
-        const accountRegister = { ...data.data, id: data.data.id || Date.now() };
+        const accountRegister = {
+          ...data.data,
+          id: data.data.id || nextSyntheticId++,
+        };
         accountRegisters.push(accountRegister);
         return accountRegister;
       }),
@@ -53,7 +61,7 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         }
         return reoccurrences;
       }),
-      aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: new Date() } }),
+      aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: FIXED_TEST_DATE } }),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
@@ -61,13 +69,19 @@ export async function createTestDatabase(): Promise<PrismaClient> {
     },
     registerEntry: {
       create: vi.fn().mockImplementation(async (data: any) => {
-        const entry = { ...data.data, id: data.data.id || `entry-${Date.now()}` };
+        const entry = {
+          ...data.data,
+          id: data.data.id || `entry-${nextSyntheticId++}`,
+        };
         registerEntries.push(entry);
         return entry;
       }),
       createMany: vi.fn().mockImplementation(async (data: any) => {
         data.data.forEach((entry: any) => {
-          registerEntries.push({ ...entry, id: entry.id || `entry-${Date.now()}` });
+          registerEntries.push({
+            ...entry,
+            id: entry.id || `entry-${nextSyntheticId++}`,
+          });
         });
         return { count: data.data.length };
       }),
@@ -134,7 +148,7 @@ export function createMockAccountRegister(overrides = {}) {
     name: 'Test Account',
     typeId: 1,
     balance: 1000,
-    statementAt: new Date(),
+    statementAt: FIXED_TEST_DATE,
     ...overrides,
   };
 }
@@ -148,7 +162,7 @@ export function createMockReoccurrence(overrides = {}) {
     amount: 100,
     intervalId: 3, // Monthly
     intervalCount: 1,
-    lastAt: new Date(),
+    lastAt: FIXED_TEST_DATE,
     endAt: null,
     ...overrides,
   };
@@ -161,7 +175,7 @@ export function createMockRegisterEntry(overrides = {}) {
     description: 'Test Entry',
     amount: 100,
     balance: 1100,
-    createdAt: new Date().toISOString(),
+    createdAt: FIXED_TEST_ISO,
     isProjected: true,
     isPending: false,
     isCleared: false,

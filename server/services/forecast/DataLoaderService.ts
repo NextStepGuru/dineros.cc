@@ -133,7 +133,7 @@ export class DataLoaderService implements IDataLoaderService {
       ...entry,
       amount: Number(entry.amount),
       balance: Number(entry.balance),
-      createdAt: dateTimeService.createUTC(entry.createdAt).toMoment(),
+      createdAt: dateTimeService.createUTC(entry.createdAt).toDate(),
     }));
 
     // Insert into cache (this was missing!)

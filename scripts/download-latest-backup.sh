@@ -18,19 +18,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🔍 Finding latest production backup...${NC}"
+ENVIRONMENT="${1:-production}"
+if [ "$ENVIRONMENT" != "production" ] && [ "$ENVIRONMENT" != "staging" ]; then
+    echo -e "${RED}❌ Invalid environment. Use 'production' or 'staging'${NC}"
+    echo -e "${YELLOW}Usage: $0 [production|staging]${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}🔍 Finding latest ${ENVIRONMENT} backup...${NC}"
 
 # Create temp directory
 mkdir -p "$TEMP_DIR"
 
-# List objects in bucket and find the latest production backup
-LATEST_BACKUP=$(gsutil ls "gs://$BUCKET_NAME/" | \
-  grep "production.*\.zip$" | \
-  sort | \
-  tail -1)
+# List objects recursively and find latest backup by object timestamp.
+LATEST_BACKUP=$(
+  gsutil ls -l -r "gs://$BUCKET_NAME/**" | \
+  awk -v env="$ENVIRONMENT" '$0 !~ /TOTAL:/ && $3 ~ env && $3 ~ /\.zip$/ { print $0 }' | \
+  sort -k2,2 | \
+  tail -1 | \
+  awk '{print $3}'
+)
 
 if [ -z "$LATEST_BACKUP" ]; then
-    echo -e "${RED}❌ No production backup files found in bucket${NC}"
+    echo -e "${RED}❌ No ${ENVIRONMENT} backup files found in bucket${NC}"
     exit 1
 fi
 

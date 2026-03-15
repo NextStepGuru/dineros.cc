@@ -1,7 +1,12 @@
 import type { H3Event } from "h3";
 import { z } from "zod";
 import cuid2 from "@paralleldrive/cuid2";
-import { postmarkClient } from "../clients/postmarkClient";
+import {
+  postmarkClient,
+  hasPostmarkToken,
+} from "../clients/postmarkClient";
+import env from "../env";
+import { log } from "../logger";
 import { prisma } from "../clients/prismaClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
@@ -37,11 +42,13 @@ export default defineEventHandler(async (event: H3Event) => {
       },
     });
 
-    await postmarkClient.sendEmail({
-      From: "Mr. Pepe Dineros <pepe@dineros.cc>",
-      To: email,
-      Subject: "Dineros Password Reset Request",
-      HtmlBody: `${lookupUser.firstName},<br>
+    const isLocal = env?.DEPLOY_ENV === "local";
+    if (hasPostmarkToken && !isLocal) {
+      await postmarkClient.sendEmail({
+        From: "Mr. Pepe Dineros <pepe@dineros.cc>",
+        To: email,
+        Subject: "Dineros Password Reset Request",
+        HtmlBody: `${lookupUser.firstName},<br>
       <br>
       Your password reset code is: ${token}<br>
       <br>
@@ -51,7 +58,14 @@ export default defineEventHandler(async (event: H3Event) => {
       Regards,<br>
       &nbsp;&nbsp;Mr. Pepe &amp; The Dineros Team
       `,
-    });
+      });
+    } else {
+      log({
+        message: "[FORGOT_PASSWORD] Reset code (email not sent; local or no Postmark token)",
+        level: "info",
+        data: { email, resetCode: token },
+      });
+    }
 
     setResponseStatus(event, 200);
     return { message: "Reset code sent" };

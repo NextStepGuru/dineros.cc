@@ -67,17 +67,6 @@ vi.mock("@paralleldrive/cuid2", () => ({
   createId: vi.fn(),
 }));
 
-vi.mock("moment", () => {
-  const mockMoment = vi.fn(() => ({
-    utc: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    isSameOrAfter: vi.fn(),
-    isBefore: vi.fn(),
-    add: vi.fn().mockReturnThis(),
-    toDate: vi.fn().mockReturnValue(new Date("2024-01-01")),
-  }));
-  return { default: mockMoment };
-});
 
 describe("Register Entry API Endpoints", () => {
   beforeEach(() => {
@@ -108,7 +97,7 @@ describe("Register Entry API Endpoints", () => {
         isBalanceEntry: false,
         plaidId: null,
         plaidJson: null,
-        createdAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
       };
 
       const mockLookup = {
@@ -130,7 +119,6 @@ describe("Register Entry API Endpoints", () => {
       const { addRecalculateJob } = await import(
         "~/server/clients/queuesClient"
       );
-      const moment = await import("moment");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -141,15 +129,6 @@ describe("Register Entry API Endpoints", () => {
       (createId as any).mockReturnValue("entry-123");
       (prisma.registerEntry.upsert as any).mockResolvedValue(mockCreatedEntry);
       (registerEntrySchema.parse as any).mockReturnValue(mockCreatedEntry);
-
-      // Mock moment for date comparison
-      const mockMomentInstance = {
-        utc: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        isSameOrAfter: vi.fn().mockReturnValue(false),
-        isBefore: vi.fn().mockReturnValue(true),
-      };
-      (moment.default as any).mockReturnValue(mockMomentInstance);
 
       const result = await registerEntryPostHandler(mockEvent);
 
@@ -503,26 +482,16 @@ describe("Register Entry API Endpoints", () => {
 
       const mockReoccurrence = {
         id: "reoccurrence-123",
-        lastAt: new Date("2024-01-01"),
+        lastAt: new Date("2024-01-01T00:00:00.000Z"),
         intervalId: 1,
       };
 
-      const moment = await import("moment");
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { addRecalculateJob } = await import(
         "~/server/clients/queuesClient"
       );
       const { dateTimeService } = await import("~/server/services/forecast");
-
-      // Mock moment for date calculation
-      const mockMomentInstance = {
-        utc: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        add: vi.fn().mockReturnThis(),
-        toDate: vi.fn().mockReturnValue(new Date("2024-02-01")),
-      };
-      (moment.default as any).mockReturnValue(mockMomentInstance);
 
       // Mock dateTimeService methods
       (dateTimeService.add as any) = vi.fn().mockReturnValue({
@@ -600,7 +569,7 @@ describe("Register Entry API Endpoints", () => {
         const mockLookup = {
           id: "entry-123",
           reoccurrenceId: "reoccurrence-123",
-          createdAt: new Date("2024-01-01"),
+          createdAt: new Date("2024-01-01T00:00:00.000Z"),
           accountRegisterId: 1,
           register: {
             accountId: "account-123",
@@ -609,27 +578,17 @@ describe("Register Entry API Endpoints", () => {
 
         const mockReoccurrence = {
           id: "reoccurrence-123",
-          lastAt: new Date("2024-01-01"),
+          lastAt: new Date("2024-01-01T00:00:00.000Z"),
           intervalCount: 1,
           interval: { name: "month" },
           accountId: "account-123",
         };
 
-        const moment = await import("moment");
         const { getUser } = await import("~/server/lib/getUser");
         const { prisma } = await import("~/server/clients/prismaClient");
         const { addRecalculateJob } = await import(
           "~/server/clients/queuesClient"
         );
-
-        // Mock moment for date calculation
-        const mockMomentInstance = {
-          utc: vi.fn().mockReturnThis(),
-          set: vi.fn().mockReturnThis(),
-          add: vi.fn().mockReturnThis(),
-          toDate: vi.fn().mockReturnValue(new Date("2024-02-01")),
-        };
-        (moment.default as any).mockReturnValue(mockMomentInstance);
 
         (globalThis as any).readBody.mockResolvedValue(mockBody);
         (getUser as any).mockReturnValue({ userId: 123 });
@@ -720,7 +679,7 @@ describe("Register Entry API Endpoints", () => {
         id: "entry-123",
         description: "Transfer",
         amount: 100,
-        createdAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
         reoccurrenceId: null,
         plaidId: null,
         plaidJson: null,
@@ -866,8 +825,8 @@ describe("Register Entry API Endpoints", () => {
       const { registerEntrySchema } = await import("~/schema/zod");
       const { dateTimeService } = await import("~/server/services/forecast");
 
-      (dateTimeService.toDate as any) = vi.fn().mockReturnValue(new Date("2024-01-15"));
-      (dateTimeService.parseInput as any) = vi.fn().mockReturnValue(new Date("2024-01-15"));
+      (dateTimeService.toDate as any) = vi.fn().mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
+      (dateTimeService.parseInput as any) = vi.fn().mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
       (dateTimeService.createUTC as any) = vi.fn().mockReturnThis();
       (dateTimeService.createUTC().set as any) = vi.fn().mockReturnThis();
       (dateTimeService.createUTC().set().isSameOrBefore as any) = vi.fn().mockReturnValue(true);

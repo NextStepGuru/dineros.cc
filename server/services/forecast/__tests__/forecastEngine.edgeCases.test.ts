@@ -7,9 +7,9 @@ import { TransferService } from "../TransferService";
 import { AccountRegisterService } from "../AccountRegisterService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { ForecastContext } from "../types";
+import { dateTimeService } from "../DateTimeService";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 describe("ForecastEngine - Edge Cases and Error Handling", () => {
   let forecastEngine: ForecastEngine;
@@ -21,7 +21,6 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
   let loanCalculator: LoanCalculatorService;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     const mockDb = {
       accountRegister: {
         findMany: vi.fn(),
@@ -463,8 +462,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       const context: ForecastContext = {
         accountId: "test-account",
-        startDate: new Date("2024-01-01"),
-        endDate: new Date("2035-01-01"), // 11 years later
+        startDate: new Date("2024-01-01T00:00:00.000Z"),
+        endDate: new Date("2035-01-01T00:00:00.000Z"), // 11 years later
         logging: { enabled: false },
       };
 
@@ -500,8 +499,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       const context: ForecastContext = {
         accountId: "test-account",
-        startDate: new Date("2024-01-01"),
-        endDate: new Date("2034-01-01"), // Exactly 10 years later
+        startDate: new Date("2024-01-01T00:00:00.000Z"),
+        endDate: new Date("2034-01-01T00:00:00.000Z"), // Exactly 10 years later
         logging: { enabled: false },
       };
 

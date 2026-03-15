@@ -13,14 +13,12 @@ vi.mock("@dazlab-team/loan-calc", () => ({
   })),
 }));
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 describe("LoanCalculatorService", () => {
   let service: LoanCalculatorService;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     service = new LoanCalculatorService();
   });
 
@@ -41,9 +39,9 @@ describe("LoanCalculatorService", () => {
       apr1: 0.15,
       apr1StartAt: null,
       apr2: 0.2,
-      apr2StartAt: new Date("2024-01-01"),
+      apr2StartAt: new Date("2024-01-01T00:00:00.000Z"),
       apr3: 0.25,
-      apr3StartAt: new Date("2024-02-01"),
+      apr3StartAt: new Date("2024-02-01T00:00:00.000Z"),
       targetAccountRegisterId: 2,
       loanStartAt: null,
       loanPaymentsPerYear: 12,
@@ -270,7 +268,7 @@ describe("LoanCalculatorService", () => {
         balance: 1000,
         apr1: 0.12,
         apr2: 0.18,
-        apr2StartAt: new Date("2023-12-01"), // Use Date instead of moment
+        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use Date instead of moment
         statementAt: moment("2024-01-15"),
         typeId: 4, // Credit Card (credit account)
       });
@@ -285,9 +283,9 @@ describe("LoanCalculatorService", () => {
         balance: 1000,
         apr1: 0.12,
         apr2: 0.18,
-        apr2StartAt: new Date("2023-12-01"), // Use Date instead of moment
+        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use Date instead of moment
         apr3: 0.24,
-        apr3StartAt: new Date("2024-01-01"), // Use Date instead of moment
+        apr3StartAt: new Date("2024-01-01T00:00:00.000Z"), // Use Date instead of moment
         statementAt: moment("2024-01-15"),
         typeId: 4, // Credit Card (credit account)
       });
@@ -598,7 +596,7 @@ describe("LoanCalculatorService", () => {
         balance: 1000,
         apr1: 0.12,
         apr2: 0.18,
-        apr2StartAt: new Date("2023-12-01"),
+        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"),
         apr3: 0.24,
         apr3StartAt: new Date(NaN), // Invalid date
         typeId: 4,

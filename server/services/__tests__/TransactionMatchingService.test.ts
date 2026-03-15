@@ -50,7 +50,7 @@ describe("TransactionMatchingService", () => {
         id: "existing-id",
         amount: -100,
         description: "Old Description",
-        createdAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
       } as unknown as RegisterEntry;
 
       // First call returns null (no existing plaid transaction)
@@ -103,7 +103,7 @@ describe("TransactionMatchingService", () => {
         id: "existing-id",
         amount: -100,
         description: "Old Description",
-        createdAt: new Date("2024-01-05"), // 4 days later
+        createdAt: new Date("2024-01-05T00:00:00.000Z"), // 4 days later
       } as unknown as RegisterEntry;
 
       // First call returns null (no existing plaid transaction)
@@ -219,7 +219,7 @@ describe("TransactionMatchingService", () => {
         id: "existing-id",
         amount: 100, // Positive for credit accounts
         description: "Old Description",
-        createdAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
       } as RegisterEntry;
 
       // First call returns null (no existing plaid transaction)
@@ -405,14 +405,14 @@ describe("TransactionMatchingService", () => {
         id: "existing-id",
         amount: -100,
         description: "Old Description",
-        createdAt: new Date("2024-01-02"),
+        createdAt: new Date("2024-01-02T00:00:00.000Z"),
       } as RegisterEntry;
 
       const updatedEntry: RegisterEntry = {
         ...existingEntry,
         plaidId: "test-id",
         description: "Updated Transaction Name",
-        createdAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
       } as RegisterEntry;
 
       mockDb.registerEntry.update.mockResolvedValue(updatedEntry);
@@ -430,7 +430,7 @@ describe("TransactionMatchingService", () => {
           plaidId: "test-id",
           plaidJson: JSON.parse(JSON.stringify(transaction)),
           // description is preserved, not updated
-          createdAt: new Date("2024-01-01"),
+          createdAt: new Date("2024-01-01T00:00:00.000Z"),
         },
       });
     });

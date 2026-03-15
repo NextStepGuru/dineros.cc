@@ -8,14 +8,12 @@ import type {
   CacheReoccurrenceSkip,
 } from "../ModernCacheService";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 describe("ModernCacheService", () => {
   let cache: ModernCacheService;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     cache = new ModernCacheService();
   });
 
@@ -87,7 +85,7 @@ describe("ModernCacheService", () => {
       accountId: "test-account",
       accountRegisterId: 1,
       description: "Test Reoccurrence",
-      lastAt: new Date("2024-01-01"),
+      lastAt: new Date("2024-01-01T00:00:00.000Z"),
       amount: 100,
       transferAccountRegisterId: null,
       intervalId: 1,
@@ -95,7 +93,7 @@ describe("ModernCacheService", () => {
       endAt: null,
       totalIntervals: null,
       elapsedIntervals: null,
-      updatedAt: new Date("2024-01-01"),
+      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
       adjustBeforeIfOnWeekend: false,
       ...overrides,
     } as CacheReoccurrence;

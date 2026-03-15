@@ -1,7 +1,11 @@
 import { Page, expect } from "@playwright/test";
 
 export class TestHelpers {
-  constructor(private page: Page) {}
+  constructor(private _page: Page) {}
+
+  get page(): Page {
+    return this._page;
+  }
 
   /**
    * Wait for page to be fully loaded
@@ -77,7 +81,7 @@ export class TestHelpers {
    */
   async expectToast(
     message: string,
-    type: "success" | "error" | "warning" = "success"
+    _type: "success" | "error" | "warning" = "success"
   ) {
     const toast = this.page.locator(
       `[data-testid="toast"], .toast, [role="alert"]`

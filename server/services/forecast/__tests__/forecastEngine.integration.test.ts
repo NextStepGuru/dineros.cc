@@ -10,8 +10,7 @@ import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
 import { forecastLogger } from "../logger";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 // Mock the database
 const mockDb = {
@@ -46,8 +45,7 @@ describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
   let testContext: ForecastContext;
 
-  beforeEach(async () => {
-    moment = (await import("moment")).default;
+beforeEach(async () => {
     vi.clearAllMocks();
 
     // Reset the global mockDb (skip $transaction/$executeRaw to avoid mockReset on non-vi functions)

@@ -5,7 +5,10 @@ dotenv.config();
 
 export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)
-    .filter((key) => key.startsWith("DB_DECRYPTION_KEY"))
+    .filter(
+      (key) =>
+        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS",
+    )
     .map((key) => process.env[key]!)
     .filter((value) => value !== undefined); // Ensure no undefined values
 };

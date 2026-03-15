@@ -1,267 +1,534 @@
-import moment, {
-  type Moment,
-  type DurationInputArg2,
-  type unitOfTime,
-  type MomentSetObject,
-} from "moment";
-
 /** Full ISO datetime with Z or offset - required to avoid ambiguous local interpretation */
 const HAS_EXPLICIT_OFFSET = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 /** Date-only YYYY-MM-DD; safe to interpret in a given timezone. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+type CanonicalDurationUnit =
+  | "year"
+  | "month"
+  | "week"
+  | "day"
+  | "hour"
+  | "minute"
+  | "second"
+  | "millisecond";
+
+type DateTimeInput = DateTime | Date | string | number;
+type DurationObjectInput = Partial<Record<CanonicalDurationUnit, number>>;
+
+export type DurationInputArg2 =
+  | CanonicalDurationUnit
+  | "years"
+  | "y"
+  | "months"
+  | "M"
+  | "weeks"
+  | "w"
+  | "days"
+  | "d"
+  | "hours"
+  | "h"
+  | "minutes"
+  | "m"
+  | "seconds"
+  | "s"
+  | "milliseconds"
+  | "ms";
+
+export namespace unitOfTime {
+  export type StartOf =
+    | "year"
+    | "month"
+    | "week"
+    | "day"
+    | "hour"
+    | "minute"
+    | "second";
+}
+
+export type MomentSetObject = Partial<{
+  year: number;
+  month: number;
+  date: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+  milliseconds: number;
+}>;
+
+function normalizeUnit(unit: DurationInputArg2): CanonicalDurationUnit {
+  switch (unit) {
+    case "year":
+    case "years":
+    case "y":
+      return "year";
+    case "month":
+    case "months":
+    case "M":
+      return "month";
+    case "week":
+    case "weeks":
+    case "w":
+      return "week";
+    case "day":
+    case "days":
+    case "d":
+      return "day";
+    case "hour":
+    case "hours":
+    case "h":
+      return "hour";
+    case "minute":
+    case "minutes":
+    case "m":
+      return "minute";
+    case "second":
+    case "seconds":
+    case "s":
+      return "second";
+    case "millisecond":
+    case "milliseconds":
+    case "ms":
+      return "millisecond";
+    default:
+      return "millisecond";
+  }
+}
+
+function daysInMonthUTC(year: number, monthZeroBased: number): number {
+  return new Date(Date.UTC(year, monthZeroBased + 1, 0)).getUTCDate();
+}
+
+function toDate(input?: DateTimeInput): Date {
+  if (input instanceof DateTime) return new Date(input.valueOf());
+  if (input instanceof Date) return new Date(input.getTime());
+  if (typeof input === "number") return new Date(input);
+  if (typeof input === "string") return new Date(input);
+  return new Date();
+}
+
+function pad(value: number, len = 2): string {
+  return String(value).padStart(len, "0");
+}
+
+function formatDateUTC(date: Date, formatString: string): string {
+  const replacements: Record<string, string> = {
+    YYYY: String(date.getUTCFullYear()),
+    MM: pad(date.getUTCMonth() + 1),
+    DD: pad(date.getUTCDate()),
+    HH: pad(date.getUTCHours()),
+    mm: pad(date.getUTCMinutes()),
+    ss: pad(date.getUTCSeconds()),
+    SSS: pad(date.getUTCMilliseconds(), 3),
+    dddd: DAY_NAMES[date.getUTCDay()],
+    M: String(date.getUTCMonth() + 1),
+    D: String(date.getUTCDate()),
+    H: String(date.getUTCHours()),
+    m: String(date.getUTCMinutes()),
+    s: String(date.getUTCSeconds()),
+  };
+
+  return formatString.replace(
+    /YYYY|dddd|SSS|MM|DD|HH|mm|ss|M|D|H|m|s/g,
+    (token) => replacements[token] ?? token
+  );
+}
+
 /**
- * Custom DateTime class that wraps moment functionality.
+ * Custom DateTime class backed by native Date in UTC semantics.
  * Use DateTimeService for all server-side datetime to respect run context and UTC boundaries.
  */
 export class DateTime {
-  private _moment: Moment;
+  private _date: Date;
 
-  constructor(input?: Moment | Date | string | DateTime) {
-    if (input instanceof DateTime) {
-      this._moment = input._moment.clone();
-    } else if (input) {
-      this._moment = moment(input);
-    } else {
-      this._moment = moment();
-    }
+  constructor(input?: DateTimeInput) {
+    this._date = toDate(input);
   }
 
-  // Factory methods
   static now(): DateTime {
     return new DateTime();
   }
 
-  static from(input: Moment | Date | string | DateTime): DateTime {
+  static from(input: DateTimeInput): DateTime {
     return new DateTime(input);
   }
 
   static parse(dateString: string, format: string): DateTime {
-    return new DateTime(moment(dateString, format));
+    const trimmed = dateString.trim();
+    if (format === "YYYY-MM-DD") {
+      const [year, month, day] = trimmed.split("-").map(Number);
+      return new DateTime(new Date(Date.UTC(year, month - 1, day)));
+    }
+    if (format === "YYYY-MM-DD HH:mm:ss") {
+      const [datePart, timePart] = trimmed.split(" ");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute, second] = timePart.split(":").map(Number);
+      return new DateTime(
+        new Date(Date.UTC(year, month - 1, day, hour, minute, second, 0))
+      );
+    }
+    return new DateTime(trimmed);
   }
 
-  /**
-   * Parse as UTC only. Use for boundary normalization; avoids local timezone interpretation.
-   */
   static parseUTC(input: string | Date): DateTime {
-    const m = moment.utc(input);
-    return new DateTime(m.isValid() ? m : moment.invalid());
+    if (input instanceof Date) {
+      return new DateTime(new Date(input.getTime()));
+    }
+    const parsed = new Date(input);
+    if (!Number.isNaN(parsed.getTime())) return new DateTime(parsed);
+    return new DateTime(new Date(Number.NaN));
   }
 
-  /**
-   * True if full datetime string has explicit timezone (Z or offset). Reject ambiguous at boundaries.
-   */
   static hasExplicitOffset(value: string): boolean {
     return HAS_EXPLICIT_OFFSET.test(value.trim());
   }
 
-  /** Date-only YYYY-MM-DD; safe to interpret in a given timezone when timezone is provided. */
   static isDateOnly(value: string): boolean {
     return DATE_ONLY.test(value.trim());
   }
 
-  // Conversion methods
   toDate(): Date {
-    return this._moment.toDate();
-  }
-
-  toMoment(): Moment {
-    return this._moment.clone();
+    return new Date(this._date.getTime());
   }
 
   clone(): DateTime {
-    return new DateTime(this._moment.clone());
+    return new DateTime(this._date);
   }
 
-  // Formatting
   format(formatString: string): string {
-    return this._moment.format(formatString);
+    return formatDateUTC(this._date, formatString);
   }
 
-  // Arithmetic operations
-  add(amount: number, unit: DurationInputArg2): DateTime {
-    return new DateTime(this._moment.add(amount, unit));
+  add(_amount: number, _unit: DurationInputArg2): DateTime;
+  add(_duration: DurationObjectInput): DateTime;
+  add(
+    amountOrDuration: number | DurationObjectInput,
+    unit?: DurationInputArg2
+  ): DateTime {
+    if (
+      typeof amountOrDuration === "object" &&
+      amountOrDuration !== null &&
+      !Array.isArray(amountOrDuration)
+    ) {
+      let chained = this.clone();
+      const orderedUnits: CanonicalDurationUnit[] = [
+        "year",
+        "month",
+        "week",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        "millisecond",
+      ];
+      for (const u of orderedUnits) {
+        const v = amountOrDuration[u];
+        if (typeof v === "number" && Number.isFinite(v) && v !== 0) {
+          chained = chained.add(v, u);
+        }
+      }
+      return chained;
+    }
+
+    const amount = amountOrDuration;
+    const resolvedUnit: DurationInputArg2 = unit ?? "millisecond";
+    const next = this.toDate();
+    const normalized = normalizeUnit(resolvedUnit);
+    switch (normalized) {
+      case "year":
+        {
+          const year = next.getUTCFullYear() + amount;
+          const month = next.getUTCMonth();
+          const day = Math.min(next.getUTCDate(), daysInMonthUTC(year, month));
+          next.setUTCFullYear(year, month, day);
+        }
+        break;
+      case "month":
+        {
+          const currentYear = next.getUTCFullYear();
+          const currentMonth = next.getUTCMonth();
+          const currentDay = next.getUTCDate();
+          const absoluteMonths = currentYear * 12 + currentMonth + amount;
+          const targetYear = Math.floor(absoluteMonths / 12);
+          const targetMonth = ((absoluteMonths % 12) + 12) % 12;
+          const targetDay = Math.min(
+            currentDay,
+            daysInMonthUTC(targetYear, targetMonth)
+          );
+          next.setUTCFullYear(targetYear, targetMonth, targetDay);
+        }
+        break;
+      case "week":
+        next.setUTCDate(next.getUTCDate() + amount * 7);
+        break;
+      case "day":
+        next.setUTCDate(next.getUTCDate() + amount);
+        break;
+      case "hour":
+        next.setUTCHours(next.getUTCHours() + amount);
+        break;
+      case "minute":
+        next.setUTCMinutes(next.getUTCMinutes() + amount);
+        break;
+      case "second":
+        next.setUTCSeconds(next.getUTCSeconds() + amount);
+        break;
+      case "millisecond":
+        next.setUTCMilliseconds(next.getUTCMilliseconds() + amount);
+        break;
+      default:
+        break;
+    }
+    return new DateTime(next);
   }
 
   subtract(amount: number, unit: DurationInputArg2): DateTime {
-    return new DateTime(this._moment.subtract(amount, unit));
+    return this.add(-amount, unit);
   }
 
-  // Comparison methods
+  private resolveOther(other: DateTime | Date | string): Date {
+    return toDate(other);
+  }
+
   isAfter(other: DateTime | Date | string): boolean {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.isAfter(otherMoment);
+    return this.valueOf() > this.resolveOther(other).getTime();
   }
 
   isBefore(other: DateTime | Date | string): boolean {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.isBefore(otherMoment);
+    return this.valueOf() < this.resolveOther(other).getTime();
   }
 
   isSame(other: DateTime | Date | string): boolean {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.isSame(otherMoment);
+    return this.valueOf() === this.resolveOther(other).getTime();
   }
 
   isSameOrBefore(other: DateTime | Date | string): boolean {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.isSameOrBefore(otherMoment);
+    return this.valueOf() <= this.resolveOther(other).getTime();
   }
 
   isSameOrAfter(other: DateTime | Date | string): boolean {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.isSameOrAfter(otherMoment);
+    return this.valueOf() >= this.resolveOther(other).getTime();
   }
 
-  // Start/End of time periods
   startOf(unit: unitOfTime.StartOf): DateTime {
-    return new DateTime(this._moment.startOf(unit));
+    const d = this.toDate();
+    switch (unit) {
+      case "year":
+        d.setUTCMonth(0, 1);
+        d.setUTCHours(0, 0, 0, 0);
+        break;
+      case "month":
+        d.setUTCDate(1);
+        d.setUTCHours(0, 0, 0, 0);
+        break;
+      case "week": {
+        const day = d.getUTCDay();
+        d.setUTCDate(d.getUTCDate() - day);
+        d.setUTCHours(0, 0, 0, 0);
+        break;
+      }
+      case "day":
+        d.setUTCHours(0, 0, 0, 0);
+        break;
+      case "hour":
+        d.setUTCMinutes(0, 0, 0);
+        break;
+      case "minute":
+        d.setUTCSeconds(0, 0);
+        break;
+      case "second":
+        d.setUTCMilliseconds(0);
+        break;
+      default:
+        break;
+    }
+    return new DateTime(d);
   }
 
   endOf(unit: unitOfTime.StartOf): DateTime {
-    return new DateTime(this._moment.endOf(unit));
+    const d = this.startOf(unit).toDate();
+    switch (unit) {
+      case "year":
+        d.setUTCFullYear(d.getUTCFullYear() + 1);
+        break;
+      case "month":
+        d.setUTCMonth(d.getUTCMonth() + 1);
+        break;
+      case "week":
+        d.setUTCDate(d.getUTCDate() + 7);
+        break;
+      case "day":
+        d.setUTCDate(d.getUTCDate() + 1);
+        break;
+      case "hour":
+        d.setUTCHours(d.getUTCHours() + 1);
+        break;
+      case "minute":
+        d.setUTCMinutes(d.getUTCMinutes() + 1);
+        break;
+      case "second":
+        d.setUTCSeconds(d.getUTCSeconds() + 1);
+        break;
+      default:
+        break;
+    }
+    d.setUTCMilliseconds(d.getUTCMilliseconds() - 1);
+    return new DateTime(d);
   }
 
-  // Setting values
   set(units: MomentSetObject): DateTime {
-    return new DateTime(this._moment.set(units));
+    const d = this.toDate();
+    if (units.year !== undefined) d.setUTCFullYear(units.year);
+    if (units.month !== undefined) d.setUTCMonth(units.month);
+    if (units.date !== undefined) d.setUTCDate(units.date);
+    if (units.hour !== undefined) d.setUTCHours(units.hour);
+    if (units.minute !== undefined) d.setUTCMinutes(units.minute);
+    if (units.second !== undefined) d.setUTCSeconds(units.second);
+    if (units.millisecond !== undefined) d.setUTCMilliseconds(units.millisecond);
+    if (units.milliseconds !== undefined) d.setUTCMilliseconds(units.milliseconds);
+    return new DateTime(d);
   }
 
-  // Utility methods
   diff(
     other: DateTime | Date | string,
     unit: DurationInputArg2 = "milliseconds"
   ): number {
-    const otherMoment =
-      other instanceof DateTime ? other._moment : moment(other);
-    return this._moment.diff(otherMoment, unit);
+    const lhs = this.valueOf();
+    const rhs = this.resolveOther(other).getTime();
+    const delta = lhs - rhs;
+    switch (normalizeUnit(unit)) {
+      case "year":
+        return this.year() - new DateTime(other).year();
+      case "month":
+        return (
+          (this.year() as number) * 12 +
+          (this.month() as number) -
+          ((new DateTime(other).year() as number) * 12 +
+            (new DateTime(other).month() as number))
+        );
+      case "week":
+        return Math.trunc(delta / (7 * 24 * 60 * 60 * 1000));
+      case "day":
+        return Math.trunc(delta / (24 * 60 * 60 * 1000));
+      case "hour":
+        return Math.trunc(delta / (60 * 60 * 1000));
+      case "minute":
+        return Math.trunc(delta / (60 * 1000));
+      case "second":
+        return Math.trunc(delta / 1000);
+      case "millisecond":
+      default:
+        return delta;
+    }
   }
 
   isValid(): boolean {
-    return this._moment.isValid();
+    return !Number.isNaN(this._date.getTime());
   }
 
   daysInMonth(): number {
-    return this._moment.daysInMonth();
+    return daysInMonthUTC(this._date.getUTCFullYear(), this._date.getUTCMonth());
   }
 
-  // Getter methods for date components
   hour(): number {
-    return this._moment.hour();
+    return this._date.getUTCHours();
   }
 
   minute(): number {
-    return this._moment.minute();
+    return this._date.getUTCMinutes();
   }
 
   second(): number {
-    return this._moment.second();
+    return this._date.getUTCSeconds();
   }
 
   millisecond(): number {
-    return this._moment.millisecond();
+    return this._date.getUTCMilliseconds();
   }
 
-  // Setter methods for date components (return DateTime for chaining)
   setYear(year: number): DateTime {
-    return new DateTime(this._moment.year(year));
+    return this.set({ year });
   }
 
   setMonth(month: number): DateTime {
-    return new DateTime(this._moment.month(month));
+    return this.set({ month });
   }
 
   setDate(day: number): DateTime {
-    return new DateTime(this._moment.date(day));
+    return this.set({ date: day });
   }
 
   setHour(hour: number): DateTime {
-    return new DateTime(this._moment.hour(hour));
+    return this.set({ hour });
   }
 
   setMinute(minute: number): DateTime {
-    return new DateTime(this._moment.minute(minute));
+    return this.set({ minute });
   }
 
   setSecond(second: number): DateTime {
-    return new DateTime(this._moment.second(second));
+    return this.set({ second });
   }
 
   setMillisecond(millisecond: number): DateTime {
-    return new DateTime(this._moment.millisecond(millisecond));
+    return this.set({ millisecond });
   }
 
-  // Alias methods for backward compatibility and chaining
   year(year?: number): DateTime | number {
-    if (year !== undefined) {
-      return new DateTime(this._moment.year(year));
-    }
-    return this._moment.year();
+    if (year !== undefined) return this.setYear(year);
+    return this._date.getUTCFullYear();
   }
 
   month(month?: number): DateTime | number {
-    if (month !== undefined) {
-      return new DateTime(this._moment.month(month));
-    }
-    return this._moment.month();
+    if (month !== undefined) return this.setMonth(month);
+    return this._date.getUTCMonth();
   }
 
   date(day?: number): DateTime | number {
-    if (day !== undefined) {
-      return new DateTime(this._moment.date(day));
-    }
-    return this._moment.date();
+    if (day !== undefined) return this.setDate(day);
+    return this._date.getUTCDate();
   }
 
-  // Get day of week (0 = Sunday, 6 = Saturday)
   day(): number {
-    return this._moment.day();
+    return this._date.getUTCDay();
   }
 
-  // UTC methods
   utc(): DateTime {
-    return new DateTime(this._moment.utc());
+    return this.clone();
   }
 
-  /**
-   * Start of day in UTC (00:00:00.000). Use for canonical day boundaries.
-   */
   startOfDayUTC(): DateTime {
-    return new DateTime(this._moment.clone().utc().startOf("day"));
+    return this.startOf("day");
   }
 
-  /**
-   * End of day in UTC (23:59:59.999). Use for canonical day boundaries.
-   */
   endOfDayUTC(): DateTime {
-    return new DateTime(this._moment.clone().utc().endOf("day"));
+    return this.endOf("day");
   }
 
-  // String representation
   toString(): string {
-    return this._moment.toString();
+    return this._date.toUTCString();
   }
 
-  // JSON serialization
   toJSON(): string {
-    return this._moment.toJSON();
+    return this._date.toJSON();
   }
 
-  // ISO string representation
   toISOString(): string {
-    return this._moment.toISOString();
+    return this._date.toISOString();
   }
 
-  // Value for comparison
   valueOf(): number {
-    return this._moment.valueOf();
+    return this._date.getTime();
   }
 }
-
-// Export types for compatibility
-export type { DurationInputArg2, unitOfTime, MomentSetObject };

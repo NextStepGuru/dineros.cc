@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import prismaPkg from "@prisma/client";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
@@ -24,11 +25,39 @@ export const globalClient = new PrismaClient({
   adapter,
 }); // log: ["query", "error"]
 
+const encryptionKey = env.DB_ENCRYPTION_KEY;
+const decryptionKeys = env.DB_DECRYPTION_KEYS;
+
+const debugKeys =
+  process.env.LOGIN_DEBUG === "1" || process.env.DEBUG_KEYS === "1";
+if (debugKeys) {
+  const fp = (s: string) =>
+    createHash("sha256").update(s).digest("hex").slice(0, 8);
+  const encFp = fp(encryptionKey);
+  const decFps = Array.isArray(decryptionKeys)
+    ? decryptionKeys.map((k: string) => fp(k))
+    : [];
+  log({
+    message: "[KEYS][prismaClient] Extension config (what Prisma field encryption receives)",
+    level: "info",
+    data: {
+      encryptionKeyLen: encryptionKey.length,
+      encryptionKeyFingerprint: encFp,
+      decryptionKeysCount: Array.isArray(decryptionKeys) ? decryptionKeys.length : 0,
+      decryptionKeyFingerprints: decFps,
+      encryptionKeyInDecryptionList: decFps.includes(encFp),
+      decryptionKeyLengths: Array.isArray(decryptionKeys)
+        ? decryptionKeys.map((k: string) => k.length)
+        : [],
+    },
+  });
+}
+
 export const prisma = globalClient.$extends(
   fieldEncryptionExtension({
     dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
-    encryptionKey: env.DB_ENCRYPTION_KEY,
-    decryptionKeys: env.DB_DECRYPTION_KEYS,
+    encryptionKey,
+    decryptionKeys,
   }),
 ) as PrismaClientType;
 

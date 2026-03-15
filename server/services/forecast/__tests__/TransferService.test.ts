@@ -9,8 +9,7 @@ import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
 import { Decimal } from "~/types/test-types";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 describe("TransferService", () => {
   let service: TransferService;
@@ -20,7 +19,6 @@ describe("TransferService", () => {
   let mockAccountService: AccountRegisterService;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     mockDb = await createTestDatabase();
 
     // Create a real ModernCacheService instance for testing

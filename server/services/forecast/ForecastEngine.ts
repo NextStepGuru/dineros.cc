@@ -285,7 +285,7 @@ export class ForecastEngine implements IForecastEngine {
     startDate: any,
     endDate: any
   ): Promise<number> {
-    const currentDate = dateTimeService.clone(startDate);
+    let currentDate = dateTimeService.clone(startDate);
     let dayCount = 0;
 
     forecastLogger.info(
@@ -356,7 +356,7 @@ export class ForecastEngine implements IForecastEngine {
       await this.loadManualEntriesForDate(currentDate);
 
       // Move to next day
-      currentDate.add(1, "day");
+      currentDate = currentDate.add(1, "day");
     }
 
     forecastLogger.info(

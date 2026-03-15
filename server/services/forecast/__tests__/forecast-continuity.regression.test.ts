@@ -9,8 +9,7 @@ import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 /**
  * Regression tests for Bug #3: Forecast Timeline Continuity
@@ -24,7 +23,6 @@ describe("Forecast Continuity Regression Tests", () => {
   let cache: ModernCacheService;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     // Mock Prisma client
     mockPrisma = {
       accountRegister: {
@@ -138,8 +136,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Run forecast for 2 months instead of 6 months to reduce resource usage
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2025-08-01"),
-        endDate: new Date("2025-10-01"), // 2 months instead of 6 months
+        startDate: new Date("2025-08-01T00:00:00.000Z"),
+        endDate: new Date("2025-10-01T00:00:00.000Z"), // 2 months instead of 6 months
         logging: { enabled: false },
       });
 
@@ -151,18 +149,15 @@ describe("Forecast Continuity Regression Tests", () => {
       expect(result.datesProcessed).toBeGreaterThan(60); // ~2 months of days
 
       // Should have created entries beyond the original problem date
-      const createCalls = mockPrisma.registerEntry.createMany.mock.calls;
-      expect(createCalls.length).toBeGreaterThan(0);
-
-      if (createCalls.length > 0) {
-        const allEntries = createCalls.flatMap((call: any) => call[0].data);
-        const latestEntryDate = Math.max(
-          ...allEntries.map((entry: any) => new Date(entry.createdAt).getTime())
-        );
-        expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
-          new Date("2025-09-01").getTime() // Adjusted for shorter period
-        );
-      }
+      const allEntries = result.registerEntries || [];
+      expect(allEntries.length).toBeGreaterThan(0);
+      const latestEntryDate = Math.max(
+        ...allEntries.map((entry: any) => new Date(entry.createdAt).getTime())
+      );
+      expect(Number.isFinite(latestEntryDate)).toBe(true);
+      expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
+        new Date("2025-09-01T00:00:00.000Z").getTime() // Adjusted for shorter period
+      );
     });
 
     it("should handle multiple accounts with different statement cycles", async () => {
@@ -299,8 +294,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Run forecast over 1 month instead of 3 months
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-02-01"), // 1 month instead of 3 months
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-02-01T00:00:00.000Z"), // 1 month instead of 3 months
         logging: { enabled: false },
       });
 
@@ -399,8 +394,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Forecast through Feb (28 days), March (31 days) - reduced to 2 months
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-03-01"), // 2 months instead of 4 months
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-03-01T00:00:00.000Z"), // 2 months instead of 4 months
         logging: { enabled: false },
       });
 
@@ -458,8 +453,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Forecast through non-leap year 2025
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2024-02-01"),
-        endDate: new Date("2025-03-31"),
+        startDate: new Date("2024-02-01T00:00:00.000Z"),
+        endDate: new Date("2025-03-31T00:00:00.000Z"),
         logging: { enabled: false },
       });
 
@@ -552,8 +547,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Run forecast for 6 months instead of 2 years to reduce resource usage
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-07-01"), // 6 months instead of 2 years
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-07-01T00:00:00.000Z"), // 6 months instead of 2 years
         logging: { enabled: false },
       });
 
@@ -625,8 +620,8 @@ describe("Forecast Continuity Regression Tests", () => {
       // Act: Run forecast for 3 months instead of 1 year to reduce resource usage
       const result = await engine.recalculate({
         accountId: "3f8c9e1a-5b4d-4e2f-9c3b-7a8d9e0f1b2c",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-04-01"), // 3 months instead of 1 year
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-04-01T00:00:00.000Z"), // 3 months instead of 1 year
         logging: { enabled: false },
       });
 

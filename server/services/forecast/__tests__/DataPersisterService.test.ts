@@ -69,6 +69,26 @@ describe("DataPersisterService", () => {
       });
     });
 
+    it("should persist createdAt as valid ISO-8601 for Prisma", async () => {
+      const entries = [
+        createMockEntry({
+          id: "entry-iso",
+          createdAt: dateTimeService.create("2026-03-15T23:59:59Z"),
+        }),
+      ];
+
+      vi.spyOn(mockDb.registerEntry, "createMany").mockResolvedValue({ count: 1 });
+
+      await service.persistForecastResults(entries);
+
+      const createManyArgs = (mockDb.registerEntry.createMany as any).mock.calls[0][0];
+      const createdAt = createManyArgs.data[0].createdAt;
+
+      expect(typeof createdAt).toBe("string");
+      expect(createdAt).not.toContain("[Z]");
+      expect(new Date(createdAt).toISOString()).toBe(createdAt);
+    });
+
     it("should preserve original IDs for balance entries", async () => {
       const entries = [
         createMockEntry({ id: "balance-1", isBalanceEntry: true }),
@@ -311,8 +331,8 @@ describe("DataPersisterService", () => {
             intervalId: 3,
             intervalName: "Month",
             intervalCount: 1,
-            lastAt: new Date("2028-01-02"),
-            lastRunAt: new Date("2026-02-02"),
+            lastAt: new Date("2028-01-02T00:00:00.000Z"),
+            lastRunAt: new Date("2026-02-02T00:00:00.000Z"),
             endAt: null,
             amount: 100,
             description: "Monthly",
@@ -337,7 +357,7 @@ describe("DataPersisterService", () => {
       dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
       try {
         vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
-          { id: 1, lastAt: new Date("2026-01-02") },
+          { id: 1, lastAt: new Date("2026-01-02T00:00:00.000Z") },
         ]);
         (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
@@ -348,7 +368,7 @@ describe("DataPersisterService", () => {
             intervalId: 3,
             intervalName: "Month",
             intervalCount: 1,
-            lastAt: new Date("2028-03-02"),
+            lastAt: new Date("2028-03-02T00:00:00.000Z"),
             endAt: null,
             amount: 100,
             description: "Monthly",
@@ -372,7 +392,7 @@ describe("DataPersisterService", () => {
       dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
       try {
         vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
-          { id: 1, lastAt: new Date("2026-01-01") },
+          { id: 1, lastAt: new Date("2026-01-01T00:00:00.000Z") },
         ]);
         (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
@@ -382,8 +402,8 @@ describe("DataPersisterService", () => {
             accountRegisterId: 1,
             intervalId: 3,
             intervalCount: 2,
-            lastRunAt: new Date("2026-01-01"),
-            lastAt: new Date("2026-01-01"),
+            lastRunAt: new Date("2026-01-01T00:00:00.000Z"),
+            lastAt: new Date("2026-01-01T00:00:00.000Z"),
             endAt: null,
             amount: 100,
             description: "Every 2 months",
@@ -407,7 +427,7 @@ describe("DataPersisterService", () => {
       dateTimeService.setNowOverride(new Date("2026-05-01T12:00:00.000Z"));
       try {
         vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
-          { id: 1, lastAt: new Date("2026-04-15") },
+          { id: 1, lastAt: new Date("2026-04-15T00:00:00.000Z") },
         ]);
         (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
@@ -418,8 +438,8 @@ describe("DataPersisterService", () => {
             intervalId: 3,
             intervalName: "Month",
             intervalCount: 1,
-            lastAt: new Date("2026-04-15"),
-            lastRunAt: new Date("2026-03-01"),
+            lastAt: new Date("2026-04-15T00:00:00.000Z"),
+            lastRunAt: new Date("2026-03-01T00:00:00.000Z"),
             endAt: null,
             amount: 100,
             description: "Monthly",
@@ -443,7 +463,7 @@ describe("DataPersisterService", () => {
       dateTimeService.setNowOverride(new Date("2026-04-10T12:00:00.000Z"));
       try {
         vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
-          { id: 1, lastAt: new Date("2026-02-01") },
+          { id: 1, lastAt: new Date("2026-02-01T00:00:00.000Z") },
         ]);
         (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
         const reoccurrences = [
@@ -454,8 +474,8 @@ describe("DataPersisterService", () => {
             intervalId: 3,
             intervalName: "Month",
             intervalCount: 1,
-            lastAt: new Date("2028-01-01"),
-            lastRunAt: new Date("2028-01-01"),
+            lastAt: new Date("2028-01-01T00:00:00.000Z"),
+            lastRunAt: new Date("2028-01-01T00:00:00.000Z"),
             endAt: null,
             amount: 100,
             description: "Monthly",

@@ -1,4 +1,3 @@
-import moment from "moment";
 import { dateTimeService } from "../services/forecast/DateTimeService";
 import { log } from "../logger";
 
@@ -8,7 +7,7 @@ export default defineNitroPlugin(() => {
   }
   const raw = process.env.TEST_DATE.trim();
   if (!raw) return;
-  const parsed = moment.utc(raw);
+  const parsed = dateTimeService.createUTC(raw);
   if (!parsed.isValid()) {
     log({
       message: `TEST_DATE invalid, ignored: ${raw}`,

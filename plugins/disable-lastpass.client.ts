@@ -1,6 +1,6 @@
 export default defineNuxtPlugin(() => {
   // Only run on client side
-  if (process.client) {
+  if (import.meta.client) {
     // Function to disable LastPass and autocomplete for an element
     const disableLastPass = (element: HTMLElement) => {
       if (

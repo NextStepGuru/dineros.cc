@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.9
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -15,12 +15,13 @@ RUN --mount=type=cache,id=pnpm-microservice-store,target=/pnpm/store \
 # ---- Build stage ----
 FROM deps AS build
 COPY . .
-# Generate Prisma client
+# Prisma config requires DATABASE_URL at generate time; placeholder is enough (no DB connection)
+ENV DATABASE_URL="mysql://build:build@localhost:3306/build"
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN pnpm prisma generate
 
 # ---- Runtime stage ----
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 

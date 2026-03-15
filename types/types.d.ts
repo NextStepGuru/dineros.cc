@@ -1,8 +1,8 @@
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+
 import { z } from "zod";
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+
 import { plaidAccountSchema } from "~/schema/plaid";
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+
 import {
   accountRegisterSchema,
   intervalSchema,

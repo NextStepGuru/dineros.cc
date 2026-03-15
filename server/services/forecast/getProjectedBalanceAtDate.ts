@@ -1,10 +1,9 @@
-import type { Moment } from "moment";
 import type { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
 /**
  * Shared projected balance at a date: latestBalance + sum of non-balance entries with createdAt <= target date.
- * Uses epoch comparison to avoid Moment allocations in hot paths.
+ * Uses epoch comparison to avoid heavy date allocations in hot paths.
  */
 export function getProjectedBalanceAtDate(
   cache: ModernCacheService,
@@ -20,9 +19,11 @@ export function getProjectedBalanceAtDate(
   });
   let balance = +account.latestBalance;
   for (const entry of entries) {
+    const entryEpoch = dateTimeService.toDate(entry.createdAt as any).getTime();
     if (
       !entry.isBalanceEntry &&
-      (entry.createdAt as Moment).valueOf() <= targetEpoch
+      Number.isFinite(entryEpoch) &&
+      entryEpoch <= targetEpoch
     ) {
       balance += +entry.amount;
     }

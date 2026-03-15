@@ -65,19 +65,31 @@ echo -e "${BLUE}Checks to run:${NC}"
 [ "$RUN_PRECOMMIT" = true ] && echo -e "  ${GREEN}✓${NC} Pre-commit"
 echo ""
 
-# Build the command to run based on selected checks
+# DATABASE_URL required by Prisma config at generate time (no real DB connection)
+export DATABASE_URL="${DATABASE_URL:-mysql://ci:ci@localhost:3306/ci}"
+
+# Isolated container storage (no host node_modules, .nuxt, or pnpm store)
+CI_NODE_MODULES_VOLUME="dineros-ci-node_modules"
+CI_PNPM_VOLUME="dineros-ci-pnpm_store"
+CI_NUXT_VOLUME="dineros-ci-nuxt"
+
+# Build the command to run based on selected checks (DATABASE_URL passed via -e below)
+# PNPM_HOME and TMPDIR so pnpm store and temp files stay off read-only /workspace
 CMD="set -e
 export NODE_ENV=test
 export RUN_EDGE_CASE_TESTS=true
 export RUN_SLOW_TESTS=true
 export CI=true
+export PNPM_HOME=/ci-pnpm
+export PATH=\"/ci-pnpm:\$PATH\"
+export TMPDIR=/tmp
 
 # Enable corepack and setup pnpm
 echo '📦 Setting up pnpm...'
 corepack enable
 corepack prepare pnpm@${PNPM_VERSION} --activate
 
-# Install dependencies
+# Install dependencies (into container's own node_modules volume)
 echo '📥 Installing dependencies...'
 pnpm install --frozen-lockfile
 
@@ -127,14 +139,24 @@ CMD="${CMD}
 echo '🎉 All CI checks passed!'
 "
 
-# Run checks in Docker container
+# Run checks in Docker: mount source read-only; use volumes for install/generate (fully isolated)
+# - /workspace = project root (read-only)
+# - dineros-ci-node_modules = container's node_modules
+# - dineros-ci-nuxt = container's .nuxt (postinstall)
+# - dineros-ci-pnpm_store = container's pnpm store
 if docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \
+  -v "${CI_NODE_MODULES_VOLUME}:/workspace/node_modules" \
+  -v "${CI_NUXT_VOLUME}:/workspace/.nuxt" \
+  -v "${CI_PNPM_VOLUME}:/ci-pnpm" \
   -w /workspace \
   -e NODE_ENV=test \
   -e RUN_EDGE_CASE_TESTS=true \
   -e RUN_SLOW_TESTS=true \
   -e CI=true \
+  -e DATABASE_URL="${DATABASE_URL}" \
+  -e PNPM_HOME=/ci-pnpm \
+  -e TMPDIR=/tmp \
   "${IMAGE_NAME}" \
   bash -c "$CMD"; then
   echo -e "\n${GREEN}✅ All CI checks passed!${NC}"

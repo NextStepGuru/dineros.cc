@@ -27,7 +27,13 @@ docker buildx use "$BUILDER_NAME"
 # Same env as GHA
 export CI=true
 
-echo "Building (context: ., file: ./Dockerfile, platform: $PLATFORM)..."
+# Docker applies .dockerignore from the build context (.) automatically; require it so context is correct
+if [[ ! -f .dockerignore ]]; then
+  echo "Error: .dockerignore not found in repo root. Build context would not be filtered." >&2
+  exit 1
+fi
+
+echo "Building (context: ., file: ./Dockerfile, .dockerignore applied, platform: $PLATFORM)..."
 if [[ -n "${NUXT_UI_PRO_LICENSE:-}" ]]; then
   docker buildx build \
     --file ./Dockerfile \

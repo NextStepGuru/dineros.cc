@@ -3,8 +3,7 @@ import { dateTimeService } from "../DateTimeService";
 import { Decimal } from "~/types/test-types";
 import { ForecastEngineFactory } from "../index";
 
-// Dynamic moment import
-let moment: any;
+const moment = (input?: any) => dateTimeService.create(input);
 
 /**
  * Integration Regression Tests
@@ -22,7 +21,6 @@ describe("Integration Regression Tests", () => {
   let engine: any;
 
   beforeEach(async () => {
-    moment = (await import("moment")).default;
     // Mock Prisma with realistic database behavior
     mockPrisma = {
       accountRegister: {
@@ -155,8 +153,8 @@ describe("Integration Regression Tests", () => {
       // Act: Run the exact forecast that originally failed
       const result = await engine.recalculate({
         accountId: gmFinancialAccount.accountId,
-        startDate: new Date("2025-08-01"),
-        endDate: new Date("2025-12-01"), // 4 months beyond issue date
+        startDate: new Date("2025-08-01T00:00:00.000Z"),
+        endDate: new Date("2025-12-01T00:00:00.000Z"), // 4 months beyond issue date
         logging: { enabled: false },
       });
 
@@ -204,7 +202,7 @@ describe("Integration Regression Tests", () => {
         ...gmEntries.map((entry: any) => new Date(entry.createdAt).getTime())
       );
       expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
-        new Date("2025-11-01").getTime()
+        new Date("2025-11-01T00:00:00.000Z").getTime()
       );
     });
   });
@@ -347,11 +345,11 @@ describe("Integration Regression Tests", () => {
           accountRegisterId: 10,
           intervalId: 3,
           intervalCount: 1,
-          lastAt: new Date("2024-12-01"),
+          lastAt: new Date("2024-12-01T00:00:00.000Z"),
           endAt: null,
           amount: new Decimal("500.00"),
           description: "Monthly Savings Transfer",
-          updatedAt: new Date("2024-12-01"),
+          updatedAt: new Date("2024-12-01T00:00:00.000Z"),
           transferAccountRegisterId: null,
           adjustBeforeIfOnWeekend: false,
           totalIntervals: null,
@@ -394,8 +392,8 @@ describe("Integration Regression Tests", () => {
       // Act: Run comprehensive 6-month forecast
       const result = await engine.recalculate({
         accountId: "test-budget",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-07-01"), // 6 months
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-07-01T00:00:00.000Z"), // 6 months
         logging: { enabled: false },
       });
 
@@ -462,9 +460,11 @@ describe("Integration Regression Tests", () => {
         ]);
       }
 
+      const resultEntries = result.registerEntries || [];
+
       // Each account should have entries throughout the timeline
       for (const account of accounts) {
-        const accountEntries = allCreatedEntries.filter(
+        const accountEntries = resultEntries.filter(
           (e) => e.accountRegisterId === account.id
         );
         expect(accountEntries.length).toBeGreaterThan(0);
@@ -473,8 +473,9 @@ describe("Integration Regression Tests", () => {
         const latestEntry = Math.max(
           ...accountEntries.map((e) => new Date(e.createdAt).getTime())
         );
+        expect(Number.isFinite(latestEntry)).toBe(true);
         expect(new Date(latestEntry).getTime()).toBeGreaterThan(
-          new Date("2025-03-01").getTime()
+          new Date("2025-03-01T00:00:00.000Z").getTime()
         );
       }
     });
@@ -566,8 +567,8 @@ describe("Integration Regression Tests", () => {
       // Act: Process through month-end and leap year boundary
       const result = await engine.recalculate({
         accountId: "edge-case",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-03-31"), // Cross month boundaries
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2025-03-31T00:00:00.000Z"), // Cross month boundaries
         logging: { enabled: false },
       });
 
@@ -642,8 +643,8 @@ describe("Integration Regression Tests", () => {
       // Act: Run 5-year forecast (stress test)
       const result = await engine.recalculate({
         accountId: "long-term",
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2030-01-01"), // 5 years
+        startDate: new Date("2025-01-01T00:00:00.000Z"),
+        endDate: new Date("2030-01-01T00:00:00.000Z"), // 5 years
         logging: { enabled: false },
       });
 

@@ -45,21 +45,21 @@ export const formatDate = (
 
 export const handleError = (
   event: FormErrorEvent | Error,
-  toast: {
+  toastInstance: {
     toasts: globalThis.Ref<Toast[], Toast[]>;
-    add: (toast: Partial<Toast>) => Toast;
-    update: (id: string | number, toast: Omit<Partial<Toast>, "id">) => void;
-    remove: (id: string | number) => void;
+    add: (_toast: Partial<Toast>) => Toast;
+    update: (_id: string | number, _toast: Omit<Partial<Toast>, "id">) => void;
+    remove: (_id: string | number) => void;
     clear: () => void;
   }
 ) => {
   if (event instanceof Error) {
-    toast.add({ color: "error", description: event.message });
+    toastInstance.add({ color: "error", description: event.message });
   } else {
     const errorMessages = event.errors
-      .map((err) => `${err.name}: ${err.message}`)
+      .map((e) => `${e.name}: ${e.message}`)
       .join(", ");
-    toast.add({ color: "error", description: errorMessages });
+    toastInstance.add({ color: "error", description: errorMessages });
 
     if (event?.errors?.[0]?.id) {
       const element = document.getElementById(event.errors[0].id);
@@ -189,8 +189,8 @@ export const formatCurrencyOptions: Intl.NumberFormatOptions = {
 };
 
 // export const adjustBeforeIfOnWeekend = function (
-//   date: moment.Moment
-// ): moment.Moment {
+//   date: Date
+// ): Date {
 //   if (date.day() === 6) {
 //     // Saturday
 //     return date.subtract(1, "days");

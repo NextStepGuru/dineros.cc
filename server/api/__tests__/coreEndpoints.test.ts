@@ -77,11 +77,15 @@ vi.mock('~/server/lib/handleApiError', () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', () => ({
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
-}));
+vi.mock('~/schema/zod', () => {
+  const parse = vi.fn();
+  return {
+    publicProfileSchema: {
+      parse,
+      extend: vi.fn(() => ({ parse })),
+    },
+  };
+});
 
 describe('Core API Endpoints', () => {
   beforeEach(() => {

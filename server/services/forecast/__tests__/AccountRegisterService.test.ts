@@ -450,7 +450,12 @@ describe("AccountRegisterService", () => {
       await (service as any).updateStatementDate(account, forecastDate);
 
       // Should update in cache (db persistence is done elsewhere via _pendingStatementAtUpdates)
-      expect(account.statementAt.format("YYYY-MM-DD")).toBe("2024-02-15"); // One month later
+      expect(
+        dateTimeService.format(
+          "YYYY-MM-DD",
+          dateTimeService.createUTC(account.statementAt as any)
+        )
+      ).toBe("2024-02-15"); // One month later
       expect(mockCache.accountRegister.update).toHaveBeenCalledWith(account);
     });
 
@@ -460,15 +465,21 @@ describe("AccountRegisterService", () => {
         statementAt: dateTimeService.create("2024-01-20"),
       });
 
-      const originalStatementAt = account.statementAt.format("YYYY-MM-DD");
+      const originalStatementAt = dateTimeService.format(
+        "YYYY-MM-DD",
+        dateTimeService.createUTC(account.statementAt as any)
+      );
       const forecastDate = dateTimeService.create("2024-01-15"); // Before statement date
 
       await (service as any).updateStatementDate(account, forecastDate);
 
       // Should not update
-      expect(account.statementAt.format("YYYY-MM-DD")).toBe(
-        originalStatementAt
-      );
+      expect(
+        dateTimeService.format(
+          "YYYY-MM-DD",
+          dateTimeService.createUTC(account.statementAt as any)
+        )
+      ).toBe(originalStatementAt);
       expect(mockCache.accountRegister.update).not.toHaveBeenCalled();
       expect(mockDb.accountRegister.update).not.toHaveBeenCalled();
     });

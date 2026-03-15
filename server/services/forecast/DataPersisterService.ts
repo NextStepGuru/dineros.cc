@@ -168,10 +168,10 @@ export class DataPersisterService implements IDataPersisterService {
       if (!item.isBalanceEntry) idMap.set(item.id, newId);
       return {
         ...item,
-        createdAt: dateTimeService.formatDate(
-          dateTimeService.createUTC(item.createdAt),
-          "YYYY-MM-DDTHH:mm:ss.SSS[Z]"
-        ),
+        createdAt: dateTimeService
+          .createUTC(item.createdAt)
+          .toDate()
+          .toISOString(),
         id: newId,
       };
     });

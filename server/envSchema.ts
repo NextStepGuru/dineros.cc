@@ -7,7 +7,7 @@ const envSchema = z.object({
   DB_DECRYPTION_KEYS: z.string().transform((a: string) => a.split(",")),
   PLAID_CLIENT_ID: z.string(),
   PLAID_SECRET: z.string(),
-  POSTMARK_SERVER_TOKEN: z.string(),
+  POSTMARK_SERVER_TOKEN: z.string().optional().default(""),
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z
     .string()

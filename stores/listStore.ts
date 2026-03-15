@@ -108,8 +108,6 @@ export const useListStore = defineStore("listStore", {
           this.setBudgets(data.budgets);
           this.setAccounts(data.accounts);
         }
-      } catch (e) {
-        throw e;
       } finally {
         this.isLoading = false;
       }

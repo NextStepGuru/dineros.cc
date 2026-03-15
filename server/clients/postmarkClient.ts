@@ -1,4 +1,13 @@
 import postmarkapp from "postmark";
 import env from "~/server/env";
 
-export const postmarkClient = new postmarkapp.Client(env.POSTMARK_SERVER_TOKEN);
+// Strip surrounding quotes (Docker --env-file can leave them in the value)
+const raw = env?.POSTMARK_SERVER_TOKEN?.trim() ?? "";
+const token = raw.replace(/^["']|["']$/g, "");
+export const hasPostmarkToken = Boolean(token);
+export const postmarkClient: postmarkapp.Client = hasPostmarkToken
+  ? new postmarkapp.Client(token)
+  : ({
+      sendEmail: async () => {},
+      sendEmailBatch: async () => [],
+    } as unknown as postmarkapp.Client);

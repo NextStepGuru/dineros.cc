@@ -1,5 +1,18 @@
 import { vi } from "vitest";
 
+// Optimize test isolation - these will be called automatically by Vitest
+// beforeEach(() => {
+//   vi.clearAllMocks();
+//   vi.clearAllTimers();
+// });
+
+// afterEach(() => {
+//   vi.restoreAllMocks();
+// });
+
+// Mock Nuxt utilities (defineStore so store modules can load in tests)
+import { defineStore } from "pinia";
+
 // Set environment for tests
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
@@ -18,6 +31,8 @@ process.env.REDIS_PORT = "6379";
 process.env.NATS_URL = "nats://localhost:4222";
 process.env.NUXT_UI_PRO_LICENSE = "test-license-key";
 process.env.DEPLOY_ENV = "local";
+process.env.TEST_DATE = "2024-01-01T00:00:00.000Z";
+process.env.TEST_TIMEZONE = "UTC";
 process.env.RUN_EDGE_CASE_TESTS = "true";
 process.env.RUN_SLOW_TESTS = "true";
 
@@ -53,20 +68,20 @@ const h3Mocks = {
 };
 
 vi.mock("h3", () => h3Mocks);
-
-// Optimize test isolation - these will be called automatically by Vitest
-// beforeEach(() => {
-//   vi.clearAllMocks();
-//   vi.clearAllTimers();
-// });
-
-// afterEach(() => {
-//   vi.restoreAllMocks();
-// });
-
-// Mock Nuxt utilities (defineStore so store modules can load in tests)
-import { defineStore } from "pinia";
 vi.mock("#imports", () => ({ defineStore }));
+
+// Prevent BullMQ from connecting to Redis in any test (e.g. queueManager.test toggles NODE_ENV)
+vi.mock("bullmq", () => ({
+  Queue: vi.fn().mockImplementation(() => ({
+    add: vi.fn().mockResolvedValue({ id: "mock-job-id", name: "", data: {} }),
+    close: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn(),
+  })),
+  Worker: vi.fn().mockImplementation(() => ({
+    on: vi.fn(),
+    close: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
 
 // Mock crypto module for RSA service tests
 vi.mock("crypto", async (importOriginal) => {

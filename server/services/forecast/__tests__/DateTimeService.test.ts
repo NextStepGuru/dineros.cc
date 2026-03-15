@@ -61,13 +61,13 @@ describe("DateTimeService", () => {
     dateTimeService.setNowOverride(dateString);
     expect(dateTimeService.now().isSame(dateTimeService.create(dateString))).toBe(true);
 
-    // Test with moment object
-    const momentObj = dateTimeService.create("2024-01-15T10:30:00Z");
-    dateTimeService.setNowOverride(momentObj);
-    expect(dateTimeService.now().isSame(momentObj)).toBe(true);
+    // Test with DateTime object
+    const dateTimeObj = dateTimeService.create("2024-01-15T10:30:00Z");
+    dateTimeService.setNowOverride(dateTimeObj);
+    expect(dateTimeService.now().isSame(dateTimeObj)).toBe(true);
   });
 
-  it("should return cloned moment objects to prevent mutation", () => {
+  it("should return cloned DateTime objects to prevent mutation", () => {
     const overrideDate = dateTimeService.create("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(overrideDate);
 
@@ -75,8 +75,8 @@ describe("DateTimeService", () => {
     const now2 = dateTimeService.now();
 
     // Modifying one should not affect the other
-    now1.add(1, "day");
+    const mutatedNow1 = now1.add(1, "day");
     expect(now2.isSame(overrideDate)).toBe(true);
-    expect(now1.isSame(overrideDate)).toBe(false);
+    expect(mutatedNow1.isSame(overrideDate)).toBe(false);
   });
 });

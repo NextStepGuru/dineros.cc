@@ -1,5 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
+// Import modules after mocks
+import RsaService from "../RsaService";
+import { prisma } from "~/server/clients/prismaClient";
+import { createId } from "@paralleldrive/cuid2";
+import { generateKeyPairSync } from "crypto";
+
 // Mock createId to return predictable IDs
 vi.mock("@paralleldrive/cuid2", () => ({
   createId: vi.fn(() => "test-generated-id"),
@@ -34,12 +40,6 @@ vi.mock("~/server/clients/prismaClient", () => ({
     },
   },
 }));
-
-// Import modules after mocks
-import RsaService from "../RsaService";
-import { prisma } from "~/server/clients/prismaClient";
-import { createId } from "@paralleldrive/cuid2";
-import { generateKeyPairSync } from "crypto";
 
 // Get typed references to the mocked functions
 const mockRsaDb = prisma.rsa as any;

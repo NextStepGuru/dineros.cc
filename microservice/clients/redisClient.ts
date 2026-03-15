@@ -5,8 +5,8 @@ import { log } from "../logger";
 
 // Configure Redis connection options
 const redisOptions: RedisOptions = {
-  port: env.REDIS_PORT,
-  host: env.REDIS_HOST,
+  port: env?.REDIS_PORT,
+  host: env?.REDIS_HOST,
   maxRetriesPerRequest: null,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000); // Exponential backoff up to 2 seconds
@@ -18,13 +18,26 @@ const redisOptions: RedisOptions = {
   },
 };
 
-export const sharedRedisConnection = new Redis(redisOptions);
-sharedRedisConnection.on("ready", () => {
-  log({ message: "Redis connection ready.", level: "debug" });
-});
-sharedRedisConnection.on("error", (error) => {
-  log({ message: "Redis error:", data: error, level: "error" });
-});
+// In test mode, create a mock Redis connection
+const isTestMode = process.env.NODE_ENV === "test";
+
+export const sharedRedisConnection = isTestMode
+  ? ({
+      // Mock Redis connection for tests
+      on: () => {},
+      ping: async () => "PONG",
+      disconnect: () => {},
+    } as any)
+  : new Redis(redisOptions);
+
+if (!isTestMode) {
+  sharedRedisConnection.on("ready", () => {
+    log({ message: "Redis connection ready.", level: "debug" });
+  });
+  sharedRedisConnection.on("error", (error: any) => {
+    log({ message: "Redis error:", data: error, level: "error" });
+  });
+}
 
 export const checkRedisConnection = async () => {
   try {

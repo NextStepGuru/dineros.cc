@@ -352,7 +352,7 @@ describe("Account Register API Endpoints", () => {
         budgetId: 1,
         name: "Loan Account",
         balance: 50000,
-        loanStartAt: new Date("2023-01-01"),
+        loanStartAt: new Date("2023-01-01T00:00:00.000Z"),
         loanPaymentsPerYear: 12,
         loanTotalYears: 30,
         loanOriginalAmount: 50000,

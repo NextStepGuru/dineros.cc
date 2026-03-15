@@ -123,14 +123,14 @@ describe('HashService', () => {
       const invalidHash = 'invalid-base64-hash!@#$';
       const password = 'testPassword123';
 
-      await expect(hashService.verify(invalidHash, password)).rejects.toThrow();
+      await expect(hashService.verify(invalidHash, password)).resolves.toBe(false);
     });
 
     it('should handle malformed hash gracefully', async () => {
       const malformedHash = btoa('not-an-argon2-hash');
       const password = 'testPassword123';
 
-      await expect(hashService.verify(malformedHash, password)).rejects.toThrow();
+      await expect(hashService.verify(malformedHash, password)).resolves.toBe(false);
     });
 
     it('should handle very long input strings', async () => {

@@ -1,7 +1,5 @@
 import bankersRounding from "bankers-rounding";
-import prismaPkg from "@prisma/client";
-
-const { Prisma } = prismaPkg;
+import { Prisma } from "@prisma/client";
 
 /**
  * Bankers Rounding Utility for Financial Calculations

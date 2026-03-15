@@ -36,8 +36,8 @@ describe("DataLoaderService", () => {
     it("should load all account data successfully", async () => {
       const context: ForecastContext = {
         accountId: "test-account",
-        startDate: new Date("2023-01-01"),
-        endDate: new Date("2023-12-31"),
+        startDate: new Date("2023-01-01T00:00:00.000Z"),
+        endDate: new Date("2023-12-31T00:00:00.000Z"),
       };
 
       // Mock database responses
@@ -48,7 +48,7 @@ describe("DataLoaderService", () => {
           name: "Checking",
           balance: 1000,
           typeId: 1,
-          statementAt: new Date("2023-01-01"),
+          statementAt: new Date("2023-01-01T00:00:00.000Z"),
           isArchived: false,
         },
       ];
@@ -59,7 +59,7 @@ describe("DataLoaderService", () => {
           accountRegisterId: 1,
           description: "Test Entry",
           amount: 100,
-          createdAt: new Date("2023-01-01"),
+          createdAt: new Date("2023-01-01T00:00:00.000Z"),
           isCleared: false,
           isProjected: false,
         },
@@ -72,7 +72,7 @@ describe("DataLoaderService", () => {
           description: "Monthly Salary",
           amount: 5000,
           intervalId: 1,
-          lastAt: new Date("2023-01-01"),
+          lastAt: new Date("2023-01-01T00:00:00.000Z"),
         },
       ];
 
@@ -80,7 +80,7 @@ describe("DataLoaderService", () => {
         {
           id: 1,
           reoccurrenceId: 1,
-          skipAt: new Date("2023-02-01"),
+          skipAt: new Date("2023-02-01T00:00:00.000Z"),
         },
       ];
 
@@ -221,7 +221,7 @@ describe("DataLoaderService", () => {
     it("should return minimum lastAt date from reoccurrences", async () => {
       const mockAggregateResult = {
         _min: {
-          lastAt: new Date("2023-01-15"),
+          lastAt: new Date("2023-01-15T00:00:00.000Z"),
         },
       };
 
@@ -229,7 +229,7 @@ describe("DataLoaderService", () => {
 
       const result = await dataLoader.getMinReoccurrenceDate("test-account");
 
-      expect(result).toEqual(new Date("2023-01-15"));
+      expect(result).toEqual(new Date("2023-01-15T00:00:00.000Z"));
       expect(mockDb.reoccurrence.aggregate).toHaveBeenCalledWith({
         where: { register: { accountId: "test-account" } },
         _min: { lastAt: true },
@@ -309,7 +309,7 @@ describe("DataLoaderService", () => {
   });
 
   describe("Data Transformation", () => {
-    it("should convert dates to moment objects correctly", async () => {
+    it("should convert dates to DateTime-compatible values correctly", async () => {
       const context: ForecastContext = {
         accountId: "test-account",
         startDate: new Date(),
@@ -335,7 +335,7 @@ describe("DataLoaderService", () => {
 
       const result = await dataLoader.loadAccountData(context);
 
-      // Check that statementAt is converted to moment
+      // Check that statementAt is converted to a valid date value
       expect(
         dateTimeService.isValid(result.accountRegisters[0].statementAt)
       ).toBe(true);
@@ -362,15 +362,15 @@ describe("DataLoaderService", () => {
         balance: 1500.5,
         latestBalance: 1400.25,
         minPayment: 50,
-        statementAt: new Date("2023-06-15"),
+        statementAt: new Date("2023-06-15T00:00:00.000Z"),
         apr1: 0.15,
-        apr1StartAt: new Date("2023-01-01"),
+        apr1StartAt: new Date("2023-01-01T00:00:00.000Z"),
         apr2: null,
         apr2StartAt: null,
         apr3: null,
         apr3StartAt: null,
         targetAccountRegisterId: 2,
-        loanStartAt: new Date("2023-01-01"),
+        loanStartAt: new Date("2023-01-01T00:00:00.000Z"),
         loanPaymentsPerYear: 12,
         loanTotalYears: 30,
         loanOriginalAmount: 250000,

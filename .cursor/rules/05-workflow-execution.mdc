@@ -19,6 +19,13 @@ alwaysApply: true
   - For **forecast engine only** (unit + integration + runner): use `pnpm test:forecast:all`.
 - There is no `test:all` script in this repo; use `pnpm test` for the full test suite and `pnpm test:forecast:all` for forecast-only.
 
+## Date/Time Test Conventions
+
+- Prefer UTC instants in tests: `new Date("YYYY-MM-DDT00:00:00.000Z")` over date-only parsing.
+- In server tests that depend on current time, use `dateTimeService.setNowOverride(...)` and always clear in `afterEach` or `finally`.
+- Prefer date assertions by epoch/ISO (`getTime()` or `toISOString()`) instead of comparing ambiguous date-only constructors.
+- Test scripts should run with `TZ=UTC` for consistent behavior across environments.
+
 ## Backup and Cloud Tooling
 
 - Use **Google Cloud SDK (gcloud CLI)** for backup and cloud operations. Do not use AWS CLI for backup scripts or cloud storage unless the user explicitly requests AWS.

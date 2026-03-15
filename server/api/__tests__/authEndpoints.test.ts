@@ -55,6 +55,14 @@ vi.mock("../env", () => ({
   },
 }));
 
+// Forgot-password imports env from server/env (../env from server/api/), so mock it for email tests
+vi.mock("~/server/env", () => ({
+  default: {
+    NODE_ENV: "test",
+    DEPLOY_ENV: "staging",
+  },
+}));
+
 vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
     user: {
@@ -66,6 +74,7 @@ vi.mock("~/server/clients/prismaClient", () => ({
 }));
 
 vi.mock("~/server/clients/postmarkClient", () => ({
+  hasPostmarkToken: true,
   postmarkClient: {
     sendEmail: vi.fn(),
   },
@@ -207,6 +216,71 @@ describe("Authentication API Endpoints", () => {
           path: "/",
         })
       );
+    });
+
+    it("should normalize email (strip zero-width chars and trim) before validation", async () => {
+      const mockEvent = {};
+      const rawEmail = "\u200B test@example.com \uFEFF";
+      const mockBody = {
+        email: rawEmail,
+        password: "password123",
+      };
+
+      const mockUser = {
+        id: 123,
+        email: "test@example.com",
+        password: "hashedPassword",
+        settings: {
+          speakeasy: {
+            isEnabled: false,
+            isVerified: false,
+            base32secret: null,
+          },
+        },
+      };
+
+      const mockParsedUser = {
+        id: 123,
+        email: "test@example.com",
+        name: "Test User",
+      };
+
+      const { readBody, setResponseStatus, setCookie } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { loginSchema, privateUserSchema, publicProfileSchema } =
+        await import("~/schema/zod");
+
+      (readBody as any).mockResolvedValue(mockBody);
+
+      const parseSpy = vi.fn().mockReturnValue({
+        email: "test@example.com",
+        password: "password123",
+      });
+      (loginSchema.extend as any).mockReturnValue({ parse: parseSpy });
+
+      (prisma.user.findUnique as any).mockResolvedValue(null);
+      (prisma.user.findFirst as any).mockResolvedValue(mockUser);
+      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      mockHashService.verify.mockResolvedValue(true);
+      mockJwtService.sign.mockResolvedValue("jwt-token");
+      (prisma.user.update as any).mockResolvedValue(mockUser);
+      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
+
+      const result = await loginHandler(mockEvent);
+
+      expect(parseSpy).toHaveBeenCalledTimes(1);
+      expect(parseSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "test@example.com",
+          password: "password123",
+        })
+      );
+      expect(result).toEqual({
+        token: "jwt-token",
+        message: null,
+        user: mockParsedUser,
+      });
+      expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 200);
     });
 
     it("should return error for non-existent user", async () => {

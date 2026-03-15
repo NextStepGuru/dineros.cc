@@ -50,10 +50,10 @@ vi.mock("~/server/services/forecast", () => ({
   dateTimeService: {
     now: vi.fn(() => ({
       startOf: vi.fn(() => ({
-        toDate: vi.fn(() => new Date("2024-01-01")),
+        toDate: vi.fn(() => new Date("2024-01-01T00:00:00.000Z")),
       })),
       add: vi.fn(() => ({
-        toDate: vi.fn(() => new Date("2026-01-01")),
+        toDate: vi.fn(() => new Date("2026-01-01T00:00:00.000Z")),
       })),
     })),
   },
@@ -61,17 +61,6 @@ vi.mock("~/server/services/forecast", () => ({
 
 vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {},
-}));
-
-vi.mock("moment", () => ({
-  default: vi.fn(() => ({
-    startOf: vi.fn(() => ({
-      toDate: vi.fn(() => new Date("2024-01-01")),
-    })),
-    add: vi.fn(() => ({
-      toDate: vi.fn(() => new Date("2026-01-01")),
-    })),
-  })),
 }));
 
 describe("Recalculate POST API Endpoint", () => {

@@ -44,11 +44,11 @@ const mockRecalculateSchema = {
   parse: vi.fn(),
 };
 
-// Mock moment
+// Mock DateTime chain object
 const mockMoment = vi.fn(() => ({
   startOf: vi.fn().mockReturnThis(),
   add: vi.fn().mockReturnThis(),
-  toDate: vi.fn().mockReturnValue(new Date("2024-01-01")),
+  toDate: vi.fn().mockReturnValue(new Date("2024-01-01T00:00:00.000Z")),
 }));
 
 // Mock imports
@@ -71,10 +71,6 @@ vi.mock("~/schema/zod", () => ({
   recalculateSchema: mockRecalculateSchema,
 }));
 
-vi.mock("moment", () => ({
-  default: mockMoment,
-}));
-
 vi.mock("~/consts", () => ({
   MAX_YEARS: 2,
 }));
@@ -83,11 +79,11 @@ describe("Recalculate API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Reset moment mock implementation
+    // Reset DateTime chain mock implementation
     mockMoment.mockImplementation(() => ({
       startOf: vi.fn().mockReturnThis(),
       add: vi.fn().mockReturnThis(),
-      toDate: vi.fn().mockReturnValue(new Date("2024-01-01")),
+      toDate: vi.fn().mockReturnValue(new Date("2024-01-01T00:00:00.000Z")),
     }));
 
     // Reset engine factory to default behavior
@@ -245,8 +241,8 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      const mockStartDate = new Date("2024-01-01");
-      const mockEndDate = new Date("2026-01-01");
+      const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
+      const mockEndDate = new Date("2026-01-01T00:00:00.000Z");
 
       const mockMomentChain = {
         startOf: vi.fn().mockReturnThis(),
@@ -553,8 +549,8 @@ describe("Recalculate API Endpoints", () => {
     it("should use correct date range with MAX_YEARS", async () => {
       const mockEvent = {} as any;
 
-      const mockStartDate = new Date("2024-01-01");
-      const mockEndDate = new Date("2026-01-01");
+      const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
+      const mockEndDate = new Date("2026-01-01T00:00:00.000Z");
 
       const mockMomentChain = {
         startOf: vi.fn().mockReturnThis(),

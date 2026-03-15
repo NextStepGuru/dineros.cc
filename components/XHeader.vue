@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-env node */
 import type { User } from "~/types/types";
 import { formatAccountRegisters } from "~/lib/utils";
 

@@ -37,20 +37,11 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
       },
       select: {
         id: true,
-        plaidId: true,
       },
     });
     if (!record) {
       return cursor;
     }
-    await tx.registerEntry.update({
-      where: {
-        id: record.id,
-      },
-      data: {
-        plaidId: record.plaidId,
-      },
-    });
     return record.id;
   });
 }

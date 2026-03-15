@@ -2,6 +2,8 @@
 .nuxt
 .output
 node_modules
+microservice
+node-compile-cache
 dist
 build
 
@@ -11,6 +13,7 @@ build
 *.log
 *.tmp
 *.temp
+.pnpm-store
 
 # Environment files
 .env
@@ -88,9 +91,11 @@ jest.config.*
 
 # Temporary and cache files
 .cache/
+**/.cache/
 .temp/
 tmp/
 temp/
+.docker-build-cache/
 
 # Microservice specific (if not needed in main image)
 microservice/
@@ -102,6 +107,7 @@ microservice/
 .github/
 .deployment/
 .deploy/
+.gcloudignore
 *.tar.gz
 *.zip
 *.rar
@@ -117,3 +123,31 @@ database/
 nextstepguru-*.json
 runner.yaml
 linearbudget/
+
+# Turbo / tool caches
+.turbo/
+.parcel-cache/
+
+# Deploy / hosting config (not used at build time)
+.vercel/
+.netlify/
+
+# Ignore lists (only affect local tooling)
+.cursorignore
+.prettierignore
+.eslintignore
+
+# Git hooks
+.husky/
+
+# Local overrides
+*.local
+
+# E2E / Playwright artifacts
+playwright-report/
+test-results/
+.playwright/
+
+# Storybook (if present)
+.storybook/
+storybook-static/

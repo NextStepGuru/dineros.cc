@@ -59,16 +59,6 @@ vi.mock("~/lib/sort", () => ({
   recalculateRunningBalanceAndSort: vi.fn(),
 }));
 
-vi.mock("moment", () => {
-  const mockMoment = vi.fn((date?: any) => ({
-    utc: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    subtract: vi.fn().mockReturnThis(),
-    milliseconds: vi.fn().mockReturnThis(),
-    toDate: vi.fn().mockReturnValue(new Date("2024-01-01")),
-  }));
-  return { default: mockMoment };
-});
 
 vi.mock("papaparse", () => ({
   default: {
@@ -210,7 +200,7 @@ describe("Register and File Upload API Endpoints", () => {
         lowest: mockBalanceUpdated[1], // Entry with lower balance
         highest: mockBalanceUpdated[0], // Entry with higher balance
         skip: 0,
-        focusedAt: new Date("2024-01-01"),
+        focusedAt: new Date("2024-01-01T00:00:00.000Z"),
         take: 100,
         loadMode: "full",
         isPartialLoad: false,
@@ -385,7 +375,7 @@ describe("Register and File Upload API Endpoints", () => {
                   isProjected: false,
                   isCleared: false,
                   createdAt: {
-                    lte: new Date("2024-01-01"),
+                    lte: new Date("2024-01-01T00:00:00.000Z"),
                   },
                 },
               ],
@@ -493,20 +483,10 @@ describe("Register and File Upload API Endpoints", () => {
           },
         };
 
-        const moment = await import("moment");
         const { getUser } = await import("~/server/lib/getUser");
         const { prisma } = await import("~/server/clients/prismaClient");
         const papaparse = await import("papaparse");
         const { createId } = await import("@paralleldrive/cuid2");
-
-        const mockMomentInstance = {
-          utc: vi.fn().mockReturnThis(),
-          set: vi.fn().mockReturnThis(),
-          subtract: vi.fn().mockReturnThis(),
-          add: vi.fn().mockReturnThis(),
-          milliseconds: vi.fn().mockReturnThis(),
-          toDate: vi.fn().mockReturnValue(new Date("2024-01-01")),
-        };
 
         (globalThis as any).readMultipartFormData.mockResolvedValue(
           mockFormData
@@ -514,7 +494,6 @@ describe("Register and File Upload API Endpoints", () => {
         (getUser as any).mockReturnValue({ userId: 123 });
         (papaparse.default.parse as any).mockReturnValue(mockCsvData);
         (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates found
-        (moment.default as any).mockReturnValue(mockMomentInstance);
         (createId as any).mockReturnValue("entry-123");
         (prisma.registerEntry.create as any).mockResolvedValue({
           id: "entry-123",
@@ -543,7 +522,7 @@ describe("Register and File Upload API Endpoints", () => {
               amount: 100,
               isCleared: true,
               isProjected: false,
-              createdAt: new Date("2024-01-01"),
+              createdAt: new Date("2024-01-01T00:00:00.000Z"),
             }),
           ]),
         });

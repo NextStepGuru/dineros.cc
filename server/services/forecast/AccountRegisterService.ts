@@ -257,14 +257,9 @@ export class AccountRegisterService implements IAccountRegisterService {
         statementAt,
         accountRegister.statementIntervalId
       );
-      // Always update in-memory cache to continue forecast processing
-      // Handle both Date and Moment objects
-      const statementAtMoment =
-        typeof newStatementAt === "object" && newStatementAt._isAMomentObject
-          ? newStatementAt
-          : dateTimeService.create(newStatementAt);
-      statementAt = statementAtMoment;
-      accountRegister.statementAt = statementAtMoment;
+      // Always update in-memory cache to continue forecast processing.
+      statementAt = dateTimeService.create(newStatementAt);
+      accountRegister.statementAt = dateTimeService.toDate(statementAt);
       updated = true;
     }
     if (updated) {
@@ -284,14 +279,14 @@ export class AccountRegisterService implements IAccountRegisterService {
   ): any {
     switch (statementIntervalId) {
       case 1: { // Day
-        // Use moment's add method directly to avoid any wrapper issues
+        // Use DateTime add method directly.
         const dailyMoment = dateTimeService.create(currentStatementAt);
         const dailyNextDay = dailyMoment.add(1, "day");
 
         return dailyNextDay;
       }
       case 2: { // Week
-        // Use moment's add method directly to avoid any wrapper issues
+        // Use DateTime add method directly.
         const weeklyMoment = dateTimeService.create(currentStatementAt);
         const weeklyNextDay = weeklyMoment.add(1, "week");
 
@@ -389,7 +384,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         return yearlyNextDay;
       }
       case 5: { // Once (one-time)
-        // Use moment's add method directly to avoid any wrapper issues
+        // Use DateTime add method directly.
         const onceMoment = dateTimeService.create(currentStatementAt);
         const onceNextDay = onceMoment.add(1, "year"); // Default to yearly for one-time
 

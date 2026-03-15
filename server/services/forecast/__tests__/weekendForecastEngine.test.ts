@@ -226,8 +226,8 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
           accountRegisterId: 1,
           name: "Weekly Payment",
           amount: 100,
-          lastAt: new Date("2024-01-20"), // Previous Saturday
-          nextAt: new Date("2024-01-27"), // Current Saturday
+          lastAt: new Date("2024-01-20T00:00:00.000Z"), // Previous Saturday
+          nextAt: new Date("2024-01-27T00:00:00.000Z"), // Current Saturday
           intervalId: 2, // Weekly
           intervalCount: 1,
           adjustBeforeIfOnWeekend: true,
@@ -260,8 +260,8 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
           accountRegisterId: 1,
           name: "Monthly Payment",
           amount: 500,
-          lastAt: new Date("2023-12-28"), // Previous Thursday
-          nextAt: new Date("2024-01-28"), // Current Sunday (should be adjusted)
+          lastAt: new Date("2023-12-28T00:00:00.000Z"), // Previous Thursday
+          nextAt: new Date("2024-01-28T00:00:00.000Z"), // Current Sunday (should be adjusted)
           intervalId: 3, // Monthly
           intervalCount: 1,
           adjustBeforeIfOnWeekend: true,
@@ -299,7 +299,7 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
           balance: -500,
           latestBalance: -500,
           minPayment: 25,
-          statementAt: new Date("2024-01-28"), // Sunday
+          statementAt: new Date("2024-01-28T00:00:00.000Z"), // Sunday
           apr1: 0.18,
           apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
           targetAccountRegisterId: 1,
@@ -337,9 +337,9 @@ describe("ForecastEngine Weekend Testing with DateTimeService Overrides", () => 
           balance: -1000,
           latestBalance: -1000,
           minPayment: 25,
-          statementAt: new Date("2024-02-15"),
+          statementAt: new Date("2024-02-15T00:00:00.000Z"),
           apr1: 0.18, // 18% APR
-          apr1StartAt: new Date("2024-01-01"),
+          apr1StartAt: new Date("2024-01-01T00:00:00.000Z"),
           targetAccountRegisterId: null,
           isArchived: false,
           typeId: 2,

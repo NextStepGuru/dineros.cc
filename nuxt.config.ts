@@ -31,7 +31,7 @@ export default defineNuxtConfig({
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "https://dineros.cc",
     },
   },
-  devtools: { enabled: process.env.DEPLOY_ENV === "local", vscode: {} },
+  devtools: false,
   experimental: {
     payloadExtraction: false,
     defaults: {

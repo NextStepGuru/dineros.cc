@@ -142,7 +142,7 @@ export const useAuthStore = defineStore("authStore", {
       this.budgetId = 0;
 
       // Only try to access localStorage on the client side
-      if (process.client) {
+      if (import.meta.client) {
         try {
           localStorage.removeItem("authToken");
         } catch (error) {

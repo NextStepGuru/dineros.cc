@@ -152,7 +152,18 @@ export const recalculateRunningBalanceAndSort = <
   // Find and validate balance entry
   const balanceEntry = registerEntries.find(isBalance);
   if (!balanceEntry) {
-    return [];
+    // Fallback path: some datasets can legitimately miss a synthetic balance entry.
+    // In that case, still return chronologically sorted entries with forward running balances.
+    const sortedEntries = sortEntriesChronologically(
+      registerEntries,
+      type,
+      "oldest-first"
+    );
+    const processedEntries = calculateForwardBalance(sortedEntries, balance);
+    return processedEntries.map((entry, index) => ({
+      ...entry,
+      seq: index + 1,
+    }));
   }
 
   // Set up the starting balance

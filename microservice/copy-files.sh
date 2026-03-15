@@ -3,5 +3,4 @@
 ls -alh .
 rm -rf ./prisma
 cp -r ../prisma ./
-cp ../server/clients/prismaClient.ts ./clients
 cp ../server/clients/redisClient.ts ./clients

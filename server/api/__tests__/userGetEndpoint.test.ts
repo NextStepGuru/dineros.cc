@@ -43,11 +43,15 @@ vi.mock("~/server/clients/prismaClient", () => ({
   },
 }));
 
-vi.mock("~/schema/zod", () => ({
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
-}));
+vi.mock("~/schema/zod", () => {
+  const parse = vi.fn();
+  return {
+    publicProfileSchema: {
+      parse,
+      extend: vi.fn(() => ({ parse })),
+    },
+  };
+});
 
 describe("User GET API Endpoint", () => {
   let userGetHandler: any;
@@ -68,8 +72,8 @@ describe("User GET API Endpoint", () => {
       email: "test@example.com",
       firstName: "Test",
       lastName: "User",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
     };
     const mockParsedUser = {
       id: 123,

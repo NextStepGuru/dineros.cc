@@ -946,6 +946,44 @@ describe("recalculateRunningBalanceAndSort", () => {
     expect(result[balanceIndex].isBalanceEntry).toBe(true);
     expect(result[manualEntryIndex].amount).toBe(-100);
   });
+
+  it("should return sorted entries when balance entry is missing", () => {
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: [
+        {
+          amount: 50,
+          balance: 0,
+          createdAt: dateTimeService.create("2025-01-03"),
+          isBalanceEntry: false,
+          isCleared: false,
+          isManualEntry: false,
+          isMatched: false,
+          isPending: false,
+          isProjected: true,
+        },
+        {
+          amount: -100,
+          balance: 0,
+          createdAt: dateTimeService.create("2025-01-02"),
+          isBalanceEntry: false,
+          isCleared: false,
+          isManualEntry: false,
+          isMatched: false,
+          isPending: false,
+          isProjected: true,
+        },
+      ],
+      balance: 1000,
+      type: "debit",
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.seq)).toEqual([1, 2]);
+    expect(result[0].amount).toBe(-100);
+    expect(result[0].balance).toBe(900);
+    expect(result[1].amount).toBe(50);
+    expect(result[1].balance).toBe(950);
+  });
 });
 
 function randomSort<T>(array: T[]): T[] {

@@ -21,7 +21,7 @@ const app = createApp();
     }
 
     const module = await import(`./${file}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const handler: any = module.default; // Use `any` to bypass type errors
 
     log({
