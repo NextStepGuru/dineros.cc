@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { prisma } from "~/prisma/prismaClient";
+import { prisma } from "~/server/clients/prismaClient";
 import { migrate } from "~/prisma/reencrypt";
 import RsaService from "~/server/services/RsaService";
 

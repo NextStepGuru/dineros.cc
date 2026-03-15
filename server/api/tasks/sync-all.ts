@@ -1,4 +1,4 @@
-import { prisma } from "~/prisma/prismaClient";
+import { prisma } from "~/server/clients/prismaClient";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { log } from "~/server/logger";
 

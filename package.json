@@ -47,7 +47,7 @@
     "@bull-board/h3": "^6.20.5",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/icon": "^2.2.1",
-    "@nuxt/ui": "^4.5.1",
+    "@nuxt/ui": "^3.3.7",
     "@nuxtjs/color-mode": "^4.0.0",
     "@prisma/client": "^6.19.2",
     "archiver": "^7.0.1",

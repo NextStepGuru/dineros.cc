@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import type {
   IDataPersisterService,
@@ -13,6 +13,8 @@ import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
 import { dateTimeService } from "./DateTimeService";
 import { forecastLogger } from "./logger";
+
+const { Prisma } = prismaPkg;
 
 export class DataPersisterService implements IDataPersisterService {
   private rateLimiter: DatabaseRateLimiter;

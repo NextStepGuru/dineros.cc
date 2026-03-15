@@ -1,7 +1,10 @@
-import { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import env from "../env";
 import { log } from "../logger";
+
+const { PrismaClient } = prismaPkg;
 
 export const globalClient = new PrismaClient({
   log: ["warn"],
@@ -12,7 +15,7 @@ export const prisma = globalClient.$extends(
     encryptionKey: env.DB_ENCRYPTION_KEY,
     decryptionKeys: env.DB_DECRYPTION_KEYS,
   })
-) as PrismaClient;
+) as PrismaClientType;
 
 const connectWithRetry = async (
   maxAttempts = 10,

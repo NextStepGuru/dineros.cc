@@ -1,6 +1,6 @@
 import { prisma } from "~/server/clients/prismaClient";
 import { generateKeyPairSync } from "crypto";
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { createId } from "@paralleldrive/cuid2";
 
 class RsaService {

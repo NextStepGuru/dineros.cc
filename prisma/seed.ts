@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import { accounts } from "./backup/accounts";
 import { accountRegisters } from "./backup/accountRegisters";
 import { users } from "./backup/users";
@@ -258,6 +258,8 @@ const countries = [
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import dotenv from "dotenv";
 dotenv.config();
+
+const { PrismaClient } = prismaPkg;
 
 export const prisma = new PrismaClient().$extends(
   fieldEncryptionExtension({

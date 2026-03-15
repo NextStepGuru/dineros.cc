@@ -1,6 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { log } from "../../logger";
+
+const { PrismaClient } = prismaPkg;
 
 export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)
@@ -23,7 +26,7 @@ export const prisma = globalClient.$extends(
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
     decryptionKeys: dbDecryptionKeyValues,
   })
-);
+) as PrismaClientType;
 
 const connectWithRetry = async (
   maxAttempts = 10,

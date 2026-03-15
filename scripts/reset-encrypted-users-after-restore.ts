@@ -12,10 +12,13 @@
  * RegisterEntry, and Reoccurrence with fun common placeholder names.
  */
 import dotenv from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { migrate } from "../prisma/reencrypt";
 import HashService from "../server/services/HashService";
+
+const { PrismaClient } = prismaPkg;
 
 dotenv.config();
 
@@ -440,7 +443,7 @@ async function main() {
     console.log(
       `Re-encrypting with source key (${restoreFromEnv}); then resetting user emails for local login.`
     );
-    await migrate(prisma as PrismaClient, (p) =>
+    await migrate(prisma as PrismaClientType, (p) =>
       console.info(
         `${p.model.padEnd(15)} ${Math.round((100 * p.processed) / p.totalCount)}% ${p.processed}/${p.totalCount}`
       )
