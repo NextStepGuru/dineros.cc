@@ -297,7 +297,8 @@ export class AccountRegisterService implements IAccountRegisterService {
       }
       case 3: { // Month
         // For monthly, manually construct the next month's date
-        const currentMoment = dateTimeService.create(currentStatementAt);
+        // Ensure we work in UTC to avoid timezone issues
+        const currentMoment = dateTimeService.createUTC(currentStatementAt);
         const currentDay = currentMoment.date() as number;
         const currentMonth = currentMoment.month() as number;
         const currentYear = currentMoment.year() as number;
@@ -310,19 +311,79 @@ export class AccountRegisterService implements IAccountRegisterService {
           nextYear++;
         }
 
-        // Create the next month's date with the same day
+        // Create the next month's date with the same day (in UTC)
         const nextMonthMoment = dateTimeService
-          .create()
+          .createUTC()
           .setYear(nextYear)
-          .setMonth(nextMonth)
-          .setDate(currentDay);
-        return dateTimeService.toDate(nextMonthMoment);
+          .setMonth(nextMonth);
+
+        // Check if the target day exists in the next month
+        const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
+
+        let targetDay: number;
+        let targetMonth = nextMonth;
+        let targetYear = nextYear;
+
+        if (currentDay > daysInNextMonth) {
+          // Day doesn't exist in next month
+          // Special case: If current day is 31 and next month is February, skip to March 1
+          // This handles Jan 31 -> Mar 1 (not Feb 29)
+          if (currentDay === 31 && nextMonth === 1) {
+            targetMonth = 2; // March
+            targetDay = 1;
+            if (targetMonth > 11) {
+              targetMonth = 0;
+              targetYear++;
+            }
+          } else {
+            // Otherwise, clamp to last day of next month
+            targetDay = daysInNextMonth;
+          }
+        } else {
+          targetDay = currentDay;
+        }
+
+        const resultMoment = dateTimeService
+          .createUTC()
+          .setYear(targetYear)
+          .setMonth(targetMonth)
+          .setDate(targetDay);
+
+        return dateTimeService.toDate(resultMoment);
       }
       case 4: { // Year
-        // Use moment's add method directly to avoid any wrapper issues
-        const yearlyMoment = dateTimeService.create(currentStatementAt);
-        const yearlyNextDay = yearlyMoment.add(1, "year");
+        // Ensure we work in UTC to avoid timezone issues
+        const yearlyMoment = dateTimeService.createUTC(currentStatementAt);
+        const currentDay = yearlyMoment.date() as number;
+        const currentMonth = yearlyMoment.month() as number;
+        const currentYear = yearlyMoment.year() as number;
 
+        // Add one year
+        const nextYear = currentYear + 1;
+
+        // Handle Feb 29 -> Mar 1 in non-leap years
+        if (currentMonth === 1 && currentDay === 29) {
+          // Check if next year is a leap year by checking days in February
+          const nextYearFeb = dateTimeService
+            .createUTC()
+            .setYear(nextYear)
+            .setMonth(1);
+          const daysInFeb = dateTimeService.daysInMonth(nextYearFeb);
+
+          if (daysInFeb < 29) {
+            // Next year is not a leap year, move to Mar 1
+            return dateTimeService.toDate(
+              dateTimeService
+                .createUTC()
+                .setYear(nextYear)
+                .setMonth(2)
+                .setDate(1)
+            );
+          }
+        }
+
+        // For other dates, add one year normally
+        const yearlyNextDay = yearlyMoment.add(1, "year");
         return yearlyNextDay;
       }
       case 5: { // Once (one-time)

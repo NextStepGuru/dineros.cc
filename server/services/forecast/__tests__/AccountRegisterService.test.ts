@@ -755,27 +755,27 @@ describe("AccountRegisterService", () => {
     const utcYmd = (date: any) =>
       dateTimeService.createUTC(date).format("YYYY-MM-DD");
 
-    it("shows Jan 31 monthly overflow behavior in non-leap year (current gotcha)", () => {
+    it("shows Jan 31 monthly overflow behavior in non-leap year (fixed: now skips to Mar 1)", () => {
       dateTimeService.setNowOverride("2023-01-01T00:00:00.000Z");
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2023-01-31T00:00:00.000Z"),
           3
         );
-        expect(utcYmd(next)).toBe("2023-03-03");
+        expect(utcYmd(next)).toBe("2023-03-01");
       } finally {
         dateTimeService.clearNowOverride();
       }
     });
 
-    it("shows Jan 31 monthly overflow behavior in leap year (current gotcha)", () => {
+    it("shows Jan 31 monthly overflow behavior in leap year (fixed: now skips to Mar 1)", () => {
       dateTimeService.setNowOverride("2024-01-01T00:00:00.000Z");
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2024-01-31T00:00:00.000Z"),
           3
         );
-        expect(utcYmd(next)).toBe("2024-03-02");
+        expect(utcYmd(next)).toBe("2024-03-01");
       } finally {
         dateTimeService.clearNowOverride();
       }
