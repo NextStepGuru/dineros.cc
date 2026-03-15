@@ -171,6 +171,9 @@ importers:
       '@types/speakeasy':
         specifier: ^2.0.10
         version: 2.0.10
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.57.0
+        version: 8.57.0(@typescript-eslint/parser@8.57.0(eslint@9.31.0(jiti@2.6.1))(typescript@5.8.3))(eslint@9.31.0(jiti@2.6.1))(typescript@5.8.3)
       '@typescript-eslint/parser':
         specifier: ^8.57.0
         version: 8.57.0(eslint@9.31.0(jiti@2.6.1))(typescript@5.8.3)
