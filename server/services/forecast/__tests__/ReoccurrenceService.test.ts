@@ -119,8 +119,8 @@ describe("ReoccurrenceService", () => {
 
       // First occurrence is next after lastAt (2024-02-01), not replay of lastAt
       expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith({
-        targetAccountRegisterId: 1,
-        sourceAccountRegisterId: 2,
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
         amount: 100,
         description: "Test Reoccurrence",
         reoccurrence: expect.objectContaining({
@@ -310,6 +310,101 @@ describe("ReoccurrenceService", () => {
     });
   });
 
+  describe("initReoccurrenceSchedule", () => {
+    it("builds schedule map with correct date keys", () => {
+      const reoccurrences = [
+        createMockReoccurrence({
+          id: 1,
+          lastAt: new Date("2024-01-01"),
+          intervalId: 2,
+          intervalCount: 1,
+        }),
+      ];
+      mockCache.reoccurrence.find.mockReturnValue(reoccurrences);
+
+      service.initReoccurrenceSchedule(
+        new Date("2024-01-01"),
+        new Date("2024-01-31"),
+      );
+
+      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const expectedKey = dateTimeService.format(
+        "YYYY-MM-DD",
+        service.calculateNextOccurrence(reoccurrences[0])!,
+      );
+      expect(schedule.has(expectedKey)).toBe(true);
+      expect(schedule.get(expectedKey)?.[0].id).toBe(1);
+    });
+
+    it("skips once recurrences that have null next occurrence", () => {
+      const reoccurrences = [
+        createMockReoccurrence({
+          id: 1,
+          intervalId: 5,
+        }),
+      ];
+      mockCache.reoccurrence.find.mockReturnValue(reoccurrences);
+
+      service.initReoccurrenceSchedule(
+        new Date("2024-01-01"),
+        new Date("2024-01-31"),
+      );
+
+      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      expect(schedule.size).toBe(0);
+    });
+
+    it("skips recurrences whose next date is beyond endDate", () => {
+      const reoccurrences = [
+        createMockReoccurrence({
+          id: 1,
+          lastAt: new Date("2024-01-01"),
+          intervalId: 3,
+          intervalCount: 1,
+        }),
+      ];
+      mockCache.reoccurrence.find.mockReturnValue(reoccurrences);
+
+      service.initReoccurrenceSchedule(
+        new Date("2024-01-01"),
+        new Date("2024-01-15"),
+      );
+
+      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      expect(schedule.size).toBe(0);
+    });
+
+    it("stores multiple recurrences on the same schedule date", () => {
+      const reoccurrences = [
+        createMockReoccurrence({
+          id: 1,
+          lastAt: new Date("2024-01-01"),
+          intervalId: 2,
+        }),
+        createMockReoccurrence({
+          id: 2,
+          lastAt: new Date("2024-01-01"),
+          intervalId: 2,
+        }),
+      ];
+      mockCache.reoccurrence.find.mockReturnValue(reoccurrences);
+
+      service.initReoccurrenceSchedule(
+        new Date("2024-01-01"),
+        new Date("2024-01-31"),
+      );
+
+      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const expectedKey = dateTimeService.format(
+        "YYYY-MM-DD",
+        service.calculateNextOccurrence(reoccurrences[0])!,
+      );
+      const sameDay = schedule.get(expectedKey) || [];
+      expect(sameDay).toHaveLength(2);
+      expect(sameDay.map((r) => r.id)).toEqual([1, 2]);
+    });
+  });
+
   describe("calculateNextOccurrence", () => {
     it("should calculate next daily occurrence", () => {
       const reoccurrence = createMockReoccurrence({
@@ -423,6 +518,82 @@ describe("ReoccurrenceService", () => {
       const result = service.calculateNextOccurrence(reoccurrence);
 
       expect(result).toEqual(new Date("2024-03-01"));
+    });
+
+    it("maps capitalized intervalName Day", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 4,
+          intervalCount: 1,
+        }),
+        intervalName: "Day",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-01-02"));
+    });
+
+    it("maps capitalized intervalName Week", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 4,
+          intervalCount: 1,
+        }),
+        intervalName: "Week",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-01-08"));
+    });
+
+    it("handles One-Time intervalName without throwing", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 5,
+          intervalCount: 1,
+        }),
+        intervalName: "One-Time",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toBeInstanceOf(Date);
+      expect(dateTimeService.isValid(result)).toBe(true);
+    });
+
+    it("trims intervalName whitespace", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 1,
+          intervalCount: 1,
+        }),
+        intervalName: " months ",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-02-01"));
+    });
+
+    it("falls back to intervalId when intervalName is empty", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-01-01"),
+          intervalId: 2,
+          intervalCount: 1,
+        }),
+        intervalName: "",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-01-08"));
     });
 
     describe("weekend adjustment", () => {

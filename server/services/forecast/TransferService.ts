@@ -27,7 +27,7 @@ export class TransferService implements ITransferService {
     } = params;
 
     // Cap transfer to debt account so payment never exceeds balance
-    let effectiveAmount = +amount;
+    let effectiveAmount = Math.abs(+amount);
     const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
     if (targetForCap && +targetForCap.balance < 0) {
       const amountOwed = Math.abs(+targetForCap.balance);
@@ -70,7 +70,7 @@ export class TransferService implements ITransferService {
     } = params;
 
     // Cap transfer to debt account so payment never exceeds balance
-    let effectiveAmount = +amount;
+    let effectiveAmount = Math.abs(+amount);
     const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
     if (targetForCap && +targetForCap.balance < 0) {
       const amountOwed = Math.abs(+targetForCap.balance);

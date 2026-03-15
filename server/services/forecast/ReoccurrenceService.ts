@@ -52,8 +52,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
     let occurrenceCount = 0;
 
     if (
-      (reoccurrence.endAt &&
-        dateTimeService.isAfter(nextAt, reoccurrence.endAt))
+      reoccurrence.endAt &&
+      dateTimeService.isAfter(nextAt, reoccurrence.endAt)
     ) {
       return;
     }
@@ -101,7 +101,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
       const targetAccountForCap = this.cache.accountRegister?.findOne?.({
         id: reoccurrence.accountRegisterId,
       });
-      if (targetAccountForCap && [3, 4, 5, 99].includes(targetAccountForCap.typeId)) {
+      if (
+        targetAccountForCap &&
+        [3, 4, 5, 99].includes(targetAccountForCap.typeId)
+      ) {
         const amountOwed = Math.abs(+targetAccountForCap.balance);
         if (amountOwed <= 0.005) {
           effectiveAmount = 0;
@@ -131,7 +134,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
               dateTimeService.createUTC(nowDate),
             )
           ) {
-            cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
+            cachedReoccurrence.lastRunAt =
+              dateTimeService.toDate(adjustedLastAt);
           }
           this.cache.reoccurrence.update(cachedReoccurrence);
         }
@@ -142,8 +146,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Create the entry for this occurrence
       if (reoccurrence.transferAccountRegisterId) {
         this.transferService.transferBetweenAccounts({
-          targetAccountRegisterId: reoccurrence.accountRegisterId,
-          sourceAccountRegisterId: reoccurrence.transferAccountRegisterId,
+          targetAccountRegisterId: reoccurrence.transferAccountRegisterId,
+          sourceAccountRegisterId: reoccurrence.accountRegisterId,
           amount: effectiveAmount,
           description: reoccurrence.description,
           reoccurrence: reoccurrenceForEntry,

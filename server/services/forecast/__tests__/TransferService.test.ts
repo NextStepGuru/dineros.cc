@@ -219,6 +219,98 @@ describe("TransferService", () => {
     });
   });
 
+  describe("amount normalization", () => {
+    it("normalizes negative amount to positive transfer magnitude", () => {
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: -500,
+        description: "Negative amount transfer",
+      });
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 2,
+          amount: 500,
+        }),
+      );
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 1,
+          amount: -500,
+        }),
+      );
+    });
+
+    it("returns early for zero amount", () => {
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: 0,
+        description: "Zero transfer",
+      });
+
+      expect(mockEntryService.createEntry).not.toHaveBeenCalled();
+    });
+
+    it("returns early for amount below epsilon", () => {
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: 0.004,
+        description: "Tiny transfer",
+      });
+
+      expect(mockEntryService.createEntry).not.toHaveBeenCalled();
+    });
+
+    it("creates entries for amount above epsilon", () => {
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: 0.006,
+        description: "Small valid transfer",
+      });
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(2);
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 2,
+          amount: 0.006,
+        }),
+      );
+    });
+
+    it("normalizes then caps negative amount when target is debt account", () => {
+      mockCache.accountRegister.insert(
+        createMockAccount({
+          id: 2,
+          balance: -120,
+        }),
+      );
+
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: -500,
+        description: "Debt capped transfer",
+      });
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 2,
+          amount: 120,
+        }),
+      );
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 1,
+          amount: -120,
+        }),
+      );
+    });
+  });
+
   describe("processExtraDebtPayments", () => {
     it("should process accounts with allowExtraPayment enabled", async () => {
       const sourceAccounts = [
