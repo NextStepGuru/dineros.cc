@@ -3,6 +3,33 @@ import { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { handleError } from "~/lib/utils";
 const toast = useToast(); // Initialize the toast composable
+const runtimeConfig = useRuntimeConfig();
+const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
+const canonicalUrl = `${siteUrl}/signup`;
+const socialImageUrl =
+  "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png";
+
+useServerSeoMeta({
+  title: "Create Your Dineros Account | Predictive Budgeting",
+  description:
+    "Create a Dineros account to start predictive budgeting, automate recurring transaction tracking, and forecast account balances.",
+  robots: "noindex, follow",
+  ogTitle: "Create Your Dineros Account | Predictive Budgeting",
+  ogDescription:
+    "Create a Dineros account to start predictive budgeting, automate recurring transaction tracking, and forecast account balances.",
+  ogType: "website",
+  ogUrl: canonicalUrl,
+  ogImage: socialImageUrl,
+  twitterCard: "summary",
+  twitterTitle: "Create Your Dineros Account | Predictive Budgeting",
+  twitterDescription:
+    "Create a Dineros account to start predictive budgeting, automate recurring transaction tracking, and forecast account balances.",
+  twitterImage: socialImageUrl,
+});
+
+useHead({
+  link: [{ rel: "canonical", href: canonicalUrl }],
+});
 
 // Zod schema for form validation
 const signupSchema = z
@@ -75,15 +102,20 @@ const handleSubmit = async ({
 </script>
 
 <template lang="pug">
-  section(class="flex items-center justify-center min-h-screen")
-    UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+  section(class="auth-page flex items-center justify-center")
+    UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
       template(#header)
-        h2(class="text-xl font-bold text-center") Register an Account
+        .auth-card__header
+          UIcon(name="i-lucide-user-plus" class="size-10 text-primary")
+          h1(class="text-2xl font-bold") Create your account
+          p(class="text-sm frog-text-muted") Build your first predictive budget in minutes.
 
-      UForm(:state="formState" :schema="signupSchema" class="space-y-4" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
+      UForm(:state="formState" :schema="signupSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
         UFormField(label="First Name" for="firstName")
           UInput(
             id="firstName"
+            name="firstName"
+            aria-label="First name"
             v-model="formState.firstName"
             type="text"
             placeholder="Enter your first name"
@@ -92,6 +124,8 @@ const handleSubmit = async ({
         UFormField(label="Last Name" for="lastName")
           UInput(
             id="lastName"
+            name="lastName"
+            aria-label="Last name"
             v-model="formState.lastName"
             type="text"
             placeholder="Enter your last name"
@@ -100,6 +134,8 @@ const handleSubmit = async ({
         UFormField(label="Email Address" for="email")
           UInput(
             id="email"
+            name="email"
+            aria-label="Email address"
             v-model="formState.email"
             type="text"
             placeholder="Enter your email"
@@ -108,6 +144,8 @@ const handleSubmit = async ({
         UFormField(label="Password" for="password")
           UInput(
             id="password"
+            name="password"
+            aria-label="Password"
             v-model="formState.password"
             type="password"
             placeholder="Enter your password"
@@ -116,6 +154,8 @@ const handleSubmit = async ({
         UFormField(label="Confirm Password" for="confirmPassword")
           UInput(
             id="confirmPassword"
+            name="confirmPassword"
+            aria-label="Confirm password"
             v-model="formState.confirmPassword"
             type="password"
             placeholder="Confirm your password"
@@ -127,13 +167,13 @@ const handleSubmit = async ({
           type="submit"
           :disabled="isSaving"
           :loading="isSaving"
-        ) Register
+        ) Create account
 
       template(#footer)
         div(class="text-sm text-center")
           ul
             li
-              NuxtLink(to="/login" class="text-primary-500 hover:underline")  Login
+              NuxtLink(to="/login" class="frog-link hover:underline")  Already have an account? Sign in
             li
-              NuxtLink(to="/forgot-password" class="text-primary-500 hover:underline")  Forgot Password
+              NuxtLink(to="/forgot-password" class="frog-link hover:underline")  Need help accessing your account?
 </template>

@@ -27,8 +27,7 @@ onMounted(() => {
   UApp
     XHeader
 
-    //- main(class="max-w-[var(--ui-container)] m-auto")
-    UMain(class="max-w-[var(--ui-container)] m-auto")
+    UMain(:class="route.path === '/' ? 'w-full' : 'max-w-[var(--ui-container)] mx-auto'")
       NuxtPage
 
     USeparator(v-if="!isFooterHidden" type="dashed" class="h-px pt-0 px-4")

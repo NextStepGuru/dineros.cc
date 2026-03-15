@@ -277,7 +277,7 @@ div.p-4
       h3(class="text-lg font-semibold mb-4") Currently Synced Accounts
       .overflow-x-auto
         table(class="w-full mb-6")
-          thead(class="bg-gray-50 dark:bg-gray-800")
+          thead(class="frog-surface-elevated")
             tr
               th.text-left.p-3 Account Name
               th.text-left.p-3 Type
@@ -288,11 +288,11 @@ div.p-4
             tr(
               v-for="account in syncedAccounts"
               :key="account.id"
-              class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              class="border-b frog-border"
             )
               td.p-3 {{ account.name }}
               td.p-3 {{ account.type.name }}
-              td.p-3(:class="account.balance < 0 ? 'text-red-600' : 'text-green-600'") {{ formatBalance(account.balance, account.type.isCredit) }}
+              td.p-3(:class="account.balance < 0 ? 'frog-status-negative' : 'frog-status-positive'") {{ formatBalance(account.balance, account.type.isCredit) }}
               td.p-3 {{ formatDate(account.plaidLastSyncAt) }}
               td.p-3
                 UButton(
@@ -307,7 +307,7 @@ div.p-4
       h3(class="text-lg font-semibold mb-4 mt-8") Available Accounts to Link
       .overflow-x-auto
         table(class="w-full")
-          thead(class="bg-gray-50 dark:bg-gray-800")
+          thead(class="frog-surface-elevated")
             tr
               th.text-left.p-3 Plaid Account
               th.text-left.p-3 Account Number
@@ -317,12 +317,12 @@ div.p-4
             tr(
               v-for="account in availablePlaidAccounts"
               :key="account.id"
-              class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              class="border-b frog-border"
             )
               td.p-3 {{ account.name }}
               td.p-3 {{ account.mask }}
               td.p-3
-                UIcon(name="lucide:arrow-right-left" class="text-gray-400")
+                UIcon(name="lucide:arrow-right-left" class="frog-text-muted")
               td.p-3
                 USelect(
                   v-model="selectedAccounts[account.id]"
@@ -343,5 +343,5 @@ div.p-4
 
     // No accounts available
     div(v-else-if="syncedAccounts.length === 0")
-      p.text-center.text-gray-500.mt-8 No accounts are currently synced. Link your first account above.
+      p.text-center.frog-text-muted.mt-8 No accounts are currently synced. Link your first account above.
 </template>

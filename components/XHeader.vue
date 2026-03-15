@@ -39,6 +39,16 @@ const items = computed(() => {
         to: "/reoccurrences",
         active: route.path.startsWith("/reoccurrences"),
       },
+      {
+        label: "About",
+        to: "/about",
+        active: route.path.startsWith("/about"),
+      },
+      {
+        label: "Contact",
+        to: "/contact",
+        active: route.path.startsWith("/contact"),
+      },
     ];
   } else {
     // Items for not logged-in users
@@ -49,12 +59,17 @@ const items = computed(() => {
         active: route.path === "/",
       },
       {
-        label: "Login",
-        to: "/login",
-        active: route.path.startsWith("/login"),
+        label: "About",
+        to: "/about",
+        active: route.path.startsWith("/about"),
       },
       {
-        label: "Register",
+        label: "Contact",
+        to: "/contact",
+        active: route.path.startsWith("/contact"),
+      },
+      {
+        label: "Create account",
         to: "/signup",
         active: route.path.startsWith("/signup"),
       },
@@ -135,7 +150,9 @@ const selectedBudgetId = computed({
 </script>
 
 <template lang="pug">
-UHeader(:toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }")
+UHeader(
+  title="DinerosPredictive budgeting"
+  :toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }")
   template(#title)
     XLogo(class="h-6 w-auto")
 
@@ -147,7 +164,7 @@ UHeader(:toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }"
       v-model="selectedBudgetId"
       size="xs"
       class="my-0 mr-4"
-      placeholder="Select a Budget"
+      placeholder="Select budget"
       :items="listStore.getBudgets"
       valueKey="id"
       labelKey="name")
@@ -155,16 +172,16 @@ UHeader(:toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }"
       @click="logout"
       color="neutral"
       v-if="authStore.getIsUserLoggedIn"
-      class="cursor-pointer") Logout
+      class="cursor-pointer") Sign out
     ULink(
       to="/edit-profile/profile"
-      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer transition-colors before:transition-colors text-[var(--ui-text-highlighted)] before:bg-[var(--ui-bg-elevated)]/50' : 'cursor-pointer transition-colors before:transition-colors hover:text-[var(--ui-text-highlighted)] hover:before:bg-[var(--ui-bg-elevated)]/50'"
+      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer transition-colors before:transition-colors text-highlighted before:bg-(--ui-bg-elevated)/50' : 'cursor-pointer transition-colors before:transition-colors hover:text-highlighted hover:before:bg-(--ui-bg-elevated)/50'"
       v-if="authStore.getIsUserLoggedIn")
       UIcon(name="lucide:user" class="2x")
     UColorModeButton
 
   template(#content)
-    .mobile-menu-container(class="flex flex-col items-center justify-center min-h-screen bg-gray-900/95 p-8")
+    .mobile-menu-container(class="flex flex-col items-center justify-center min-h-screen p-8")
       .mobile-menu-items(class="w-full max-w-sm space-y-4")
         .mobile-menu-item(
           v-for="item in items"
@@ -185,6 +202,12 @@ UHeader(:toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }"
           color="error"
           variant="ghost"
           size="lg"
-          class="w-full h-16 text-lg font-semibold justify-center mt-8") Logout
+          class="w-full h-16 text-lg font-semibold justify-center mt-8") Sign out
 
 </template>
+
+<style scoped>
+.mobile-menu-container {
+  background: color-mix(in srgb, var(--frog-surface) 20%, #000 80%);
+}
+</style>

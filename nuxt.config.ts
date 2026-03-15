@@ -11,12 +11,24 @@ const watchIgnore = [
   "**/.pnpm/**",
 ];
 
+const baseSecurityHeaders = {
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy":
+    "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+  "content-security-policy":
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' ws: wss: https:;",
+};
+
 export default defineNuxtConfig({
+  ssr: true,
   compatibilityDate: "2026-01-31",
   components: true,
   runtimeConfig: {
     public: {
       testDate: process.env.TEST_DATE || "",
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "https://dineros.cc",
     },
   },
   devtools: { enabled: process.env.DEPLOY_ENV === "local", vscode: {} },
@@ -36,6 +48,21 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    compressPublicAssets: true,
+    routeRules: {
+      "/_nuxt/**": {
+        headers: {
+          "cache-control": "public, max-age=31536000, immutable",
+          ...baseSecurityHeaders,
+        },
+      },
+      "/**": {
+        headers: {
+          "cache-control": "public, max-age=0, must-revalidate",
+          ...baseSecurityHeaders,
+        },
+      },
+    },
     watchOptions: {
       ignored: watchIgnore,
       usePolling: true,
@@ -44,8 +71,30 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      viewport:
-        "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+      htmlAttrs: {
+        lang: "en",
+      },
+      viewport: "width=device-width, initial-scale=1",
+      link: [
+        { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+        { rel: "apple-touch-icon", href: "/favicon.ico" },
+      ],
+      meta: [
+        {
+          property: "og:image",
+          content:
+            "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png",
+        },
+        {
+          name: "twitter:card",
+          content: "summary_large_image",
+        },
+        {
+          name: "twitter:image",
+          content:
+            "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png",
+        },
+      ],
     },
   },
   vite: {

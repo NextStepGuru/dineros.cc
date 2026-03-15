@@ -4,6 +4,33 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import { handleError } from "~/lib/utils";
 import { passwordAndCodeSchema } from "~/schema/zod";
 const toast = useToast(); // Initialize the toast composable
+const runtimeConfig = useRuntimeConfig();
+const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
+const canonicalUrl = `${siteUrl}/reset-password-with-code`;
+const socialImageUrl =
+  "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png";
+
+useServerSeoMeta({
+  title: "Reset Your Dineros Password | Secure Account Recovery",
+  description:
+    "Set a new password for your Dineros account using your secure reset code.",
+  robots: "noindex, follow",
+  ogTitle: "Reset Your Dineros Password | Secure Account Recovery",
+  ogDescription:
+    "Set a new password for your Dineros account using your secure reset code.",
+  ogType: "website",
+  ogUrl: canonicalUrl,
+  ogImage: socialImageUrl,
+  twitterCard: "summary",
+  twitterTitle: "Reset Your Dineros Password | Secure Account Recovery",
+  twitterDescription:
+    "Set a new password for your Dineros account using your secure reset code.",
+  twitterImage: socialImageUrl,
+});
+
+useHead({
+  link: [{ rel: "canonical", href: canonicalUrl }],
+});
 
 type PasswordAndCodeSchemaType = z.infer<typeof passwordAndCodeSchema>;
 // Form state
@@ -57,12 +84,15 @@ const handleSubmit = async ({
 </script>
 
 <template lang="pug">
-  section(class="flex items-center justify-center min-h-screen")
-    UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+  section(class="auth-page flex items-center justify-center")
+    UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
       template(#header)
-        h2(class="text-xl font-bold text-center") Forgot Password
+        .auth-card__header
+          UIcon(name="i-lucide-rotate-ccw" class="size-10 text-primary")
+          h2(class="text-2xl font-bold") Set a new password
+          p(class="text-sm frog-text-muted") Confirm your reset code and choose a secure password.
 
-      UForm(:state="formState" :schema="passwordAndCodeSchema" class="space-y-4" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
+      UForm(:state="formState" :schema="passwordAndCodeSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
         UFormField(label="Reset Code" for="resetCode" hint="Check email for reset code")
           UInput(
             id="resetCode"
@@ -75,7 +105,7 @@ const handleSubmit = async ({
             id="newPassword"
             v-model="formState.newPassword"
             type="password"
-            placeholder="Enter new your password"
+            placeholder="Enter your new password"
             class="w-full")
         UFormField(label="Confirm Password" for="confirmPassword")
           UInput(
@@ -90,13 +120,13 @@ const handleSubmit = async ({
           type="submit"
           :disabled="isSaving"
           :loading="isSaving"
-          block) Reset Password
+          block) Update password
 
       template(#footer)
         div(class="text-sm text-center")
           ul
             li
-              NuxtLink(to="/account-signup" class="text-primary-500 hover:underline")  Register
+              NuxtLink(to="/signup" class="frog-link hover:underline")  Need an account? Create one
             li
-              NuxtLink(to="/login" class="text-primary-500 hover:underline")  Login
+              NuxtLink(to="/login" class="frog-link hover:underline")  Back to sign in
 </template>

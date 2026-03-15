@@ -4,9 +4,7 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import { handleError } from "~/lib/utils";
 import { loginSchema } from "~/schema/zod";
 import type { User } from "~/types/types";
-import type {
-   LoginResponse
-} from "~/lib/auth";
+import type { LoginResponse } from "~/lib/auth";
 import {
   processLoginResponse,
   formatLoginError,
@@ -17,6 +15,33 @@ const authStore = useAuthStore();
 const listStore = useListStore();
 const toast = useToast();
 const route = useRoute();
+const runtimeConfig = useRuntimeConfig();
+const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
+const canonicalUrl = `${siteUrl}/login`;
+const socialImageUrl =
+  "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png";
+
+useServerSeoMeta({
+  title: "Sign In to Dineros | Predictive Budgeting Access",
+  description:
+    "Sign in to Dineros to access your predictive budgets, recurring transaction automation, secure account registers, and forward-looking balance forecasts.",
+  robots: "noindex, follow",
+  ogTitle: "Sign In to Dineros | Predictive Budgeting Access",
+  ogDescription:
+    "Sign in to Dineros to access your predictive budgets, recurring transaction automation, secure account registers, and forward-looking balance forecasts.",
+  ogType: "website",
+  ogUrl: canonicalUrl,
+  ogImage: socialImageUrl,
+  twitterCard: "summary",
+  twitterTitle: "Sign In to Dineros | Predictive Budgeting Access",
+  twitterDescription:
+    "Sign in to Dineros to access your predictive budgets, recurring transaction automation, secure account registers, and forward-looking balance forecasts.",
+  twitterImage: socialImageUrl,
+});
+
+useHead({
+  link: [{ rel: "canonical", href: canonicalUrl }],
+});
 
 type LoginSchemaType = z.infer<typeof loginSchema>;
 
@@ -24,7 +49,7 @@ const formState = ref<Partial<LoginSchemaType>>({ email: "", password: "" });
 
 const isSaving = ref(false);
 const tokenChallengeRequired = ref(false);
-const loginFormRef = ref< { submit: () => void } | null>(null);
+const loginFormRef = ref<{ submit: () => void } | null>(null);
 
 function onLoginClick() {
   const form = loginFormRef.value as { submit?: () => void } | null;
@@ -32,7 +57,9 @@ function onLoginClick() {
     form.submit();
   } else {
     // Fallback: UForm submit event may not fire inside ClientOnly; call handler with current state
-    handleSubmit({ data: { ...formState.value } } as FormSubmitEvent<LoginSchemaType>);
+    handleSubmit({
+      data: { ...formState.value },
+    } as FormSubmitEvent<LoginSchemaType>);
   }
 }
 
@@ -66,7 +93,9 @@ const handleSubmit = async ({
     isSaving.value = true;
     const $api = useNuxtApp().$api as typeof $fetch;
     let data: LoginResponse | null = null;
-    let err: { value?: { statusCode?: number; data?: unknown } } = { value: undefined };
+    let err: { value?: { statusCode?: number; data?: unknown } } = {
+      value: undefined,
+    };
     try {
       data = (await $api("/api/login", {
         method: "POST",
@@ -106,7 +135,6 @@ const handleSubmit = async ({
       // Full-page navigation to avoid Nuxt payload client throwing on undefined manifest (prerendered check)
       window.location.assign(redirectPath);
       return;
-
     } else if (result.requiresTwoFactor) {
       isSaving.value = false;
       tokenChallengeRequired.value = true;
@@ -129,15 +157,17 @@ const handleSubmit = async ({
 </script>
 
 <template lang="pug">
-  section(class="flex items-center justify-center min-h-screen")
+  section(class="auth-page flex items-center justify-center")
     ClientOnly
-      UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+      UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
         template(#header)
-          h2(class="text-xl font-bold text-center") Login to Your Account
+          .auth-card__header
+            UIcon(name="i-lucide-log-in" class="size-10 text-primary")
+            h1(class="text-2xl font-bold") Welcome back
+            p(class="text-sm frog-text-muted") Sign in to continue forecasting, tracking, and planning with confidence.
 
-        UForm(ref="loginFormRef" class="space-y-4" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
-        template(v-if="tokenChallengeRequired")
-          UFormField(label="Code" for="tokenChallenge")
+        UForm(ref="loginFormRef" class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
+          UFormField(v-if="tokenChallengeRequired" label="Code" for="tokenChallenge")
             UInput(
               id="tokenChallenge"
               v-model="formState.tokenChallenge"
@@ -145,8 +175,7 @@ const handleSubmit = async ({
               placeholder="Enter your two-factor authentication code"
               class="w-full"
             )
-        template(v-else="")
-          UFormField(label="Email Address" for="email")
+          UFormField(v-if="!tokenChallengeRequired" label="Email Address" for="email")
             UInput(
               id="email"
               v-model="formState.email"
@@ -154,7 +183,7 @@ const handleSubmit = async ({
               placeholder="Enter your email"
               class="w-full"
             )
-          UFormField(label="Password" for="password")
+          UFormField(v-if="!tokenChallengeRequired" label="Password" for="password")
             UInput(
               id="password"
               v-model="formState.password"
@@ -162,26 +191,28 @@ const handleSubmit = async ({
               placeholder="Enter your password"
               class="w-full"
             )
-        UButton(
-          color="primary"
-          size="lg"
-          type="button"
-          :disabled="isSaving"
-          :loading="isSaving"
-          @click="onLoginClick"
-        ) Login
+          UButton(
+            color="primary"
+            size="lg"
+            type="button"
+            :disabled="isSaving"
+            :loading="isSaving"
+            @click="onLoginClick"
+          ) Sign in
 
         template(#footer)
           div(class="text-sm text-center")
             ul
               li
-                NuxtLink(to="/signup" class="text-primary-500 hover:underline")  Register
+                NuxtLink(to="/signup" class="frog-link hover:underline")  New to Dineros? Create account
               li
-                NuxtLink(to="/forgot-password" class="text-primary-500 hover:underline")  Forgot Password
+                NuxtLink(to="/forgot-password" class="frog-link hover:underline")  Forgot password?
       template(#fallback)
-        UCard(class="w-full max-w-md p-6 rounded-lg shadow-md")
+        UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
           template(#header)
-            h2(class="text-xl font-bold text-center") Login to Your Account
+            .auth-card__header
+              UIcon(name="i-lucide-log-in" class="size-10 text-primary")
+              h1(class="text-2xl font-bold") Welcome back
           div(class="flex justify-center py-8")
             UIcon(name="i-lucide-loader-2" class="animate-spin size-8 text-primary")
 </template>

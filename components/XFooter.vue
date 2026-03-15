@@ -1,23 +1,36 @@
 <script setup lang="ts">
-// Navigation items for footer
 const items = [
   {
-    label: "Terms of Service",
+    label: "About",
+    to: "/about",
+  },
+  {
+    label: "Contact",
+    to: "/contact",
+  },
+  {
+    label: "Terms",
     to: "/terms-of-service",
   },
   {
-    label: "Privacy Policy",
+    label: "Privacy",
     to: "/privacy-policy",
+  },
+  {
+    label: "Do Not Sell",
+    to: "/privacy-policy#california-privacy-rights",
   },
 ];
 </script>
 
 <template lang="pug">
-UFooter(class="max-sm:hidden")
+UFooter(class="max-sm:hidden border-t border-default")
   template(#left)
-    p.text.text-sm Copyright &copy; {{ new Date().getFullYear() }}
+    .flex.items-center.gap-2
+      XLogo(class="h-5 w-auto opacity-60")
+      span(class="text-xs frog-text-muted") &copy; {{ new Date().getFullYear() }} Forecast with confidence.
 
-  UNavigationMenu(:items="items" variant="link" class="")
+  UNavigationMenu(:items="items" variant="link")
 
   template(#right)
     UButton(
@@ -27,5 +40,4 @@ UFooter(class="max-sm:hidden")
       to="https://x.com/nextstepguru"
       target="_blank"
       aria-label="X")
-
 </template>

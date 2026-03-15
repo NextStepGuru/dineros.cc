@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Auth and account recovery pages are intentionally noindex.
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password-with-code
+
+Sitemap: /sitemap.xml

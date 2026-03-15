@@ -500,7 +500,7 @@ async function recalcAccount() {
         UInput(v-model="globalFilter" size="sm" class="w-full lg:max-w-48" placeholder="Filter..." id="search")
 
       div(class="ml-auto flex justify-center items-center")
-        div(class="text-sm font-medium dark:text-gray-500 mt-2 mr-2 text-nowrap") Selected Account:
+        div(class="text-sm font-medium frog-text-muted mt-2 mr-2 text-nowrap") Selected Account:
         ClientOnly
           USelect(
             v-model="accountRegisterId"
@@ -513,20 +513,20 @@ async function recalcAccount() {
           template(#fallback)
             span(class="w-full md:w-64 my-0 text-sm text-default") {{ formatAccountRegisters(listStore.getAccountRegisters).find((r) => r.id === accountRegisterId)?.name ?? '…' }}
 
-    .w-full(class="text-[var(--ui-text-muted)] text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
+    .w-full(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
       span The lowest balance of&nbsp;
-      b(@click="scrollToLowestBalance" class="cursor-pointer hover:text-blue-500") {{ formatCurrency(lowestEntry.balance) }}&nbsp;
+      b(@click="scrollToLowestBalance" class="cursor-pointer frog-link") {{ formatCurrency(lowestEntry.balance) }}&nbsp;
       span &nbsp;on
       b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
-    .w-full(class="text-[var(--ui-text-muted)] text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
+    .w-full(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
       span The loan will be paid off on
       b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
-    .w-full(class="text-[var(--ui-text-muted)] text-right" v-else="") &nbsp;
+    .w-full(class="text-muted text-right" v-else="") &nbsp;
 
     //- Skeleton loading state
     div(v-if="isLoading && tableEntries.length === 0" class="flex-1 max-h-[calc(100vh-200px)] overflow-hidden")
       //- Table header skeleton
-      div(class="flex border-b border-gray-200 dark:border-gray-700 p-4")
+      div(class="flex border-b frog-border p-4")
         div(class="flex-1")
           USkeleton(class="h-4 w-16")
         div(class="flex-1")
@@ -537,7 +537,7 @@ async function recalcAccount() {
           USkeleton(class="h-4 w-20 ml-auto")
 
       //- Table rows skeleton
-      div(v-for="i in 25" :key="i" class="flex border-b border-gray-200 dark:border-gray-700 p-4")
+      div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
         div(class="flex-1")
           USkeleton(class="h-4 w-20")
         div(class="flex-1")
@@ -564,7 +564,7 @@ async function recalcAccount() {
 
     // div(v-if="isLoadingMore" class="flex justify-center items-center py-4")
       USpinner(size="sm" color="primary")
-      span.ml-2.text-sm.text-gray-600(class="dark:text-gray-400") Loading more entries...
+      span.ml-2.text-sm.frog-text-muted Loading more entries...
 
     // div(v-if="!hasMoreData && tableEntries.length > 0" class="flex justify-center items-center py-4 text-sm text-gray-500 dark:text-gray-400")
       span No more entries to load

@@ -864,12 +864,12 @@ const estimatedNetWorth = computed(() => {
   section(class="m-4")
     // Sort mode tabs
     div(class="mb-4")
-      div(class="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1")
+      div(class="flex space-x-1 frog-surface-elevated rounded-lg p-1")
         button(
           v-for="item in tabItems"
           :key="item.key"
           @click="activeSortMode = item.key"
-          :class="activeSortMode === item.key ? 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+          :class="activeSortMode === item.key ? 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors frog-surface text-(--frog-text) shadow-sm' : 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors frog-text-muted hover:text-(--frog-text)'"
         )
           UIcon(:name="item.icon" class="w-4 h-4")
           span {{ item.label }}
@@ -878,23 +878,23 @@ const estimatedNetWorth = computed(() => {
       UButton(color="info" size="sm" class="mr-4" @click="handleAddAccountRegister") Add
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search" ref="search")
 
-    .w-full(class="text-[var(--ui-text-muted)] text-right")
+    .w-full(class="text-muted text-right")
       span Your estimated net worth
       b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
     div(class="relative overflow-auto flex-1 max-h-[calc(100vh-270px)] w-full")
       table(class="w-full min-w-full text-xs sm:text-sm")
-        thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-[var(--ui-border-accented)] sticky top-0 inset-x-0 bg-[var(--ui-bg)]/75 z-[1] backdrop-blur w-full")
-          tr(class="data-[selected=true]:bg-[var(--ui-bg-elevated)]/50 odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-12 sm:w-16")
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold w-1/5") Type
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-left rtl:text-right font-semibold") Account Name
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-[var(--ui-text-highlighted)] text-right font-semibold w-1/5") Balance
+        thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented) sticky top-0 inset-x-0 bg-(--ui-bg)/75 z-1 backdrop-blur w-full")
+          tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold w-1/5") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
-          tr(v-if="isDragging" class="h-2 bg-blue-200 dark:bg-blue-800/50 border-2 border-dashed border-blue-400 dark:border-blue-600 transition-all duration-200")
+          tr(v-if="isDragging" class="h-2 bg-primary/20 border-2 border-dashed border-primary/60 transition-all duration-200")
             td(colspan="4" class="p-0")
-              div(class="h-2 bg-gradient-to-r from-blue-400 to-blue-600 dark:from-blue-500 dark:to-blue-700 animate-pulse")
+              div(class="h-2 bg-linear-to-r from-(--frog-primary) to-(--frog-accent) animate-pulse")
 
           // Main accounts with their sub-accounts grouped together
           template(v-for="(row, index) in draggableAccountRegisters" :key="`main-${row.id}`")
@@ -912,12 +912,12 @@ const estimatedNetWorth = computed(() => {
               @touchend="handleTouchEnd($event, index)"
               style="touch-action: pan-y;"
             )
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
-                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
-                  UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 text-lg sm:text-base")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
+                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                  UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
                   //- span(class="hidden sm:inline text-xs text-gray-500 ml-1") Drag
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
                 div(class="flex items-center")
                   div(
                     v-if="listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length > 0"
@@ -925,9 +925,9 @@ const estimatedNetWorth = computed(() => {
                     class="cursor-pointer mr-2 transition-transform duration-200 hover:scale-110"
                     :class="collapsedParents.has(row.id) ? 'rotate-0' : 'rotate-90'"
                   )
-                    UIcon(name="i-lucide-chevron-right" class="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm")
-                  div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold text-gray-900 dark:text-white") {{ row.name }}
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+                    UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
+                  div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                 div(:class="formatCurrencyClass(row.balance)") {{ formatCurrency(row.balance) }}
 
             // Sub-accounts for this main account (draggable pocket accounts)
@@ -946,19 +946,19 @@ const estimatedNetWorth = computed(() => {
                 @touchmove="handlePocketTouchMove($event, subRow, row.id)"
                 @touchend="handlePocketTouchEnd($event, subRow, row.id)"
                 style="touch-action: pan-y;")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-12 sm:w-16")
-                  a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 hover:text-green-600 dark:hover:text-green-400 active:cursor-grabbing touch-manipulation p-1 sm:p-0")
-                    UIcon(name="i-lucide-grip-vertical" class="text-gray-400 hover:text-green-600 dark:hover:text-green-400 text-lg sm:text-base")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
+                  a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                    UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                   div(class="flex items-center")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap")
-                  div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center text-gray-900 dark:text-white")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center text-green-400/60 dark:text-green-500/60")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
+                  div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center frog-text")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ subRow.name }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-[var(--ui-text-muted)] whitespace-nowrap w-1/5")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                   div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
 </template>
