@@ -81,6 +81,7 @@ export function calculateNextOccurrenceDate(
 ): Date | null {
   const { intervalId, intervalName, lastAt } = input;
   const intervalCount = Number(input.intervalCount ?? 1);
+  const normalizedName = normalizeIntervalName(intervalName);
 
   if (!lastAt) return null;
   if (intervalCount <= 0) return null;
@@ -100,7 +101,11 @@ export function calculateNextOccurrenceDate(
     );
   }
 
-  if (intervalName && unitFromName === null) {
+  if (
+    normalizedName === "once" ||
+    normalizedName === "one-time" ||
+    normalizedName === "one time"
+  ) {
     return null;
   }
 

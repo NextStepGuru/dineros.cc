@@ -549,6 +549,41 @@ describe("DataPersisterService", () => {
         dateTimeService.clearNowOverride();
       }
     });
+
+    it("falls back to intervalId when intervalName is unsupported", async () => {
+      dateTimeService.setNowOverride(new Date("2026-04-01T12:00:00.000Z"));
+      try {
+        vi.spyOn(mockDb.reoccurrence, "findMany").mockResolvedValue([
+          { id: 1, lastAt: new Date("2026-01-02T00:00:00.000Z") },
+        ]);
+        (mockDb as any).$executeRaw = vi.fn().mockResolvedValue(undefined);
+        const reoccurrences = [
+          {
+            id: 1,
+            accountId: "a",
+            accountRegisterId: 1,
+            intervalId: 3,
+            intervalName: "fortnightly",
+            intervalCount: 1,
+            lastAt: new Date("2026-01-02T00:00:00.000Z"),
+            endAt: null,
+            amount: 100,
+            description: "Fallback monthly",
+            updatedAt: new Date(),
+            transferAccountRegisterId: null,
+            totalIntervals: null,
+            elapsedIntervals: null,
+            adjustBeforeIfOnWeekend: false,
+          } as any,
+        ];
+        await service.persistReoccurrenceLastAt(reoccurrences);
+        const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
+        expect(lastAt).toBeDefined();
+        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-02");
+      } finally {
+        dateTimeService.clearNowOverride();
+      }
+    });
   });
 
   describe("updateAccountRegisterBalances", () => {
