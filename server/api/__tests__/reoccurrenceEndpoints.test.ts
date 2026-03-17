@@ -29,11 +29,17 @@ vi.mock('~/server/clients/prismaClient', () => ({
   prisma: {
     accountRegister: {
       findFirstOrThrow: vi.fn(),
+      findMany: vi.fn(),
     },
     reoccurrence: {
       findFirstOrThrow: vi.fn(),
       upsert: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       delete: vi.fn(),
+    },
+    reoccurrenceSplit: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
     },
     registerEntry: {
       deleteMany: vi.fn(),
@@ -55,7 +61,7 @@ vi.mock('~/server/lib/handleApiError', () => ({
 }));
 
 vi.mock('~/schema/zod', () => ({
-  reoccurrenceSchema: {
+  reoccurrenceWithSplitsSchema: {
     parse: vi.fn(),
   },
 }));
@@ -103,15 +109,17 @@ describe('Reoccurrence API Endpoints', () => {
 
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { addRecalculateJob } = await import('~/server/clients/queuesClient');
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockBody);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
       (prisma.reoccurrence.upsert as any).mockResolvedValue(mockCreatedReoccurrence);
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockCreatedReoccurrence);
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockCreatedReoccurrence);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockCreatedReoccurrence);
 
       const result = await reoccurrencePostHandler(mockEvent);
 
@@ -180,15 +188,18 @@ describe('Reoccurrence API Endpoints', () => {
       const { readBody } = await import('h3');
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { addRecalculateJob } = await import('~/server/clients/queuesClient');
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockBody);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.accountRegister.findMany as any).mockResolvedValue([{ id: 2 }]);
       (prisma.reoccurrence.upsert as any).mockResolvedValue(mockUpdatedReoccurrence);
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockUpdatedReoccurrence);
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockUpdatedReoccurrence);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockUpdatedReoccurrence);
 
       const result = await reoccurrencePostHandler(mockEvent);
 
@@ -218,12 +229,12 @@ describe('Reoccurrence API Endpoints', () => {
       const { readBody } = await import('h3');
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { handleApiError } = await import('~/server/lib/handleApiError');
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockBody);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
       (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
         new Error('User does not have permission to access this account register')
       );
@@ -244,14 +255,14 @@ describe('Reoccurrence API Endpoints', () => {
 
       const { readBody } = await import('h3');
       const { getUser } = await import('~/server/lib/getUser');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { handleApiError } = await import('~/server/lib/handleApiError');
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
 
       const validationError = new Error('Invalid schema');
-      (reoccurrenceSchema.parse as any).mockImplementation(() => {
+      (reoccurrenceWithSplitsSchema.parse as any).mockImplementation(() => {
         throw validationError;
       });
       (handleApiError as any).mockImplementation((error: any) => {
@@ -277,16 +288,17 @@ describe('Reoccurrence API Endpoints', () => {
       const { readBody } = await import('h3');
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { handleApiError } = await import('~/server/lib/handleApiError');
 
       const dbError = new Error('Database constraint violation');
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockBody);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
       (prisma.reoccurrence.upsert as any).mockRejectedValue(dbError);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
       (handleApiError as any).mockImplementation((error: any) => {
         throw error;
       });
@@ -323,7 +335,7 @@ describe('Reoccurrence API Endpoints', () => {
 
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
       const { addRecalculateJob } = await import('~/server/clients/queuesClient');
 
       (globalThis as any).getQuery.mockReturnValue(mockQuery);
@@ -334,13 +346,16 @@ describe('Reoccurrence API Endpoints', () => {
           registerEntry: {
             deleteMany: vi.fn().mockResolvedValue({ count: 5 }),
           },
+          reoccurrenceSplit: {
+            deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
           reoccurrence: {
             delete: vi.fn().mockResolvedValue(mockDeletedReoccurrence),
           },
         };
         return await callback(mockPrisma);
       });
-      (reoccurrenceSchema.parse as any).mockReturnValue(mockDeletedReoccurrence);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockDeletedReoccurrence);
 
       const result = await reoccurrenceDeleteHandler(mockEvent);
 
@@ -475,10 +490,10 @@ describe('Reoccurrence API Endpoints', () => {
     });
 
     it('should use consistent schema validation', async () => {
-      const { reoccurrenceSchema } = await import('~/schema/zod');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
 
-      expect(reoccurrenceSchema).toBeDefined();
-      expect(typeof reoccurrenceSchema.parse).toBe('function');
+      expect(reoccurrenceWithSplitsSchema).toBeDefined();
+      expect(typeof reoccurrenceWithSplitsSchema.parse).toBe('function');
     });
   });
 });

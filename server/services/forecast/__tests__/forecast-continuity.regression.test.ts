@@ -44,6 +44,9 @@ describe("Forecast Continuity Regression Tests", () => {
       reoccurrenceSkip: {
         findMany: vi.fn().mockResolvedValue([]),
       },
+      reoccurrenceSplit: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
       $executeRaw: vi.fn().mockResolvedValue(undefined),
     };

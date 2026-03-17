@@ -281,6 +281,11 @@ describe('Core API Endpoints', () => {
             },
           },
         },
+        include: {
+          splits: {
+            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+          },
+        },
         orderBy: [
           { lastAt: "asc" },
           { id: "asc" },

@@ -37,6 +37,9 @@ const mockDb = {
   reoccurrenceSkip: {
     findMany: vi.fn(),
   },
+  reoccurrenceSplit: {
+    findMany: vi.fn(),
+  },
   $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
   $executeRaw: vi.fn().mockResolvedValue(undefined),
 } as any;
@@ -191,6 +194,7 @@ beforeEach(async () => {
 
     // Mock reoccurrence skips
     mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
+    mockDb.reoccurrenceSplit.findMany.mockResolvedValue([]);
 
     // Mock reoccurrence aggregate
     mockDb.reoccurrence.aggregate.mockResolvedValue({

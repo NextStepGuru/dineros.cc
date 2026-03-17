@@ -172,6 +172,7 @@ describe("ModernCacheService", () => {
         accountRegisters: 2,
         registerEntries: 3,
         reoccurrenceSkips: 0,
+        reoccurrenceSplits: 0,
       });
     });
   });

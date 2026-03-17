@@ -39,6 +39,9 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       reoccurrenceSkip: {
         findMany: vi.fn(),
       },
+      reoccurrenceSplit: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
     } as any;
 
     forecastEngine = new ForecastEngine(mockDb);
@@ -454,6 +457,9 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         reoccurrenceSkip: {
           findMany: vi.fn().mockResolvedValue([]),
         },
+        reoccurrenceSplit: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
         $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
         $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
@@ -489,6 +495,9 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
           aggregate: vi.fn().mockResolvedValue({ _min: { lastAt: null } }),
         },
         reoccurrenceSkip: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        reoccurrenceSplit: {
           findMany: vi.fn().mockResolvedValue([]),
         },
         $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),

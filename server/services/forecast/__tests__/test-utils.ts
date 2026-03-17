@@ -19,6 +19,7 @@ export async function createTestDatabase(): Promise<PrismaClient> {
   const registerEntries: any[] = [];
   const reoccurrences: any[] = [];
   const reoccurrenceSkips: any[] = [];
+  const reoccurrenceSplits: any[] = [];
 
   const mockDb = {
     accountRegister: {
@@ -110,6 +111,37 @@ export async function createTestDatabase(): Promise<PrismaClient> {
           return reoccurrenceSkips.filter(rs => rs.accountId === query.where.accountId);
         }
         return reoccurrenceSkips;
+      }),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    reoccurrenceSplit: {
+      create: vi.fn().mockImplementation(async (data: any) => {
+        const split = {
+          ...data.data,
+          id: data.data.id ?? reoccurrenceSplits.length + 1,
+        };
+        reoccurrenceSplits.push(split);
+        return split;
+      }),
+      findMany: vi.fn().mockImplementation(async (query: any) => {
+        if (query?.where?.reoccurrence?.accountId) {
+          const accountId = query.where.reoccurrence.accountId;
+          const reoccurrenceIds = reoccurrences
+            .filter((r) => r.accountId === accountId)
+            .map((r) => r.id);
+          return reoccurrenceSplits.filter((s) =>
+            reoccurrenceIds.includes(s.reoccurrenceId)
+          );
+        }
+        if (query?.where?.reoccurrenceId) {
+          return reoccurrenceSplits.filter(
+            (s) => s.reoccurrenceId === query.where.reoccurrenceId,
+          );
+        }
+        return reoccurrenceSplits;
       }),
       update: vi.fn(),
       updateMany: vi.fn(),
