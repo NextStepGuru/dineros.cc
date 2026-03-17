@@ -9,7 +9,7 @@ import {
 } from "~/lib/utils";
 import type { Reoccurrence } from "~/types/types";
 
-import { reoccurrenceSchema } from "~/schema/zod";
+import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
 const form = useTemplateRef("form");
 const toast = useToast();
 const { $api } = useNuxtApp();
@@ -25,18 +25,25 @@ export type ModalReoccurrenceProps = {
 const listStore = useListStore();
 const props = defineProps<ModalReoccurrenceProps>();
 
-type Schema = z.output<typeof reoccurrenceSchema>;
+type Schema = z.output<typeof reoccurrenceWithSplitsSchema>;
 
 const isSaving = ref(false);
 const isDeleting = ref(false);
-const formState = reactive<Partial<Schema>>(props.reoccurrence);
+const formState = reactive<Partial<Schema>>({
+  ...props.reoccurrence,
+});
+const splitsRef = ref<NonNullable<Schema["splits"]>>(
+  (props.reoccurrence.splits ?? []).map((s) => ({
+    ...s,
+    amount: Number(s.amount),
+  })),
+);
 const isExternal = ref(true);
+const accountRegisterOptions = computed(() =>
+  formatAccountRegisters(listStore.getAccountRegisters),
+);
 
-if (props.reoccurrence.transferAccountRegisterId) {
-  isExternal.value = false;
-}
-
-watch(props, () => {
+function syncFormStateFromProps() {
   formState.id = props.reoccurrence.id;
   formState.accountId = props.reoccurrence.accountId;
   formState.lastAt = formatDate(props.reoccurrence.lastAt);
@@ -50,18 +57,68 @@ watch(props, () => {
   formState.intervalCount = props.reoccurrence.intervalCount;
   formState.adjustBeforeIfOnWeekend =
     props.reoccurrence.adjustBeforeIfOnWeekend;
+  splitsRef.value = (props.reoccurrence.splits ?? []).map((split) => ({
+    ...split,
+    amount: Number(split.amount),
+  }));
 
-  if (props.reoccurrence.transferAccountRegisterId) {
-    isExternal.value = false;
-  }
-});
+  isExternal.value = !props.reoccurrence.transferAccountRegisterId;
+}
 
-async function handleSubmit({ data: formData }: FormSubmitEvent<Reoccurrence>) {
+watch(
+  () => props.reoccurrence?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) syncFormStateFromProps();
+  },
+  { immediate: true },
+);
+
+function addSplit() {
+  const current = [...splitsRef.value];
+  current.push({
+    transferAccountRegisterId: undefined as unknown as number,
+    amount: 0,
+    description: "",
+    sortOrder: current.length,
+  });
+  splitsRef.value = current;
+}
+
+function removeSplit(index: number) {
+  const current = [...splitsRef.value];
+  current.splice(index, 1);
+  splitsRef.value = current.map((split, sortOrder) => ({
+    ...split,
+    sortOrder,
+  }));
+}
+
+const splitTargetOptions = computed(() =>
+  accountRegisterOptions.value.filter(
+    (item) => item.id !== formState.accountRegisterId,
+  ),
+);
+
+async function handleSubmit({ data: formData }: FormSubmitEvent<Schema>) {
   try {
     isSaving.value = true;
+    const payload: Schema = {
+      ...formData,
+      transferAccountRegisterId: isExternal.value
+        ? undefined
+        : formData.transferAccountRegisterId,
+      splits: splitsRef.value.map((split, sortOrder) => ({
+        id: split.id,
+        reoccurrenceId: split.reoccurrenceId,
+        transferAccountRegisterId: split.transferAccountRegisterId,
+        amount: Number(split.amount),
+        description: split.description?.trim() || undefined,
+        sortOrder,
+      })),
+    };
     const responseData = await $api("/api/reoccurrence", {
       method: "POST",
-      body: formData,
+      body: payload,
       onRequestError: () => {
         isSaving.value = false;
       },
@@ -78,7 +135,7 @@ async function handleSubmit({ data: formData }: FormSubmitEvent<Reoccurrence>) {
       return;
     }
 
-    props.callback(reoccurrenceSchema.parse(responseData));
+    props.callback(reoccurrenceWithSplitsSchema.parse(responseData));
 
     toast.add({
       color: "success",
@@ -143,6 +200,11 @@ function confirmDelete() {
   }
 }
 
+const splitCountLabel = computed(() => {
+  const count = splitsRef.value.length;
+  return `${count} split${count === 1 ? "" : "s"}`;
+});
+
 // ESC key handler to close modal
 defineShortcuts({
   escape: () => {
@@ -154,15 +216,15 @@ defineShortcuts({
 </script>
 
 <template lang="pug">
-UModal(title="Edit Reoccurrence" class="max-sm:!w-full max-sm:!h-full max-sm:!max-w-none max-sm:!max-h-none max-sm:!rounded-none")
+UModal(title="Edit Reoccurrence" class="max-sm:w-full! max-sm:h-full! max-sm:max-w-none! max-sm:max-h-none! max-sm:rounded-none!")
   template(#body)
-    UForm(:schema="reoccurrenceSchema" :state="formState" class="space-y-4" @submit="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving || isDeleting" ref="form")
+    UForm(:schema="reoccurrenceWithSplitsSchema" :state="formState" class="space-y-4" @submit="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving || isDeleting" ref="form")
       .flex.space-x-4
         UFormField(label="Transfer funds from Account" name="accountRegisterId" class="flex-1")
           USelect(v-model="formState.accountRegisterId"
             placeholder="Select an Account"
             class="w-full"
-            :items="formatAccountRegisters(listStore.getAccountRegisters)"
+            :items="accountRegisterOptions"
             valueKey="id"
             labelKey="name")
         UFormField(label="External?" class="flex-none text-center justify-center")
@@ -171,7 +233,7 @@ UModal(title="Edit Reoccurrence" class="max-sm:!w-full max-sm:!h-full max-sm:!ma
         USelect(v-model="formState.transferAccountRegisterId"
           placeholder="Select an Account"
           class="w-full"
-          :items="formatAccountRegisters(listStore.getAccountRegisters).filter(item => item.id !== formState.accountRegisterId)"
+          :items="splitTargetOptions"
           valueKey="id"
           labelKey="name")
 
@@ -207,6 +269,23 @@ UModal(title="Edit Reoccurrence" class="max-sm:!w-full max-sm:!h-full max-sm:!ma
 
         UFormField(label="End at" name="endAt" class="flex-1")
           UInput(v-model="formState.endAt" type="date" class="w-full")
+
+      .space-y-3
+        .flex.items-center.justify-between
+          UFormField(label="Split transfers")
+          UButton(color="neutral" variant="subtle" size="xs" @click="addSplit") Add split
+        p.text-xs.text-gray-400 {{ splitCountLabel }}
+        .space-y-3(v-if="splitsRef.length > 0")
+          .grid.grid-cols-1.gap-3.border.border-gray-700.rounded-lg.p-3(v-for="(split, index) in splitsRef" :key="split.id || 'new-split-' + index")
+            .flex.gap-3.items-start(class="max-sm:flex-col")
+              UFormField(label="Amount" class="flex-1")
+                UInputNumber(v-model="split.amount" :format-options="formatCurrencyOptions" :step="0.01" class="w-full")
+              UFormField(label="Transfer into Account" class="flex-1")
+                USelect(v-model="split.transferAccountRegisterId" :items="splitTargetOptions" valueKey="id" labelKey="name" class="w-full" placeholder="Select account")
+              UFormField(label="Label" class="flex-1")
+                UInput(v-model="split.description" class="w-full" placeholder="Optional")
+              UButton(color="error" variant="soft" size="xs" class="mt-6" @click="removeSplit(index)") Remove
+        p.text-xs.text-gray-500(v-else) No split transfers configured.
 
   template(#footer)
     .flex.justify-between.w-full

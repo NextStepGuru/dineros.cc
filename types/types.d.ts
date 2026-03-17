@@ -8,6 +8,8 @@ import {
   intervalSchema,
   publicProfileSchema,
   reoccurrenceSchema,
+  reoccurrenceSplitSchema,
+  reoccurrenceWithSplitsSchema,
 } from "~/schema/zod";
 
 export type AccountType = {
@@ -17,7 +19,9 @@ export type AccountType = {
   isCredit: boolean;
 };
 
-export type Reoccurrence = z.infer<typeof reoccurrenceSchema>;
+export type ReoccurrenceBase = z.infer<typeof reoccurrenceSchema>;
+export type ReoccurrenceSplit = z.infer<typeof reoccurrenceSplitSchema>;
+export type Reoccurrence = z.infer<typeof reoccurrenceWithSplitsSchema>;
 export type Interval = z.infer<typeof intervalSchema>;
 export type AccountRegister = z.infer<typeof accountRegisterSchema>;
 export type User = z.infer<typeof publicProfileSchema>;

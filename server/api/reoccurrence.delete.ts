@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
-import { reoccurrenceSchema } from "~/schema/zod";
+import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
 import type { H3Event } from "h3";
 import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
@@ -38,9 +38,18 @@ export default defineEventHandler(async (event: H3Event) => {
           where: { reoccurrenceId },
         });
 
+        await prisma.reoccurrenceSplit.deleteMany({
+          where: { reoccurrenceId },
+        });
+
         return await prisma.reoccurrence.delete({
           where: {
             id: reoccurrenceId,
+          },
+          include: {
+            splits: {
+              orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+            },
           },
         });
       },
@@ -49,7 +58,7 @@ export default defineEventHandler(async (event: H3Event) => {
 
     addRecalculateJob({ accountId: lookup.accountId });
 
-    return reoccurrenceSchema.parse(deletedData);
+    return reoccurrenceWithSplitsSchema.parse(deletedData);
   } catch (error) {
     handleApiError(error);
 

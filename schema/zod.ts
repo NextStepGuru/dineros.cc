@@ -7,9 +7,9 @@ export const publicProfileSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string(),
-  countryId: z.number().optional(),
-  timezoneOffset: z.number().optional(),
-  isDaylightSaving: z.boolean().optional(),
+  countryId: z.number().nullable().optional(),
+  timezoneOffset: z.number().nullable().optional(),
+  isDaylightSaving: z.boolean().nullable().optional(),
   settings: z
     .object({
       speakeasy: z
@@ -138,6 +138,19 @@ export const reoccurrenceSchema = z.object({
   description: z
     .string()
     .min(3, "Description must be at least 3 characters long"),
+});
+
+export const reoccurrenceSplitSchema = z.object({
+  id: z.coerce.number().optional(),
+  reoccurrenceId: z.coerce.number().optional(),
+  transferAccountRegisterId: z.coerce.number().min(1),
+  amount: z.coerce.number(),
+  description: z.string().max(500).optional(),
+  sortOrder: z.coerce.number().min(0).default(0),
+});
+
+export const reoccurrenceWithSplitsSchema = reoccurrenceSchema.extend({
+  splits: z.array(reoccurrenceSplitSchema).optional().default([]),
 });
 
 export const intervalSchema = z.object({

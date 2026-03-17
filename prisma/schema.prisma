@@ -164,6 +164,7 @@ model AccountRegister {
 
   entries       RegisterEntry[]
   reoccurrences Reoccurrence[]
+  splitTargets  ReoccurrenceSplit[]
   children      AccountRegister[] @relation("ar_children")
 
   @@index([accountId, isArchived])
@@ -265,10 +266,27 @@ model Reoccurrence {
   interval Interval           @relation(fields: [intervalId], references: [id])
   entries  RegisterEntry[]
   skips    ReoccurrenceSkip[]
+  splits   ReoccurrenceSplit[]
 
   @@index([accountId])
   @@index([accountId, lastAt])
   @@map("reoccurrence")
+}
+
+model ReoccurrenceSplit {
+  id                        Int      @id @default(autoincrement()) @db.UnsignedInt
+  reoccurrenceId            Int      @map("reoccurrence_id") @db.UnsignedInt
+  transferAccountRegisterId Int      @map("transfer_account_register_id") @db.UnsignedInt
+  amount                    Decimal  @db.Decimal(19, 2)
+  description               String?  @db.VarChar(500)
+  sortOrder                 Int      @default(0) @map("sort_order") @db.UnsignedInt
+  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
+
+  reoccurrence   Reoccurrence   @relation(fields: [reoccurrenceId], references: [id])
+  targetRegister AccountRegister @relation(fields: [transferAccountRegisterId], references: [id])
+
+  @@index([reoccurrenceId])
+  @@map("reoccurrence_split")
 }
 
 model ReoccurrenceSkip {

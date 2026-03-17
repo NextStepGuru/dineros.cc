@@ -21,6 +21,11 @@ export default defineEventHandler(async (event) => {
       await Promise.all([
         PrismaDb.reoccurrence.findMany({
           where: userAccountFilter,
+          include: {
+            splits: {
+              orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+            },
+          },
           orderBy: [{ lastAt: "asc" }, { id: "asc" }],
         }),
         PrismaDb.budget.findMany({

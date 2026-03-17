@@ -82,6 +82,15 @@ export type CacheReoccurrenceSkip = {
   skippedAt: string;
 };
 
+export type CacheReoccurrenceSplit = {
+  id: number;
+  reoccurrenceId: number;
+  transferAccountRegisterId: number;
+  amount: number;
+  description: string | null;
+  sortOrder: number;
+};
+
 // Modern collection interface
 interface Collection<T> {
   insert(item: T): void;
@@ -367,6 +376,7 @@ export class ModernCacheService {
   public readonly accountRegister: Collection<CacheAccountRegister>;
   public readonly registerEntry: Collection<CacheRegisterEntry>;
   public readonly reoccurrenceSkip: Collection<CacheReoccurrenceSkip>;
+  public readonly reoccurrenceSplit: Collection<CacheReoccurrenceSplit>;
 
   constructor() {
     this.reoccurrence = new ModernCollection<CacheReoccurrence>();
@@ -375,6 +385,7 @@ export class ModernCacheService {
       (item) => item.id
     );
     this.reoccurrenceSkip = new ModernCollection<CacheReoccurrenceSkip>();
+    this.reoccurrenceSplit = new ModernCollection<CacheReoccurrenceSplit>();
 
     // Create indexes for commonly queried fields
     this.createOptimizedIndexes();
@@ -401,6 +412,10 @@ export class ModernCacheService {
       .reoccurrence as ModernCollection<CacheReoccurrence>;
     reoccurrenceCollection.createIndex("accountId");
     reoccurrenceCollection.createIndex("accountRegisterId");
+
+    const reoccurrenceSplitCollection = this
+      .reoccurrenceSplit as ModernCollection<CacheReoccurrenceSplit>;
+    reoccurrenceSplitCollection.createIndex("reoccurrenceId");
   }
 
   // Utility methods for common operations
@@ -409,6 +424,7 @@ export class ModernCacheService {
     this.accountRegister.clear();
     this.registerEntry.clear();
     this.reoccurrenceSkip.clear();
+    this.reoccurrenceSplit.clear();
   }
 
   getStats(): {
@@ -416,12 +432,14 @@ export class ModernCacheService {
     accountRegisters: number;
     registerEntries: number;
     reoccurrenceSkips: number;
+    reoccurrenceSplits: number;
   } {
     return {
       reoccurrences: this.reoccurrence.count(),
       accountRegisters: this.accountRegister.count(),
       registerEntries: this.registerEntry.count(),
       reoccurrenceSkips: this.reoccurrenceSkip.count(),
+      reoccurrenceSplits: this.reoccurrenceSplit.count(),
     };
   }
 }

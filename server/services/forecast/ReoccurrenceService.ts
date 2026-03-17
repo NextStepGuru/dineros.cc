@@ -169,6 +169,33 @@ export class ReoccurrenceService implements IReoccurrenceService {
         });
       }
 
+      const splitEntries = (this.cache.reoccurrenceSplit
+        ?.find({ reoccurrenceId: reoccurrence.id }) ?? [])
+        .sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) {
+            return a.sortOrder - b.sortOrder;
+          }
+          return a.id - b.id;
+        });
+
+      for (const splitEntry of splitEntries) {
+        if (splitEntry.transferAccountRegisterId === reoccurrence.accountRegisterId) {
+          continue;
+        }
+
+        const splitDescription = splitEntry.description?.trim()
+          ? `${occurrenceDescription} - ${splitEntry.description.trim()}`
+          : `${occurrenceDescription} - Split`;
+
+        this.transferService.transferBetweenAccounts({
+          targetAccountRegisterId: splitEntry.transferAccountRegisterId,
+          sourceAccountRegisterId: reoccurrence.accountRegisterId,
+          amount: Number(splitEntry.amount),
+          description: splitDescription,
+          reoccurrence: reoccurrenceForEntry,
+        });
+      }
+
       // Advance to next occurrence
       const processedNominalDate = dateTimeService.toDate(nextAt);
       const nextDate = this.calculateNextOccurrence({

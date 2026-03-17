@@ -19,6 +19,7 @@ export class DataLoaderService implements IDataLoaderService {
     this.cache.registerEntry.clear();
     this.cache.reoccurrence.clear();
     this.cache.reoccurrenceSkip.clear();
+    this.cache.reoccurrenceSplit.clear();
 
     const [accountRegisters, registerEntries, reoccurrences, reoccurrenceSkips] =
       await Promise.all([
@@ -26,6 +27,7 @@ export class DataLoaderService implements IDataLoaderService {
         this.loadRegisterEntries(context.accountId),
         this.loadReoccurrences(context.accountId),
         this.loadReoccurrenceSkips(context.accountId),
+        this.loadReoccurrenceSplits(context.accountId),
       ]);
 
     const minReoccurrenceDate = (() => {
@@ -182,6 +184,24 @@ export class DataLoaderService implements IDataLoaderService {
     });
 
     return reoccurrenceSkips;
+  }
+
+  private async loadReoccurrenceSplits(accountId?: string) {
+    const reoccurrenceSplits = await this.db.reoccurrenceSplit.findMany({
+      where: {
+        reoccurrence: { accountId },
+      },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    });
+
+    reoccurrenceSplits.forEach((item) => {
+      this.cache.reoccurrenceSplit.insert({
+        ...item,
+        amount: Number(item.amount),
+      });
+    });
+
+    return reoccurrenceSplits;
   }
 
   async getMinReoccurrenceDate(accountId?: string): Promise<Date | null> {

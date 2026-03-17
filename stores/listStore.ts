@@ -36,7 +36,10 @@ export const useListStore = defineStore("listStore", {
 
       return state.accountRegisters
         .filter((item) => item.budgetId === authStore.getBudgetId)
-        .sort((a, b) => (a.sortOrder > b.sortOrder ? 1 : -1));
+        .sort(
+          (a, b) =>
+            (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0)
+        );
     },
     getBudgets: (state) => state.budgets,
     getAccounts: (state) => state.accounts,

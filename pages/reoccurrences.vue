@@ -77,6 +77,7 @@ function handleAddReoccurrence() {
       endAt: undefined,
       intervalCount: 1,
       adjustBeforeIfOnWeekend: false,
+      splits: [],
     },
   };
   const modal = overlay.create(ModalsEditReoccurrence);
