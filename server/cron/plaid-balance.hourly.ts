@@ -8,7 +8,7 @@ export default defineCronHandler("hourly", async () => {
   const olderThanDate = dateTimeService
     .now()
     .utc()
-    .subtract({ hours: 6 })
+    .subtract(6, "hours")
     .toDate();
 
   const accountRegisters = await prisma.accountRegister.groupBy({
