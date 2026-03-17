@@ -89,14 +89,14 @@ async function handleRecalculate() {
 
   isRecalculating.value = true;
   try {
-    const { data } = await useAPI<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>(() => "/api/recalculate", {
+    const data = await (useNuxtApp().$api as typeof $fetch)<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>("/api/recalculate", {
       method: "POST",
       body: {
         accountId: listStore.getAccounts?.[0]?.id,
       },
     });
 
-    if (data.value?.success) {
+    if (data?.success) {
       // Refresh the lists after recalculation
       await listStore.fetchLists();
     }

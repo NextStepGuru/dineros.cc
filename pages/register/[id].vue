@@ -517,21 +517,19 @@ async function recalcAccount() {
 
   isRecalcAccountLoading.value = true;
   try {
-    const { data } = await useAPI<{
+    const data = await (useNuxtApp().$api as typeof $fetch)<{
       success: boolean;
       entriesCalculated: number;
       entriesBalance: number;
       accountRegisters: number;
-    }>(() => "/api/recalculate", {
+    }>("/api/recalculate", {
       method: "POST",
-      key: `recalculate-${Date.now()}`, // Unique key for each call
-      server: false, // Force client-side execution
       body: {
         accountId: currentAccountRegister.value?.accountId,
       },
     });
 
-    if (data.value?.success) {
+    if (data?.success) {
       // Refresh the account entries after recalculation
       await refreshAccountEntries();
     }
