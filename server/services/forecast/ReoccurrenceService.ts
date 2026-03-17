@@ -6,6 +6,11 @@ import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
+import { holidayService } from "./HolidayService";
+import {
+  calculateNextOccurrenceDate,
+  isTwiceMonthlyInterval,
+} from "./reoccurrenceIntervals";
 
 export class ReoccurrenceService implements IReoccurrenceService {
   /** Pre-scheduled reoccurrences by ISO date string (YYYY-MM-DD). Built once at timeline start; O(1) lookup per day. */
@@ -72,7 +77,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       // Apply weekend adjustment to the current occurrence date if enabled
       let adjustedLastAt = dateTimeService.clone(nextAt);
       if (reoccurrence.adjustBeforeIfOnWeekend) {
-        adjustedLastAt = this.adjustDateIfWeekend(adjustedLastAt);
+        adjustedLastAt = this.adjustDateIfWeekendOrHoliday(adjustedLastAt);
       }
 
       // endAt boundary is evaluated against the effective (possibly adjusted) occurrence date
@@ -140,18 +145,24 @@ export class ReoccurrenceService implements IReoccurrenceService {
       }
 
       // Create the entry for this occurrence
+      const occurrenceDescription = this.getOccurrenceDescription(
+        reoccurrence.description,
+        reoccurrence.intervalId,
+        (reoccurrence as { intervalName?: string }).intervalName,
+        dateTimeService.toDate(nextAt),
+      );
       if (reoccurrence.transferAccountRegisterId) {
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: reoccurrence.transferAccountRegisterId,
           sourceAccountRegisterId: reoccurrence.accountRegisterId,
           amount: effectiveAmount,
-          description: reoccurrence.description,
+          description: occurrenceDescription,
           reoccurrence: reoccurrenceForEntry,
         });
       } else {
         this.entryService.createEntry({
           accountRegisterId: reoccurrence.accountRegisterId,
-          description: reoccurrence.description,
+          description: occurrenceDescription,
           amount: effectiveAmount,
           reoccurrence: reoccurrenceForEntry,
           typeId: 9, // Reoccurrence Entry
@@ -204,69 +215,64 @@ export class ReoccurrenceService implements IReoccurrenceService {
   calculateNextOccurrence(reoccurrence: any): Date | null {
     if (!reoccurrence?.lastAt) return null;
     if (reoccurrence.intervalCount <= 0) return null;
-    const lastAt = dateTimeService.createUTC(reoccurrence.lastAt);
     const cached = reoccurrence as { intervalName?: string };
-    const intervalName = cached.intervalName?.trim().toLowerCase();
+    const intervalName = cached.intervalName?.trim().toLowerCase() ?? "";
 
-    if (intervalName) {
-      if (intervalName === "once") return null;
-      const intervalNameToUnit: Record<string, "days" | "weeks" | "months" | "years"> = {
-        day: "days",
-        days: "days",
-        week: "weeks",
-        weeks: "weeks",
-        month: "months",
-        months: "months",
-        year: "years",
-        years: "years",
-      };
-      const unit = intervalNameToUnit[intervalName];
-      if (!unit) {
-        // Fallback to intervalId when intervalName is unsupported.
-        return this.calculateNextOccurrence({
-          ...reoccurrence,
-          intervalName: undefined,
-        } as Reoccurrence);
-      }
-      return dateTimeService.toDate(
-        dateTimeService.add(reoccurrence.intervalCount, unit, lastAt),
-      );
+    const computed = calculateNextOccurrenceDate({
+      lastAt: dateTimeService.toDate(reoccurrence.lastAt),
+      intervalId: reoccurrence.intervalId,
+      intervalCount: reoccurrence.intervalCount,
+      intervalName: cached.intervalName,
+    });
+    if (computed) {
+      return computed;
     }
 
-    switch (reoccurrence.intervalId) {
-      case 1: // Daily
-        return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "days", lastAt),
-        );
-      case 2: // Weekly
-        return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "weeks", lastAt),
-        );
-      case 3: // Monthly
-        return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "months", lastAt),
-        );
-      case 4: // Yearly
-        return dateTimeService.toDate(
-          dateTimeService.add(reoccurrence.intervalCount, "years", lastAt),
-        );
-      case 5: // Once (one-time)
-        return null;
-      default:
-        throw new Error(`Invalid intervalId: ${reoccurrence.intervalId}`);
+    if (
+      reoccurrence.intervalId === 5 ||
+      intervalName === "once" ||
+      intervalName === "one-time" ||
+      intervalName === "one time"
+    ) {
+      return null;
+    }
+
+    if (intervalName) {
+      // Fallback to intervalId when intervalName is unsupported.
+      return this.calculateNextOccurrence({
+        ...reoccurrence,
+        intervalName: undefined,
+      } as Reoccurrence);
+    }
+
+    throw new Error(`Invalid intervalId: ${reoccurrence.intervalId}`);
+  }
+
+  private adjustDateIfWeekendOrHoliday(date: any): any {
+    let adjusted = dateTimeService.clone(date);
+    while (true) {
+      const dayOfWeek = adjusted.day(); // 0 = Sunday, 6 = Saturday
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = holidayService.isHoliday(dateTimeService.toDate(adjusted));
+      if (!isWeekend && !isHoliday) {
+        return adjusted;
+      }
+      adjusted = dateTimeService.subtract(1, "days", adjusted);
     }
   }
 
-  private adjustDateIfWeekend(date: any): any {
-    const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
-    if (dayOfWeek === 0) {
-      // Sunday - move to Friday
-      return dateTimeService.subtract(2, "days", date);
-    } else if (dayOfWeek === 6) {
-      // Saturday - move to Friday
-      return dateTimeService.subtract(1, "days", date);
+  private getOccurrenceDescription(
+    baseDescription: string,
+    intervalId: number,
+    intervalName: string | undefined,
+    nominalDate: Date,
+  ): string {
+    if (!isTwiceMonthlyInterval(intervalId, intervalName)) {
+      return baseDescription;
     }
-    return date;
+    const dayOfMonth = dateTimeService.date(nominalDate);
+    const suffix = dayOfMonth === 15 ? "#1" : "#2";
+    return `${baseDescription} ${suffix}`;
   }
 
   /**
@@ -347,6 +353,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
         return "yearly";
       case 5:
         return "once";
+      case 6:
+        return "twice-monthly";
       default:
         return "unknown";
     }

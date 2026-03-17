@@ -127,6 +127,48 @@ describe("Reoccurrence + Forecast integration", () => {
     expect(monthly.every((entry) => entry.amount === 100)).toBe(true);
   });
 
+  it("supports twice-monthly recurrence with #1/#2 suffix and business-day adjustment", async () => {
+    const checking = await db.accountRegister.create({
+      data: account({ id: 12, name: "Twice Monthly", balance: 1000, latestBalance: 1000 }),
+    });
+
+    await db.reoccurrence.create({
+      data: {
+        accountId,
+        accountRegisterId: checking.id,
+        description: "PWC Payment",
+        amount: -100,
+        intervalId: 6,
+        intervalCount: 1,
+        lastAt: new Date("2025-01-01T00:00:00.000Z"),
+        endAt: null,
+        adjustBeforeIfOnWeekend: true,
+      },
+    });
+
+    const result = await runForecast("2025-01-01", "2025-02-28");
+
+    expect(result.isSuccess).toBe(true);
+    const twiceMonthly = result.registerEntries
+      .filter(
+        (entry) =>
+          entry.accountRegisterId === checking.id &&
+          entry.description.startsWith("PWC Payment #"),
+      )
+      .map((entry) => ({
+        date: entry.createdAt.slice(0, 10),
+        description: entry.description,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    expect(twiceMonthly).toEqual([
+      { date: "2025-01-15", description: "PWC Payment #1" },
+      { date: "2025-01-31", description: "PWC Payment #2" },
+      { date: "2025-02-14", description: "PWC Payment #1" },
+      { date: "2025-02-28", description: "PWC Payment #2" },
+    ]);
+  });
+
   it("processes mixed transfer and non-transfer recurrences due same day", async () => {
     const checking = await db.accountRegister.create({
       data: account({ id: 21, name: "Checking", balance: 2000, latestBalance: 2000 }),

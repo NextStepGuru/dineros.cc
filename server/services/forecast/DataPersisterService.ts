@@ -13,6 +13,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { DatabaseRateLimiter } from "./lib/rateLimiter";
 import { dateTimeService } from "./DateTimeService";
 import { forecastLogger } from "./logger";
+import { calculateNextOccurrenceDate } from "./reoccurrenceIntervals";
 
 const { Prisma } = prismaPkg;
 
@@ -120,41 +121,29 @@ export class DataPersisterService implements IDataPersisterService {
     nowMoment: ReturnType<typeof dateTimeService.createUTC>
   ): Date | null {
     if (!existingLastAt) return null;
-    const unit = this.getIntervalUnit(intervalId, intervalName);
-    if (!unit) return null;
-    let lastRun = dateTimeService.createUTC(existingLastAt);
-    let nextRun = dateTimeService.add(intervalCount || 1, unit, lastRun);
-    while (dateTimeService.isSameOrBefore(nextRun, nowMoment)) {
+    let lastRun = dateTimeService.toDate(existingLastAt);
+    let nextRun = calculateNextOccurrenceDate({
+      lastAt: lastRun,
+      intervalId,
+      intervalCount,
+      intervalName,
+    });
+    let guard = 0;
+    while (
+      nextRun &&
+      dateTimeService.isSameOrBefore(dateTimeService.createUTC(nextRun), nowMoment)
+    ) {
       lastRun = nextRun;
-      nextRun = dateTimeService.add(intervalCount || 1, unit, lastRun);
+      nextRun = calculateNextOccurrenceDate({
+        lastAt: lastRun,
+        intervalId,
+        intervalCount,
+        intervalName,
+      });
+      guard += 1;
+      if (guard > 2000) break;
     }
-    return dateTimeService.toDate(lastRun);
-  }
-
-  private getIntervalUnit(
-    intervalId: number,
-    intervalName: string | null | undefined
-  ): "days" | "weeks" | "months" | "years" | null {
-    const name = intervalName?.trim().toLowerCase();
-    if (name === "once") return null;
-    if (name === "day" || name === "days") return "days";
-    if (name === "week" || name === "weeks") return "weeks";
-    if (name === "month" || name === "months") return "months";
-    if (name === "year" || name === "years") return "years";
-    switch (intervalId) {
-      case 1:
-        return "days";
-      case 2:
-        return "weeks";
-      case 3:
-        return "months";
-      case 4:
-        return "years";
-      case 5:
-        return null;
-      default:
-        return "months";
-    }
+    return lastRun;
   }
 
   async persistForecastResults(

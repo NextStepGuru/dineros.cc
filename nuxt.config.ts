@@ -109,6 +109,7 @@ export default defineNuxtConfig({
       },
     },
     optimizeDeps: {
+      include: ["zod"],
       exclude: ["fsevents"],
     },
   },

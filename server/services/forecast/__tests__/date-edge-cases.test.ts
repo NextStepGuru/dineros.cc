@@ -1,8 +1,12 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ReoccurrenceService } from "../ReoccurrenceService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient, Reoccurrence } from "~/types/test-types";
+import type { PrismaClient } from "~/types/test-types";
 import { dateTimeService } from "../DateTimeService";
+
+type ServiceReoccurrence = Parameters<
+  ReoccurrenceService["processReoccurrences"]
+>[0][number];
 
 describe("Date edge cases for recurrences", () => {
   let service: ReoccurrenceService;
@@ -27,7 +31,7 @@ describe("Date edge cases for recurrences", () => {
     mockTransferService = { transferBetweenAccounts: vi.fn() };
 
     service = new ReoccurrenceService(
-      mockDb,
+      mockDb as unknown as ConstructorParameters<typeof ReoccurrenceService>[0],
       mockCache,
       mockEntryService as any,
       mockTransferService as any,
@@ -39,13 +43,15 @@ describe("Date edge cases for recurrences", () => {
     vi.restoreAllMocks();
   });
 
-  function recurrence(overrides: Partial<Reoccurrence> = {}): Reoccurrence {
+  function recurrence(
+    overrides: Partial<ServiceReoccurrence> = {},
+  ): ServiceReoccurrence {
     return {
       id: 1,
       accountId: "test-account",
       accountRegisterId: 10,
       description: "Date Edge",
-      amount: 100,
+      amount: 100 as unknown as ServiceReoccurrence["amount"],
       intervalId: 3,
       intervalCount: 1,
       lastAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -56,11 +62,14 @@ describe("Date edge cases for recurrences", () => {
       updatedAt: new Date("2024-01-01T00:00:00.000Z"),
       adjustBeforeIfOnWeekend: false,
       ...overrides,
-    } as Reoccurrence;
+    } as ServiceReoccurrence;
   }
 
   function ymd(date: Date | null): string {
-    return dateTimeService.format("YYYY-MM-DD", dateTimeService.createUTC(date as Date));
+    return dateTimeService.format(
+      "YYYY-MM-DD",
+      dateTimeService.createUTC(date as Date),
+    );
   }
 
   describe("month-end rollover", () => {
@@ -208,12 +217,21 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2025-02-22T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2025-03-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-03-01T00:00:00.000Z"),
+      );
 
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2025-02-28");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2025-02-28",
+      );
       const update = mockCache.reoccurrence.update.mock.calls.at(-1)[0];
       expect(dateTimeService.createUTC(update.lastAt).day()).toBe(6);
     });
@@ -225,29 +243,47 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2026-02-22T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2026-03-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2026-03-01T00:00:00.000Z"),
+      );
 
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2026-02-27");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2026-02-27",
+      );
       const update = mockCache.reoccurrence.update.mock.calls.at(-1)[0];
       expect(dateTimeService.createUTC(update.lastAt).day()).toBe(0);
     });
 
-    it("Saturday Jan 1 2028 adjusts to Friday Dec 31 2027", async () => {
+    it("Saturday Jan 1 2028 adjusts to Thursday Dec 30 2027", async () => {
       const r = recurrence({
         intervalId: 2,
         adjustBeforeIfOnWeekend: true,
         lastAt: new Date("2027-12-25T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2028-01-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2028-01-01T00:00:00.000Z"),
+      );
 
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2027-12-31");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2027-12-30",
+      );
     });
 
     it("Sunday Jan 1 2023 adjusts to Friday Dec 30 2022", async () => {
@@ -257,12 +293,21 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2022-12-25T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2023-01-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2023-01-01T00:00:00.000Z"),
+      );
 
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2022-12-30");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2022-12-30",
+      );
     });
 
     it("transfer recurrence uses adjusted date in transfer payload and nominal date in cache", async () => {
@@ -273,12 +318,21 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2025-02-22T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2025-03-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-03-01T00:00:00.000Z"),
+      );
 
       const call = mockTransferService.transferBetweenAccounts.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2025-02-28");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2025-02-28",
+      );
       const update = mockCache.reoccurrence.update.mock.calls.at(-1)[0];
       expect(update.lastAt.toISOString().slice(0, 10)).toBe("2025-03-01");
     });
@@ -290,12 +344,71 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2025-02-27T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2025-02-28T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-02-28T00:00:00.000Z"),
+      );
 
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2025-02-28");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2025-02-28",
+      );
+    });
+
+    it("moves holiday occurrence to previous business day", async () => {
+      const r = recurrence({
+        intervalId: 2,
+        adjustBeforeIfOnWeekend: true,
+        // Next weekly run is 2025-07-04 (Friday, US federal holiday)
+        lastAt: new Date("2025-06-27T00:00:00.000Z"),
+      });
+      mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
+
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-07-04T00:00:00.000Z"),
+      );
+
+      const call = mockEntryService.createEntry.mock.calls[0][0];
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2025-07-03",
+      );
+    });
+
+    it("moves weekend then observed holiday to previous business day", async () => {
+      const r = recurrence({
+        intervalId: 2,
+        adjustBeforeIfOnWeekend: true,
+        // Next weekly run is 2026-07-04 (Saturday), observed holiday is 2026-07-03
+        lastAt: new Date("2026-06-27T00:00:00.000Z"),
+      });
+      mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
+
+      await service.processReoccurrences(
+        [r],
+        new Date("2026-07-04T00:00:00.000Z"),
+      );
+
+      const call = mockEntryService.createEntry.mock.calls[0][0];
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2026-07-02",
+      );
     });
 
     it("allows weekend-adjusted occurrence when adjusted date equals endAt", async () => {
@@ -306,13 +419,22 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2025-02-22T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2025-03-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-03-01T00:00:00.000Z"),
+      );
 
       expect(mockEntryService.createEntry).toHaveBeenCalledTimes(1);
       const call = mockEntryService.createEntry.mock.calls[0][0];
-      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe("2025-02-28");
+      expect(call.reoccurrence.lastAt.toISOString().slice(0, 10)).toBe(
+        "2025-02-28",
+      );
     });
   });
 
@@ -353,9 +475,16 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2024-03-07T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2024-03-11T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2024-03-11T00:00:00.000Z"),
+      );
 
       expect(mockEntryService.createEntry).toHaveBeenCalledTimes(4);
       const created = mockEntryService.createEntry.mock.calls.map((c: any[]) =>
@@ -414,9 +543,16 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2024-12-01T00:00:00.000Z"),
         endAt: new Date("2024-12-31T00:00:00.000Z"),
       });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2025-01-31T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2025-01-31T00:00:00.000Z"),
+      );
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
     });
   });
@@ -429,9 +565,16 @@ describe("Date edge cases for recurrences", () => {
         endAt: new Date("2024-02-01T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2024-02-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
       expect(mockEntryService.createEntry).toHaveBeenCalledTimes(1);
     });
 
@@ -441,9 +584,16 @@ describe("Date edge cases for recurrences", () => {
         lastAt: new Date("2024-01-01T00:00:00.000Z"),
         endAt: new Date("2024-01-31T00:00:00.000Z"),
       });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2024-02-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
     });
 
@@ -454,11 +604,20 @@ describe("Date edge cases for recurrences", () => {
         endAt: new Date("2024-02-01T00:00:00.000Z"),
       });
       mockCache.reoccurrence.findOne.mockReturnValue({ ...r });
-      mockCache.accountRegister.findOne.mockReturnValue({ id: 10, typeId: 1, balance: 1000 });
+      mockCache.accountRegister.findOne.mockReturnValue({
+        id: 10,
+        typeId: 1,
+        balance: 1000,
+      });
 
-      await service.processReoccurrences([r], new Date("2024-02-01T00:00:00.000Z"));
+      await service.processReoccurrences(
+        [r],
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
       const created = mockEntryService.createEntry.mock.calls[0][0];
-      expect(created.reoccurrence.lastAt.toISOString()).toBe("2024-02-01T00:00:00.000Z");
+      expect(created.reoccurrence.lastAt.toISOString()).toBe(
+        "2024-02-01T00:00:00.000Z",
+      );
     });
   });
 
@@ -529,7 +688,7 @@ describe("Date edge cases for recurrences", () => {
           lastAt: new Date("2024-01-01T00:00:00.000Z"),
         }),
         intervalName: "fortnightly",
-      } as Reoccurrence & { intervalName: string });
+      } as ServiceReoccurrence & { intervalName: string });
       expect(ymd(result)).toBe("2024-01-08");
     });
   });

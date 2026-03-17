@@ -4,9 +4,13 @@ import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient, Reoccurrence } from "~/types/test-types";
+import type { PrismaClient } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
+
+type ServiceReoccurrence = Parameters<
+  ReoccurrenceService["processReoccurrences"]
+>[0][number];
 
 describe("ReoccurrenceService", () => {
   let service: ReoccurrenceService;
@@ -36,10 +40,10 @@ describe("ReoccurrenceService", () => {
     };
 
     service = new ReoccurrenceService(
-      mockDb,
+      mockDb as unknown as ConstructorParameters<typeof ReoccurrenceService>[0],
       mockCache as any,
       mockEntryService as any,
-      mockTransferService as any
+      mockTransferService as any,
     );
 
     // Mock forecastLogger to avoid test output
@@ -53,14 +57,14 @@ describe("ReoccurrenceService", () => {
   });
 
   function createMockReoccurrence(
-    overrides: Partial<Reoccurrence> = {}
-  ): Reoccurrence {
+    overrides: Partial<ServiceReoccurrence> = {},
+  ): ServiceReoccurrence {
     return {
       id: 1,
       accountId: "test-account",
       accountRegisterId: 1,
       description: "Test Reoccurrence",
-      amount: 100,
+      amount: 100 as unknown as ServiceReoccurrence["amount"],
       intervalId: 3, // Monthly
       intervalCount: 1,
       lastAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -71,7 +75,7 @@ describe("ReoccurrenceService", () => {
       updatedAt: new Date(),
       adjustBeforeIfOnWeekend: false,
       ...overrides,
-    } as Reoccurrence;
+    } as ServiceReoccurrence;
   }
 
   // Recurrence regression matrix: due-date gating, next-occurrence progression, cache lastAt/lastRunAt,
@@ -93,13 +97,13 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence1, reoccurrence2],
-        new Date("2024-03-01T00:00:00.000Z")
+        new Date("2024-03-01T00:00:00.000Z"),
       );
 
       expect(mockEntryService.createEntry).toHaveBeenCalled();
       expect(forecastLogger.service).toHaveBeenCalledWith(
         "ReoccurrenceService",
-        expect.stringContaining("Processing 2 reoccurrences")
+        expect.stringContaining("Processing 2 reoccurrences"),
       );
     });
 
@@ -114,7 +118,7 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-02-01T00:00:00.000Z")
+        new Date("2024-02-01T00:00:00.000Z"),
       );
 
       // First occurrence is next after lastAt (2024-02-01), not replay of lastAt
@@ -152,7 +156,7 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-02-01T00:00:00.000Z")
+        new Date("2024-02-01T00:00:00.000Z"),
       );
 
       // First occurrence is next after lastAt (2024-02-01), not replay of lastAt
@@ -179,6 +183,57 @@ describe("ReoccurrenceService", () => {
       });
     });
 
+    it("appends #1 and #2 suffix for twice-monthly entry descriptions", async () => {
+      const reoccurrence = createMockReoccurrence({
+        description: "PWC Payment",
+        lastAt: new Date("2024-01-01T00:00:00.000Z"),
+        intervalId: 6,
+        intervalCount: 1,
+      });
+      mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-01-31T00:00:00.000Z"),
+      );
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(2);
+      expect(
+        (mockEntryService.createEntry as any).mock.calls[0][0].description,
+      ).toBe("PWC Payment #1");
+      expect(
+        (mockEntryService.createEntry as any).mock.calls[1][0].description,
+      ).toBe("PWC Payment #2");
+    });
+
+    it("appends suffix for twice-monthly transfer descriptions", async () => {
+      const reoccurrence = createMockReoccurrence({
+        description: "Payroll Transfer",
+        lastAt: new Date("2024-01-01T00:00:00.000Z"),
+        transferAccountRegisterId: 2,
+        intervalId: 6,
+        intervalCount: 1,
+      });
+      mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-01-31T00:00:00.000Z"),
+      );
+
+      expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(
+        (mockTransferService.transferBetweenAccounts as any).mock.calls[0][0]
+          .description,
+      ).toBe("Payroll Transfer #1");
+      expect(
+        (mockTransferService.transferBetweenAccounts as any).mock.calls[1][0]
+          .description,
+      ).toBe("Payroll Transfer #2");
+    });
+
     it("should not create entry when first next occurrence is after endAt", async () => {
       const reoccurrence = createMockReoccurrence({
         lastAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -188,7 +243,7 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-03-01T00:00:00.000Z")
+        new Date("2024-03-01T00:00:00.000Z"),
       );
 
       // First next occurrence is 2024-02-01, which is after endAt 2024-01-15, so we break before creating any entry
@@ -204,7 +259,7 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-03-01T00:00:00.000Z")
+        new Date("2024-03-01T00:00:00.000Z"),
       );
 
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
@@ -220,7 +275,7 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-02-01T00:00:00.000Z")
+        new Date("2024-02-01T00:00:00.000Z"),
       );
 
       expect(mockCache.reoccurrence.update).toHaveBeenCalled();
@@ -234,12 +289,14 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       // First next occurrence would be 2024-02-01, which is after endDate 2024-01-15
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
-      expect(mockTransferService.transferBetweenAccounts).not.toHaveBeenCalled();
+      expect(
+        mockTransferService.transferBetweenAccounts,
+      ).not.toHaveBeenCalled();
     });
 
     it("should set lastRunAt on cache only when occurrence date is in the past", async () => {
@@ -253,13 +310,17 @@ describe("ReoccurrenceService", () => {
 
         await service.processReoccurrences(
           [reoccurrence],
-          new Date("2024-03-01T00:00:00.000Z")
+          new Date("2024-03-01T00:00:00.000Z"),
         );
 
         // Processed 2024-02-01 and 2024-03-01; both are <= now (2024-03-15), so lastRunAt should be set to 2024-03-01 on final update
         expect(mockCache.reoccurrence.update).toHaveBeenCalled();
-        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
-        expect(lastUpdate.lastRunAt).toEqual(new Date("2024-03-01T00:00:00.000Z"));
+        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(
+          -1,
+        )[0];
+        expect(lastUpdate.lastRunAt).toEqual(
+          new Date("2024-03-01T00:00:00.000Z"),
+        );
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -276,12 +337,14 @@ describe("ReoccurrenceService", () => {
 
         await service.processReoccurrences(
           [reoccurrence],
-          new Date("2024-02-01T00:00:00.000Z")
+          new Date("2024-02-01T00:00:00.000Z"),
         );
 
         // First occurrence 2024-02-01 is after now (2024-01-15), so lastRunAt must not be set
         expect(mockCache.reoccurrence.update).toHaveBeenCalled();
-        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
+        const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(
+          -1,
+        )[0];
         expect(lastUpdate.lastRunAt).toBeUndefined();
       } finally {
         dateTimeService.clearNowOverride();
@@ -297,15 +360,23 @@ describe("ReoccurrenceService", () => {
 
       await service.processReoccurrences(
         [reoccurrence],
-        new Date("2024-04-01T00:00:00.000Z")
+        new Date("2024-04-01T00:00:00.000Z"),
       );
 
       expect(mockEntryService.createEntry).toHaveBeenCalledTimes(3);
       const calls = (mockEntryService.createEntry as any).mock.calls;
-      expect(calls[0][0].reoccurrence.lastAt).toEqual(new Date("2024-02-01T00:00:00.000Z"));
-      expect(calls[1][0].reoccurrence.lastAt).toEqual(new Date("2024-03-01T00:00:00.000Z"));
-      expect(calls[2][0].reoccurrence.lastAt).toEqual(new Date("2024-04-01T00:00:00.000Z"));
-      const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(-1)[0];
+      expect(calls[0][0].reoccurrence.lastAt).toEqual(
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
+      expect(calls[1][0].reoccurrence.lastAt).toEqual(
+        new Date("2024-03-01T00:00:00.000Z"),
+      );
+      expect(calls[2][0].reoccurrence.lastAt).toEqual(
+        new Date("2024-04-01T00:00:00.000Z"),
+      );
+      const lastUpdate = (mockCache.reoccurrence.update as any).mock.calls.at(
+        -1,
+      )[0];
       expect(lastUpdate.lastAt).toEqual(new Date("2024-04-01T00:00:00.000Z"));
     });
   });
@@ -327,13 +398,16 @@ describe("ReoccurrenceService", () => {
         new Date("2024-01-31T00:00:00.000Z"),
       );
 
-      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const schedule = (service as any)._scheduleByDate as Map<
+        string,
+        ServiceReoccurrence[]
+      >;
       const expectedKey = dateTimeService.format(
         "YYYY-MM-DD",
         service.calculateNextOccurrence(reoccurrences[0])!,
       );
       expect(schedule.has(expectedKey)).toBe(true);
-      expect(schedule.get(expectedKey)?.[0].id).toBe(1);
+      expect(schedule.get(expectedKey)?.[0]?.id).toBe(1);
     });
 
     it("skips once recurrences that have null next occurrence", () => {
@@ -350,7 +424,10 @@ describe("ReoccurrenceService", () => {
         new Date("2024-01-31T00:00:00.000Z"),
       );
 
-      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const schedule = (service as any)._scheduleByDate as Map<
+        string,
+        ServiceReoccurrence[]
+      >;
       expect(schedule.size).toBe(0);
     });
 
@@ -370,7 +447,10 @@ describe("ReoccurrenceService", () => {
         new Date("2024-01-15T00:00:00.000Z"),
       );
 
-      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const schedule = (service as any)._scheduleByDate as Map<
+        string,
+        ServiceReoccurrence[]
+      >;
       expect(schedule.size).toBe(0);
     });
 
@@ -394,7 +474,10 @@ describe("ReoccurrenceService", () => {
         new Date("2024-01-31T00:00:00.000Z"),
       );
 
-      const schedule = (service as any)._scheduleByDate as Map<string, Reoccurrence[]>;
+      const schedule = (service as any)._scheduleByDate as Map<
+        string,
+        ServiceReoccurrence[]
+      >;
       const expectedKey = dateTimeService.format(
         "YYYY-MM-DD",
         service.calculateNextOccurrence(reoccurrences[0])!,
@@ -466,6 +549,57 @@ describe("ReoccurrenceService", () => {
       expect(result).toBeNull();
     });
 
+    it("should calculate next twice-monthly occurrence on the 15th", () => {
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-02-01T00:00:00.000Z"),
+        intervalId: 6,
+        intervalCount: 1,
+      });
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-02-15T00:00:00.000Z"));
+    });
+
+    it("should calculate next twice-monthly occurrence at month end", () => {
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-02-15T00:00:00.000Z"),
+        intervalId: 6,
+        intervalCount: 1,
+      });
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-02-29T00:00:00.000Z"));
+    });
+
+    it("should roll twice-monthly month-end occurrence to 15th of next month", () => {
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-02-29T00:00:00.000Z"),
+        intervalId: 6,
+        intervalCount: 1,
+      });
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-03-15T00:00:00.000Z"));
+    });
+
+    it("should support twice-monthly interval by intervalName", () => {
+      const reoccurrence = {
+        ...createMockReoccurrence({
+          lastAt: new Date("2024-02-10T00:00:00.000Z"),
+          intervalId: 4,
+          intervalCount: 1,
+        }),
+        intervalName: "15th & Last Day",
+      } as ReturnType<typeof createMockReoccurrence> & { intervalName: string };
+
+      const result = service.calculateNextOccurrence(reoccurrence);
+
+      expect(result).toEqual(new Date("2024-02-15T00:00:00.000Z"));
+    });
+
     it("should throw error for invalid interval ID", () => {
       const reoccurrence = createMockReoccurrence({
         lastAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -474,7 +608,7 @@ describe("ReoccurrenceService", () => {
       });
 
       expect(() => service.calculateNextOccurrence(reoccurrence)).toThrow(
-        "Invalid intervalId: 99"
+        "Invalid intervalId: 99",
       );
     });
 
@@ -726,7 +860,9 @@ describe("ReoccurrenceService", () => {
         return reoccurrences.filter(filter);
       });
 
-      const result = service.getReoccurrencesDue(new Date("2024-01-15T00:00:00.000Z"));
+      const result = service.getReoccurrencesDue(
+        new Date("2024-01-15T00:00:00.000Z"),
+      );
 
       expect(result).toHaveLength(2);
       expect(result.map((r) => r.id)).toEqual([1, 2]);
@@ -746,10 +882,12 @@ describe("ReoccurrenceService", () => {
         return reoccurrences.filter(filter);
       });
 
-      const result = service.getReoccurrencesDue(new Date("2024-01-15T00:00:00.000Z"));
+      const result = service.getReoccurrencesDue(
+        new Date("2024-01-15T00:00:00.000Z"),
+      );
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(1);
+      expect(result[0]!.id).toBe(1);
     });
 
     it("should return due reoccurrences when using intervalName", () => {
@@ -762,17 +900,21 @@ describe("ReoccurrenceService", () => {
             intervalCount: 1,
           }),
           intervalName: "Day",
-        } as ReturnType<typeof createMockReoccurrence> & { intervalName: string },
+        } as ReturnType<typeof createMockReoccurrence> & {
+          intervalName: string;
+        },
       ];
 
       mockCache.reoccurrence.find.mockImplementation((filter: any) => {
         return reoccurrences.filter(filter);
       });
 
-      const result = service.getReoccurrencesDue(new Date("2024-01-15T00:00:00.000Z"));
+      const result = service.getReoccurrencesDue(
+        new Date("2024-01-15T00:00:00.000Z"),
+      );
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(1);
+      expect(result[0]!.id).toBe(1);
     });
   });
 
@@ -785,7 +927,7 @@ describe("ReoccurrenceService", () => {
 
       const result = service.isReoccurrenceActive(
         reoccurrence,
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       expect(result).toBe(true);
@@ -799,7 +941,7 @@ describe("ReoccurrenceService", () => {
 
       const result = service.isReoccurrenceActive(
         reoccurrence,
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       expect(result).toBe(false);
@@ -813,7 +955,7 @@ describe("ReoccurrenceService", () => {
 
       const result = service.isReoccurrenceActive(
         reoccurrence,
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       expect(result).toBe(false);
@@ -827,7 +969,7 @@ describe("ReoccurrenceService", () => {
 
       const result = service.isReoccurrenceActive(
         reoccurrence,
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       expect(result).toBe(true);
@@ -856,11 +998,11 @@ describe("ReoccurrenceService", () => {
 
       const result = service.filterActiveReoccurrences(
         reoccurrences,
-        new Date("2024-01-15T00:00:00.000Z")
+        new Date("2024-01-15T00:00:00.000Z"),
       );
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(1);
+      expect(result[0]!.id).toBe(1);
     });
   });
 

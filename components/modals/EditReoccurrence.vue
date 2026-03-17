@@ -188,7 +188,7 @@ UModal(title="Edit Reoccurrence" class="max-sm:!w-full max-sm:!h-full max-sm:!ma
 
       UFormField(label="Adjust before if on weekend" name="adjustBeforeIfOnWeekend")
         UCheckbox(v-model="formState.adjustBeforeIfOnWeekend"
-          label="Move transaction to Friday if it falls on a weekend")
+          label="Move to previous business day if weekend or holiday")
 
       UFormField(label="Description" name="description")
         UInput(v-model="formState.description" class="w-full")
