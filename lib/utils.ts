@@ -18,7 +18,7 @@ export const getAccountRegisterLabel = (
   accountRegisterId: number,
   accountRegisters: AccountRegister[]
 ) => {
-  const item = accountRegisters.find((r) => (r.id = accountRegisterId));
+  const item = accountRegisters.find((r) => r.id === accountRegisterId);
   return item?.name || "Unknown";
 };
 

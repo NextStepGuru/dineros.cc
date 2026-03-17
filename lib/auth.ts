@@ -70,11 +70,16 @@ export function validateLoginCredentials(credentials: LoginCredentials): string 
 }
 
 /**
- * Determine navigation target after successful login
+ * Determine navigation target after successful login.
+ * Uses the first account register when sorted by sortOrder (ascending).
  */
 export function getPostLoginRedirect(accountRegisters: any[]): string {
   if (accountRegisters.length > 0) {
-    return `/register/${accountRegisters[0].id}`;
+    const bySortOrder = [...accountRegisters].sort(
+      (a, b) =>
+        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0)
+    );
+    return `/register/${bySortOrder[0].id}`;
   }
   return '/register';
 }

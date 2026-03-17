@@ -24,7 +24,8 @@ const authStore = useAuthStore();
 
 onBeforeMount(async () => {
   if (route.params.id === "") {
-    const firstId = formatAccountRegisters(listStore.getAccountRegisters)[0]?.id;
+    const regs = listStore.getAccountRegisters;
+    const firstId = regs.length > 0 ? regs[0].id : undefined;
     if (firstId != null) {
       await navigateTo(`/register/${firstId}`);
     }
@@ -51,7 +52,7 @@ watch(authStore, async () => {
       item.budgetId === authStore.getBudgetId && item.id === +route.params.id
   );
   if (!verify.length && regs.length > 0) {
-    const target = formatAccountRegisters(regs)[0]?.id;
+    const target = regs[0].id;
     if (target != null) {
       await navigateTo(`/register/${target}`);
     }
