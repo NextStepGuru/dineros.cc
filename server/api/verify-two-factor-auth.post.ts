@@ -17,12 +17,13 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    if (!user.settings.mfa.totp.base32secret) {
+    const totp = user.settings.mfa?.totp;
+    if (!totp?.base32secret) {
       return false;
     }
 
     // Check if the token is a backup code
-    const backupCodes = user.settings.mfa.totp.backupCodes || [];
+    const backupCodes = totp.backupCodes || [];
     const isBackupCode = backupCodes.includes(token);
 
     let verificationResult = false;
@@ -48,7 +49,7 @@ export default defineEventHandler(async (event) => {
     } else {
       // Verify TOTP token
       const result = await verify({
-        secret: user.settings.mfa.totp.base32secret,
+        secret: totp.base32secret,
         token,
         epochTolerance: 300, // ±300s (10 periods), matches previous speakeasy window
       });

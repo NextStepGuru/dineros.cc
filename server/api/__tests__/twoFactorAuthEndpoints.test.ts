@@ -49,17 +49,10 @@ vi.mock("~/schema/zod", () => ({
   },
 }));
 
-vi.mock("speakeasy", () => ({
-  default: {
-    generateSecret: vi.fn(),
-    totp: {
-      verify: vi.fn(),
-    },
-  },
+vi.mock("otplib", () => ({
   generateSecret: vi.fn(),
-  totp: {
-    verify: vi.fn(),
-  },
+  generateURI: vi.fn(),
+  verify: vi.fn(),
 }));
 
 vi.mock("qrcode", () => ({
@@ -96,24 +89,21 @@ describe("Two-Factor Authentication API Endpoints", () => {
         },
       };
 
-      const mockSecret = {
-        ascii: "secret-ascii",
-        hex: "secret-hex",
-        base32: "secret-base32",
-        otpauth_url:
-          "otpauth://totp/test@example.com+Dineros.cc?secret=secret-base32&issuer=Dineros.cc",
-      };
+      const mockSecret = "secret-base32";
+      const mockUri =
+        "otpauth://totp/Dineros.cc:test@example.com?secret=secret-base32&issuer=Dineros.cc";
 
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { privateUserSchema } = await import("~/schema/zod");
-      const speakeasy = await import("speakeasy");
+      const otplib = await import("otplib");
       const qrcode = await import("qrcode");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (speakeasy.default.generateSecret as any).mockReturnValue(mockSecret);
+      (otplib.generateSecret as any).mockReturnValue(mockSecret);
+      (otplib.generateURI as any).mockReturnValue(mockUri);
       (qrcode.default.toDataURL as any).mockResolvedValue(
         "data:image/png;base64,qrcode-data"
       );
@@ -134,13 +124,14 @@ describe("Two-Factor Authentication API Endpoints", () => {
       expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 123 },
       });
-      expect(speakeasy.default.generateSecret).toHaveBeenCalledWith({
-        length: 512,
-        name: "test@example.com+Dineros.cc",
+      expect(otplib.generateSecret).toHaveBeenCalledTimes(1);
+      expect(otplib.generateURI).toHaveBeenCalledWith({
         issuer: "Dineros.cc",
+        label: "test@example.com",
+        secret: mockSecret,
       });
       expect(qrcode.default.toDataURL).toHaveBeenCalledWith(
-        mockSecret.otpauth_url
+        `${mockUri}&image=https%3A%2F%2Fres.cloudinary.com%2Fguidedsteps%2Fimage%2Fupload%2Fc_fill%2Cg_face%3Aauto%2Cw_128%2Fv1737776329%2Fpepe_solo_t0twqk.png`
       );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
@@ -166,6 +157,12 @@ describe("Two-Factor Authentication API Endpoints", () => {
         id: 123,
         email: "test@example.com",
         settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: true,
+            },
+          },
           speakeasy: {
             isEnabled: true,
             isVerified: true,
@@ -272,10 +269,13 @@ describe("Two-Factor Authentication API Endpoints", () => {
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
         data: {
-          settings: {
+          settings: expect.objectContaining({
             otherSetting: "preserved",
-            speakeasy: { isEnabled: false, isVerified: false },
-          },
+            speakeasy: expect.objectContaining({
+              isEnabled: false,
+              isVerified: false,
+            }),
+          }),
         },
       });
       expect(result).toEqual(mockParsedUser);
@@ -349,6 +349,14 @@ describe("Two-Factor Authentication API Endpoints", () => {
         id: 123,
         email: "test@example.com",
         settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: false,
+              base32secret: "secret-base32",
+              backupCodes: [],
+            },
+          },
           speakeasy: {
             isEnabled: true,
             isVerified: false,
@@ -376,35 +384,34 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { privateUserSchema, publicProfileSchema } = await import(
         "~/schema/zod"
       );
-      const speakeasy = await import("speakeasy");
+      const otplib = await import("otplib");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (speakeasy.default.totp.verify as any).mockReturnValue(true);
+      (otplib.verify as any).mockResolvedValue({ valid: true });
       (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
       (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
       expect((globalThis as any).readBody).toHaveBeenCalledWith(mockEvent);
-      expect(speakeasy.default.totp.verify).toHaveBeenCalledWith({
+      expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret-base32",
-        encoding: "base32",
         token: "123456",
-        window: 10,
+        epochTolerance: 300,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
         data: {
-          settings: {
-            speakeasy: {
+          settings: expect.objectContaining({
+            speakeasy: expect.objectContaining({
               isEnabled: true,
               isVerified: true,
               base32secret: "secret-base32",
-            },
-          },
+            }),
+          }),
         },
       });
       expect(result).toEqual(mockParsedUser);
@@ -416,6 +423,12 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const mockUser = {
         id: 123,
         settings: {
+          mfa: {
+            totp: {
+              base32secret: "secret-base32",
+              backupCodes: [],
+            },
+          },
           speakeasy: {
             base32secret: "secret-base32",
           },
@@ -428,33 +441,32 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { privateUserSchema, publicProfileSchema } = await import(
         "~/schema/zod"
       );
-      const speakeasy = await import("speakeasy");
+      const otplib = await import("otplib");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (speakeasy.default.totp.verify as any).mockReturnValue(false);
+      (otplib.verify as any).mockResolvedValue({ valid: false });
       (prisma.user.update as any).mockResolvedValue(mockUser);
       (publicProfileSchema.parse as any).mockReturnValue(mockUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
-      expect(speakeasy.default.totp.verify).toHaveBeenCalledWith({
+      expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret-base32",
-        encoding: "base32",
         token: "123456",
-        window: 10,
+        epochTolerance: 300,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
         data: {
-          settings: {
-            speakeasy: {
+          settings: expect.objectContaining({
+            speakeasy: expect.objectContaining({
               base32secret: "secret-base32",
               isVerified: false,
-            },
-          },
+            }),
+          }),
         },
       });
     });

@@ -51,6 +51,7 @@ describe('Authentication Utilities', () => {
       expect(result).toEqual({
         success: false,
         requiresTwoFactor: true,
+        mfaMethods: [],
       });
     });
 

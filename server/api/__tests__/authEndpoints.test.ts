@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import speakeasy from "speakeasy";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -22,6 +21,7 @@ vi.mock("h3", () => ({
   readBody: vi.fn(),
   setResponseStatus: vi.fn(),
   setCookie: vi.fn(),
+  getCookie: vi.fn(),
 }));
 
 // Make H3 functions globally available
@@ -29,12 +29,8 @@ vi.mock("h3", () => ({
 (global as any).setResponseStatus = vi.fn();
 
 // Mock external dependencies
-vi.mock("speakeasy", () => ({
-  default: {
-    totp: {
-      verify: vi.fn(),
-    },
-  },
+vi.mock("otplib", () => ({
+  verify: vi.fn(),
 }));
 
 vi.mock("@paralleldrive/cuid2", () => ({
@@ -77,6 +73,16 @@ vi.mock("~/server/clients/postmarkClient", () => ({
   hasPostmarkToken: true,
   postmarkClient: {
     sendEmail: vi.fn(),
+  },
+}));
+
+vi.mock("~/server/clients/redisClient", () => ({
+  sharedRedisConnection: {
+    setex: vi.fn(),
+    get: vi.fn(),
+    del: vi.fn(),
+    incr: vi.fn(),
+    expire: vi.fn(),
   },
 }));
 
@@ -363,6 +369,16 @@ describe("Authentication API Endpoints", () => {
         email: "test@example.com",
         password: "hashedPassword",
         settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: true,
+              base32secret: "secret123",
+              backupCodes: [],
+            },
+            passkeys: [],
+            emailOtp: { isEnabled: false, isVerified: false },
+          },
           speakeasy: {
             isEnabled: true,
             isVerified: true,
@@ -389,7 +405,10 @@ describe("Authentication API Endpoints", () => {
 
       const result = await loginHandler(mockEvent);
 
-      expect(result).toEqual({ twoFactorChallengeRequired: true });
+      expect(result).toEqual({
+        twoFactorChallengeRequired: true,
+        mfaMethods: ["totp"],
+      });
       expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 200);
     });
 
@@ -406,6 +425,16 @@ describe("Authentication API Endpoints", () => {
         email: "test@example.com",
         password: "hashedPassword",
         settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: true,
+              base32secret: "secret123",
+              backupCodes: [],
+            },
+            passkeys: [],
+            emailOtp: { isEnabled: false, isVerified: false },
+          },
           speakeasy: {
             isEnabled: true,
             isVerified: true,
@@ -426,6 +455,7 @@ describe("Authentication API Endpoints", () => {
         await import("~/schema/zod");
       const HashService = await import("~/server/services/HashService");
       const JwtService = await import("~/server/services/JwtService");
+      const otplib = await import("otplib");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
@@ -438,7 +468,7 @@ describe("Authentication API Endpoints", () => {
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
       mockHashService.verify.mockResolvedValue(true);
-      (speakeasy.totp.verify as any).mockReturnValue(true);
+      (otplib.verify as any).mockResolvedValue({ valid: true });
       mockJwtService.sign.mockResolvedValue("jwt-token");
       (prisma.user.update as any).mockResolvedValue(mockUser);
       (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
@@ -450,11 +480,10 @@ describe("Authentication API Endpoints", () => {
         message: null,
         user: mockParsedUser,
       });
-      expect(speakeasy.totp.verify).toHaveBeenCalledWith({
+      expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret123",
-        encoding: "base32",
         token: "123456",
-        window: 10,
+        epochTolerance: 300,
       });
     });
 
@@ -513,6 +542,16 @@ describe("Authentication API Endpoints", () => {
         email: "test@example.com",
         password: "hashedPassword",
         settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: true,
+              base32secret: "secret123",
+              backupCodes: [],
+            },
+            passkeys: [],
+            emailOtp: { isEnabled: false, isVerified: false },
+          },
           speakeasy: {
             isEnabled: true,
             isVerified: true,
@@ -525,6 +564,7 @@ describe("Authentication API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
       const HashService = await import("~/server/services/HashService");
+      const otplib = await import("otplib");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
@@ -537,7 +577,7 @@ describe("Authentication API Endpoints", () => {
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
       mockHashService.verify.mockResolvedValue(true);
-      (speakeasy.totp.verify as any).mockReturnValue(false);
+      (otplib.verify as any).mockResolvedValue({ valid: false });
 
       const result = await loginHandler(mockEvent);
 

@@ -19,7 +19,8 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    if (user.settings.mfa.totp.isEnabled && user.settings.mfa.totp.isVerified) {
+    const totp = user.settings.mfa?.totp;
+    if (totp?.isEnabled && totp?.isVerified) {
       throw new Error("Two-factor authentication is already enabled.");
     }
 

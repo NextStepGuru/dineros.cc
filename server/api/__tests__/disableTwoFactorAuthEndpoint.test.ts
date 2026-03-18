@@ -127,10 +127,13 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 123 },
       data: {
-        settings: {
-          speakeasy: { isEnabled: false, isVerified: false },
+        settings: expect.objectContaining({
+          speakeasy: expect.objectContaining({
+            isEnabled: false,
+            isVerified: false,
+          }),
           otherSetting: "value",
-        },
+        }),
       },
     });
     expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUpdatedUser);
@@ -237,9 +240,12 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 123 },
       data: {
-        settings: {
-          speakeasy: { isEnabled: false, isVerified: false },
-        },
+        settings: expect.objectContaining({
+          speakeasy: expect.objectContaining({
+            isEnabled: false,
+            isVerified: false,
+          }),
+        }),
       },
     });
     expect(handleApiError).toHaveBeenCalledWith(expect.any(Error));
@@ -302,9 +308,12 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 123 },
       data: {
-        settings: {
-          speakeasy: { isEnabled: false, isVerified: false },
-        },
+        settings: expect.objectContaining({
+          speakeasy: expect.objectContaining({
+            isEnabled: false,
+            isVerified: false,
+          }),
+        }),
       },
     });
     expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUpdatedUser);

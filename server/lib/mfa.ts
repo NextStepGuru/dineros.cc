@@ -42,8 +42,40 @@ type MfaSettings = {
   };
 };
 
+const DEFAULT_MFA_SETTINGS: MfaSettings = {
+  totp: { isEnabled: false, isVerified: false },
+  passkeys: [],
+  emailOtp: { isEnabled: false, isVerified: false },
+};
+
 function toMfaSettings(settings: Record<string, any>): MfaSettings {
-  return settings.mfa as MfaSettings;
+  const mfa = settings?.mfa;
+  if (!mfa || typeof mfa !== "object" || Array.isArray(mfa)) {
+    return DEFAULT_MFA_SETTINGS;
+  }
+  return {
+    totp:
+      mfa.totp && typeof mfa.totp === "object" && !Array.isArray(mfa.totp)
+        ? {
+            isEnabled: Boolean(mfa.totp.isEnabled),
+            isVerified: Boolean(mfa.totp.isVerified),
+            ...(typeof mfa.totp.base32secret === "string"
+              ? { base32secret: mfa.totp.base32secret }
+              : {}),
+            ...(Array.isArray(mfa.totp.backupCodes)
+              ? { backupCodes: mfa.totp.backupCodes }
+              : {}),
+          }
+        : DEFAULT_MFA_SETTINGS.totp,
+    passkeys: Array.isArray(mfa.passkeys) ? mfa.passkeys : [],
+    emailOtp:
+      mfa.emailOtp && typeof mfa.emailOtp === "object" && !Array.isArray(mfa.emailOtp)
+        ? {
+            isEnabled: Boolean(mfa.emailOtp.isEnabled),
+            isVerified: Boolean(mfa.emailOtp.isVerified),
+          }
+        : DEFAULT_MFA_SETTINGS.emailOtp,
+  };
 }
 
 export function getEnabledMfaMethods(settings: Record<string, any>): MfaMethod[] {
