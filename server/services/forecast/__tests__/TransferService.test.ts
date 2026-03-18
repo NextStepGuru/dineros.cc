@@ -7,7 +7,9 @@ import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import type { PrismaClient, Reoccurrence } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
-import { Decimal } from "~/types/test-types";
+import prismaPkg from "@prisma/client";
+
+const { Prisma } = prismaPkg;
 
 const moment = (input?: any) => dateTimeService.create(input);
 
@@ -127,7 +129,7 @@ describe("TransferService", () => {
         intervalCount: 1,
         lastAt: dateTimeService.create("2024-01-15").toDate(),
         endAt: null,
-        amount: new Decimal(100),
+        amount: new Prisma.Decimal(100),
         description: "Test Transfer",
         totalIntervals: null,
         elapsedIntervals: null,
@@ -156,7 +158,7 @@ describe("TransferService", () => {
         intervalCount: 1,
         lastAt: dateTimeService.create("2024-01-15").toDate(),
         endAt: null,
-        amount: new Decimal(100),
+        amount: new Prisma.Decimal(100),
         description: "Test Transfer",
         totalIntervals: null,
         elapsedIntervals: null,
@@ -176,7 +178,7 @@ describe("TransferService", () => {
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           description: "Custom From Description",
-        })
+        }),
       );
     });
   });
@@ -192,7 +194,7 @@ describe("TransferService", () => {
         intervalCount: 1,
         lastAt: dateTimeService.create("2024-01-15").toDate(),
         endAt: null,
-        amount: new Decimal(100),
+        amount: new Prisma.Decimal(100),
         description: "Test Transfer",
         totalIntervals: null,
         elapsedIntervals: null,
@@ -212,7 +214,7 @@ describe("TransferService", () => {
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           forecastDate: dateTimeService.create("2024-01-20").toDate(),
-        })
+        }),
       );
     });
   });
@@ -342,12 +344,12 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       await service.processExtraDebtPayments(
         sourceAccounts,
-        dateTimeService.create("2024-01-01").toDate() // Use 1st of month
+        dateTimeService.create("2024-01-01").toDate(), // Use 1st of month
       );
 
       expect(mockEntryService.createEntry).toHaveBeenCalled();
@@ -441,13 +443,13 @@ describe("TransferService", () => {
           amount: 1000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-15").toDate(),
-        })
+        }),
       );
 
       const targetDate = dateTimeService.create("2024-01-20").toDate();
       const result = (service as any).shouldProcessExtraDebtPayment(
         account,
-        targetDate
+        targetDate,
       );
 
       expect(result).toBe(true); // Should use projected balance of 2000
@@ -498,12 +500,12 @@ describe("TransferService", () => {
 
       // Test the date comparison directly
       const filteredEntries = accountEntries.filter((entry) =>
-        dateTimeService.isSameOrBefore(entry.createdAt, targetDate)
+        dateTimeService.isSameOrBefore(entry.createdAt, targetDate),
       );
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
-        targetDate
+        targetDate,
       );
 
       // Implementation returns sum of entry amounts only (not latestBalance + entries)
@@ -513,7 +515,7 @@ describe("TransferService", () => {
     it("should return 0 for non-existent account", () => {
       const result = (service as any).calculateProjectedBalanceAtDate(
         999,
-        dateTimeService.create("2024-01-01")
+        dateTimeService.create("2024-01-01"),
       );
 
       expect(result).toBe(0);
@@ -535,7 +537,7 @@ describe("TransferService", () => {
           amount: 500,
           isBalanceEntry: true, // Should be excluded
           createdAt: dateTimeService.create("2024-01-15").toDate(),
-        })
+        }),
       );
       mockCache.registerEntry.insert(
         createMockEntry({
@@ -543,12 +545,12 @@ describe("TransferService", () => {
           amount: 200,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-15").toDate(),
-        })
+        }),
       );
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
-        dateTimeService.create("2024-01-20").toDate()
+        dateTimeService.create("2024-01-20").toDate(),
       );
 
       // Implementation sums all entries up to target (does not exclude balance entries)
@@ -570,12 +572,12 @@ describe("TransferService", () => {
           amount: 3000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       const projectedBalance = (service as any).calculateProjectedBalanceAtDate(
         1,
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       expect(projectedBalance).toBe(3000);
@@ -596,12 +598,12 @@ describe("TransferService", () => {
           amount: 3000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       const projectedBalance = (service as any).calculateProjectedBalanceAtDate(
         1,
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       expect(projectedBalance).toBe(3000);
@@ -632,7 +634,7 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       const result = await (service as any).processExtraDebtPayment({
@@ -692,7 +694,7 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       await (service as any).processExtraDebtPayment({
@@ -704,7 +706,7 @@ describe("TransferService", () => {
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           amount: 100,
-        })
+        }),
       );
     });
 
@@ -736,7 +738,7 @@ describe("TransferService", () => {
       // Debug: Check what accounts are in cache
       const allAccounts = mockCache.accountRegister.find({});
       const debtAccounts = mockCache.accountRegister.find(
-        (account) => account.balance < 0
+        (account) => account.balance < 0,
       );
 
       // Test the sorting logic directly
@@ -753,7 +755,7 @@ describe("TransferService", () => {
       // Mock the calculateProjectedBalanceAtDate method to return the expected balance
       vi.spyOn(
         service as any,
-        "calculateProjectedBalanceAtDate"
+        "calculateProjectedBalanceAtDate",
       ).mockReturnValue(3000);
 
       await (service as any).processExtraDebtPayment({
@@ -771,7 +773,7 @@ describe("TransferService", () => {
         expect.objectContaining({
           accountRegisterId: 2,
           amount: 500,
-        })
+        }),
       );
 
       // Check second payment (lower priority debt) - should receive remaining $1000
@@ -779,7 +781,7 @@ describe("TransferService", () => {
         expect.objectContaining({
           accountRegisterId: 3,
           amount: 1000, // Capped at debt balance
-        })
+        }),
       );
     });
 
@@ -812,7 +814,7 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       await (service as any).processExtraDebtPayment({
@@ -824,7 +826,7 @@ describe("TransferService", () => {
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           accountRegisterId: 2,
-        })
+        }),
       );
     });
   });
@@ -847,7 +849,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       // Should skip savings goals when debt exists
@@ -870,18 +872,18 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       const processSavingsGoalForAccountSpy = vi.spyOn(
         service as any,
-        "processSavingsGoalForAccount"
+        "processSavingsGoalForAccount",
       );
       processSavingsGoalForAccountSpy.mockResolvedValue(true);
 
       await service.processSavingsGoals(
         [sourceAccount],
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       expect(processSavingsGoalForAccountSpy).toHaveBeenCalledWith({
@@ -906,19 +908,19 @@ describe("TransferService", () => {
       // Test the shouldProcessExtraDebtPayment function directly
       const shouldProcessSpy = vi.spyOn(
         service as any,
-        "shouldProcessExtraDebtPayment"
+        "shouldProcessExtraDebtPayment",
       );
       shouldProcessSpy.mockReturnValue(true); // Force it to return true
 
       await service.processSavingsGoals(
         [sourceAccount],
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       // Should call shouldProcessExtraDebtPayment
       expect(shouldProcessSpy).toHaveBeenCalledWith(
         sourceAccount,
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       shouldProcessSpy.mockRestore();
@@ -976,7 +978,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       // Should not create any entries since goal is already reached
@@ -1010,7 +1012,7 @@ describe("TransferService", () => {
 
       await service.processSavingsGoals(
         [sourceAccount],
-        dateTimeService.create("2024-01-01").toDate()
+        dateTimeService.create("2024-01-01").toDate(),
       );
 
       // This test is temporarily disabled due to mock complexity
@@ -1051,7 +1053,7 @@ describe("TransferService", () => {
       const result = service.findExtraPaymentAccounts();
 
       expect(result).toHaveLength(1);
-      expect(result[0].allowExtraPayment).toBe(true);
+      expect(result[0]!.allowExtraPayment).toBe(true);
     });
 
     it("getAccountBalance should return account balance or 0", () => {
@@ -1105,7 +1107,7 @@ describe("TransferService", () => {
       const found = mockCache.registerEntry.find({ accountRegisterId: 1 });
 
       expect(found.length).toBe(1);
-      expect(found[0].amount).toBe(500);
+      expect(found[0]!.amount).toBe(500);
     });
   });
 
@@ -1132,7 +1134,7 @@ describe("TransferService", () => {
           amount: 2000,
           isBalanceEntry: false,
           createdAt: dateTimeService.create("2024-01-01").toDate(),
-        })
+        }),
       );
 
       vi.clearAllMocks();
@@ -1174,7 +1176,7 @@ describe("TransferService", () => {
     // Test the debt account finding logic
     const allAccounts = mockCache.accountRegister.find({});
     const debtAccounts = mockCache.accountRegister.find(
-      (account) => account.balance < 0
+      (account) => account.balance < 0,
     );
 
     expect(allAccounts.length).toBe(3);
@@ -1212,7 +1214,7 @@ describe("TransferService", () => {
         amount: 3000,
         isBalanceEntry: false,
         createdAt: dateTimeService.create("2024-01-01").toDate(),
-      })
+      }),
     );
 
     vi.clearAllMocks();

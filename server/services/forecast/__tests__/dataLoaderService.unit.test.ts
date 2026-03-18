@@ -99,9 +99,9 @@ describe("DataLoaderService", () => {
       expect(result.reoccurrences).toHaveLength(1);
       expect(result.reoccurrenceSkips).toHaveLength(1);
 
-      expect(result.accountRegisters[0].name).toBe("Checking");
-      expect(result.registerEntries[0].description).toBe("Test Entry");
-      expect(result.reoccurrences[0].description).toBe("Monthly Salary");
+      expect(result.accountRegisters[0]!.name).toBe("Checking");
+      expect(result.registerEntries[0]!.description).toBe("Test Entry");
+      expect(result.reoccurrences[0]!.description).toBe("Monthly Salary");
       expect(result).toHaveProperty("minReoccurrenceDate");
     });
 
@@ -121,7 +121,7 @@ describe("DataLoaderService", () => {
         balance: 500,
         latestBalance: 500,
         minPayment: 0,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -267,11 +267,11 @@ describe("DataLoaderService", () => {
       };
 
       mockDb.accountRegister.findMany.mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
-        "Database connection failed"
+        "Database connection failed",
       );
     });
 
@@ -284,11 +284,11 @@ describe("DataLoaderService", () => {
 
       mockDb.accountRegister.findMany.mockResolvedValue([]);
       mockDb.registerEntry.findMany.mockRejectedValue(
-        new Error("Register entry query failed")
+        new Error("Register entry query failed"),
       );
 
       await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
-        "Register entry query failed"
+        "Register entry query failed",
       );
     });
 
@@ -302,11 +302,11 @@ describe("DataLoaderService", () => {
       mockDb.accountRegister.findMany.mockResolvedValue([]);
       mockDb.registerEntry.findMany.mockResolvedValue([]);
       mockDb.reoccurrence.findMany.mockRejectedValue(
-        new Error("Reoccurrence query failed")
+        new Error("Reoccurrence query failed"),
       );
 
       await expect(dataLoader.loadAccountData(context)).rejects.toThrow(
-        "Reoccurrence query failed"
+        "Reoccurrence query failed",
       );
     });
   });
@@ -340,13 +340,13 @@ describe("DataLoaderService", () => {
 
       // Check that statementAt is converted to a valid date value
       expect(
-        dateTimeService.isValid(result.accountRegisters[0].statementAt)
+        dateTimeService.isValid(result.accountRegisters[0]!.statementAt),
       ).toBe(true);
       expect(
         dateTimeService.format(
           "YYYY-MM-DD",
-          result.accountRegisters[0].statementAt
-        )
+          result.accountRegisters[0]!.statementAt,
+        ),
       ).toBe("2023-06-15");
     });
 
@@ -391,7 +391,7 @@ describe("DataLoaderService", () => {
       mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
 
       const result = await dataLoader.loadAccountData(context);
-      const loadedAccount = result.accountRegisters[0];
+      const loadedAccount = result.accountRegisters[0]!;
 
       expect(loadedAccount.id).toBe(1);
       expect(loadedAccount.budgetId).toBe("budget-123");
@@ -452,8 +452,8 @@ describe("DataLoaderService", () => {
 
       expect(cachedAccounts).toHaveLength(1);
       expect(cachedEntries).toHaveLength(1);
-      expect(cachedAccounts[0].name).toBe("Test Account");
-      expect(cachedEntries[0].description).toBe("Test Entry");
+      expect(cachedAccounts[0]!.name).toBe("Test Account");
+      expect(cachedEntries[0]!.description).toBe("Test Entry");
     });
 
     it("should handle large datasets efficiently", async () => {

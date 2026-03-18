@@ -29,6 +29,12 @@ export default defineEventHandler(async (event: H3Event) => {
       const { accountRegisterId, fileData } =
         uploadFileSchema.parse(structuredData);
 
+      const register = await prisma.accountRegister.findUniqueOrThrow({
+        where: { id: accountRegisterId },
+        select: { accountId: true },
+      });
+      const accountId = register.accountId;
+
       const csvData = papaparse.parse<{
         Date: string;
         Description: string;
@@ -51,11 +57,12 @@ export default defineEventHandler(async (event: H3Event) => {
           })
           .toDate();
         const amount = parseFloat(
-          item.Amount.replace("$", "").replace(",", "")
+          item.Amount.replace("$", "").replace(",", ""),
         );
         const description = item.Description;
+        const categoryName = item.Category?.trim() || null;
 
-        return { createdAt, amount, description };
+        return { createdAt, amount, description, categoryName };
       });
 
       const filtered = await Promise.all(
@@ -72,7 +79,7 @@ export default defineEventHandler(async (event: H3Event) => {
                     second: 0,
                     milliseconds: 0,
                   })
-                  .subtract({ day: 2 })
+                  .subtract(2, "day")
                   .toDate(),
                 lte: dateTimeService
                   .createUTC(item.createdAt)
@@ -82,19 +89,25 @@ export default defineEventHandler(async (event: H3Event) => {
                     second: 0,
                     milliseconds: 0,
                   })
-                  .add({ day: 2 })
+                  .add(2, "day")
                   .toDate(),
               },
             },
           });
 
           return !lookup;
-        })
+        }),
       );
 
       const filteredResults = results.filter((_, index) => filtered[index]);
 
       if (filteredResults.length) {
+        const categories = await prisma.category.findMany({
+          where: { accountId, isArchived: false },
+          select: { id: true, name: true },
+        });
+        const categoryByName = new Map(categories.map((c) => [c.name, c.id]));
+
         await prisma.registerEntry.createMany({
           data: filteredResults.map((item) => ({
             id: cuid2(),
@@ -105,6 +118,9 @@ export default defineEventHandler(async (event: H3Event) => {
             balance: item.amount,
             isCleared: true,
             isProjected: false,
+            categoryId: item.categoryName
+              ? (categoryByName.get(item.categoryName) ?? null)
+              : null,
           })),
         });
       }

@@ -62,7 +62,7 @@ describe("AccountRegisterService", () => {
       mockCache as any,
       mockLoanCalculator,
       mockEntryService,
-      mockTransferService
+      mockTransferService,
     );
 
     // Mock forecastLogger to avoid test output
@@ -75,7 +75,7 @@ describe("AccountRegisterService", () => {
   });
 
   function createMockAccount(
-    overrides: Partial<CacheAccountRegister> = {}
+    overrides: Partial<CacheAccountRegister> = {},
   ): CacheAccountRegister {
     return {
       id: 1,
@@ -86,7 +86,7 @@ describe("AccountRegisterService", () => {
       balance: 1000,
       latestBalance: 1000,
       minPayment: null,
-      statementAt: dateTimeService.create("2024-01-15"),
+      statementAt: dateTimeService.create("2024-01-15").toDate(),
       apr1: 0.15,
       apr1StartAt: null,
       apr2: null,
@@ -186,11 +186,11 @@ describe("AccountRegisterService", () => {
 
       expect(mockLoanCalculator.shouldProcessInterest).toHaveBeenCalledTimes(3);
       expect(
-        mockLoanCalculator.calculateInterestForAccount
+        mockLoanCalculator.calculateInterestForAccount,
       ).toHaveBeenCalledWith(account1, 0); // Should include projected balance parameter
       expect(mockLoanCalculator.calculatePaymentAmount).toHaveBeenCalledWith(
         account1,
-        50
+        50,
       );
       expect(mockEntryService.createEntry).toHaveBeenCalled();
     });
@@ -209,7 +209,7 @@ describe("AccountRegisterService", () => {
       await service.processInterestCharges(accounts);
 
       expect(
-        mockLoanCalculator.calculateInterestForAccount
+        mockLoanCalculator.calculateInterestForAccount,
       ).toHaveBeenCalledWith(account, 0); // Should include projected balance parameter
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
     });
@@ -219,7 +219,7 @@ describe("AccountRegisterService", () => {
 
       expect(mockLoanCalculator.shouldProcessInterest).not.toHaveBeenCalled();
       expect(
-        mockLoanCalculator.calculateInterestForAccount
+        mockLoanCalculator.calculateInterestForAccount,
       ).not.toHaveBeenCalled();
     });
 
@@ -236,7 +236,7 @@ describe("AccountRegisterService", () => {
 
       expect(mockLoanCalculator.shouldProcessInterest).toHaveBeenCalledWith(
         account,
-        undefined
+        undefined,
       );
     });
   });
@@ -258,7 +258,7 @@ describe("AccountRegisterService", () => {
 
       await (service as any).processAccountInterestCharge(
         account,
-        forecastDate
+        forecastDate,
       );
 
       // Should create interest charge entry (signed amount so running balance is correct)
@@ -284,12 +284,12 @@ describe("AccountRegisterService", () => {
             totalIntervals: null,
             elapsedIntervals: null,
           }),
-        })
+        }),
       );
 
       // Should create transfer for payment
       expect(
-        mockTransferService.transferBetweenAccountsWithDate
+        mockTransferService.transferBetweenAccountsWithDate,
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           targetAccountRegisterId: 1,
@@ -312,7 +312,7 @@ describe("AccountRegisterService", () => {
             elapsedIntervals: null,
             transferAccountRegisterId: 2,
           }),
-        })
+        }),
       );
     });
 
@@ -336,11 +336,11 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           description: "Payment for Loan Account",
           amount: 100,
-        })
+        }),
       );
 
       expect(
-        mockTransferService.transferBetweenAccountsWithDate
+        mockTransferService.transferBetweenAccountsWithDate,
       ).not.toHaveBeenCalled();
     });
 
@@ -360,10 +360,10 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           description: "Interest Earned",
           amount: 25,
-        })
+        }),
       );
       expect(
-        mockTransferService.transferBetweenAccountsWithDate
+        mockTransferService.transferBetweenAccountsWithDate,
       ).not.toHaveBeenCalled();
     });
 
@@ -383,7 +383,7 @@ describe("AccountRegisterService", () => {
           accountRegisterId: 1,
           amount: 500,
           isBalanceEntry: false,
-          createdAt: dateTimeService.create("2024-01-15"),
+          createdAt: dateTimeService.create("2024-01-15").toDate(),
         },
       ]);
 
@@ -395,15 +395,15 @@ describe("AccountRegisterService", () => {
 
       await (service as any).processAccountInterestCharge(
         account,
-        forecastDate
+        forecastDate,
       );
 
       // Should call calculateInterestForAccount with projected balance
       expect(
-        mockLoanCalculator.calculateInterestForAccount
+        mockLoanCalculator.calculateInterestForAccount,
       ).toHaveBeenCalledWith(
         account,
-        1500 // 1000 (latestBalance) + 500 (entry amount) = 1500 projected balance
+        1500, // 1000 (latestBalance) + 500 (entry amount) = 1500 projected balance
       );
     });
   });
@@ -442,7 +442,7 @@ describe("AccountRegisterService", () => {
     it("should update statement date when forecast date is after statement date", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: dateTimeService.create("2024-01-15"),
+        statementAt: dateTimeService.create("2024-01-15").toDate(),
       });
 
       const forecastDate = dateTimeService.create("2024-01-20"); // After statement date
@@ -453,8 +453,8 @@ describe("AccountRegisterService", () => {
       expect(
         dateTimeService.format(
           "YYYY-MM-DD",
-          dateTimeService.createUTC(account.statementAt as any)
-        )
+          dateTimeService.createUTC(account.statementAt as any),
+        ),
       ).toBe("2024-02-15"); // One month later
       expect(mockCache.accountRegister.update).toHaveBeenCalledWith(account);
     });
@@ -462,12 +462,12 @@ describe("AccountRegisterService", () => {
     it("should not update when forecast date is before statement date", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: dateTimeService.create("2024-01-20"),
+        statementAt: dateTimeService.create("2024-01-20").toDate(),
       });
 
       const originalStatementAt = dateTimeService.format(
         "YYYY-MM-DD",
-        dateTimeService.createUTC(account.statementAt as any)
+        dateTimeService.createUTC(account.statementAt as any),
       );
       const forecastDate = dateTimeService.create("2024-01-15"); // Before statement date
 
@@ -477,8 +477,8 @@ describe("AccountRegisterService", () => {
       expect(
         dateTimeService.format(
           "YYYY-MM-DD",
-          dateTimeService.createUTC(account.statementAt as any)
-        )
+          dateTimeService.createUTC(account.statementAt as any),
+        ),
       ).toBe(originalStatementAt);
       expect(mockCache.accountRegister.update).not.toHaveBeenCalled();
       expect(mockDb.accountRegister.update).not.toHaveBeenCalled();
@@ -487,7 +487,7 @@ describe("AccountRegisterService", () => {
     it("should update cache but not database for future dates", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: dateTimeService.create("2024-01-01"),
+        statementAt: dateTimeService.create("2024-01-01").toDate(),
       });
 
       // Use vi.spyOn to mock Date instead of moment
@@ -511,7 +511,7 @@ describe("AccountRegisterService", () => {
     it("should handle no forecast date provided", async () => {
       const account = createMockAccount({
         id: 1,
-        statementAt: dateTimeService.create().subtract(1, "day"), // Yesterday
+        statementAt: dateTimeService.create().subtract(1, "day").toDate(), // Yesterday
       });
 
       await (service as any).updateStatementDate(account); // No forecastDate
@@ -540,8 +540,8 @@ describe("AccountRegisterService", () => {
         typeId: 1,
       });
       expect(result).toHaveLength(2);
-      expect(result[0].typeId).toBe(1);
-      expect(result[1].typeId).toBe(1);
+      expect(result[0]!.typeId).toBe(1);
+      expect(result[1]!.typeId).toBe(1);
     });
 
     it("should return empty array when no accounts match", () => {
@@ -704,8 +704,8 @@ describe("AccountRegisterService", () => {
       const result = service.filterActiveAccounts(accounts);
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe(1);
-      expect(result[1].id).toBe(3);
+      expect(result[0]!.id).toBe(1);
+      expect(result[1]!.id).toBe(3);
       expect(result.every((acc) => !acc.isArchived)).toBe(true);
     });
 
@@ -745,13 +745,13 @@ describe("AccountRegisterService", () => {
 
       expect(mockEntryService.createBalanceEntry).toHaveBeenCalledTimes(3);
       expect(mockEntryService.createBalanceEntry).toHaveBeenCalledWith(
-        accounts[0]
+        accounts[0],
       );
       expect(mockEntryService.createBalanceEntry).toHaveBeenCalledWith(
-        accounts[1]
+        accounts[1],
       );
       expect(mockEntryService.createBalanceEntry).toHaveBeenCalledWith(
-        accounts[2]
+        accounts[2],
       );
     });
 
@@ -771,7 +771,7 @@ describe("AccountRegisterService", () => {
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2023-01-31T00:00:00.000Z"),
-          3
+          3,
         );
         expect(utcYmd(next)).toBe("2023-03-01");
       } finally {
@@ -784,7 +784,7 @@ describe("AccountRegisterService", () => {
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2024-01-31T00:00:00.000Z"),
-          3
+          3,
         );
         expect(utcYmd(next)).toBe("2024-03-01");
       } finally {
@@ -797,7 +797,7 @@ describe("AccountRegisterService", () => {
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2024-11-30T00:00:00.000Z"),
-          3
+          3,
         );
         expect(utcYmd(next)).toBe("2024-12-30");
       } finally {
@@ -810,7 +810,7 @@ describe("AccountRegisterService", () => {
       try {
         const next = (service as any).calculateNextStatementDate(
           dateTimeService.create("2024-03-31T00:00:00.000Z"),
-          3
+          3,
         );
         expect(utcYmd(next)).toBe("2024-04-30");
       } finally {
@@ -821,7 +821,7 @@ describe("AccountRegisterService", () => {
     it("shows multi-cycle monthly drift from Jan 31 (current behavior)", () => {
       const first = (service as any).calculateNextStatementDate(
         dateTimeService.create("2024-01-31T00:00:00.000Z"),
-        3
+        3,
       );
       const second = (service as any).calculateNextStatementDate(first, 3);
       const third = (service as any).calculateNextStatementDate(second, 3);
@@ -834,7 +834,7 @@ describe("AccountRegisterService", () => {
     it("shows multi-cycle monthly drift from Jan 30 (current behavior)", () => {
       const first = (service as any).calculateNextStatementDate(
         dateTimeService.create("2024-01-30T00:00:00.000Z"),
-        3
+        3,
       );
       const second = (service as any).calculateNextStatementDate(first, 3);
 
@@ -845,7 +845,7 @@ describe("AccountRegisterService", () => {
     it("advances yearly statement from leap day anchor (current behavior)", () => {
       const first = (service as any).calculateNextStatementDate(
         dateTimeService.create("2024-02-29T00:00:00.000Z"),
-        4
+        4,
       );
       const second = (service as any).calculateNextStatementDate(first, 4);
 
@@ -856,7 +856,7 @@ describe("AccountRegisterService", () => {
     it("keeps intervalId 5 on yearly cadence (current once behavior)", () => {
       const first = (service as any).calculateNextStatementDate(
         dateTimeService.create("2024-01-15T00:00:00.000Z"),
-        5
+        5,
       );
       const second = (service as any).calculateNextStatementDate(first, 5);
 

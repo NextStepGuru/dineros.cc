@@ -6,7 +6,11 @@ import { getAccountTypeLabel } from "~/lib/utils";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
 
 const ModalsEditAccountRegister = defineAsyncComponent(
-  () => import("~/components/modals/EditAccountRegister.vue")
+  () => import("~/components/modals/EditAccountRegister.vue"),
+);
+
+const ModalsManageCategories = defineAsyncComponent(
+  () => import("~/components/modals/ManageCategories.vue"),
 );
 
 definePageMeta({
@@ -21,7 +25,7 @@ function handleDragStart(event: DragEvent, index: number) {
   // Check if this parent has pocket accounts
   const parentAccount = draggableAccountRegisters.value[index];
   const pocketAccounts = listStore.getAccountRegisters.filter(
-    (f) => f.subAccountRegisterId === parentAccount.id
+    (f) => f.subAccountRegisterId === parentAccount.id,
   );
 
   if (event.dataTransfer) {
@@ -70,7 +74,7 @@ function handleTouchStart(event: TouchEvent, index: number) {
 
     const parentAccount = draggableAccountRegisters.value[index];
     const pocketAccounts = listStore.getAccountRegisters.filter(
-      (f) => f.subAccountRegisterId === parentAccount.id
+      (f) => f.subAccountRegisterId === parentAccount.id,
     );
     if (pocketAccounts.length > 0) {
       draggedPocketGroup.value = {
@@ -119,8 +123,8 @@ function handleTouchMove(event: TouchEvent, index: number) {
     0,
     Math.min(
       draggableAccountRegisters.value.length - 1,
-      Math.round(deltaY / rowHeight) + touchStartIndex.value
-    )
+      Math.round(deltaY / rowHeight) + touchStartIndex.value,
+    ),
   );
 
   if (newIndex !== dragOverIndex.value) {
@@ -149,7 +153,7 @@ function handleTouchEnd(event: TouchEvent, index: number) {
       dragOverIndex.value !== null &&
       draggedIndex.value !== dragOverIndex.value
     ) {
-      handleDrop(null as any, dragOverIndex.value);
+      handleDrop(null as any, dragOverIndex.value as number);
     }
 
     draggedPocketGroup.value = null;
@@ -186,7 +190,7 @@ function handleTouchEnd(event: TouchEvent, index: number) {
 function handlePocketDragStart(
   event: DragEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   draggedIndex.value = `sub-${subRow.id}`;
   isDragging.value = true;
@@ -202,7 +206,7 @@ function handlePocketDragStart(
 function handlePocketDragOver(
   event: DragEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   event.preventDefault();
   if (
@@ -225,7 +229,7 @@ function handlePocketDragLeave(event: DragEvent) {
 function handlePocketDrop(
   event: DragEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   if (
     draggedIndex.value === null ||
@@ -235,7 +239,7 @@ function handlePocketDrop(
   }
 
   // Extract the dragged pocket account ID
-  const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
+  const draggedPocketId = parseInt(String(draggedIndex.value).replace("sub-", ""));
 
   // Get all pocket accounts for this parent
   const pocketAccounts = listStore.getAccountRegisters
@@ -243,7 +247,7 @@ function handlePocketDrop(
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const draggedPocketIndex = pocketAccounts.findIndex(
-    (p) => p.id === draggedPocketId
+    (p) => p.id === draggedPocketId,
   );
   const dropPocketIndex = pocketAccounts.findIndex((p) => p.id === subRow.id);
 
@@ -285,7 +289,7 @@ function handlePocketDrop(
 function handlePocketTouchStart(
   event: TouchEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   if (event.touches.length > 1) return;
 
@@ -314,7 +318,7 @@ function handlePocketTouchStart(
 function handlePocketTouchMove(
   event: TouchEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   if (event.touches.length > 1) {
     if (longPressTimer.value != null) {
@@ -352,14 +356,14 @@ function handlePocketTouchMove(
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const currentIndex = pocketAccounts.findIndex(
-    (p) => p.id === touchStartIndex.value
+    (p) => p.id === touchStartIndex.value,
   );
   const newIndex = Math.max(
     0,
     Math.min(
       pocketAccounts.length - 1,
-      Math.round(deltaY / rowHeight) + currentIndex
-    )
+      Math.round(deltaY / rowHeight) + currentIndex,
+    ),
   );
 
   if (newIndex !== currentIndex) {
@@ -370,7 +374,7 @@ function handlePocketTouchMove(
 function handlePocketTouchEnd(
   event: TouchEvent,
   subRow: AccountRegister,
-  parentId: number
+  parentId: number,
 ) {
   if (longPressTimer.value != null) {
     clearTimeout(longPressTimer.value);
@@ -384,18 +388,18 @@ function handlePocketTouchEnd(
       dragOverIndex.value !== null &&
       draggedIndex.value !== dragOverIndex.value
     ) {
-      const draggedPocketId = parseInt(draggedIndex.value.replace("sub-", ""));
-      const dropPocketId = parseInt(dragOverIndex.value.replace("sub-", ""));
+      const draggedPocketId = parseInt(String(draggedIndex.value).replace("sub-", ""));
+      const dropPocketId = parseInt(String(dragOverIndex.value).replace("sub-", ""));
 
       const pocketAccounts = listStore.getAccountRegisters
         .filter((f) => f.subAccountRegisterId === parentId)
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
       const draggedPocketIndex = pocketAccounts.findIndex(
-        (p) => p.id === draggedPocketId
+        (p) => p.id === draggedPocketId,
       );
       const dropPocketIndex = pocketAccounts.findIndex(
-        (p) => p.id === dropPocketId
+        (p) => p.id === dropPocketId,
       );
 
       if (draggedPocketIndex !== -1 && dropPocketIndex !== -1) {
@@ -492,10 +496,11 @@ function handleDrop(event: DragEvent, dropIndex: number) {
   }
 
   const items = [...draggableAccountRegisters.value];
-  const draggedItem = items[draggedIndex.value];
+  const fromIndex = draggedIndex.value as number;
+  const draggedItem = items[fromIndex];
 
   // Remove the dragged item
-  items.splice(draggedIndex.value, 1);
+  items.splice(fromIndex, 1);
 
   // Insert at the new position
   items.splice(dropIndex, 0, draggedItem);
@@ -509,7 +514,7 @@ function handleDrop(event: DragEvent, dropIndex: number) {
   draggableAccountRegisters.value = updatedItems;
 
   // Call the API to persist the change
-  handleDragEnd({ oldIndex: draggedIndex.value, newIndex: dropIndex });
+  handleDragEnd({ oldIndex: fromIndex, newIndex: dropIndex });
 
   // Reset pocket group state
   draggedPocketGroup.value = null;
@@ -531,6 +536,7 @@ const showShortcuts = ref(false);
 // });
 
 const modal = overlay.create(ModalsEditAccountRegister);
+const categoriesModal = overlay.create(ModalsManageCategories);
 
 function handleTableClick(data: AccountRegister) {
   const editAccountRegister: ModelAccountRegisterProps = {
@@ -564,7 +570,7 @@ const columns: TableColumn<AccountRegister>[] = [
         {
           onClick: () => handleTableClick(row.original),
         },
-        row.getValue("name")
+        row.getValue("name"),
       ),
   },
   {
@@ -583,7 +589,7 @@ const columns: TableColumn<AccountRegister>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("balance"))
+        }).format(row.getValue("balance")),
       );
     },
   },
@@ -597,13 +603,14 @@ function handleAddAccountRegister() {
     accountRegister: {
       id: 0,
       budgetId: authStore.getBudgetId,
-      accountId: listStore.getAccounts?.[0]?.id,
+      accountId: listStore.getAccounts?.[0]?.id ?? "",
       name: "",
       typeId: 0,
       balance: 0,
       latestBalance: 0,
       minPayment: null,
       statementAt: today.value,
+      statementIntervalId: 0,
       apr1: null,
       apr1StartAt: null,
       apr2: null,
@@ -617,6 +624,9 @@ function handleAddAccountRegister() {
       loanTotalYears: null,
       loanOriginalAmount: null,
       sortOrder: 0,
+      loanPaymentSortOrder: 0,
+      savingsGoalSortOrder: 0,
+      accountSavingsGoal: null,
       minAccountBalance: 0,
       allowExtraPayment: false,
       isArchived: false,
@@ -628,6 +638,22 @@ function handleAddAccountRegister() {
     cancel: () => modal.close(),
   };
   modal.open(addAccountRegister);
+}
+
+function handleManageCategories() {
+  const accountId =
+    listStore.getAccountRegisters[0]?.accountId ??
+    listStore.getAccounts?.[0]?.id;
+  if (!accountId) {
+    return;
+  }
+  categoriesModal.open({
+    accountId,
+    callback: () => {
+      categoriesModal.close();
+    },
+    cancel: () => categoriesModal.close(),
+  });
 }
 
 function formatCurrencyClass(balance: number): string {
@@ -651,7 +677,7 @@ function isCreditRegister(reg: AccountRegister): boolean {
 /** Debit / credit / net for accounts table (linked loan+asset or standalone). */
 function registerDebitCreditNet(
   row: AccountRegister,
-  isSubRow: boolean
+  isSubRow: boolean,
 ): { debit: number | null; credit: number | null; net: number | null } {
   if (isSubRow) {
     const b = +row.balance;
@@ -665,7 +691,7 @@ function registerDebitCreditNet(
     (r) =>
       !r.subAccountRegisterId &&
       r.collateralAssetRegisterId === row.id &&
-      r.id !== row.id
+      r.id !== row.id,
   );
   if (linkedLoan && !isCreditRegister(row)) {
     const assetBal = +row.balance;
@@ -709,9 +735,9 @@ const { $api } = useNuxtApp();
 const toast = useToast();
 
 // Drag and drop state
-const draggedIndex = ref<number | null>(null);
+const draggedIndex = ref<number | string | null>(null);
 const isDragging = ref(false);
-const dragOverIndex = ref<number | null>(null);
+const dragOverIndex = ref<number | string | null>(null);
 
 // Touch state for mobile
 const LONG_PRESS_MS = 450;
@@ -753,7 +779,7 @@ const sortMenuItems = computed(() => [
       label: item.label,
       icon: item.icon,
       onSelect: () => {
-        activeSortMode.value = item.key;
+        activeSortMode.value = item.key as "visual" | "loan" | "savings";
       },
     })),
   ],
@@ -768,15 +794,15 @@ watch(
         .filter((account) => !account.subAccountRegisterId)
         .filter((parent) =>
           accountRegisters.some(
-            (pocket) => pocket.subAccountRegisterId === parent.id
-          )
+            (pocket) => pocket.subAccountRegisterId === parent.id,
+          ),
         )
         .map((parent) => parent.id);
 
       collapsedParents.value = new Set(parentsWithPockets);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Toggle pocket accounts visibility
@@ -828,7 +854,7 @@ async function handleDragEnd(event: any) {
       }
 
       return updatedItem;
-    }
+    },
   );
 
   try {
@@ -903,7 +929,7 @@ const globalFilter = ref("");
 const accountRegistersSectionEl = ref<HTMLElement | null>(null);
 const accountRegistersTableViewportEl = ref<HTMLElement | null>(null);
 const accountRegistersViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)"
+  "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
 let accountRegistersResizeObserver: ResizeObserver | null = null;
 let accountRegistersViewportFrameId: number | null = null;
@@ -921,7 +947,7 @@ function updateAccountRegistersViewportMaxHeight() {
     const bottomSpacing = 16;
     const available = Math.max(
       220,
-      Math.floor(window.innerHeight - tableTop - bottomSpacing)
+      Math.floor(window.innerHeight - tableTop - bottomSpacing),
     );
     accountRegistersViewportMaxHeight.value = `${available}px`;
   });
@@ -948,8 +974,9 @@ function subRowDcn(subRow: AccountRegister) {
 /** True when at least one account has a linked asset (loan+asset pair exists). */
 const showDebitCreditColumns = computed(() =>
   listStore.getAccountRegisters.some(
-    (r) => r.collateralAssetRegisterId != null && r.collateralAssetRegisterId > 0
-  )
+    (r) =>
+      r.collateralAssetRegisterId != null && r.collateralAssetRegisterId > 0,
+  ),
 );
 
 // Only main accounts for draggable (no sub-accounts)
@@ -961,7 +988,7 @@ watch(
   (newValue) => {
     draggableAccountRegisters.value = [...newValue];
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const estimatedNetWorth = computed(() => {
@@ -977,7 +1004,7 @@ const estimatedNetWorth = computed(() => {
 /** Main registers only: lowest computed balance + risk signal for cross-account snapshot */
 const accountLiquiditySnapshot = computed(() => {
   const mains = listStore.getAccountRegisters.filter(
-    (r) => !r.subAccountRegisterId
+    (r) => !r.subAccountRegisterId,
   );
   if (mains.length === 0) return null;
   const withNet = mains.map((r) => ({
@@ -1040,6 +1067,12 @@ onBeforeUnmount(() => {
   section(ref="accountRegistersSectionEl" class="m-4")
     div(class="w-full flex flex-wrap items-center gap-2 mb-4")
       UButton(color="info" size="sm" @click="handleAddAccountRegister") Add
+      UButton(
+        variant="soft"
+        size="sm"
+        :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
+        @click="handleManageCategories"
+      ) Manage Categories
       UDropdownMenu(:items="sortMenuItems")
         UButton(variant="soft" size="sm") Sort
       UButton(variant="soft" size="sm" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}

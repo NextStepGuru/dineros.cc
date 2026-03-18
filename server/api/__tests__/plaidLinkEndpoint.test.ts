@@ -84,15 +84,15 @@ describe("Plaid Link API Endpoint", () => {
 
       expect(getUser).toHaveBeenCalledWith(mockEvent);
       expect(PlaidApi).toHaveBeenCalled();
-      expect(mockPlaidClient.linkTokenCreate).toHaveBeenCalledWith({
-        user: {
-          client_user_id: "123",
-        },
-        client_name: "Dineros.cc",
-        products: [Products.Transactions],
-        language: "en",
-        country_codes: [CountryCode.Us],
-      });
+      expect(mockPlaidClient.linkTokenCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: { client_user_id: "123" },
+          client_name: "Dineros.cc",
+          products: [Products.Transactions],
+          language: "en",
+          country_codes: [CountryCode.Us],
+        }),
+      );
       expect(result).toEqual(mockLinkTokenResponse.data);
     });
 
@@ -111,7 +111,7 @@ describe("Plaid Link API Endpoint", () => {
       });
 
       await expect(plaidLinkHandler(mockEvent)).rejects.toThrow(
-        "Plaid API error"
+        "Plaid API error",
       );
 
       expect(getUser).toHaveBeenCalledWith(mockEvent);
@@ -165,7 +165,7 @@ describe("Plaid Link API Endpoint", () => {
           products: ["transactions"],
           language: "en",
           country_codes: ["US"],
-        })
+        }),
       );
     });
   });

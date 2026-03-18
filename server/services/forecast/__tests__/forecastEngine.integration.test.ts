@@ -48,7 +48,7 @@ describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
   let testContext: ForecastContext;
 
-beforeEach(async () => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Reset the global mockDb (skip $transaction/$executeRaw to avoid mockReset on non-vi functions)
@@ -264,7 +264,7 @@ beforeEach(async () => {
 
       // Should have balance entries for each account
       const balanceEntries = result.registerEntries.filter(
-        (entry) => entry.isBalanceEntry === true
+        (entry) => entry.isBalanceEntry === true,
       );
 
       expect(balanceEntries.length).toBe(2); // One for each account
@@ -277,10 +277,10 @@ beforeEach(async () => {
 
       // Should have salary and rent entries
       const salaryEntries = result.registerEntries.filter((entry) =>
-        entry.description.includes("Monthly Salary")
+        entry.description.includes("Monthly Salary"),
       );
       const rentEntries = result.registerEntries.filter((entry) =>
-        entry.description.includes("Monthly Rent")
+        entry.description.includes("Monthly Rent"),
       );
 
       expect(salaryEntries.length).toBeGreaterThan(0);
@@ -294,12 +294,12 @@ beforeEach(async () => {
 
       // Should have interest charges for credit card
       const interestEntries = result.registerEntries.filter((entry) =>
-        entry.description.includes("Interest Charge")
+        entry.description.includes("Interest Charge"),
       );
 
       // Should have payment entries
       const paymentEntries = result.registerEntries.filter((entry) =>
-        entry.description.includes("Payment")
+        entry.description.includes("Payment"),
       );
 
       // Interest and payment entries may or may not be generated depending on account setup
@@ -380,7 +380,7 @@ beforeEach(async () => {
       try {
         // Simulate database error
         mockDb.accountRegister.findMany.mockRejectedValue(
-          new Error("Database connection failed")
+          new Error("Database connection failed"),
         );
 
         const result = await engine.recalculate(testContext);
@@ -416,24 +416,27 @@ beforeEach(async () => {
       expect(result.isSuccess).toBe(true);
 
       // Group entries by account
-      const entriesByAccount = result.registerEntries.reduce((acc, entry) => {
-        if (!acc[entry.accountRegisterId]) {
-          acc[entry.accountRegisterId] = [];
-        }
-        acc[entry.accountRegisterId].push(entry);
-        return acc;
-      }, {} as Record<number, typeof result.registerEntries>);
+      const entriesByAccount = result.registerEntries.reduce(
+        (acc, entry) => {
+          const id = entry.accountRegisterId;
+          const arr = acc[id] ?? [];
+          if (arr.length === 0) acc[id] = arr;
+          arr.push(entry);
+          return acc;
+        },
+        {} as Record<number, typeof result.registerEntries>,
+      );
 
       // Verify running balances for each account
       Object.values(entriesByAccount).forEach((accountEntries) => {
         const sortedEntries = accountEntries.sort(
           (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         );
 
         // Find the balance entry to get the starting balance
         const balanceEntry = sortedEntries.find(
-          (entry) => entry.isBalanceEntry
+          (entry) => entry.isBalanceEntry,
         );
         if (!balanceEntry) {
           throw new Error("No balance entry found in test data");
@@ -447,6 +450,7 @@ beforeEach(async () => {
 
         for (let i = 0; i < sortedEntries.length; i++) {
           const current = sortedEntries[i];
+          if (current == null) continue;
 
           // Skip balance entries as they set the initial balance
           if (current.isBalanceEntry) {
@@ -468,10 +472,10 @@ beforeEach(async () => {
       expect(result.isSuccess).toBe(true);
 
       const balanceEntries = result.registerEntries.filter(
-        (e) => e.isBalanceEntry
+        (e) => e.isBalanceEntry,
       );
       const projectedEntries = result.registerEntries.filter(
-        (e) => e.isProjected
+        (e) => e.isProjected,
       );
       const pendingEntries = result.registerEntries.filter((e) => e.isPending);
 
@@ -557,7 +561,7 @@ beforeEach(async () => {
 
       // Should have extra debt payment entries
       const extraPaymentEntries = result.registerEntries.filter((entry) =>
-        entry.description.includes("Extra debt payment")
+        entry.description.includes("Extra debt payment"),
       );
 
       expect(extraPaymentEntries.length).toBeGreaterThanOrEqual(0);

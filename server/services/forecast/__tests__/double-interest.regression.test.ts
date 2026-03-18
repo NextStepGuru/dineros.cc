@@ -45,7 +45,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       cache,
       loanCalculator,
       entryService,
-      transferService
+      transferService,
     );
   });
 
@@ -58,7 +58,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.12,
         apr2: null,
         apr3: null,
-        statementAt: dateTimeService.create("2025-01-15"),
+        statementAt: dateTimeService.create("2025-01-15").toDate(),
         statementIntervalId: 3,
         typeId: 4,
         name: "Test Credit Card",
@@ -87,41 +87,41 @@ describe("Double Interest Calculation Regression Tests", () => {
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          dateTimeService.create("2025-01-15")
-        )
+          dateTimeService.create("2025-01-15"),
+        ),
       ).toBe(true);
 
       // Should NOT process on the day before
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          dateTimeService.create("2025-01-14")
-        )
+          dateTimeService.create("2025-01-14"),
+        ),
       ).toBe(false);
 
       // Should NOT process on the day after (this was the bug!)
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          dateTimeService.create("2025-01-16")
-        )
+          dateTimeService.create("2025-01-16"),
+        ),
       ).toBe(false);
 
       // Should NOT process within old "grace period"
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          dateTimeService.create("2025-01-17")
-        )
+          dateTimeService.create("2025-01-17"),
+        ),
       ).toBe(false);
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-18"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-18")),
       ).toBe(false);
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-20"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-20")),
       ).toBe(false);
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-22"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-22")),
       ).toBe(false); // 7 days later
     });
 
@@ -132,7 +132,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0, // No APR
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-15"),
+        statementAt: moment("2025-01-15").toDate(),
         statementIntervalId: 3,
         typeId: 4,
         name: "No APR Account",
@@ -158,7 +158,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       };
 
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-15"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-15")),
       ).toBe(false);
     });
 
@@ -169,7 +169,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.12,
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-15"),
+        statementAt: moment("2025-01-15").toDate(),
         statementIntervalId: 3,
         typeId: 4,
         name: "Zero Balance Account",
@@ -195,7 +195,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       };
 
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-15"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-15")),
       ).toBe(false);
     });
   });
@@ -210,7 +210,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.18,
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-15"),
+        statementAt: moment("2025-01-15").toDate(),
         statementIntervalId: 3, // Monthly
         typeId: 4,
         name: "Statement Date Test",
@@ -239,7 +239,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       // Act: Update statement date as if interest was processed
       await accountService.updateStatementDates(
         [account],
-        moment("2025-01-15")
+        moment("2025-01-15"),
       );
 
       // Assert: Statement date should advance to next month
@@ -247,8 +247,8 @@ describe("Double Interest Calculation Regression Tests", () => {
       expect(
         dateTimeService.format(
           "YYYY-MM-DD",
-          dateTimeService.createUTC(updatedAccount?.statementAt as any)
-        )
+          dateTimeService.createUTC(updatedAccount?.statementAt as any),
+        ),
       ).toBe("2025-02-15");
     });
 
@@ -267,7 +267,7 @@ describe("Double Interest Calculation Regression Tests", () => {
           id: testCase.intervalId + 10,
           balance: -1000,
           latestBalance: -1000,
-          statementAt: moment(testCase.current),
+          statementAt: moment(testCase.current).toDate(),
           statementIntervalId: testCase.intervalId,
           typeId: 4,
           name: `Interval Test ${testCase.intervalId}`,
@@ -299,7 +299,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         // Act
         await accountService.updateStatementDates(
           [account],
-          moment(testCase.current)
+          moment(testCase.current),
         );
 
         // Assert
@@ -309,8 +309,8 @@ describe("Double Interest Calculation Regression Tests", () => {
         expect(
           dateTimeService.format(
             "YYYY-MM-DD",
-            dateTimeService.createUTC(updatedAccount?.statementAt as any)
-          )
+            dateTimeService.createUTC(updatedAccount?.statementAt as any),
+          ),
         ).toBe(testCase.expected);
       }
     });
@@ -326,7 +326,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.05, // 5% APR
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-15"),
+        statementAt: moment("2025-01-15").toDate(),
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
         name: "Interest Timeline Test",
@@ -360,7 +360,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       while (currentDate.isBefore(endDate)) {
         const shouldProcess = loanCalculator.shouldProcessInterest(
           account,
-          currentDate.clone()
+          currentDate.clone(),
         );
 
         if (shouldProcess) {
@@ -368,7 +368,7 @@ describe("Double Interest Calculation Regression Tests", () => {
 
           // Simulate statement date update after processing
           if (currentDate.isSameOrAfter(account.statementAt)) {
-            account.statementAt = account.statementAt.clone().add(1, "month");
+            account.statementAt = dateTimeService.create(account.statementAt).add(1, "month").toDate();
           }
         }
 
@@ -402,7 +402,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.05,
         apr2: null,
         apr3: null,
-        statementAt: moment("2027-05-21"), // From screenshot
+        statementAt: moment("2027-05-21").toDate(), // From screenshot
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
         name: "Slides & Solar savings fund",
@@ -431,15 +431,15 @@ describe("Double Interest Calculation Regression Tests", () => {
       // Act: Test consecutive days around statement date
       const may21Should = loanCalculator.shouldProcessInterest(
         account,
-        moment("2027-05-21")
+        moment("2027-05-21"),
       );
       const may22Should = loanCalculator.shouldProcessInterest(
         account,
-        moment("2027-05-22")
+        moment("2027-05-22"),
       );
       const may23Should = loanCalculator.shouldProcessInterest(
         account,
-        moment("2027-05-23")
+        moment("2027-05-23"),
       );
 
       // Assert: Only statement date should process
@@ -459,7 +459,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.04, // 4% APR
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-02-01"),
+        statementAt: moment("2025-02-01").toDate(),
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
         name: "Integration Test Account",
@@ -495,21 +495,20 @@ describe("Double Interest Calculation Regression Tests", () => {
         // Check if should process interest
         const shouldProcess = loanCalculator.shouldProcessInterest(
           account,
-          statementDate
+          statementDate,
         );
 
         if (shouldProcess) {
           // Calculate and record interest
-          const interest = await loanCalculator.calculateInterestForAccount(
-            account
-          );
+          const interest =
+            await loanCalculator.calculateInterestForAccount(account);
           interestEntries.push({
             date: statementDate.format("YYYY-MM-DD"),
             amount: interest,
           });
 
           // Update statement date (simulate what happens in real processing)
-          account.statementAt = statementDate.clone().add(1, "month");
+          account.statementAt = statementDate.clone().add(1, "month").toDate();
           account.balance += interest; // Add earned interest to balance
         }
       }
@@ -540,7 +539,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.05,
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-03-09 12:00:00"), // DST transition weekend
+        statementAt: moment("2025-03-09 12:00:00").toDate(), // DST transition weekend
         statementIntervalId: 3,
         typeId: 2,
         name: "DST Test Account",
@@ -569,34 +568,34 @@ describe("Double Interest Calculation Regression Tests", () => {
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          moment("2025-03-09 00:00:00")
-        )
+          moment("2025-03-09 00:00:00"),
+        ),
       ).toBe(true);
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          moment("2025-03-09 12:00:00")
-        )
+          moment("2025-03-09 12:00:00"),
+        ),
       ).toBe(true);
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          moment("2025-03-09 23:59:59")
-        )
+          moment("2025-03-09 23:59:59"),
+        ),
       ).toBe(true);
 
       // Should not process day before or after
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          moment("2025-03-08 23:59:59")
-        )
+          moment("2025-03-08 23:59:59"),
+        ),
       ).toBe(false);
       expect(
         loanCalculator.shouldProcessInterest(
           account,
-          moment("2025-03-10 00:00:01")
-        )
+          moment("2025-03-10 00:00:01"),
+        ),
       ).toBe(false);
     });
 
@@ -607,7 +606,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         apr1: 0.05,
         apr2: null,
         apr3: null,
-        statementAt: moment("2025-01-31"), // End of month
+        statementAt: moment("2025-01-31").toDate(), // End of month
         statementIntervalId: 3,
         typeId: 2,
         name: "Month End Test",
@@ -634,13 +633,13 @@ describe("Double Interest Calculation Regression Tests", () => {
 
       // Should process only on exact date
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-31"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-31")),
       ).toBe(true);
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-01-30"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-01-30")),
       ).toBe(false);
       expect(
-        loanCalculator.shouldProcessInterest(account, moment("2025-02-01"))
+        loanCalculator.shouldProcessInterest(account, moment("2025-02-01")),
       ).toBe(false);
     });
   });

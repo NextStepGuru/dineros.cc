@@ -827,9 +827,11 @@ describe("Register Entry API Endpoints", () => {
 
       (dateTimeService.toDate as any) = vi.fn().mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
       (dateTimeService.parseInput as any) = vi.fn().mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
-      (dateTimeService.createUTC as any) = vi.fn().mockReturnThis();
-      (dateTimeService.createUTC().set as any) = vi.fn().mockReturnThis();
-      (dateTimeService.createUTC().set().isSameOrBefore as any) = vi.fn().mockReturnValue(true);
+      const createUTCMock = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnThis(),
+        isSameOrBefore: vi.fn().mockReturnValue(true),
+      });
+      (dateTimeService.createUTC as any) = createUTCMock;
       (dateTimeService.now as any) = vi.fn().mockReturnValue({ utc: vi.fn().mockReturnThis(), set: vi.fn().mockReturnThis() });
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);

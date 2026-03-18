@@ -27,7 +27,7 @@ describe("Debug Forecast Engine Test", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -64,7 +64,7 @@ describe("Debug Forecast Engine Test", () => {
         isProjected: false,
         isManualEntry: true,
         isReconciled: false,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
       },
     });
 
@@ -72,7 +72,7 @@ describe("Debug Forecast Engine Test", () => {
     const allEntries = await db.registerEntry.findMany();
 
     // Create forecast engine
-    const engine = ForecastEngineFactory.create(db);
+    const engine = ForecastEngineFactory.create(db as any);
 
     // Run forecast
     const result = await engine.recalculate({

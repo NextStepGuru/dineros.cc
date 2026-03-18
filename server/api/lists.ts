@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
       },
     };
 
-    const [reoccurrences, budgets, intervals, accountTypes, accountRegisters, accounts] =
+    const [reoccurrences, budgets, intervals, accountTypes, accountRegisters, accounts, categories] =
       await Promise.all([
         PrismaDb.reoccurrence.findMany({
           where: userAccountFilter,
@@ -45,6 +45,15 @@ export default defineEventHandler(async (event) => {
             userAccounts: { some: { userId: user.userId } },
           },
         }),
+        PrismaDb.category.findMany({
+          where: {
+            isArchived: false,
+            account: {
+              userAccounts: { some: { userId: user.userId } },
+            },
+          },
+          orderBy: { name: "asc" },
+        }),
       ]);
 
     return {
@@ -54,6 +63,7 @@ export default defineEventHandler(async (event) => {
       accountRegisters,
       budgets,
       accounts,
+      categories,
     };
   } catch (error) {
     handleApiError(error);

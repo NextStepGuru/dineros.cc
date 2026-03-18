@@ -81,16 +81,6 @@ export default defineVitestConfig({
         "nuxt.config.ts",
         "app.config.ts",
         "eslint.config.mjs",
-        // Exclude all Plaid-related files
-        "**/plaid*.{js,ts}", // Files starting with 'plaid'
-        "**/*plaid*.{js,ts}", // Files containing 'plaid'
-        "server/api/plaid-*.{js,ts}", // Plaid API endpoints
-        "server/api/webhook/plaid*.{js,ts}", // Plaid webhooks
-        "server/cron/plaid*.{js,ts}", // Plaid cron jobs
-        "server/queues/plaid*.{js,ts}", // Plaid queue processors
-        "server/services/PlaidSyncService.ts", // Plaid sync service
-        "server/lib/getPlaidClient.ts", // Plaid client configuration
-        "schema/plaid.ts", // Plaid schema definitions
       ],
       include: [
         "server/**/*.{js,ts}",

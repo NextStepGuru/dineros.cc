@@ -26,7 +26,7 @@ describe("ModernCacheService", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -65,7 +65,7 @@ describe("ModernCacheService", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -93,7 +93,7 @@ describe("ModernCacheService", () => {
       cache.accountRegister.update(updatedAccount);
 
       const found = cache.accountRegister.find({ id: 1 });
-      expect(found[0].balance).toBe(1500);
+      expect(found[0]!.balance).toBe(1500);
     });
 
     it("should remove account registers", () => {
@@ -106,7 +106,7 @@ describe("ModernCacheService", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -143,11 +143,12 @@ describe("ModernCacheService", () => {
         seq: 1,
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
         description: "Test Entry",
         reoccurrenceId: null,
         amount: 100,
         balance: 1100,
+        typeId: null,
         isBalanceEntry: false,
         isPending: false,
         isCleared: false,
@@ -169,11 +170,12 @@ describe("ModernCacheService", () => {
         seq: 1,
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
         description: "Test Entry",
         reoccurrenceId: null,
         amount: 100,
         balance: 1100,
+        typeId: null,
         isBalanceEntry: false,
         isPending: false,
         isCleared: false,
@@ -188,7 +190,7 @@ describe("ModernCacheService", () => {
       cache.registerEntry.update(updatedEntry);
 
       const found = cache.registerEntry.find({ id: "test-entry" });
-      expect(found[0].amount).toBe(150);
+      expect(found[0]!.amount).toBe(150);
     });
 
     it("should remove register entries", () => {
@@ -197,11 +199,12 @@ describe("ModernCacheService", () => {
         seq: 1,
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
         description: "Test Entry",
         reoccurrenceId: null,
         amount: 100,
         balance: 1100,
+        typeId: null,
         isBalanceEntry: false,
         isPending: false,
         isCleared: false,
@@ -227,13 +230,13 @@ describe("ModernCacheService", () => {
         intervalId: 1,
         transferAccountRegisterId: null,
         intervalCount: 1,
-        lastAt: dateTimeService.create(),
+        lastAt: dateTimeService.create().toDate(),
         endAt: null,
         amount: 100,
         description: "Test Reoccurrence",
         totalIntervals: null,
         elapsedIntervals: null,
-        updatedAt: dateTimeService.create(),
+        updatedAt: dateTimeService.create().toDate(),
         adjustBeforeIfOnWeekend: false,
       };
 
@@ -252,13 +255,13 @@ describe("ModernCacheService", () => {
         intervalId: 1,
         transferAccountRegisterId: null,
         intervalCount: 1,
-        lastAt: dateTimeService.create(),
+        lastAt: dateTimeService.create().toDate(),
         endAt: null,
         amount: 100,
         description: "Test Reoccurrence",
         totalIntervals: null,
         elapsedIntervals: null,
-        updatedAt: dateTimeService.create(),
+        updatedAt: dateTimeService.create().toDate(),
         adjustBeforeIfOnWeekend: false,
       };
 
@@ -268,7 +271,7 @@ describe("ModernCacheService", () => {
       cache.reoccurrence.update(updatedReoccurrence);
 
       const found = cache.reoccurrence.find({ id: 1 });
-      expect(found[0].amount).toBe(150);
+      expect(found[0]!.amount).toBe(150);
     });
 
     it("should remove reoccurrences", () => {
@@ -279,13 +282,13 @@ describe("ModernCacheService", () => {
         intervalId: 1,
         transferAccountRegisterId: null,
         intervalCount: 1,
-        lastAt: dateTimeService.create(),
+        lastAt: dateTimeService.create().toDate(),
         endAt: null,
         amount: 100,
         description: "Test Reoccurrence",
         totalIntervals: null,
         elapsedIntervals: null,
-        updatedAt: dateTimeService.create(),
+        updatedAt: dateTimeService.create().toDate(),
         adjustBeforeIfOnWeekend: false,
       };
 
@@ -329,7 +332,7 @@ describe("ModernCacheService", () => {
       cache.reoccurrenceSkip.update(updatedSkip);
 
       const found = cache.reoccurrenceSkip.find({ id: 1 });
-      expect(found[0].skippedAt).toBe("2024-01-02");
+      expect(found[0]!.skippedAt).toBe("2024-01-02");
     });
 
     it("should remove reoccurrence skips", () => {
@@ -361,7 +364,7 @@ describe("ModernCacheService", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -388,11 +391,12 @@ describe("ModernCacheService", () => {
         seq: 1,
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
         description: "Test Entry",
         reoccurrenceId: null,
         amount: 100,
         balance: 1100,
+        typeId: null,
         isBalanceEntry: false,
         isPending: false,
         isCleared: false,
@@ -426,7 +430,7 @@ describe("ModernCacheService", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -453,11 +457,12 @@ describe("ModernCacheService", () => {
         seq: 1,
         accountRegisterId: 1,
         sourceAccountRegisterId: null,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
         description: "Test Entry",
         reoccurrenceId: null,
         amount: 100,
         balance: 1100,
+        typeId: null,
         isBalanceEntry: false,
         isPending: false,
         isCleared: false,

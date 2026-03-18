@@ -45,15 +45,15 @@ describe('ForecastEngineFactory', () => {
     });
 
     it('should create a ForecastEngine instance with empty custom services object', () => {
-      const engine = ForecastEngineFactory.createWithCustomServices(mockPrismaClient, {});
+      const engine = ForecastEngineFactory.createWithCustomServices(mockPrismaClient);
 
       expect(engine).toBeInstanceOf(ForecastEngine);
       expect(engine).toBeDefined();
     });
 
     it('should create different instances on multiple calls with custom services', () => {
-      const engine1 = ForecastEngineFactory.createWithCustomServices(mockPrismaClient, {});
-      const engine2 = ForecastEngineFactory.createWithCustomServices(mockPrismaClient, {});
+      const engine1 = ForecastEngineFactory.createWithCustomServices(mockPrismaClient);
+      const engine2 = ForecastEngineFactory.createWithCustomServices(mockPrismaClient);
 
       expect(engine1).not.toBe(engine2);
       expect(engine1).toBeInstanceOf(ForecastEngine);

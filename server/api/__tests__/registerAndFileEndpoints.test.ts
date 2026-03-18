@@ -44,6 +44,9 @@ vi.mock("~/server/clients/prismaClient", () => ({
       createMany: vi.fn(),
       count: vi.fn(),
     },
+    category: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -492,8 +495,12 @@ describe("Register and File Upload API Endpoints", () => {
           mockFormData
         );
         (getUser as any).mockReturnValue({ userId: 123 });
+        (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue({
+          accountId: mockAccountRegister.id,
+        });
         (papaparse.default.parse as any).mockReturnValue(mockCsvData);
         (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates found
+        (prisma.category.findMany as any).mockResolvedValue([]);
         (createId as any).mockReturnValue("entry-123");
         (prisma.registerEntry.create as any).mockResolvedValue({
           id: "entry-123",

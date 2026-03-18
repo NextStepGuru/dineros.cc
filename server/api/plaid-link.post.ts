@@ -6,6 +6,8 @@ import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
 import { postmarkClient } from "../clients/postmarkClient";
 import { plaidRootSchema } from "~/schema/plaid";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast/DateTimeService";
+import { addPlaidSyncJob } from "~/server/clients/queuesClient";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -30,13 +32,23 @@ export default defineEventHandler(async (event) => {
       public_token: plaidBody.public_token,
     });
 
+    const itemId = results.data.item_id;
+    if (itemId) {
+      await PrismaDb.plaidItem.upsert({
+        where: { itemId },
+        create: { itemId, userId },
+        update: { userId, updatedAt: dateTimeService.now().toDate() },
+      });
+      addPlaidSyncJob({ name: "Initial Plaid sync after link", itemId });
+    }
+
     const userResult = await PrismaDb.user.update({
       data: {
         settings: JSON.parse(
           JSON.stringify({
             ...user.settings,
             plaid: { ...plaidBody, ...results.data, isEnabled: true },
-          })
+          }),
         ),
       },
       where: { id: userId },

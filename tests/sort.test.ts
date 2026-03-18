@@ -960,6 +960,7 @@ describe("recalculateRunningBalanceAndSort", () => {
           isMatched: false,
           isPending: false,
           isProjected: true,
+          seq: null,
         },
         {
           amount: -100,
@@ -971,6 +972,7 @@ describe("recalculateRunningBalanceAndSort", () => {
           isMatched: false,
           isPending: false,
           isProjected: true,
+          seq: null,
         },
       ],
       balance: 1000,

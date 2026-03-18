@@ -11,37 +11,33 @@ export default defineCronHandler("hourly", async () => {
     .subtract(6, "hours")
     .toDate();
 
-  const accountRegisters = await prisma.accountRegister.groupBy({
-    _min: {
-      id: true,
-    },
-    by: ["plaidAccessToken"],
+  const accountRegisters = await prisma.accountRegister.findMany({
     where: {
       isArchived: false,
-      plaidAccessToken: {
-        not: null,
-      },
+      plaidAccessToken: { not: null },
+      plaidId: { not: null },
       OR: [
         { plaidBalanceLastSyncAt: null },
-        {
-          plaidBalanceLastSyncAt: {
-            lt: olderThanDate,
-          },
-        },
+        { plaidBalanceLastSyncAt: { lt: olderThanDate } },
       ],
     },
+    select: { id: true, plaidAccessToken: true },
   });
 
-  accountRegisters.map((accountRegister) => {
-    if (accountRegister._min.id) {
-      addPlaidBalanceSyncJob({ accountRegisterId: accountRegister._min.id });
-      log({
-        message: "Plaid accounts synchronized successfully",
-        level: "info",
-        data: {
-          accountRegisterId: accountRegister._min.id,
-        },
-      });
+  const oneRegisterIdPerToken = new Map<string, number>();
+  for (const ar of accountRegisters) {
+    const token = ar.plaidAccessToken;
+    if (token && !oneRegisterIdPerToken.has(token)) {
+      oneRegisterIdPerToken.set(token, ar.id);
     }
-  });
+  }
+
+  for (const accountRegisterId of oneRegisterIdPerToken.values()) {
+    addPlaidBalanceSyncJob({ accountRegisterId });
+    log({
+      message: "Plaid balance sync job enqueued",
+      level: "info",
+      data: { accountRegisterId },
+    });
+  }
 });

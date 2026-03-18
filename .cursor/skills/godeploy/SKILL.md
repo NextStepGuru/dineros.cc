@@ -12,8 +12,24 @@ Run these steps in order. Stop and tell the user if any step fails.
 
 ## 0. Preconditions
 
-- Clean understanding of **branch name** and **commit message** (and optional **PR title/body**). Ask once if missing; branch name may be derived from the message (e.g. `feat/short-slug`).
+- Resolve **branch name**, **commit message**, **PR title**, and **PR body**. Ask once if branch/message are missing; branch name may be derived from the change (e.g. `feat/category-management`).
 - Do not run if the user is in **detached HEAD** (`git branch --show-current` empty).
+
+### Generating commit, PR title, and PR body from the diff
+
+When the user does not supply a commit message and/or PR title/body, derive them from the working tree and diff **before** committing:
+
+1. **Commit message** (conventional, one line; optional second line with bullets if many changes):
+   - Run `git status` and `git diff` (and after staging, `git diff --cached`) to see what changed.
+   - Choose type: `feat`, `fix`, `docs`, `refactor`, `chore`, etc. Add scope if clear (e.g. `feat(registers): …`).
+   - Subject: short, present-tense, imperative (e.g. "add category management" not "added").
+   - Example: `feat(registers): add category management and API endpoints`.
+
+2. **PR title** (50–72 chars, descriptive, no need to repeat "feat:"):
+   - User-supplied, or expand the commit subject into a clear headline (e.g. "Add category management and API endpoints" or "Category management for registers").
+
+3. **PR body** (short and informative):
+   - User-supplied, or write 2–4 sentences or bullets summarizing: what changed, which areas (e.g. API, UI, schema), and any notable files or behaviors. Use the diff and file list to stay accurate; avoid generic filler.
 
 ## 1. Default branch
 
@@ -46,7 +62,7 @@ If there is nothing to commit (`git status` clean after add), say so and **skip 
 git commit -m "<message>"
 ```
 
-Message: user-supplied, or short conventional line from diff (e.g. `feat: …`).
+Message: user-supplied, or generate from diff per "Generating commit, PR title, and PR body from the diff" above.
 
 ## 4. Push (safe)
 
@@ -69,7 +85,7 @@ Resolve conflicts before pushing. Never `git push --force` without lease.
 
 Follow the **pr** skill: resolve owner/repo from `origin`, `head` = current branch, `base` = `DEFAULT`. Prefer GitHub MCP `create_pull_request`; else `gh pr create --base <base> --head <branch> --title "..." [--body "..."]`.
 
-Title: user PR title or first line of the latest commit.
+Title: user PR title or generated headline per above. Body: user PR body or generated summary per above. Always pass a body when using `gh pr create` or MCP if one was generated or provided.
 
 ## Reference
 

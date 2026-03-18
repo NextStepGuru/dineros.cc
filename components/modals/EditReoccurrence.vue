@@ -10,6 +10,7 @@ import {
 import type { Reoccurrence } from "~/types/types";
 
 import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
+// @ts-expect-error form ref from template
 const form = useTemplateRef("form");
 const toast = useToast();
 const { $api } = useNuxtApp();

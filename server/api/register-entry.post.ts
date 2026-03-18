@@ -20,6 +20,7 @@ export default defineEventHandler(async (event: H3Event) => {
       reoccurrenceId,
       amount,
       balance,
+      categoryId,
       isProjected,
       isReconciled,
       isCleared,
@@ -51,6 +52,15 @@ export default defineEventHandler(async (event: H3Event) => {
         });
       });
 
+    if (categoryId) {
+      await PrismaDb.category.findFirstOrThrow({
+        where: {
+          id: categoryId,
+          accountId: lookup.accountId,
+        },
+      });
+    }
+
     const cuid = createId();
 
     let registerEntry = await PrismaDb.registerEntry
@@ -75,6 +85,7 @@ export default defineEventHandler(async (event: H3Event) => {
           plaidJson,
           createdAt,
           hasBalanceReCalc: true,
+          categoryId: categoryId ?? null,
         },
         update: {
           accountRegisterId,
@@ -92,6 +103,7 @@ export default defineEventHandler(async (event: H3Event) => {
           plaidJson,
           createdAt,
           hasBalanceReCalc: true,
+          categoryId: categoryId ?? null,
         },
       })
       .catch(() => {

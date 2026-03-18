@@ -7,6 +7,8 @@ const envSchema = z.object({
   DB_DECRYPTION_KEYS: z.string().transform((a: string) => a.split(",")),
   PLAID_CLIENT_ID: z.string(),
   PLAID_SECRET: z.string(),
+  /** Plaid webhook URL (e.g. https://your-domain.com/api/webhook/plaid). Optional; if unset, link token is created without webhook. */
+  PLAID_WEBHOOK_URL: z.url().optional(),
   POSTMARK_SERVER_TOKEN: z.string().optional().default(""),
   /** BCC on signup welcome email (Postmark); comma-separated for multiple */
   SIGNUP_WELCOME_BCC: z.string().optional().default("jeremy@nextstep.guru"),

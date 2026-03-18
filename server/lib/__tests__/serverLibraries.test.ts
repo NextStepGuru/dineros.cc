@@ -50,14 +50,14 @@ describe('Server Library Functions', () => {
           received: 'number',
           path: ['name'],
           message: 'Expected string, received number',
-        },
+        } as z.ZodIssue,
         {
           code: 'invalid_type',
           expected: 'number',
           received: 'string',
           path: ['age'],
           message: 'Expected number, received string',
-        },
+        } as z.ZodIssue,
       ]);
 
       expect(() => handleApiError(zodError)).toThrow('HTTP 400: name: Expected string, received number, age: Expected number, received string');
@@ -397,7 +397,7 @@ describe('Server Library Functions', () => {
           received: 'number',
           path: ['accountId'],
           message: 'Expected string, received number',
-        },
+        } as z.ZodIssue,
       ]);
 
       expect(() => handleApiError(validationError)).toThrow('HTTP 400: accountId: Expected string, received number');

@@ -55,7 +55,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
     it("should handle invalid date string", () => {
       const result = forecastEngine["calculateStartDate"](
-        "invalid-date" as any
+        "invalid-date" as any,
       );
       expect(result.isValid()).toBe(false);
     });
@@ -119,10 +119,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).entryService = mockEntryService;
 
       await expect(
-        forecastEngine["loadExistingEntries"](
-          mockAccountData,
-          moment().toDate()
-        )
+        forecastEngine["loadExistingEntries"](mockAccountData),
       ).rejects.toThrow("Entry creation failed");
     });
 
@@ -137,10 +134,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       (forecastEngine as any).entryService = mockEntryService;
 
-      await forecastEngine["loadExistingEntries"](
-        mockAccountData,
-        moment().toDate()
-      );
+      await forecastEngine["loadExistingEntries"](mockAccountData);
 
       expect(mockEntryService.createEntry).not.toHaveBeenCalled();
     });
@@ -174,10 +168,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).entryService = mockEntryService;
 
       await expect(
-        forecastEngine["loadExistingEntries"](
-          mockAccountData,
-          moment().toDate()
-        )
+        forecastEngine["loadExistingEntries"](mockAccountData),
       ).rejects.toThrow("Missing required fields");
     });
   });
@@ -218,7 +209,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).reoccurrenceService = mockReoccurrenceService;
 
       await expect(
-        forecastEngine["processForecastTimeline"](startDate, endDate)
+        forecastEngine["processForecastTimeline"](startDate, endDate),
       ).rejects.toThrow("Transfer failed");
     });
 
@@ -276,7 +267,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).cache = mockCache;
 
       await expect(
-        forecastEngine["loadManualEntriesForDate"](testDate)
+        forecastEngine["loadManualEntriesForDate"](testDate),
       ).rejects.toThrow("Database connection failed");
     });
 
@@ -336,7 +327,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       (forecastEngine as any).entryService = mockEntryService;
 
       await expect(
-        forecastEngine["processAccountEntries"](mockAccountRegisters)
+        forecastEngine["processAccountEntries"](mockAccountRegisters),
       ).rejects.toThrow("Balance calculation failed");
     });
 
@@ -365,13 +356,14 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
           reoccurrenceId: null,
           sourceAccountRegisterId: null,
           seq: null,
+          typeId: null,
         },
       ];
 
       const result = forecastEngine["convertToFinalFormat"](mockResults);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("1");
+      expect(result[0]!.id).toBe("1");
     });
 
     it("should handle empty results array", () => {
@@ -476,7 +468,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       const result = await engine.recalculate(context);
       expect(result.isSuccess).toBe(false);
       expect(result.errors?.[0]).toContain(
-        "Forecast date range exceeds 10 years"
+        "Forecast date range exceeds 10 years",
       );
     });
 

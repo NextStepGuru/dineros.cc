@@ -147,11 +147,15 @@ export default defineEventHandler(async (event) => {
 
     const balance = calculateAdjustedBalance(
       accountRegister.latestBalance,
-      pocketBalances
+      pocketBalances,
     );
 
     // Legacy: credit account Interest Charge entries were stored as positive; correct at read time so running balance and sums are correct
-    const toAmount = (entry: { amount: unknown; typeId?: number | null; description?: string }) => {
+    const toAmount = (entry: {
+      amount: unknown;
+      typeId?: number | null;
+      description?: string;
+    }) => {
       const n = Number(entry.amount);
       const isLegacyInterest =
         accountRegister.type.isCredit &&
@@ -179,27 +183,45 @@ export default defineEventHandler(async (event) => {
 
       // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
       if (accountRegister.type.isCredit) {
-        balanceUpdated = balanceUpdated.map((entry: { balance: number; [k: string]: unknown }) => ({
-          ...entry,
-          balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-        }));
+        balanceUpdated = balanceUpdated.map(
+          (entry: { balance: number; [k: string]: unknown }) => ({
+            ...entry,
+            balance: Number(entry.balance) > 0 ? 0 : entry.balance,
+          }),
+        ) as typeof balanceUpdated;
       }
 
       // For pagination, return only the requested slice
       const paginatedEntries = balanceUpdated.slice(skip, skip + effectiveTake);
 
+      if (balanceUpdated.length === 0) {
+        return {
+          entries: [],
+          lowest: undefined,
+          highest: undefined,
+          skip,
+          focusedAt,
+          take: effectiveTake,
+          loadMode: "quick",
+          isPartialLoad: true,
+          hasMore: skip + effectiveTake < totalCount,
+          totalCount,
+        };
+      }
+
+      const firstEntry = balanceUpdated[0]!;
       const entryWithLowestBalance = balanceUpdated.reduce(
         (minEntry, entry) => {
           return entry.balance < minEntry.balance ? entry : minEntry;
         },
-        balanceUpdated[0]
+        firstEntry,
       );
 
       const entryWithHighestBalance = balanceUpdated.reduce(
         (minEntry, entry) => {
           return entry.balance > minEntry.balance ? entry : minEntry;
         },
-        balanceUpdated[0]
+        firstEntry,
       );
 
       const hasMore = skip + effectiveTake < totalCount;
@@ -234,22 +256,40 @@ export default defineEventHandler(async (event) => {
 
     // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
     if (accountRegister.type.isCredit) {
-      balanceUpdated = balanceUpdated.map((entry: { balance: number; [k: string]: unknown }) => ({
-        ...entry,
-        balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-      }));
+      balanceUpdated = balanceUpdated.map(
+        (entry: { balance: number; [k: string]: unknown }) => ({
+          ...entry,
+          balance: Number(entry.balance) > 0 ? 0 : entry.balance,
+        }),
+      ) as typeof balanceUpdated;
     }
 
     // For pagination, return only the requested slice
     const paginatedEntries = balanceUpdated.slice(skip, skip + effectiveTake);
 
+    if (balanceUpdated.length === 0) {
+      return {
+        entries: [],
+        lowest: undefined,
+        highest: undefined,
+        skip,
+        focusedAt,
+        take,
+        loadMode: "full",
+        isPartialLoad: false,
+        hasMore: skip + effectiveTake < totalCount,
+        totalCount,
+      };
+    }
+
+    const firstEntry = balanceUpdated[0]!;
     const entryWithLowestBalance = balanceUpdated.reduce((minEntry, entry) => {
       return entry.balance < minEntry.balance ? entry : minEntry;
-    }, balanceUpdated[0]);
+    }, firstEntry);
 
     const entryWithHighestBalance = balanceUpdated.reduce((minEntry, entry) => {
       return entry.balance > minEntry.balance ? entry : minEntry;
-    }, balanceUpdated[0]);
+    }, firstEntry);
 
     const hasMore = skip + effectiveTake < totalCount;
 

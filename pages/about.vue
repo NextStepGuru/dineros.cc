@@ -46,7 +46,7 @@ useHead({
     {
       type: "application/ld+json",
       children: JSON.stringify(articleJsonLd),
-    },
+    } as { type: string; children: string },
   ],
 });
 </script>

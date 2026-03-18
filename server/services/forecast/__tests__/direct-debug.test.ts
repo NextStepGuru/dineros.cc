@@ -28,7 +28,7 @@ describe("Direct Debug Test", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -65,12 +65,12 @@ describe("Direct Debug Test", () => {
         isProjected: false,
         isManualEntry: true,
         isReconciled: false,
-        createdAt: dateTimeService.create(),
+        createdAt: dateTimeService.create().toDate(),
       },
     });
 
     // Create forecast engine
-    const engine = ForecastEngineFactory.create(db);
+    const engine = ForecastEngineFactory.create(db as any);
 
     // Test the data loader directly
     const dataLoader = engine.getCache();
