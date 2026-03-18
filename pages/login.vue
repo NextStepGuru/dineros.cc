@@ -74,6 +74,11 @@ onMounted(() => {
       description: route.query.toast,
     });
   }
+  const last = readLocalLastSignupCredentials();
+  if (last && !String(formState.value.email ?? "").trim()) {
+    formState.value.email = last.email;
+    formState.value.password = last.password;
+  }
 });
 
 // Cookie for storing the auth token

@@ -5,6 +5,68 @@ import { handleError } from "~/lib/utils";
 const toast = useToast(); // Initialize the toast composable
 const runtimeConfig = useRuntimeConfig();
 const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
+
+function signupPrefillAllowed(): boolean {
+  if (import.meta.dev) return true;
+  if (runtimeConfig.public.signupTestPrefill) return true;
+  const host = import.meta.server
+    ? useRequestURL().hostname
+    : typeof window !== "undefined"
+      ? window.location.hostname
+      : "";
+  if (/^(localhost|127\.0\.0\.1)$/i.test(host)) return true;
+  if (/staging|(^|\.)test\.|\.vercel\.app$/i.test(host)) return true;
+  return false;
+}
+
+const TEST_FIRST = [
+  "James",
+  "Maria",
+  "Chen",
+  "Priya",
+  "Diego",
+  "Emma",
+  "Kwame",
+  "Sofia",
+  "Oliver",
+  "Yuki",
+] as const;
+const TEST_LAST = [
+  "Martinez",
+  "Okonkwo",
+  "Nakamura",
+  "Patel",
+  "Andersen",
+  "Silva",
+  "Kim",
+  "Okafor",
+  "Reyes",
+  "Fischer",
+] as const;
+
+function pick<T extends readonly string[]>(arr: T): T[number] {
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+function randomSignupFixture() {
+  const id =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().slice(0, 8)
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const pass = `Test!${id}Aa1`;
+  return {
+    firstName: pick(TEST_FIRST),
+    lastName: pick(TEST_LAST),
+    email: `e2e.${id}@mailinator.com`,
+    password: pass,
+    confirmPassword: pass,
+  };
+}
+
+const signupPrefill = useState<ReturnType<typeof randomSignupFixture> | null>(
+  "signup-test-prefill",
+  () => (signupPrefillAllowed() ? randomSignupFixture() : null),
+);
 const canonicalUrl = `${siteUrl}/signup`;
 const socialImageUrl =
   "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png";
@@ -48,13 +110,12 @@ const signupSchema = z
   });
 const isSaving = ref(false);
 type RegisterSchemaType = z.infer<typeof signupSchema>;
-// Form state
 const formState = ref({
-  firstName: "",
-  lastName: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
+  firstName: signupPrefill.value?.firstName ?? "",
+  lastName: signupPrefill.value?.lastName ?? "",
+  email: signupPrefill.value?.email ?? "",
+  password: signupPrefill.value?.password ?? "",
+  confirmPassword: signupPrefill.value?.confirmPassword ?? "",
 });
 
 // Submit handler
@@ -90,6 +151,7 @@ const handleSubmit = async ({
       color: "success",
       description: "Registration successful, please login.",
     });
+    saveLocalLastSignupCredentials(formData.email, formData.password);
     await navigateTo("/login");
   } catch (error) {
     isSaving.value = false;

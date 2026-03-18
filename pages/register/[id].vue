@@ -10,6 +10,7 @@ const ModalsEditRegisterEntry = defineAsyncComponent(
 
 const overlay = useOverlay();
 const route = useRoute();
+const toast = useToast();
 const selectedTab = ref("future");
 const { todayISOString } = useToday();
 
@@ -22,10 +23,72 @@ definePageMeta({
 const listStore = useListStore();
 const authStore = useAuthStore();
 
+const REGISTER_ONBOARDING_DISMISS_KEY = "dineros_register_onboarding_dismissed";
+const REGISTER_RECALC_ONCE_KEY = "dineros_register_recalc_once";
+
+const onboardingDismissed = ref(false);
+const recalcCompletedOnce = ref(false);
+
+function readOnboardingLocal() {
+  if (!import.meta.client) return;
+  try {
+    onboardingDismissed.value =
+      localStorage.getItem(REGISTER_ONBOARDING_DISMISS_KEY) === "1";
+    recalcCompletedOnce.value =
+      localStorage.getItem(REGISTER_RECALC_ONCE_KEY) === "1";
+  } catch {
+    /* ignore */
+  }
+}
+
+function dismissRegisterOnboarding() {
+  onboardingDismissed.value = true;
+  try {
+    localStorage.setItem(REGISTER_ONBOARDING_DISMISS_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function printRegisterPage() {
+  if (import.meta.client) window.print();
+}
+
+onMounted(() => {
+  readOnboardingLocal();
+});
+
+const mainAccountCount = computed(
+  () =>
+    listStore.getAccountRegisters.filter((r) => !r.subAccountRegisterId).length
+);
+
+const showAccountSelector = computed(
+  () => tableEntries.value.length > 0 || mainAccountCount.value > 1
+);
+
+const hasReoccurrences = computed(
+  () => listStore.getReoccurrences.length > 0
+);
+
+const plaidLinked = computed(() => authStore.hasPlaidConnected);
+
+const showRegisterOnboarding = computed(() => {
+  if (onboardingDismissed.value) return false;
+  if (!listStore.getAccountRegisters.length) return false;
+  if (isInitialLoading.value) return false;
+  return tableEntries.value.length === 0;
+});
+
 onBeforeMount(async () => {
+  const regs = listStore.getAccountRegisters;
+  if (regs.length === 0) {
+    await navigateTo("/account-registers?onboarding=1");
+    return;
+  }
+
   if (route.params.id === "") {
-    const regs = listStore.getAccountRegisters;
-    const firstId = regs.length > 0 ? regs[0].id : undefined;
+    const firstId = regs[0]?.id;
     if (firstId != null) {
       await navigateTo(`/register/${firstId}`);
     }
@@ -47,6 +110,10 @@ watch(accountRegisterId, async (newId) => {
 
 watch(authStore, async () => {
   const regs = listStore.getAccountRegisters;
+  if (regs.length === 0) {
+    await navigateTo("/account-registers?onboarding=1");
+    return;
+  }
   const verify = regs.filter(
     (item) =>
       item.budgetId === authStore.getBudgetId && item.id === +route.params.id
@@ -462,37 +529,53 @@ defineShortcuts({
       search.focus();
     }
   },
-  meta_c: () => recalcAccount(),
+  meta_shift_r: () => recalcAccount(),
 });
 
 const globalFilter = ref("");
 const tableRef = ref();
 const isRecalcAccountLoading = ref(false);
+const showShortcuts = ref(false);
+const recalcLiveMessage = ref("");
 const registerSectionEl = ref<HTMLElement | null>(null);
 const registerTableViewportEl = ref<HTMLElement | null>(null);
+const registerOnboardingViewportEl = ref<HTMLElement | null>(null);
 const registerTabsEl = ref<HTMLElement | null>(null);
 const registerTableViewportMaxHeight = ref(
+  "calc(100dvh - var(--ui-header-height) - 12rem)"
+);
+const registerOnboardingMaxHeight = ref(
   "calc(100dvh - var(--ui-header-height) - 12rem)"
 );
 let registerResizeObserver: ResizeObserver | null = null;
 let registerViewportFrameId: number | null = null;
 
 function updateRegisterTableViewportMaxHeight() {
-  if (!registerTableViewportEl.value) return;
-
   if (registerViewportFrameId != null) {
     cancelAnimationFrame(registerViewportFrameId);
   }
 
   registerViewportFrameId = requestAnimationFrame(() => {
-    const tableTop = registerTableViewportEl.value?.getBoundingClientRect().top ?? 0;
     const tabsHeight = registerTabsEl.value?.offsetHeight ?? 0;
-    const bottomSpacing = 16;
-    const available = Math.max(
-      220,
-      Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing)
-    );
-    registerTableViewportMaxHeight.value = `${available}px`;
+    const bottomSpacing = 20;
+    if (registerTableViewportEl.value) {
+      const tableTop =
+        registerTableViewportEl.value.getBoundingClientRect().top ?? 0;
+      const available = Math.max(
+        220,
+        Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing)
+      );
+      registerTableViewportMaxHeight.value = `${available}px`;
+    }
+    if (registerOnboardingViewportEl.value) {
+      const top =
+        registerOnboardingViewportEl.value.getBoundingClientRect().top ?? 0;
+      const available = Math.max(
+        220,
+        Math.floor(window.innerHeight - top - tabsHeight - bottomSpacing)
+      );
+      registerOnboardingMaxHeight.value = `${available}px`;
+    }
   });
 }
 
@@ -512,6 +595,20 @@ watch(
   }
 );
 
+watch(showRegisterOnboarding, async (on) => {
+  if (on) {
+    await nextTick();
+    updateRegisterTableViewportMaxHeight();
+  }
+});
+
+watch(showShortcuts, async () => {
+  if (showRegisterOnboarding.value) {
+    await nextTick();
+    updateRegisterTableViewportMaxHeight();
+  }
+});
+
 async function recalcAccount() {
   if (isRecalcAccountLoading.value) return; // Prevent multiple simultaneous calls
 
@@ -530,11 +627,28 @@ async function recalcAccount() {
     });
 
     if (data?.success) {
+      try {
+        localStorage.setItem(REGISTER_RECALC_ONCE_KEY, "1");
+        recalcCompletedOnce.value = true;
+      } catch {
+        /* ignore */
+      }
       // Refresh the account entries after recalculation
       await refreshAccountEntries();
+      const msg = `Recalculated ${data.entriesCalculated} entries across ${data.accountRegisters} account${data.accountRegisters === 1 ? "" : "s"}.`;
+      recalcLiveMessage.value = msg;
+      toast.add({
+        color: "success",
+        description: msg,
+      });
     }
   } catch (error) {
     console.error("Recalculation failed:", error);
+    recalcLiveMessage.value = "Recalculation failed.";
+    toast.add({
+      color: "error",
+      description: "Recalculation failed. Please try again.",
+    });
   } finally {
     isRecalcAccountLoading.value = false;
   }
@@ -542,15 +656,22 @@ async function recalcAccount() {
 </script>
 
 <template lang="pug">
-  section.mx-4(ref="registerSectionEl")
-    .flex(class="flex-col mt-4  md:flex-row md:space-x-4")
-      div(class="w-full flex")
-        UButton(color="info" size="sm" class="mr-4" @click="handleAddEntry") Add
-        UButton(size="sm" class="mr-4" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
-        UButton(color="error" size="sm" class="mr-4" @click="recalcAccount()" :loading="isRecalcAccountLoading") Recalc
-        UInput(v-model="globalFilter" size="sm" class="w-full lg:max-w-48" placeholder="Filter..." id="search")
+  section.mx-4(ref="registerSectionEl" class="min-w-0")
+    div(
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true") {{ recalcLiveMessage }}
+    .flex(
+      v-if="tableEntries.length > 0 || showAccountSelector"
+      class="flex-col mt-4 gap-2 md:flex-row md:flex-wrap md:items-center md:space-x-4")
+      div(v-if="tableEntries.length > 0" class="w-full flex flex-wrap gap-2 items-center")
+        UButton(color="info" size="sm" @click="handleAddEntry") Add
+        UButton(size="sm" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
+        UButton(color="error" size="sm" @click="recalcAccount()" :loading="isRecalcAccountLoading" :aria-busy="isRecalcAccountLoading") Recalc
+        UButton(variant="soft" size="sm" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
+        UInput(v-model="globalFilter" size="sm" class="w-full min-w-[8rem] sm:max-w-48 lg:max-w-48 grow" placeholder="Filter..." id="search")
 
-      div(class="ml-auto flex justify-center items-center")
+      div(v-if="showAccountSelector" class="ml-auto flex justify-center items-center")
         div(class="text-sm font-medium frog-text-muted mt-2 mr-2 text-nowrap") Selected Account:
         ClientOnly
           USelect(
@@ -574,8 +695,86 @@ async function recalcAccount() {
       b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
     .w-full(class="text-muted text-right" v-else="") &nbsp;
 
+    UCard(v-if="showShortcuts" class="mb-4")
+      template(#header)
+        h3(class="font-semibold") Keyboard shortcuts
+      ul(class="space-y-2 text-sm")
+        li Clear filter: ⎋
+        li Add entry: ⌘ + A
+        li Focus filter: ⌘ + F
+        li Refresh register: ⌘ + R
+        li Recalculate forecast: ⌘ + Shift + R
+
+    UCard(v-if="listStore.getAccountRegisters.length === 0" class="my-4")
+      template(#header)
+        h3(class="font-semibold") No accounts yet
+      p(class="frog-text-muted mb-4") Create your first account register before adding transactions and forecasts.
+      UButton(to="/account-registers" color="primary" size="sm") Add account
+
+    //- Centered first-run checklist (scrolls inside panel only; page does not scroll)
+    div(
+      v-else-if="showRegisterOnboarding"
+      ref="registerOnboardingViewportEl"
+      class="w-full flex justify-center min-h-0 overflow-hidden"
+      :style="{ height: registerOnboardingMaxHeight, maxHeight: registerOnboardingMaxHeight }"
+    )
+      div(class="w-full max-w-lg h-full min-h-0 overflow-y-auto overscroll-y-contain py-2 px-1")
+        UCard(class="w-full frog-surface-elevated")
+          template(#header)
+            div(class="text-center space-y-1")
+              h2(class="text-lg font-semibold") Set up your forecast
+              p(class="text-sm frog-text-muted") Work through these steps once — then your register will fill in automatically.
+          ol(class="space-y-6 list-none p-0 m-0")
+            li(class="flex gap-3")
+              div(class="shrink-0 mt-0.5")
+                UIcon(
+                  :name="mainAccountCount > 0 ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                  :class="mainAccountCount > 0 ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                )
+              div(class="min-w-0 flex-1")
+                p(class="font-medium") 1. Create or update your accounts
+                p(class="text-sm frog-text-muted mt-1") Add registers, types, and opening balances so projections start from the right place.
+                UButton(to="/account-registers" size="xs" color="primary" class="mt-2") Open Accounts
+            li(class="flex gap-3")
+              div(class="shrink-0 mt-0.5")
+                UIcon(
+                  :name="hasReoccurrences ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                  :class="hasReoccurrences ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                )
+              div(class="min-w-0 flex-1")
+                p(class="font-medium") 2. Add recurring items
+                p(class="text-sm frog-text-muted mt-1") Examples: paychecks, rent or mortgage, subscriptions (streaming, gym), utilities, loan payments, insurance.
+                UButton(to="/reoccurrences" size="xs" color="primary" class="mt-2") Open Recurring
+            li(class="flex gap-3")
+              div(class="shrink-0 mt-0.5")
+                UIcon(
+                  :name="recalcCompletedOnce ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                  :class="recalcCompletedOnce ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                )
+              div(class="min-w-0 flex-1")
+                p(class="font-medium") 3. Recalc — then save a copy
+                p(class="text-sm frog-text-muted mt-1") Run Recalc to generate projected entries. Use your browser’s Print dialog (⌘P / Ctrl+P) and choose “Save as PDF” to download a snapshot.
+                div(class="flex flex-wrap gap-2 mt-2")
+                  UButton(size="xs" color="error" :loading="isRecalcAccountLoading" @click="recalcAccount") Run Recalc
+                  UButton(size="xs" variant="soft" @click="printRegisterPage") Print / Save as PDF
+            li(class="flex gap-3")
+              div(class="shrink-0 mt-0.5")
+                UIcon(
+                  :name="plaidLinked ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                  :class="plaidLinked ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                )
+              div(class="min-w-0 flex-1")
+                p(class="font-medium") 4. Link your real accounts
+                p(class="text-sm frog-text-muted mt-1") Optional — connect your bank via Plaid to sync balances and reduce manual entry.
+                UButton(to="/edit-profile/sync-accounts" size="xs" variant="soft" class="mt-2") Sync accounts
+          div(class="mt-6 pt-4 border-t frog-border flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center")
+            p(class="text-xs frog-text-muted") Add your first manual entry anytime with Add — or finish the steps above first.
+            div(class="flex gap-2")
+              UButton(size="xs" variant="ghost" @click="dismissRegisterOnboarding") Skip checklist
+              UButton(size="xs" color="info" @click="handleAddEntry") Add entry
+
     //- Skeleton loading state
-    div(v-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden" :style="{ maxHeight: registerTableViewportMaxHeight }")
+    div(v-else-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden" :style="{ maxHeight: registerTableViewportMaxHeight }")
       //- Table header skeleton
       div(class="flex border-b frog-border p-4")
         div(class="flex-1")
@@ -598,11 +797,11 @@ async function recalcAccount() {
         div(class="flex-1 text-right")
           USkeleton(class="h-4 w-16 ml-auto")
 
-    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 overflow-auto" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
+    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
       UTable(
         ref="tableRef"
         :key="tableKey"
-        class="h-full"
+        class="h-full min-w-[min(100%,42rem)] sm:min-w-0"
         :data="tableEntries"
         sticky
         v-model:globalFilter="globalFilter"
@@ -611,6 +810,13 @@ async function recalcAccount() {
         :loading="accountEntriesStatus === 'pending'"
         loading-color="primary"
         loading-animation="carousel")
+    UCard(v-else class="my-4 max-w-lg mx-auto")
+      template(#header)
+        h3(class="font-semibold") No entries in this register
+      p(class="frog-text-muted mb-4") Add your opening balance or first transaction to start forecasting this account.
+      div(class="flex gap-3")
+        UButton(color="primary" size="sm" @click="handleAddEntry") Add first entry
+        UButton(variant="soft" size="sm" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
 
     // div(v-if="isLoadingMore" class="flex justify-center items-center py-4")
       USpinner(size="sm" color="primary")
@@ -619,13 +825,28 @@ async function recalcAccount() {
     // div(v-if="!hasMoreData && tableEntries.length > 0" class="flex justify-center items-center py-4 text-sm text-gray-500 dark:text-gray-400")
       span No more entries to load
 
-    //- Tabs
-    ul.flex.space-x-2(ref="registerTabsEl" class="-mt-1 ml-5 mb-5")
-      //- Future Tab
-      li
-        button(:class="isSelectedTab('future')" @click="selectedTab = 'future'") Future
-      //- History Tab
-      li
-        button(:class="isSelectedTab('past')" @click="selectedTab = 'past'") Past
+    //- Tabs (shown after at least one entry exists)
+    ul(
+      v-if="tableEntries.length > 0"
+      ref="registerTabsEl"
+      class="flex flex-wrap gap-2 -mt-1 ml-1 sm:ml-5 mb-5"
+      role="tablist"
+      aria-label="Register time range")
+      li(role="presentation")
+        button(
+          type="button"
+          role="tab"
+          :aria-selected="selectedTab === 'future'"
+          :class="isSelectedTab('future')"
+          class="min-h-11 min-w-[4.5rem] sm:min-h-0 sm:min-w-0 touch-manipulation"
+          @click="selectedTab = 'future'") Future
+      li(role="presentation")
+        button(
+          type="button"
+          role="tab"
+          :aria-selected="selectedTab === 'past'"
+          :class="isSelectedTab('past')"
+          class="min-h-11 min-w-[4.5rem] sm:min-h-0 sm:min-w-0 touch-manipulation"
+          @click="selectedTab = 'past'") Past
 
 </template>

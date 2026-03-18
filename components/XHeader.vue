@@ -21,10 +21,10 @@ const items = computed(() => {
     return [
       {
         label: "Register",
-        to: `/register${
+        to: `${
           listStore.getAccountRegisters.length
-            ? "/" + formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
-            : ""
+            ? "/register/" + formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
+            : "/account-registers?onboarding=1"
         }`,
         active: route.path.startsWith("/register"),
       },
@@ -39,14 +39,9 @@ const items = computed(() => {
         active: route.path.startsWith("/reoccurrences"),
       },
       {
-        label: "About",
-        to: "/about",
-        active: route.path.startsWith("/about"),
-      },
-      {
-        label: "Contact",
-        to: "/contact",
-        active: route.path.startsWith("/contact"),
+        label: "Help",
+        to: "/help",
+        active: route.path.startsWith("/help"),
       },
     ];
   } else {
@@ -71,6 +66,11 @@ const items = computed(() => {
         label: "Create account",
         to: "/signup",
         active: route.path.startsWith("/signup"),
+      },
+      {
+        label: "Help",
+        to: "/help",
+        active: route.path.startsWith("/help"),
       },
     ];
   }

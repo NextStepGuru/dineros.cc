@@ -19,6 +19,7 @@ definePageMeta({
 });
 
 const listStore = useListStore();
+const toast = useToast();
 
 const stripedTheme = ref({
   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
@@ -27,6 +28,7 @@ const stripedTheme = ref({
 const overlay = useOverlay();
 const modal = overlay.create(ModalsEditReoccurrence);
 const { todayISOString } = useToday();
+const showShortcuts = ref(false);
 
 function handleTableClick(data: Reoccurrence) {
   const editReoccurrence: ModalReoccurrenceProps = {
@@ -99,9 +101,17 @@ async function handleRecalculate() {
     if (data?.success) {
       // Refresh the lists after recalculation
       await listStore.fetchLists();
+      toast.add({
+        color: "success",
+        description: `Recalculated ${data.entriesCalculated} entries across ${data.accountRegisters} account${data.accountRegisters === 1 ? "" : "s"}.`,
+      });
     }
   } catch (error) {
     console.error("Recalculation failed:", error);
+    toast.add({
+      color: "error",
+      description: "Recalculation failed. Please try again.",
+    });
   } finally {
     isRecalculating.value = false;
   }
@@ -268,9 +278,24 @@ onBeforeUnmount(() => {
     div(ref="controlsEl" class="w-full flex mb-6")
       UButton(color="info" size="sm" class="mr-4" @click="handleAddReoccurrence") Add
       UButton(color="warning" size="sm" class="mr-4" @click="handleRecalculate" :loading="isRecalculating" :disabled="isRecalculating") {{ isRecalculating ? 'Recalculating...' : 'Recalc' }}
+      UButton(variant="soft" size="sm" class="mr-4" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search")
 
-    div(ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
+    UCard(v-if="showShortcuts" class="mb-4")
+      template(#header)
+        h3(class="font-semibold") Keyboard shortcuts
+      ul(class="space-y-2 text-sm")
+        li Clear filter: ⎋
+        li Add reoccurrence: ⌘ + A
+        li Focus filter: ⌘ + F
+
+    UCard(v-if="listStore.getReoccurrences.length === 0 && !listStore.getIsListsLoading" class="mb-4")
+      template(#header)
+        h3(class="font-semibold") No recurring entries yet
+      p(class="frog-text-muted mb-4") Add recurring income and bills so forecasts stay accurate without manual entry.
+      UButton(color="primary" size="sm" @click="handleAddReoccurrence") Add first recurring entry
+
+    div(v-if="listStore.getReoccurrences.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
       UTable(
         class="h-full"
         v-model:global-filter="globalFilter"

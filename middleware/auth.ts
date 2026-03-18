@@ -11,7 +11,9 @@ export default defineNuxtRouteMiddleware((to) => {
     }
 
     return navigateTo(
-      "/login?toast=Your session has expired. Please log in again."
+      `/login?toast=${encodeURIComponent(
+        "Your session ended. Sign in again to continue."
+      )}`
     );
   }
 });

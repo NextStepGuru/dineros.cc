@@ -25,9 +25,13 @@ onMounted(() => {
 
 <template lang="pug">
   UApp
+    a(
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:px-4 focus:py-2 focus:rounded-md focus:bg-primary focus:text-white focus:outline-none focus:ring-2 focus:ring-offset-2"
+    ) Skip to main content
     XHeader
 
-    UMain(:class="route.path === '/' ? 'w-full' : 'max-w-[var(--ui-container)] mx-auto'")
+    UMain#main-content(tabindex="-1" :class="route.path === '/' ? 'w-full' : 'max-w-[var(--ui-container)] mx-auto'")
       NuxtPage
 
     USeparator(v-if="!isFooterHidden" type="dashed" class="h-px pt-0 px-4")

@@ -519,10 +519,12 @@ function handleDrop(event: DragEvent, dropIndex: number) {
 }
 
 const overlay = useOverlay();
+const route = useRoute();
 
 const listStore = useListStore();
 const authStore = useAuthStore();
 const { today } = useToday();
+const showShortcuts = ref(false);
 
 // const stripedTheme = ref({
 //   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
@@ -878,7 +880,28 @@ const estimatedNetWorth = computed(() => {
   }, 0);
 });
 
+/** Main registers only: lowest balance + risk signal for cross-account snapshot */
+const accountLiquiditySnapshot = computed(() => {
+  const mains = listStore.getAccountRegisters.filter(
+    (r) => !r.subAccountRegisterId
+  );
+  if (mains.length === 0) return null;
+  let lowest = mains[0]!;
+  for (const r of mains) {
+    if (+r.balance < +lowest.balance) lowest = r;
+  }
+  const negativeCount = mains.filter((r) => +r.balance < 0).length;
+  return { lowest, negativeCount, mainCount: mains.length };
+});
+
 onMounted(async () => {
+  if (route.query.onboarding === "1") {
+    toast.add({
+      color: "success",
+      description: "Welcome! Add your first account to start forecasting.",
+    });
+  }
+
   await nextTick();
   updateAccountRegistersViewportMaxHeight();
   window.addEventListener("resize", updateAccountRegistersViewportMaxHeight);
@@ -926,12 +949,49 @@ onBeforeUnmount(() => {
 
     div(class="w-full flex")
       UButton(color="info" size="sm" class="mr-4" @click="handleAddAccountRegister") Add
+      UButton(variant="soft" size="sm" class="mr-4" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search" ref="search")
+
+    UCard(v-if="showShortcuts" class="my-4")
+      template(#header)
+        h3(class="font-semibold") Keyboard shortcuts
+      ul(class="space-y-2 text-sm")
+        li Clear filter: ⎋
+        li Add account: ⌘ + A
+        li Focus filter: ⌘ + F
+
+    UCard(v-if="draggableAccountRegisters.length === 0" class="my-4")
+      template(#header)
+        h3(class="font-semibold") Create your first account
+      p(class="frog-text-muted mb-4") Start with an account and opening balance, then add recurring items to improve your forecast.
+      ol(class="list-decimal ml-4 mb-4 text-sm space-y-1")
+        li Add an account register
+        li Set an opening balance
+        li Add recurring entries for upcoming cash flow
+      UButton(color="primary" size="sm" @click="handleAddAccountRegister") Add first account
 
     .w-full(class="text-muted text-right")
       span Your estimated net worth
       b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
-    div(ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
+    UCard(v-if="accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
+      template(#header)
+        h3(class="font-semibold") Cross-account snapshot
+      p(class="text-sm frog-text-muted")
+        | Lowest balance among main accounts:&nbsp;
+        b(class="frog-text") {{ accountLiquiditySnapshot.lowest.name }}
+        | &nbsp;at&nbsp;
+        b(:class="formatCurrencyClass(+accountLiquiditySnapshot.lowest.balance)") {{ formatCurrency(+accountLiquiditySnapshot.lowest.balance) }}
+      p(v-if="accountLiquiditySnapshot.negativeCount > 0" class="text-sm mt-2 text-amber-700 dark:text-amber-300")
+        | {{ accountLiquiditySnapshot.negativeCount }} of {{ accountLiquiditySnapshot.mainCount }} main accounts are below zero — review registers and recurring items.
+      p(v-else class="text-sm mt-2 frog-text-muted") All main accounts are at or above zero right now.
+      div(class="mt-3")
+        UButton(
+          v-if="accountLiquiditySnapshot.lowest.id"
+          size="xs"
+          variant="soft"
+          :to="`/register/${accountLiquiditySnapshot.lowest.id}`") Open lowest-balance register
+
+    div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
       table(class="w-full min-w-full text-xs sm:text-sm")
         thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented) sticky top-0 inset-x-0 bg-(--ui-bg)/75 z-1 backdrop-blur w-full")
           tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")

@@ -81,7 +81,7 @@ export function getPostLoginRedirect(accountRegisters: any[]): string {
     );
     return `/register/${bySortOrder[0].id}`;
   }
-  return '/register';
+  return '/account-registers?onboarding=1';
 }
 
 /**

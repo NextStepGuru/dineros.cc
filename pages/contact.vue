@@ -53,7 +53,7 @@ useHead({
   script: [
     {
       type: "application/ld+json",
-      children: JSON.stringify(pageJsonLd),
+      innerHTML: JSON.stringify(pageJsonLd),
     },
   ],
 });
@@ -71,7 +71,10 @@ const contactReasonOptions = [
 
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
   reason: z.string().min(1, "Please select a reason"),
   subject: z.string().optional(),
   message: z.string().min(10, "Message must be at least 10 characters"),
@@ -93,7 +96,8 @@ function onFormError(event: Parameters<typeof handleError>[0]) {
 
 function sendMessage({ data }: FormSubmitEvent<ContactSchemaType>) {
   const { name, email, reason, subject, message } = data;
-  const reasonLabel = contactReasonOptions.find((o) => o.value === reason)?.label ?? reason;
+  const reasonLabel =
+    contactReasonOptions.find((o) => o.value === reason)?.label ?? reason;
   const body = [
     "",
     "---",
@@ -105,8 +109,17 @@ function sendMessage({ data }: FormSubmitEvent<ContactSchemaType>) {
   const subjectLine = subject || `[${reasonLabel}] Contact from Dineros`;
   const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
-  toast.add({ color: "success", description: "Opening your email client to send your message." });
-  formState.value = { name: "", email: "", reason: "", subject: "", message: "" };
+  toast.add({
+    color: "success",
+    description: "Opening your email client to send your message.",
+  });
+  formState.value = {
+    name: "",
+    email: "",
+    reason: "",
+    subject: "",
+    message: "",
+  };
 }
 
 const contactMethods = [
@@ -144,39 +157,54 @@ const contactMethods = [
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16" itemscope itemtype="https://schema.org/Article">
+  <div
+    class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16"
+    itemscope
+    itemtype="https://schema.org/Article"
+  >
     <div class="text-center mb-12">
-      <h1 class="text-3xl font-bold tracking-tight frog-text sm:text-4xl" itemprop="headline">
+      <h1
+        class="text-3xl font-bold tracking-tight frog-text sm:text-4xl"
+        itemprop="headline"
+      >
         Contact us
       </h1>
-      <p class="mt-2 text-sm frog-text-muted">
+      <p class="mt-2 text-sm frog-text-muted hidden">
         By <span itemprop="author">Dineros Editorial Team</span> •
-        <time itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z">Published March 14, 2026</time>
+        <time itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z"
+          >Published March 14, 2026</time
+        >
       </p>
-      <p class="mt-3 text-lg frog-text-muted max-w-2xl mx-auto">
-        Have a question or feedback? Send us a message and we’ll get back to you as soon as we can.
+      <p class="mt-3 text-lg frog-text-muted max-w-2xl mx-auto hidden">
+        Have a question or feedback? Send us a message and we’ll get back to you
+        as soon as we can.
       </p>
-      <p class="mt-4 text-base frog-text max-w-3xl mx-auto">
-        Dineros support can help with account access, forecasting setup, budget structure questions,
-        recurring schedule behavior, and general product guidance. For privacy and legal inquiries, we
-        route requests directly to dedicated inboxes so your message reaches the right team quickly.
+      <p class="mt-4 text-base frog-text max-w-3xl mx-auto hidden">
+        Dineros support can help with account access, forecasting setup, budget
+        structure questions, recurring schedule behavior, and general product
+        guidance. For privacy and legal inquiries, we route requests directly to
+        dedicated inboxes so your message reaches the right team quickly.
       </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto">
-        When contacting us, include relevant context such as the email on your profile, the page or
-        workflow you were using, and a brief description of what you expected to happen. This helps us
-        diagnose issues faster and provide a clear, practical response without unnecessary back and forth.
+      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
+        When contacting us, include relevant context such as the email on your
+        profile, the page or workflow you were using, and a brief description of
+        what you expected to happen. This helps us diagnose issues faster and
+        provide a clear, practical response without unnecessary back and forth.
       </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto">
-        We review support, privacy, and legal messages in the order received and prioritize anything tied
-        to account security or data access. If your request is time-sensitive, mention that in the subject
-        line and include any deadlines so we can triage appropriately.
+      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
+        We review support, privacy, and legal messages in the order received and
+        prioritize anything tied to account security or data access. If your
+        request is time-sensitive, mention that in the subject line and include
+        any deadlines so we can triage appropriately.
       </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto">
-        If you are reporting a bug, include the route you visited, the exact sequence of actions, and any
-        error text shown in the interface. If possible, include a screenshot so we can confirm visual state.
-        This speeds up reproduction and reduces follow-up questions. For billing, policy, or legal requests,
-        include your preferred response method and the specific outcome you need so we can route your message
-        to the right reviewer without delay.
+      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
+        If you are reporting a bug, include the route you visited, the exact
+        sequence of actions, and any error text shown in the interface. If
+        possible, include a screenshot so we can confirm visual state. This
+        speeds up reproduction and reduces follow-up questions. For billing,
+        policy, or legal requests, include your preferred response method and
+        the specific outcome you need so we can route your message to the right
+        reviewer without delay.
       </p>
     </div>
 
@@ -208,7 +236,9 @@ const contactMethods = [
             />
           </UFormField>
           <UFormField label="Why are you contacting?" name="reason">
-            <label id="reason-label" for="reason" class="sr-only">Why are you contacting?</label>
+            <label id="reason-label" for="reason" class="sr-only"
+              >Why are you contacting?</label
+            >
             <select
               id="reason"
               v-model="formState.reason"
@@ -258,7 +288,10 @@ const contactMethods = [
               :key="method.label"
               class="flex items-start gap-3"
             >
-              <UIcon :name="method.icon" class="size-5 text-primary shrink-0 mt-0.5" />
+              <UIcon
+                :name="method.icon"
+                class="size-5 text-primary shrink-0 mt-0.5"
+              />
               <div class="min-w-0">
                 <p class="text-sm font-medium frog-text-muted">
                   {{ method.label }}
@@ -276,13 +309,19 @@ const contactMethods = [
           </ul>
         </UCard>
         <p class="text-sm frog-text-muted">
-          For account support, include the email tied to your account. For privacy or data requests, use the addresses above so we can route and track your request correctly.
+          For account support, include the email tied to your account. For
+          privacy or data requests, use the addresses above so we can route and
+          track your request correctly.
         </p>
         <p class="text-sm frog-text-muted">
           Review our
-          <NuxtLink to="/privacy-policy" class="frog-link hover:underline"> Privacy Policy </NuxtLink>
+          <NuxtLink to="/privacy-policy" class="frog-link hover:underline">
+            Privacy Policy
+          </NuxtLink>
           and
-          <NuxtLink to="/terms-of-service" class="frog-link hover:underline"> Terms of Service </NuxtLink>
+          <NuxtLink to="/terms-of-service" class="frog-link hover:underline">
+            Terms of Service
+          </NuxtLink>
           for full details.
         </p>
       </div>
