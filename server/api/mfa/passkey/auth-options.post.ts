@@ -2,10 +2,7 @@ import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { prisma } from "~/server/clients/prismaClient";
 import { privateUserSchema } from "~/schema/zod";
 import { handleApiError } from "~/server/lib/handleApiError";
-import {
-  getPendingMfaSession,
-  getWebAuthnConfig,
-} from "~/server/lib/mfa";
+import { getPendingMfaSession, getWebAuthnConfig } from "~/server/lib/mfa";
 import { sharedRedisConnection } from "~/server/clients/redisClient";
 
 const PASSKEY_AUTH_CHALLENGE_TTL = 10 * 60;
@@ -31,7 +28,15 @@ export default defineEventHandler(async (event) => {
       allowCredentials: (user.settings.mfa.passkeys || []).map((passkey) => ({
         id: passkey.id,
         transports: passkey.transports as
-          | ("ble" | "hybrid" | "internal" | "nfc" | "smart-card" | "usb" | "cable")[]
+          | (
+              | "ble"
+              | "hybrid"
+              | "internal"
+              | "nfc"
+              | "smart-card"
+              | "usb"
+              | "cable"
+            )[]
           | undefined,
       })),
     });
@@ -39,7 +44,7 @@ export default defineEventHandler(async (event) => {
     await sharedRedisConnection.setex(
       `mfa:passkey:auth:${session.id}`,
       PASSKEY_AUTH_CHALLENGE_TTL,
-      options.challenge
+      options.challenge,
     );
 
     return options;

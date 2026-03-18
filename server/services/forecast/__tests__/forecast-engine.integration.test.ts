@@ -5,7 +5,7 @@ import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import { dateTimeService } from "../DateTimeService";
 import { log } from "../../../logger";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
@@ -119,8 +119,8 @@ describe("ForecastEngine Integration Tests", () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf("month").toDate(),
-        endDate: moment().add(6, "months").toDate(),
+        startDate: dt().startOf("month").toDate(),
+        endDate: dt().add(6, "months").toDate(),
         logging: { enabled: false },
       };
 
@@ -180,7 +180,7 @@ describe("ForecastEngine Integration Tests", () => {
       );
       expect(monthlyEntries.length).toBeGreaterThanOrEqual(2);
       const monthlyMonths = [...new Set(
-        monthlyEntries.map((e: any) => moment(e.createdAt).format("YYYY-MM"))
+        monthlyEntries.map((e: any) => dt(e.createdAt).format("YYYY-MM"))
       )].sort();
       expect(monthlyMonths.length).toBeGreaterThanOrEqual(2);
       if (monthlyMonths.length >= 4) {
@@ -199,8 +199,8 @@ describe("ForecastEngine Integration Tests", () => {
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
           for (let i = 1; i < sortedEntries.length; i++) {
-            const daysDiff = moment(sortedEntries[i].createdAt).diff(
-              moment(sortedEntries[i - 1].createdAt),
+            const daysDiff = dt(sortedEntries[i].createdAt).diff(
+              dt(sortedEntries[i - 1].createdAt),
               "days"
             );
             expect(daysDiff).toBeGreaterThan(0);
@@ -217,8 +217,8 @@ describe("ForecastEngine Integration Tests", () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().startOf("year").toDate(),
-        endDate: moment().add(5, "years").toDate(),
+        startDate: dt().startOf("year").toDate(),
+        endDate: dt().add(5, "years").toDate(),
         logging: { enabled: false },
       };
 
@@ -239,8 +239,8 @@ describe("ForecastEngine Integration Tests", () => {
     it("should handle missing account gracefully", async () => {
       const context: ForecastContext = {
         accountId: "non-existent-account",
-        startDate: moment().toDate(),
-        endDate: moment().add(1, "month").toDate(),
+        startDate: dt().toDate(),
+        endDate: dt().add(1, "month").toDate(),
         logging: { enabled: false },
       };
 
@@ -259,8 +259,8 @@ describe("ForecastEngine Integration Tests", () => {
 
       const context: ForecastContext = {
         accountId: testAccountId,
-        startDate: moment().add(1, "year").toDate(), // Start after end
-        endDate: moment().toDate(),
+        startDate: dt().add(1, "year").toDate(), // Start after end
+        endDate: dt().toDate(),
         logging: { enabled: false },
       };
 
@@ -286,7 +286,7 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         name: "Checking Account",
         typeId: 1, // Checking account type
         balance: 1000,
-        statementAt: moment().add(1, "month").toDate(),
+        statementAt: dt().add(1, "month").toDate(),
       },
     });
 
@@ -303,7 +303,7 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         amount: 5000,
         intervalId: 3, // Monthly
         intervalCount: 1,
-        lastAt: moment().startOf("month").toDate(),
+        lastAt: dt().startOf("month").toDate(),
       },
     });
 
@@ -316,7 +316,7 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         amount: -1500,
         intervalId: 3, // Monthly
         intervalCount: 1,
-        lastAt: moment().startOf("month").toDate(),
+        lastAt: dt().startOf("month").toDate(),
       },
     });
 
@@ -383,7 +383,7 @@ async function setupLargeDatasetScenario(db: any, accountId: string) {
 // Utility functions
 function groupTransfersByDate(transfers: any[]) {
   return transfers.reduce((groups, transfer) => {
-    const date = moment(transfer.createdAt).format("YYYY-MM-DD");
+    const date = dt(transfer.createdAt).format("YYYY-MM-DD");
     if (!groups[date]) groups[date] = [];
     groups[date].push(transfer);
     return groups;

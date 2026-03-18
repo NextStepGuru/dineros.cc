@@ -8,7 +8,7 @@ import type {
   CacheReoccurrenceSkip,
 } from "../ModernCacheService";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 describe("ModernCacheService", () => {
   let cache: ModernCacheService;
@@ -361,25 +361,25 @@ describe("ModernCacheService", () => {
           id: "entry-1",
           accountRegisterId: 1,
           amount: 100,
-          createdAt: moment("2024-01-01").toDate(),
+          createdAt: dt("2024-01-01").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-2",
           accountRegisterId: 1,
           amount: 200,
-          createdAt: moment("2024-01-02").toDate(),
+          createdAt: dt("2024-01-02").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-3",
           accountRegisterId: 2,
           amount: 50,
-          createdAt: moment("2024-01-03").toDate(),
+          createdAt: dt("2024-01-03").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-4",
           accountRegisterId: 1,
           amount: 300,
-          createdAt: moment("2024-01-04").toDate(),
+          createdAt: dt("2024-01-04").toDate(),
         }),
       ]);
     });
@@ -685,23 +685,23 @@ describe("ModernCacheService", () => {
       cache.registerEntry.insertMany([
         createMockRegisterEntry({
           id: "entry-1",
-          createdAt: moment("2024-01-03").toDate(),
+          createdAt: dt("2024-01-03").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-2",
-          createdAt: moment("2024-01-01").toDate(),
+          createdAt: dt("2024-01-01").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-3",
-          createdAt: moment("2024-01-02").toDate(),
+          createdAt: dt("2024-01-02").toDate(),
         }),
       ]);
 
-      // Sort by moment objects should return 0 (no change in order)
+      // Sort by dt objects should return 0 (no change in order)
       const result = cache.registerEntry.chain().simplesort("createdAt").data();
 
       expect(result).toHaveLength(3);
-      // Order should remain unchanged since moment comparison returns 0
+      // Order should remain unchanged since dt comparison returns 0
     });
   });
 });

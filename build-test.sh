@@ -67,7 +67,7 @@ build_main_project() {
 
     if [ $? -eq 0 ]; then
         success "Main project container started successfully"
-        # Give it a moment to start up
+        # Give it a second to start up
         sleep 3
 
         # Check if container is still running
@@ -116,7 +116,7 @@ build_microservice() {
 
     if [ $? -eq 0 ]; then
         success "Microservice container started successfully"
-        # Give it a moment to start up
+        # Give it a second to start up
         sleep 3
 
         # Check if container is still running

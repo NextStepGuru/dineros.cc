@@ -13,7 +13,7 @@ vi.mock("@dazlab-team/loan-calc", () => ({
   })),
 }));
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 describe("LoanCalculatorService", () => {
   let service: LoanCalculatorService;
@@ -255,7 +255,7 @@ describe("LoanCalculatorService", () => {
         apr3: null,
         apr3StartAt: null,
         typeId: 4, // Credit Card (credit account)
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
       const result = await service.calculateInterestForAccount(account);
@@ -268,8 +268,8 @@ describe("LoanCalculatorService", () => {
         balance: 1000,
         apr1: 0.12,
         apr2: 0.18,
-        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use Date instead of moment
-        statementAt: moment("2024-01-15").toDate(),
+        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use native Date
+        statementAt: dt("2024-01-15").toDate(),
         typeId: 4, // Credit Card (credit account)
       });
 
@@ -283,10 +283,10 @@ describe("LoanCalculatorService", () => {
         balance: 1000,
         apr1: 0.12,
         apr2: 0.18,
-        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use Date instead of moment
+        apr2StartAt: new Date("2023-12-01T00:00:00.000Z"), // Use native Date
         apr3: 0.24,
-        apr3StartAt: new Date("2024-01-01T00:00:00.000Z"), // Use Date instead of moment
-        statementAt: moment("2024-01-15").toDate(),
+        apr3StartAt: new Date("2024-01-01T00:00:00.000Z"), // Use native Date
+        statementAt: dt("2024-01-15").toDate(),
         typeId: 4, // Credit Card (credit account)
       });
 
@@ -302,7 +302,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -321,7 +321,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -344,7 +344,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -363,7 +363,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4, // Credit Card
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -386,7 +386,7 @@ describe("LoanCalculatorService", () => {
         apr1: 0.05,
         typeId: 5, // Use typeId 5 for loan calculation
         loanTotalYears: 5,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -406,7 +406,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -423,7 +423,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -440,7 +440,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -457,7 +457,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -508,7 +508,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -525,7 +525,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -542,7 +542,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -561,7 +561,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
       });
@@ -581,7 +581,7 @@ describe("LoanCalculatorService", () => {
         apr2StartAt: new Date(NaN), // Invalid date
         apr3: null,
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
         apr3StartAt: null,
       });
 
@@ -600,7 +600,7 @@ describe("LoanCalculatorService", () => {
         apr3: 0.24,
         apr3StartAt: new Date(NaN), // Invalid date
         typeId: 4,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
       const result = await service.calculateInterestForAccount(account);
@@ -751,7 +751,7 @@ describe("LoanCalculatorService", () => {
         apr2: null, // Override default APR2
         apr3: null, // Override default APR3
         balance: 1000,
-        statementAt: moment().toDate(),
+        statementAt: dt().toDate(),
       });
 
       const result = service.shouldProcessInterest(account);
@@ -763,7 +763,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 0,
-        statementAt: moment().toDate(),
+        statementAt: dt().toDate(),
       });
 
       const result = service.shouldProcessInterest(account);
@@ -775,7 +775,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment().subtract(10, "days").toDate(), // 10 days ago, outside grace period
+        statementAt: dt().subtract(10, "days").toDate(), // 10 days ago, outside grace period
       });
 
       const result = service.shouldProcessInterest(account);
@@ -787,7 +787,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment().subtract(3, "days").toDate(), // 3 days ago, within grace period
+        statementAt: dt().subtract(3, "days").toDate(), // 3 days ago, within grace period
       });
 
       const result = service.shouldProcessInterest(account);
@@ -799,7 +799,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment().subtract(7, "days").toDate(), // Exactly 7 days ago
+        statementAt: dt().subtract(7, "days").toDate(), // Exactly 7 days ago
       });
 
       const result = service.shouldProcessInterest(account);
@@ -811,7 +811,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment().subtract(8, "days").toDate(), // 8 days ago, outside grace period
+        statementAt: dt().subtract(8, "days").toDate(), // 8 days ago, outside grace period
       });
 
       const result = service.shouldProcessInterest(account);
@@ -827,10 +827,10 @@ describe("LoanCalculatorService", () => {
         apr3: null,
         apr3StartAt: null,
         balance: 1000,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
-      const forecastDate = moment("2024-01-15"); // Same as statement date
+      const forecastDate = dt("2024-01-15"); // Same as statement date
       const result = service.shouldProcessInterest(account, forecastDate);
 
       expect(result).toBe(true); // Implementation processes interest on statement date
@@ -843,7 +843,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         balance: 1000,
-        statementAt: moment().toDate(),
+        statementAt: dt().toDate(),
       });
 
       const result = service.shouldProcessInterest(account);
@@ -892,10 +892,10 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
-      const result = service.shouldProcessInterest(account, moment(NaN));
+      const result = service.shouldProcessInterest(account, dt(NaN));
 
       expect(result).toBe(false);
     });
@@ -904,7 +904,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
       const result = service.shouldProcessInterest(account, undefined);
@@ -916,7 +916,7 @@ describe("LoanCalculatorService", () => {
       const account = createMockAccount({
         apr1: 0.05,
         balance: 1000,
-        statementAt: moment("2024-01-15").toDate(),
+        statementAt: dt("2024-01-15").toDate(),
       });
 
       const result = service.shouldProcessInterest(account, undefined);
@@ -930,7 +930,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         balance: 1000,
-        statementAt: moment().toDate(),
+        statementAt: dt().toDate(),
       });
 
       const result = service.shouldProcessInterest(account);

@@ -9,7 +9,7 @@ import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 describe("ForecastEngine - Edge Cases and Error Handling", () => {
   let forecastEngine: ForecastEngine;
@@ -74,7 +74,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
   describe("calculateEndDate - Edge Cases", () => {
     it("should calculate end date correctly", () => {
       const result = forecastEngine["calculateEndDate"]();
-      const expected = moment()
+      const expected = dt()
         .set({
           hour: 0,
           minute: 0,
@@ -104,7 +104,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
             isManualEntry: true,
             isBalanceEntry: false,
             isPending: false,
-            createdAt: moment().toDate(),
+            createdAt: dt().toDate(),
           },
         ],
       };
@@ -154,7 +154,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
             isManualEntry: true,
             isBalanceEntry: false,
             isPending: false,
-            createdAt: moment().toDate(),
+            createdAt: dt().toDate(),
           },
         ],
       };
@@ -179,8 +179,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       const { forecastLogger } = await import("../logger");
       forecastLogger.setConfig({ enabled: false });
 
-      const startDate = moment("2024-01-01");
-      const endDate = moment("2024-01-05");
+      const startDate = dt("2024-01-01");
+      const endDate = dt("2024-01-05");
 
       // Mock services to throw errors
       const mockTransferService = {
@@ -214,8 +214,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
     });
 
     it("should handle very long timeline periods", async () => {
-      const startDate = moment("2024-01-01");
-      const endDate = moment("2034-01-01"); // 10 years
+      const startDate = dt("2024-01-01");
+      const endDate = dt("2034-01-01"); // 10 years
 
       const mockTransferService = {
         processExtraDebtPayments: vi.fn(),
@@ -253,7 +253,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       const { forecastLogger } = await import("../logger");
       forecastLogger.setConfig({ enabled: false });
 
-      const testDate = moment("2024-01-15");
+      const testDate = dt("2024-01-15");
 
       // Mock the cache to throw an error
       const mockCache = {
@@ -272,7 +272,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
     });
 
     it("should handle empty manual entries result", async () => {
-      const testDate = moment("2024-01-15");
+      const testDate = dt("2024-01-15");
 
       // Mock the entry service to return an empty array
       const mockEntryService = {
@@ -346,7 +346,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
           description: "Test Entry",
           amount: 100,
           balance: 1000,
-          createdAt: moment().toDate(),
+          createdAt: dt().toDate(),
           isBalanceEntry: false,
           isPending: false,
           isCleared: false,
@@ -391,8 +391,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       const result = await forecastEngine.validateResults({
         accountId: "test-account",
-        startDate: moment("2024-01-01").toDate(),
-        endDate: moment("2024-12-31").toDate(),
+        startDate: dt("2024-01-01").toDate(),
+        endDate: dt("2024-12-31").toDate(),
       });
 
       expect(result).toBe(false);
@@ -409,8 +409,8 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       const result = await forecastEngine.validateResults({
         accountId: "test-account",
-        startDate: moment("2024-01-01").toDate(),
-        endDate: moment("2024-12-31").toDate(),
+        startDate: dt("2024-01-01").toDate(),
+        endDate: dt("2024-12-31").toDate(),
       });
 
       expect(result).toBe(false);

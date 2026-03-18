@@ -490,7 +490,7 @@ describe("AccountRegisterService", () => {
         statementAt: dateTimeService.create("2024-01-01").toDate(),
       });
 
-      // Use vi.spyOn to mock Date instead of moment
+      // Use vi.spyOn to mock Date for deterministic tests
       const mockNow = vi
         .spyOn(Date, "now")
         .mockReturnValue(dateTimeService.create("2024-01-05").valueOf());
