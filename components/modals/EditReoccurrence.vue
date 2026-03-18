@@ -10,8 +10,7 @@ import {
 import type { Reoccurrence } from "~/types/types";
 
 import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
-// @ts-expect-error form ref from template
-const form = useTemplateRef("form");
+const form = ref<{ submit?: () => void } | null>(null);
 const toast = useToast();
 const { $api } = useNuxtApp();
 
@@ -194,7 +193,7 @@ async function deleteReoccurrence() {
 function confirmDelete() {
   if (
     confirm(
-      "Are you sure you want to delete this reoccurrence? This action cannot be undone."
+      "Are you sure you want to delete this reoccurrence? This action cannot be undone.",
     )
   ) {
     deleteReoccurrence();

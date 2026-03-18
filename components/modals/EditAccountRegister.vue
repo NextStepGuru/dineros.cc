@@ -22,7 +22,7 @@ const { $api } = useNuxtApp();
 const isSaving = ref(false);
 const isDeleting = ref(false);
 
-const form = ref();
+const form = ref<{ submit?: () => void } | null>(null);
 const toast = useToast();
 const listStore = useListStore();
 
@@ -41,13 +41,15 @@ function toNullableNumber(value: unknown): number | null {
 }
 
 function normalizeAccountRegisterState(
-  accountRegister: AccountRegister
+  accountRegister: AccountRegister,
 ): AccountRegister {
   return {
     ...accountRegister,
     typeId: toNullableNumber(accountRegister.typeId) ?? 0,
     budgetId: toNullableNumber(accountRegister.budgetId) ?? 0,
-    subAccountRegisterId: toNullableNumber(accountRegister.subAccountRegisterId),
+    subAccountRegisterId: toNullableNumber(
+      accountRegister.subAccountRegisterId,
+    ),
     balance: toNullableNumber(accountRegister.balance) ?? 0,
     latestBalance: toNullableNumber(accountRegister.latestBalance) ?? 0,
     minPayment: toNullableNumber(accountRegister.minPayment),
@@ -56,10 +58,10 @@ function normalizeAccountRegisterState(
     apr2: toNullableNumber(accountRegister.apr2),
     apr3: toNullableNumber(accountRegister.apr3),
     targetAccountRegisterId: toNullableNumber(
-      accountRegister.targetAccountRegisterId
+      accountRegister.targetAccountRegisterId,
     ),
     collateralAssetRegisterId: toNullableNumber(
-      accountRegister.collateralAssetRegisterId
+      accountRegister.collateralAssetRegisterId,
     ),
     loanPaymentsPerYear: toNullableNumber(accountRegister.loanPaymentsPerYear),
     loanTotalYears: toNullableNumber(accountRegister.loanTotalYears),
@@ -75,14 +77,14 @@ function normalizeAccountRegisterState(
 }
 
 const formState = ref<AccountRegister>(
-  normalizeAccountRegisterState(props.accountRegister)
+  normalizeAccountRegisterState(props.accountRegister),
 );
 
 const fileInput = ref<any>(null);
 
 const selectedAccountType = computed(() => {
   return listStore.getAccountTypes.find(
-    (type) => type.id === formState.value.typeId
+    (type) => type.id === formState.value.typeId,
   );
 });
 
@@ -148,7 +150,7 @@ watch(
     if (!isSelectedAccountTypeCredit.value) {
       formState.value.collateralAssetRegisterId = null;
     }
-  }
+  },
 );
 
 const collateralAssetSelectItems = computed(() => {
@@ -156,9 +158,9 @@ const collateralAssetSelectItems = computed(() => {
     listStore.getAccountRegisters
       .filter(
         (r) =>
-          r.collateralAssetRegisterId != null && r.id !== formState.value.id
+          r.collateralAssetRegisterId != null && r.id !== formState.value.id,
       )
-      .map((r) => r.collateralAssetRegisterId as number)
+      .map((r) => r.collateralAssetRegisterId as number),
   );
   const items: { id: number | null; name: string }[] = [
     { id: null, name: "None" },
@@ -169,10 +171,7 @@ const collateralAssetSelectItems = computed(() => {
     if (r.subAccountRegisterId) continue;
     const t = listStore.getAccountTypes.find((x) => x.id === r.typeId);
     if (t?.isCredit) continue;
-    if (
-      taken.has(r.id) &&
-      formState.value.collateralAssetRegisterId !== r.id
-    ) {
+    if (taken.has(r.id) && formState.value.collateralAssetRegisterId !== r.id) {
       continue;
     }
     items.push({ id: r.id, name: r.name });
@@ -277,7 +276,7 @@ async function deleteAccountRegister() {
 function confirmDelete() {
   if (
     confirm(
-      "Are you sure you want to delete this account register? This action cannot be undone."
+      "Are you sure you want to delete this account register? This action cannot be undone.",
     )
   ) {
     deleteAccountRegister();

@@ -3,7 +3,7 @@ import { dateTimeService } from "../DateTimeService";
 import { Decimal } from "~/types/test-types";
 import { ForecastEngineFactory } from "../index";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 /**
  * Integration Regression Tests
@@ -427,11 +427,11 @@ describe("Integration Regression Tests", () => {
         if (interestEntries.length > 1) {
           // Check no consecutive day interest processing
           const dates = interestEntries
-            .map((e) => moment(e.createdAt).format("YYYY-MM-DD"))
+            .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
             .sort();
           for (let i = 1; i < dates.length; i++) {
-            const daysDiff = moment(dates[i]).diff(
-              moment(dates[i - 1]),
+            const daysDiff = dt(dates[i]).diff(
+              dt(dates[i - 1]),
               "days"
             );
             if (account.statementIntervalId === 2) {
@@ -455,7 +455,7 @@ describe("Integration Regression Tests", () => {
       expect(monthlyRecurrenceEntries.length).toBeGreaterThanOrEqual(0);
       if (monthlyRecurrenceEntries.length >= 7) {
         const monthlyDates = monthlyRecurrenceEntries
-          .map((e) => moment(e.createdAt).format("YYYY-MM-DD"))
+          .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
           .sort();
         expect(monthlyDates).toEqual([
           "2025-01-01", "2025-02-01", "2025-03-01", "2025-04-01",

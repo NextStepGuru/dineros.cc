@@ -11,8 +11,6 @@ import prismaPkg from "@prisma/client";
 
 const { Prisma } = prismaPkg;
 
-const moment = (input?: any) => dateTimeService.create(input);
-
 describe("TransferService", () => {
   let service: TransferService;
   let mockDb: PrismaClient;

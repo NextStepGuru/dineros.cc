@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/types";
 import type { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { startAuthentication } from "@simplewebauthn/browser";
@@ -63,7 +67,7 @@ watch(selectedMfaMethod, (method) => {
 });
 
 function onLoginClick() {
-  const form = loginFormRef.value as { submit?: () => void } | null;
+  const form = loginFormRef.value;
   if (typeof form?.submit === "function") {
     form.submit();
   } else {
@@ -138,10 +142,10 @@ const handleSubmit = async ({
         value: undefined,
       };
       try {
-        data = (await $api("/api/login", {
+        data = await $api<LoginResponse>("/api/login", {
           method: "POST",
           body: formData,
-        })) as LoginResponse;
+        });
       } catch (e: unknown) {
         err.value = e as { statusCode?: number; data?: unknown };
       }
@@ -190,10 +194,10 @@ const handleSubmit = async ({
         return;
       }
 
-      const data = (await $api("/api/mfa/totp/verify", {
+      const data = await $fetch<LoginResponse>("/api/mfa/totp/verify", {
         method: "POST",
         body: { token: String(formState.value.tokenChallenge || "").trim() },
-      })) as LoginResponse;
+      });
       await completeAuth(data);
       isSaving.value = false;
       return;
@@ -221,10 +225,10 @@ const handleSubmit = async ({
         return;
       }
 
-      const data = (await $api("/api/mfa/email/verify", {
+      const data = await $fetch<LoginResponse>("/api/mfa/email/verify", {
         method: "POST",
         body: { code },
-      })) as LoginResponse;
+      });
       await completeAuth(data);
       isSaving.value = false;
       return;
@@ -241,15 +245,17 @@ const handleSubmit = async ({
 async function startPasskeySignIn() {
   try {
     isSaving.value = true;
-    const $api = useNuxtApp().$api as typeof $fetch;
-    const options = await $api("/api/mfa/passkey/auth-options", {
-      method: "POST",
-    });
-    const assertion = await startAuthentication(options as any);
-    const data = (await $api("/api/mfa/passkey/verify", {
+    const optionsJSON = await $fetch<PublicKeyCredentialRequestOptionsJSON>(
+      "/api/mfa/passkey/auth-options" as any,
+      {
+        method: "POST",
+      },
+    );
+    const assertion = await startAuthentication({ optionsJSON });
+    const data = await $fetch<LoginResponse>("/api/mfa/passkey/verify", {
       method: "POST",
       body: { response: assertion },
-    })) as LoginResponse;
+    });
     const result = processLoginResponse(data);
     if (result.success && result.token) {
       authTokenCookie.value = result.token;

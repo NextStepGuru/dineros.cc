@@ -10,7 +10,7 @@ import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
 import { forecastLogger } from "../logger";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 // Mock the database
 const mockDb = {
@@ -165,7 +165,7 @@ describe("ForecastEngine Integration Tests", () => {
         intervalId: 3, // Monthly
         intervalCount: 1,
         transferAccountRegisterId: null,
-        lastAt: moment().startOf("month").toDate(),
+        lastAt: dt().startOf("month").toDate(),
         endAt: null,
         amount: 3000, // Salary
         description: "Monthly Salary",
@@ -181,7 +181,7 @@ describe("ForecastEngine Integration Tests", () => {
         intervalId: 3, // Monthly
         intervalCount: 1,
         transferAccountRegisterId: null,
-        lastAt: moment().startOf("month").add(5, "days").toDate(),
+        lastAt: dt().startOf("month").add(5, "days").toDate(),
         endAt: null,
         amount: -1200, // Rent
         description: "Monthly Rent",
@@ -199,7 +199,7 @@ describe("ForecastEngine Integration Tests", () => {
     // Mock reoccurrence aggregate
     mockDb.reoccurrence.aggregate.mockResolvedValue({
       _min: {
-        lastAt: moment().startOf("month").toDate(),
+        lastAt: dt().startOf("month").toDate(),
       },
     });
 
@@ -218,7 +218,7 @@ describe("ForecastEngine Integration Tests", () => {
     mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
     mockDb.reoccurrence.aggregate.mockResolvedValue({
       _min: {
-        lastAt: moment().startOf("month").toDate(),
+        lastAt: dt().startOf("month").toDate(),
       },
     });
 
@@ -398,8 +398,8 @@ describe("ForecastEngine Integration Tests", () => {
     it("should validate context parameters", async () => {
       const invalidContext = {
         accountId: "",
-        startDate: moment().add(1, "year").toDate(), // Start after end
-        endDate: moment().toDate(),
+        startDate: dt().add(1, "year").toDate(), // Start after end
+        endDate: dt().toDate(),
       };
 
       const result = await engine.recalculate(invalidContext);
@@ -510,7 +510,7 @@ describe("ForecastEngine Integration Tests", () => {
           budgetId: 1,
           latestBalance: 5000,
           minPayment: null,
-          statementAt: moment().add(1, "month").toDate(),
+          statementAt: dt().add(1, "month").toDate(),
           apr1: null,
           apr1StartAt: null,
           apr2: null,
@@ -536,9 +536,9 @@ describe("ForecastEngine Integration Tests", () => {
           accountId: "test-account-123",
           budgetId: 1,
           latestBalance: -2000,
-          statementAt: moment().add(15, "days").toDate(),
+          statementAt: dt().add(15, "days").toDate(),
           apr1: 0.18,
-          apr1StartAt: moment().subtract(1, "year").toDate(),
+          apr1StartAt: dt().subtract(1, "year").toDate(),
           apr2: null,
           apr2StartAt: null,
           apr3: null,

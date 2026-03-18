@@ -9,7 +9,7 @@ import { RegisterEntryService } from "../RegisterEntryService";
 import { TransferService } from "../TransferService";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 
-const moment = (input?: any) => dateTimeService.create(input);
+const dt = (input?: any) => dateTimeService.create(input);
 
 /**
  * Regression tests for Bug #3: Forecast Timeline Continuity
@@ -171,7 +171,7 @@ describe("Forecast Continuity Regression Tests", () => {
           name: "Monthly Credit Card",
           typeId: 4,
           balance: -1500,
-          statementAt: moment("2025-01-15"),
+          statementAt: dt("2025-01-15"),
           statementIntervalId: 3, // Monthly
           apr1: 0.18,
           minPayment: 50,
@@ -201,7 +201,7 @@ describe("Forecast Continuity Regression Tests", () => {
           name: "Weekly Savings",
           typeId: 2,
           balance: 2000,
-          statementAt: moment("2025-01-07"),
+          statementAt: dt("2025-01-07"),
           statementIntervalId: 2, // Weekly
           apr1: 0.03,
           minPayment: null,
@@ -231,7 +231,7 @@ describe("Forecast Continuity Regression Tests", () => {
           name: "Daily Investment",
           typeId: 2,
           balance: 10000,
-          statementAt: moment("2025-01-01"),
+          statementAt: dt("2025-01-01"),
           statementIntervalId: 1, // Daily
           apr1: 0.07,
           minPayment: null,
@@ -261,7 +261,7 @@ describe("Forecast Continuity Regression Tests", () => {
           name: "Checking Account",
           typeId: 1,
           balance: 5000,
-          statementAt: moment("2025-01-01"),
+          statementAt: dt("2025-01-01"),
           statementIntervalId: 3,
           apr1: null,
           minPayment: null,
@@ -328,7 +328,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "Month End Account",
         typeId: 4,
         balance: -3000,
-        statementAt: moment("2025-01-31"),
+        statementAt: dt("2025-01-31"),
         statementIntervalId: 3, // Monthly
         apr1: 0.15,
         minPayment: 100,
@@ -359,7 +359,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "Checking",
         typeId: 1,
         balance: 10000,
-        statementAt: moment("2025-01-01"),
+        statementAt: dt("2025-01-01"),
         statementIntervalId: 3,
         apr1: null,
         budgetId: 1,
@@ -421,7 +421,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "Leap Year Test",
         typeId: 2,
         balance: 5000,
-        statementAt: moment("2024-02-29"), // Leap year date
+        statementAt: dt("2024-02-29"), // Leap year date
         statementIntervalId: 3, // Monthly
         apr1: 0.04,
         budgetId: 1,
@@ -475,7 +475,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "Balance Integrity Test",
         typeId: 5,
         balance: -15000.5,
-        statementAt: moment("2025-01-15"),
+        statementAt: dt("2025-01-15"),
         statementIntervalId: 3,
         apr1: 0.06,
         minPayment: 250.75,
@@ -506,7 +506,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "Checking",
         typeId: 1,
         balance: 20000,
-        statementAt: moment("2025-01-01"),
+        statementAt: dt("2025-01-01"),
         statementIntervalId: 3,
         apr1: null,
         budgetId: 1,
@@ -583,7 +583,7 @@ describe("Forecast Continuity Regression Tests", () => {
         name: "High Interest Account",
         typeId: 2,
         balance: 100000, // Large balance for bigger interest amounts
-        statementAt: moment("2025-01-01"),
+        statementAt: dt("2025-01-01"),
         statementIntervalId: 2, // Weekly interest
         apr1: 0.12, // High APR
         budgetId: 1,
