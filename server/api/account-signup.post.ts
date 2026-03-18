@@ -6,6 +6,7 @@ import { registerSchema } from "~/schema/zod";
 import { postmarkClient } from "../clients/postmarkClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
+import env from "~/server/env";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -92,10 +93,12 @@ export default defineEventHandler(async (event) => {
 
     log({ message: "New User", data: result, level: "debug" });
 
+    const welcomeBcc = env?.SIGNUP_WELCOME_BCC?.trim();
     // Send welcome email to the new user
     await postmarkClient.sendEmail({
       From: "Mr. Pepe Dineros <pepe@dineros.cc>",
       To: email,
+      ...(welcomeBcc ? { Bcc: welcomeBcc } : {}),
       Subject: "Welcome to Dineros!",
       HtmlBody: `${firstName},<br>
       <br>
