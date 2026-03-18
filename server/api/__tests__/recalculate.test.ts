@@ -69,9 +69,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       // This would need to be updated when we have proper test infrastructure
@@ -80,9 +79,8 @@ describe("Recalculate API Tests", () => {
     });
 
     it("should handle missing account ID", async () => {
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       const mockEngine = {
         recalculate: vi.fn(),
       };
@@ -109,9 +107,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       const result = await mockForecastEngine.recalculate({
@@ -137,9 +134,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       const accountId = "test-account-123";
@@ -179,9 +175,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       // Simulate the task endpoint logic
@@ -210,9 +205,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       // Simulate the logic for processing all accounts
@@ -270,13 +264,13 @@ describe("Recalculate API Tests", () => {
 
       // Simulate the breakdown calculation logic
       const entriesProjected = mockResult.registerEntries.filter(
-        (entry) => entry.isProjected
+        (entry) => entry.isProjected,
       ).length;
       const entriesHistorical = mockResult.registerEntries.filter(
-        (entry) => !entry.isProjected && !entry.isBalanceEntry
+        (entry) => !entry.isProjected && !entry.isBalanceEntry,
       ).length;
       const entriesBalance = mockResult.registerEntries.filter(
-        (entry) => entry.isBalanceEntry
+        (entry) => entry.isBalanceEntry,
       ).length;
 
       expect(entriesProjected).toBe(2);
@@ -315,6 +309,7 @@ describe("Recalculate API Tests", () => {
 
       accounts.forEach((account, index) => {
         const result = mockResults[index];
+        if (result == null) return;
         if (result.isSuccess) {
           results.push({
             accountId: account.accountId,
@@ -350,9 +345,8 @@ describe("Recalculate API Tests", () => {
         }),
       };
 
-      const { ForecastEngineFactory } = await import(
-        "~/server/services/forecast"
-      );
+      const { ForecastEngineFactory } =
+        await import("~/server/services/forecast");
       (ForecastEngineFactory.create as any).mockReturnValue(mockForecastEngine);
 
       // The rate limiter should be called during persistence
@@ -384,10 +378,10 @@ describe("Recalculate API Tests", () => {
 
       // Simulate the filtering logic from ForecastEngine
       const entriesToPersist = mockResult.registerEntries.filter(
-        (e) => !e.isManualEntry
+        (e) => !e.isManualEntry,
       );
       const manualEntriesToPersist = mockResult.registerEntries.filter(
-        (e) => e.isManualEntry
+        (e) => e.isManualEntry,
       );
 
       expect(entriesToPersist).toHaveLength(2);

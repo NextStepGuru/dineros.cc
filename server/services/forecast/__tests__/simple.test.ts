@@ -27,7 +27,7 @@ describe("Simple Forecast Engine Test", () => {
         balance: 1000,
         latestBalance: 1000,
         minPayment: null,
-        statementAt: dateTimeService.create(),
+        statementAt: dateTimeService.create().toDate(),
         statementIntervalId: 1,
         apr1: null,
         apr1StartAt: null,
@@ -51,7 +51,7 @@ describe("Simple Forecast Engine Test", () => {
     });
 
     // Create forecast engine
-    const engine = ForecastEngineFactory.create(db);
+    const engine = ForecastEngineFactory.create(db as any);
 
     // Call recalculate
     const result = await engine.recalculate({

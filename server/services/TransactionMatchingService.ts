@@ -33,7 +33,7 @@ class TransactionMatchingService {
    */
   private async findExistingPlaidTransaction(
     transaction: Transaction,
-    accountRegisterId: number
+    accountRegisterId: number,
   ): Promise<RegisterEntry | null> {
     return await this.db.registerEntry.findFirst({
       where: {
@@ -49,11 +49,13 @@ class TransactionMatchingService {
   private async findExactTransactionMatch(
     transaction: Transaction,
     accountRegisterId: number,
-    formattedAmount: number
+    formattedAmount: number,
   ): Promise<RegisterEntry | null> {
     const dt = dateTimeService.parseInput(transaction.date);
     const dayStart = dateTimeService.startOfDay(dt).toDate();
-    const dayEnd = dateTimeService.startOfDay(dateTimeService.add(1, "day", dt)).toDate();
+    const dayEnd = dateTimeService
+      .startOfDay(dateTimeService.add(1, "day", dt))
+      .toDate();
 
     return await this.db.registerEntry.findFirst({
       where: {
@@ -75,7 +77,7 @@ class TransactionMatchingService {
     transaction: Transaction,
     accountRegisterId: number,
     formattedAmount: number,
-    dayRange: number = DEFAULT_FUZZY_DAY_RANGE
+    dayRange: number = DEFAULT_FUZZY_DAY_RANGE,
   ): Promise<RegisterEntry | null> {
     const dt = dateTimeService.parseInput(transaction.date);
     const daysBefore = dateTimeService.subtract(dayRange, "day", dt).toDate();
@@ -103,7 +105,7 @@ class TransactionMatchingService {
     transaction: Transaction,
     accountRegister: AccountRegister,
     accountType: AccountType,
-    options: MatchOptions = {}
+    options: MatchOptions = {},
   ): Promise<TransactionMatchResult> {
     const {
       enableFuzzyMatching = true,
@@ -117,7 +119,7 @@ class TransactionMatchingService {
     // First check if this Plaid transaction already exists
     const existingPlaidTransaction = await this.findExistingPlaidTransaction(
       transaction,
-      accountRegister.id
+      accountRegister.id,
     );
 
     if (existingPlaidTransaction) {
@@ -141,7 +143,7 @@ class TransactionMatchingService {
     const exactMatch = await this.findExactTransactionMatch(
       transaction,
       accountRegister.id,
-      formattedAmount
+      formattedAmount,
     );
 
     if (exactMatch) {
@@ -168,7 +170,7 @@ class TransactionMatchingService {
         transaction,
         accountRegister.id,
         formattedAmount,
-        fuzzyDayRange
+        fuzzyDayRange,
       );
 
       if (fuzzyMatch) {
@@ -203,7 +205,7 @@ class TransactionMatchingService {
   async updateExistingTransaction(
     existingEntry: RegisterEntry,
     transaction: Transaction,
-    matchType: "exact" | "fuzzy"
+    matchType: "exact" | "fuzzy",
   ): Promise<RegisterEntry> {
     const updateData: any = {
       plaidId: transaction.transaction_id,
@@ -231,11 +233,28 @@ class TransactionMatchingService {
     transaction: Transaction,
     accountRegister: AccountRegister,
     accountType: AccountType,
-    transactionData: any
+    transactionData: any,
   ): Promise<RegisterEntry> {
     return await this.db.registerEntry.create({
       data: transactionData,
     });
+  }
+
+  /**
+   * Remove register entries by Plaid transaction IDs (for Transactions Sync "removed").
+   */
+  async removePlaidTransactions(
+    accountRegisterId: number,
+    plaidTransactionIds: string[],
+  ): Promise<number> {
+    if (plaidTransactionIds.length === 0) return 0;
+    const result = await this.db.registerEntry.deleteMany({
+      where: {
+        accountRegisterId,
+        plaidId: { in: plaidTransactionIds },
+      },
+    });
+    return result.count;
   }
 }
 

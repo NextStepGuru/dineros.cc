@@ -3,6 +3,7 @@ import type {
   Budget,
   AccountRegister,
   AccountType,
+  Category,
   Interval,
   Lists,
   Reoccurrence,
@@ -17,6 +18,7 @@ export const useListStore = defineStore("listStore", {
     accountRegisters: [] as AccountRegister[],
     budgets: [] as Budget[],
     accounts: [] as Account[],
+    categories: [] as Category[],
     isLoading: false,
   }),
   getters: {
@@ -43,6 +45,7 @@ export const useListStore = defineStore("listStore", {
     },
     getBudgets: (state) => state.budgets,
     getAccounts: (state) => state.accounts,
+    getCategories: (state) => state.categories,
     getIsListsLoading: (state) => state.isLoading,
   },
   actions: {
@@ -63,6 +66,9 @@ export const useListStore = defineStore("listStore", {
     },
     setAccounts(accounts: Account[]) {
       this.accounts = accounts;
+    },
+    setCategories(categories: Category[]) {
+      this.categories = categories;
     },
     patchAccountRegister(accountRegister: AccountRegister) {
       const index = this.accountRegisters.findIndex(
@@ -110,6 +116,7 @@ export const useListStore = defineStore("listStore", {
           this.setAccountRegisters(data.accountRegisters);
           this.setBudgets(data.budgets);
           this.setAccounts(data.accounts);
+          this.setCategories(data.categories);
         }
       } finally {
         this.isLoading = false;
@@ -122,6 +129,7 @@ export const useListStore = defineStore("listStore", {
       this.accountRegisters = [];
       this.budgets = [];
       this.accounts = [];
+      this.categories = [];
     },
   },
 });

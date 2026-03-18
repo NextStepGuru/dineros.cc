@@ -42,6 +42,8 @@ const links = ref([
   {
     label: "See how it works",
     to: "#features",
+    icon: "",
+    trailing: false,
     color: "primary" as const,
     variant: "soft" as const,
     class: "frog-cta",

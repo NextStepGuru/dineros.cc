@@ -42,7 +42,7 @@ class PlaidSyncService {
   private formatTransactionData(
     transaction: Transaction,
     accountRegister: AccountRegister,
-    accountType: AccountType
+    accountType: AccountType,
   ) {
     let formattedAmount = transaction.amount;
     if (!accountType.isCredit) {
@@ -58,7 +58,9 @@ class PlaidSyncService {
       accountRegisterId: accountRegister.id,
       amount: formattedAmount,
       balance: 0,
-      createdAt: dateTimeService.toDate(dateTimeService.parseInput(transaction.date)),
+      createdAt: dateTimeService.toDate(
+        dateTimeService.parseInput(transaction.date),
+      ),
       description: formattedName,
       isProjected: false,
       isPending: true,
@@ -71,7 +73,7 @@ class PlaidSyncService {
    */
   private async syncTransactionsForAccount(
     accountRegister: AccountRegister & { type: AccountType },
-    transactions: Transaction[]
+    transactions: Transaction[],
   ): Promise<{ newCount: number; matchedCount: number; errors: string[] }> {
     let newCount = 0;
     let matchedCount = 0;
@@ -82,7 +84,7 @@ class PlaidSyncService {
         const matchResult = await this.transactionMatcher.matchTransaction(
           transaction,
           accountRegister,
-          accountRegister.type
+          accountRegister.type,
         );
 
         if (matchResult.matchType === "skip") {
@@ -104,7 +106,7 @@ class PlaidSyncService {
           await this.transactionMatcher.updateExistingTransaction(
             matchResult.existingEntry,
             transaction,
-            matchResult.matchType as "exact" | "fuzzy"
+            matchResult.matchType as "exact" | "fuzzy",
           );
           matchedCount++;
 
@@ -122,14 +124,14 @@ class PlaidSyncService {
           const transactionData = this.formatTransactionData(
             transaction,
             accountRegister,
-            accountRegister.type
+            accountRegister.type,
           );
 
           await this.transactionMatcher.createNewTransaction(
             transaction,
             accountRegister,
             accountRegister.type,
-            transactionData
+            transactionData,
           );
           newCount++;
         }
@@ -177,7 +179,7 @@ class PlaidSyncService {
 
     const accountList = accountsResponse.data.accounts;
     const registerByPlaidId = new Map(
-      accountRegisters.map((r) => [r.plaidId, r])
+      accountRegisters.map((r) => [r.plaidId, r]),
     );
     const now = dateTimeService.nowDate();
 
@@ -186,9 +188,12 @@ class PlaidSyncService {
         const accountRegister = registerByPlaidId.get(account.account_id);
         if (!accountRegister) return Promise.resolve();
 
+        const rawBalance = accountRegister.type.isCredit
+          ? account.balances.current
+          : (account.balances.available ?? account.balances.current);
         const latestBalance = accountRegister.type.isCredit
-          ? parseFloat(account.balances.current?.toString() || "0") * -1
-          : parseFloat(account.balances.available?.toString() || "0");
+          ? parseFloat(rawBalance?.toString() || "0") * -1
+          : parseFloat(rawBalance?.toString() || "0");
 
         return this.db.accountRegister.updateMany({
           where: { plaidId: account.account_id },
@@ -197,7 +202,7 @@ class PlaidSyncService {
             plaidBalanceLastSyncAt: now,
           },
         });
-      })
+      }),
     );
 
     return accountList;
@@ -269,7 +274,7 @@ class PlaidSyncService {
     });
 
     const accountRegisterMap = new Map(
-      accountRegisters.map((ar) => [ar.plaidId, ar])
+      accountRegisters.map((ar) => [ar.plaidId, ar]),
     );
 
     // Group transactions by account
@@ -298,7 +303,7 @@ class PlaidSyncService {
 
       const result = await this.syncTransactionsForAccount(
         accountRegister,
-        accountTransactions
+        accountTransactions,
       );
 
       totalNew += result.newCount;
@@ -326,24 +331,176 @@ class PlaidSyncService {
   }
 
   /**
+   * Resolve Plaid item_id to access_token for that Item (from user settings).
+   */
+  private async getAccessTokenForItemId(
+    itemId: string,
+  ): Promise<string | null> {
+    const plaidItem = await PrismaDb.plaidItem.findUnique({
+      where: { itemId },
+      include: { user: { select: { settings: true } } },
+    });
+    if (!plaidItem?.user?.settings) return null;
+    const settings = plaidItem.user.settings as {
+      plaid?: { access_token?: string };
+    };
+    return settings?.plaid?.access_token ?? null;
+  }
+
+  /**
+   * Sync transactions for one Item using /transactions/sync (cursor-based).
+   * Applies added, modified, removed; persists cursor.
+   */
+  async syncItemWithTransactionsSync(itemId: string): Promise<void> {
+    const accessToken = await this.getAccessTokenForItemId(itemId);
+    if (!accessToken) {
+      log({
+        message: "syncItemWithTransactionsSync: no access token",
+        data: { itemId },
+        level: "warn",
+      });
+      return;
+    }
+
+    const cursorRow = await PrismaDb.plaidSyncCursor.findUnique({
+      where: { itemId },
+    });
+    let cursor = cursorRow?.cursor ?? "";
+
+    const accountRegisters = await this.db.accountRegister.findMany({
+      where: {
+        plaidAccessToken: accessToken,
+        plaidId: { not: null },
+        isArchived: false,
+      },
+      include: { type: true },
+    });
+    const registerByPlaidAccountId = new Map(
+      accountRegisters.map((r) => [r.plaidId!, r]),
+    );
+
+    let hasMore = true;
+    while (hasMore) {
+      const response = await this.client.transactionsSync({
+        access_token: accessToken,
+        cursor: cursor || undefined,
+      });
+      const data = response.data as {
+        added: Transaction[];
+        modified: Transaction[];
+        removed: Array<{ transaction_id: string }>;
+        next_cursor: string;
+        has_more: boolean;
+      };
+
+      for (const tx of data.added) {
+        const ar = registerByPlaidAccountId.get(tx.account_id);
+        if (!ar) continue;
+        try {
+          const matchResult = await this.transactionMatcher.matchTransaction(
+            tx,
+            ar,
+            ar.type,
+          );
+          if (matchResult.matchType === "skip") continue;
+          if (
+            matchResult.isMatched &&
+            matchResult.existingEntry &&
+            matchResult.matchType !== "none"
+          ) {
+            await this.transactionMatcher.updateExistingTransaction(
+              matchResult.existingEntry,
+              tx,
+              matchResult.matchType as "exact" | "fuzzy",
+            );
+          } else {
+            const transactionData = this.formatTransactionData(tx, ar, ar.type);
+            await this.transactionMatcher.createNewTransaction(
+              tx,
+              ar,
+              ar.type,
+              transactionData,
+            );
+          }
+        } catch (err) {
+          log({
+            message: "syncItemWithTransactionsSync added error",
+            data: { tx: tx.transaction_id, err },
+            level: "error",
+          });
+        }
+      }
+
+      for (const tx of data.modified) {
+        const ar = registerByPlaidAccountId.get(tx.account_id);
+        if (!ar) continue;
+        try {
+          const existing = await this.db.registerEntry.findFirst({
+            where: { accountRegisterId: ar.id, plaidId: tx.transaction_id },
+          });
+          if (existing) {
+            await this.transactionMatcher.updateExistingTransaction(
+              existing,
+              tx,
+              "exact",
+            );
+          }
+        } catch (err) {
+          log({
+            message: "syncItemWithTransactionsSync modified error",
+            data: { tx: tx.transaction_id, err },
+            level: "error",
+          });
+        }
+      }
+
+      for (const rem of data.removed) {
+        const tid = rem.transaction_id;
+        for (const ar of accountRegisters) {
+          await this.transactionMatcher.removePlaidTransactions(ar.id, [tid]);
+        }
+      }
+
+      cursor = data.next_cursor;
+      hasMore = data.has_more;
+    }
+
+    await PrismaDb.plaidSyncCursor.upsert({
+      where: { itemId },
+      create: { itemId, cursor },
+      update: { cursor, updatedAt: dateTimeService.now().toDate() },
+    });
+
+    for (const ar of accountRegisters) {
+      addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
+      addRecalculateJob({ accountId: ar.accountId });
+    }
+  }
+
+  /**
    * Main sync method that orchestrates the entire sync process
    */
   async getAndSyncPlaidAccounts(
     {
       accountRegisterId,
       resetSyncDates = false,
+      itemId,
     }: {
       accountRegisterId?: number;
       resetSyncDates?: boolean;
-    } = { resetSyncDates: false }
+      itemId?: string;
+    } = { resetSyncDates: false },
   ): Promise<void> {
+    if (itemId) {
+      await this.syncItemWithTransactionsSync(itemId);
+      return;
+    }
+
     // Get account registers one by one to avoid 'in' clause with encrypted fields
     const accountRegisters = await PrismaDb.accountRegister.findMany({
       where: {
         isArchived: false,
-        plaidId: {
-          not: null,
-        },
+        plaidId: { not: null },
         ...(accountRegisterId && { id: accountRegisterId }),
       },
       select: {
@@ -366,8 +523,8 @@ class PlaidSyncService {
           plaidAccounts[token] = [];
         }
 
-        plaidAccounts[token].push({
-          plaidId: accountRegister.plaidId,
+        plaidAccounts[token]!.push({
+          plaidId: accountRegister.plaidId!,
           plaidLastSyncAt: resetSyncDates
             ? dateTimeService.now().subtract(DAYS_REQUESTED, "days").toDate()
             : accountRegister.plaidLastSyncAt ||
@@ -377,16 +534,25 @@ class PlaidSyncService {
       }
     }
 
-    // Add balance sync jobs
-    for (const { id } of accountRegisters) {
-      addPlaidBalanceSyncJob({ accountRegisterId: id });
+    // Add balance sync jobs (only for registers we're syncing)
+    const accountRegisterIdsInScope = new Set(
+      Object.values(plaidAccounts).flatMap((arr) =>
+        arr.map((a) => a.accountRegisterId),
+      ),
+    );
+    for (const ar of accountRegisters) {
+      if (accountRegisterIdsInScope.has(ar.id)) {
+        addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
+      }
     }
 
     // Process each access token separately
     for (const accessToken in plaidAccounts) {
+      const accountsForToken = plaidAccounts[accessToken];
+      if (!accountsForToken?.length) continue;
       try {
         const startDate = (() => {
-          const dates = plaidAccounts[accessToken].map((a) => a.plaidLastSyncAt);
+          const dates = accountsForToken.map((a) => a.plaidLastSyncAt);
           if (dates.length === 0) return dateTimeService.nowDate();
           const minEpoch = Math.min(
             ...dates.map((d) => dateTimeService.createUTC(d).valueOf()),
@@ -394,25 +560,27 @@ class PlaidSyncService {
           return dateTimeService.fromEpoch(minEpoch).toDate();
         })();
 
+        const startStr = startDate.toISOString().slice(0, 10);
+        const endStr = dateTimeService
+          .now()
+          .add(DAYS_REQUESTED, "days")
+          .toISOString()
+          .slice(0, 10);
         const syncResult = await this.syncAllTransactions({
           accessToken,
-          plaidAccountIds: plaidAccounts[accessToken].map((a) => a.plaidId),
-          startDate: startDate.toISOString().split("T")[0],
-          endDate: dateTimeService
-            .now()
-            .add(DAYS_REQUESTED, "days")
-            .toISOString()
-            .split("T")[0],
+          plaidAccountIds: accountsForToken.map((a) => a.plaidId),
+          startDate: startStr,
+          endDate: endStr,
         });
 
         // Update sync dates for all accounts with this token
-        for (const accountInfo of plaidAccounts[accessToken]) {
+        for (const accountInfo of accountsForToken) {
           await this.db.accountRegister.update({
             where: { id: accountInfo.accountRegisterId },
             data: {
               plaidLastSyncAt: dateTimeService
                 .createUTC(dateTimeService.nowDate())
-                .set({ hours: 0, minutes: 0, seconds: 0, millisecond: 0 })
+                .set({ hour: 0, minute: 0, second: 0, millisecond: 0 })
                 .toDate(),
             },
           });
@@ -422,7 +590,7 @@ class PlaidSyncService {
           message: "Sync Plaid Transactions",
           data: {
             accessToken,
-            plaidAccountIds: plaidAccounts[accessToken],
+            plaidAccountIds: accountsForToken,
             syncResult,
           },
           level: "info",

@@ -7,6 +7,8 @@ export type PlaidSyncJob = {
   name: string;
   accountRegisterId?: number;
   resetSyncDates?: boolean;
+  /** When set, only sync account registers for this Plaid Item (from webhook). */
+  itemId?: string;
 };
 
 export default {
@@ -24,6 +26,7 @@ export default {
     await plaidSyncService.getAndSyncPlaidAccounts({
       accountRegisterId: job.data.accountRegisterId,
       resetSyncDates: job.data.resetSyncDates,
+      itemId: job.data.itemId,
     });
 
     log({

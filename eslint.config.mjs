@@ -15,7 +15,7 @@ export default withNuxt([
   {
     files: ["**/*.ts", "**/*.vue"],
     plugins: {
-      "@typescript-eslint": tsPlugin,
+      "@typescript-eslint": /** @type {any} */ (tsPlugin),
     },
   },
   // Parse all .ts files as TypeScript (otherwise they fall back to JS parser and fail)

@@ -50,7 +50,7 @@ useHead({
     {
       type: "application/ld+json",
       children: JSON.stringify(policyJsonLd),
-    },
+    } as { type: string; children: string },
   ],
 });
 </script>

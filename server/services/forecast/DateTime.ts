@@ -1,5 +1,6 @@
 /** Full ISO datetime with Z or offset - required to avoid ambiguous local interpretation */
-const HAS_EXPLICIT_OFFSET = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
+const HAS_EXPLICIT_OFFSET =
+  /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 /** Date-only YYYY-MM-DD; safe to interpret in a given timezone. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -131,7 +132,7 @@ function formatDateUTC(date: Date, formatString: string): string {
     mm: pad(date.getUTCMinutes()),
     ss: pad(date.getUTCSeconds()),
     SSS: pad(date.getUTCMilliseconds(), 3),
-    dddd: DAY_NAMES[date.getUTCDay()],
+    dddd: DAY_NAMES[date.getUTCDay()] ?? "",
     M: String(date.getUTCMonth() + 1),
     D: String(date.getUTCDate()),
     H: String(date.getUTCHours()),
@@ -141,7 +142,7 @@ function formatDateUTC(date: Date, formatString: string): string {
 
   return formatString.replace(
     /YYYY|dddd|SSS|MM|DD|HH|mm|ss|M|D|H|m|s/g,
-    (token) => replacements[token] ?? token
+    (token) => replacements[token] ?? token,
   );
 }
 
@@ -167,15 +168,24 @@ export class DateTime {
   static parse(dateString: string, format: string): DateTime {
     const trimmed = dateString.trim();
     if (format === "YYYY-MM-DD") {
-      const [year, month, day] = trimmed.split("-").map(Number);
+      const parts = trimmed.split("-").map(Number);
+      const year = parts[0] ?? 0;
+      const month = parts[1] ?? 0;
+      const day = parts[2] ?? 0;
       return new DateTime(new Date(Date.UTC(year, month - 1, day)));
     }
     if (format === "YYYY-MM-DD HH:mm:ss") {
       const [datePart, timePart] = trimmed.split(" ");
-      const [year, month, day] = datePart.split("-").map(Number);
-      const [hour, minute, second] = timePart.split(":").map(Number);
+      const dp = (datePart ?? "").split("-").map(Number);
+      const tp = (timePart ?? "").split(":").map(Number);
+      const year = dp[0] ?? 0;
+      const month = dp[1] ?? 0;
+      const day = dp[2] ?? 0;
+      const hour = tp[0] ?? 0;
+      const minute = tp[1] ?? 0;
+      const second = tp[2] ?? 0;
       return new DateTime(
-        new Date(Date.UTC(year, month - 1, day, hour, minute, second, 0))
+        new Date(Date.UTC(year, month - 1, day, hour, minute, second, 0)),
       );
     }
     return new DateTime(trimmed);
@@ -214,7 +224,7 @@ export class DateTime {
   add(_duration: DurationObjectInput): DateTime;
   add(
     amountOrDuration: number | DurationObjectInput,
-    unit?: DurationInputArg2
+    unit?: DurationInputArg2,
   ): DateTime {
     if (
       typeof amountOrDuration === "object" &&
@@ -241,7 +251,7 @@ export class DateTime {
       return chained;
     }
 
-    const amount = amountOrDuration;
+    const amount = amountOrDuration as number;
     const resolvedUnit: DurationInputArg2 = unit ?? "millisecond";
     const next = this.toDate();
     const normalized = normalizeUnit(resolvedUnit);
@@ -264,7 +274,7 @@ export class DateTime {
           const targetMonth = ((absoluteMonths % 12) + 12) % 12;
           const targetDay = Math.min(
             currentDay,
-            daysInMonthUTC(targetYear, targetMonth)
+            daysInMonthUTC(targetYear, targetMonth),
           );
           next.setUTCFullYear(targetYear, targetMonth, targetDay);
         }
@@ -395,21 +405,23 @@ export class DateTime {
     if (units.hour !== undefined) d.setUTCHours(units.hour);
     if (units.minute !== undefined) d.setUTCMinutes(units.minute);
     if (units.second !== undefined) d.setUTCSeconds(units.second);
-    if (units.millisecond !== undefined) d.setUTCMilliseconds(units.millisecond);
-    if (units.milliseconds !== undefined) d.setUTCMilliseconds(units.milliseconds);
+    if (units.millisecond !== undefined)
+      d.setUTCMilliseconds(units.millisecond);
+    if (units.milliseconds !== undefined)
+      d.setUTCMilliseconds(units.milliseconds);
     return new DateTime(d);
   }
 
   diff(
     other: DateTime | Date | string,
-    unit: DurationInputArg2 = "milliseconds"
+    unit: DurationInputArg2 = "milliseconds",
   ): number {
     const lhs = this.valueOf();
     const rhs = this.resolveOther(other).getTime();
     const delta = lhs - rhs;
     switch (normalizeUnit(unit)) {
       case "year":
-        return this.year() - new DateTime(other).year();
+        return (this.year() as number) - (new DateTime(other).year() as number);
       case "month":
         return (
           (this.year() as number) * 12 +
@@ -438,7 +450,10 @@ export class DateTime {
   }
 
   daysInMonth(): number {
-    return daysInMonthUTC(this._date.getUTCFullYear(), this._date.getUTCMonth());
+    return daysInMonthUTC(
+      this._date.getUTCFullYear(),
+      this._date.getUTCMonth(),
+    );
   }
 
   hour(): number {

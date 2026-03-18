@@ -34,7 +34,7 @@ const isDisabled = computed(() => {
 
 const toast = useToast();
 const listStore = useListStore();
-const form = useTemplateRef("form");
+const form = ref<{ submit?: () => void } | null>(null);
 const selectedApplyAccountRegisterId = ref<number>(0);
 const selectedTransferAccountRegisterId = ref<number>(0);
 const transferTargetDescription = ref<string>("");
@@ -58,6 +58,32 @@ watch(props, () => {
   state.isTransferMode = false;
   selectedTransferAccountRegisterId.value = 0;
   transferTargetDescription.value = "";
+});
+
+const accountIdForEntry = computed(() => {
+  const reg = listStore.getAccountRegisters.find(
+    (r) => r.id === formState.value.accountRegisterId,
+  );
+  return reg?.accountId ?? null;
+});
+
+const categorySelectItems = computed(() => {
+  const base = [{ id: null, name: "None", value: null, label: "None" }] as {
+    id: string | null;
+    name: string;
+    value: string | null;
+    label: string;
+  }[];
+  if (!accountIdForEntry.value) return base;
+  const forAccount = listStore.getCategories
+    .filter((c) => c.accountId === accountIdForEntry.value)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      value: c.id,
+      label: c.name,
+    }));
+  return [...base, ...forAccount];
 });
 
 async function handleSubmit({
@@ -192,7 +218,7 @@ async function deleteRegisterEntry() {
 function confirmDelete() {
   if (
     confirm(
-      "Are you sure you want to delete this register entry? This action cannot be undone."
+      "Are you sure you want to delete this register entry? This action cannot be undone.",
     )
   ) {
     deleteRegisterEntry();
@@ -353,20 +379,20 @@ const formatAccountRegistersForSelection = computed(() => {
       name: register.name,
       label: register.name,
       value: register.id,
-    })
+    }),
   );
 });
 
 // Available transfer destination accounts (excluding current account)
 const transferDestinationAccounts = computed(() => {
   return formatAccountRegistersForSelection.value.filter(
-    (account) => account.id !== formState.value.accountRegisterId
+    (account) => account.id !== formState.value.accountRegisterId,
   );
 });
 </script>
 
 <template lang="pug">
-UModal(title="Edit Register Entry" description="Edit Register Entry" class="max-sm:!w-full max-sm:!h-full max-sm:!max-w-none max-sm:!max-h-none max-sm:!rounded-none")
+UModal(title="Edit Register Entry" description="Edit Register Entry" class="max-sm:w-full! max-sm:h-full! max-sm:max-w-none! max-sm:max-h-none! max-sm:rounded-none!")
   template(#body)
     // Apply Account Selection
     div(v-if="state.showApplySelection" class="space-y-4")
@@ -416,6 +442,16 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="max-
 
       UFormField(label="Description" name="description")
         UInput(v-model="formState.description" type="text" id="description" class="w-full" :disabled="formState.isProjected")
+
+      UFormField(label="Category" name="categoryId")
+        USelect(
+          v-model="formState.categoryId"
+          :items="categorySelectItems"
+          value-key="value"
+          label-key="label"
+          placeholder="None"
+          class="w-full"
+          :disabled="formState.isProjected")
 
       // Transfer destination and description (only in transfer mode for new entries)
       div(v-if="state.isTransferMode && isNewEntry" class="space-y-4")

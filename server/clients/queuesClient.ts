@@ -20,7 +20,7 @@ export const queueConfigs = [
 log({ message: `BullMQ Queues: ${queueConfigs.length}`, level: "info" });
 export const queueManager = new QueueManager(
   queueConfigs,
-  sharedRedisConnection
+  sharedRedisConnection,
 );
 
 export const addBackupJob = (data: BackupJob) =>
@@ -40,7 +40,9 @@ export const addPlaidSyncJob = (data: PlaidSyncJob) =>
   queueManager.addJob(plaidSync.queueName, data, {
     attempts: 0,
     delay: 30 * 60 * 1000, // 30 minutes
-    jobId: `${data.name || ""}${data.accountRegisterId || ""}` || "PlaidSync",
+    jobId:
+      `${data.name || ""}${data.accountRegisterId ?? ""}${data.itemId ?? ""}` ||
+      "PlaidSync",
     removeOnComplete: true,
     removeOnFail: false,
     keepLogs: 4,

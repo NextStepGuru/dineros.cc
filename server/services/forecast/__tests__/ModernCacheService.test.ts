@@ -22,7 +22,7 @@ describe("ModernCacheService", () => {
   });
 
   function createMockAccountRegister(
-    overrides: Partial<CacheAccountRegister> = {}
+    overrides: Partial<CacheAccountRegister> = {},
   ): CacheAccountRegister {
     return {
       id: 1,
@@ -33,7 +33,7 @@ describe("ModernCacheService", () => {
       balance: 1000,
       latestBalance: 1000,
       minPayment: null,
-      statementAt: dateTimeService.create("2024-01-15"),
+      statementAt: dateTimeService.create("2024-01-15").toDate(),
       apr1: 0.15,
       apr1StartAt: null,
       apr2: null,
@@ -55,7 +55,7 @@ describe("ModernCacheService", () => {
   }
 
   function createMockRegisterEntry(
-    overrides: Partial<CacheRegisterEntry> = {}
+    overrides: Partial<CacheRegisterEntry> = {},
   ): CacheRegisterEntry {
     return {
       id: "entry-1",
@@ -63,7 +63,7 @@ describe("ModernCacheService", () => {
       description: "Test Entry",
       amount: 100,
       balance: 1100,
-      createdAt: dateTimeService.create("2024-01-01"),
+      createdAt: dateTimeService.create("2024-01-01").toDate(),
       isProjected: true,
       isPending: false,
       isCleared: false,
@@ -78,7 +78,7 @@ describe("ModernCacheService", () => {
   }
 
   function createMockReoccurrence(
-    overrides: Partial<CacheReoccurrence> = {}
+    overrides: Partial<CacheReoccurrence> = {},
   ): CacheReoccurrence {
     return {
       id: 1,
@@ -100,7 +100,7 @@ describe("ModernCacheService", () => {
   }
 
   function createMockReoccurrenceSkip(
-    overrides: Partial<CacheReoccurrenceSkip> = {}
+    overrides: Partial<CacheReoccurrenceSkip> = {},
   ): CacheReoccurrenceSkip {
     return {
       id: 1,
@@ -127,7 +127,7 @@ describe("ModernCacheService", () => {
 
       const found = cache.accountRegister.find({ accountId: "test-123" });
       expect(found).toHaveLength(1);
-      expect(found[0].accountId).toBe("test-123");
+      expect(found[0]!.accountId).toBe("test-123");
     });
   });
 
@@ -235,12 +235,12 @@ describe("ModernCacheService", () => {
       it("should find items by simple property match", () => {
         const checking = cache.accountRegister.find({ name: "Checking" });
         expect(checking).toHaveLength(1);
-        expect(checking[0].name).toBe("Checking");
+        expect(checking[0]!.name).toBe("Checking");
       });
 
       it("should find items by function predicate", () => {
         const positiveBalance = cache.accountRegister.find(
-          (acc) => acc.balance > 0
+          (acc) => acc.balance > 0,
         );
         expect(positiveBalance).toHaveLength(2);
         expect(positiveBalance.every((acc) => acc.balance > 0)).toBe(true);
@@ -249,7 +249,7 @@ describe("ModernCacheService", () => {
       it("should use index for fast lookup", () => {
         const byType = cache.accountRegister.find({ typeId: 1 });
         expect(byType).toHaveLength(1);
-        expect(byType[0].name).toBe("Checking");
+        expect(byType[0]!.name).toBe("Checking");
       });
 
       it("should find single item with findOne", () => {
@@ -299,7 +299,7 @@ describe("ModernCacheService", () => {
 
         const updatedCount = cache.accountRegister.updateMany(
           { typeId: 1 },
-          { balance: 9999 }
+          { balance: 9999 },
         );
 
         expect(updatedCount).toBe(2);
@@ -331,7 +331,7 @@ describe("ModernCacheService", () => {
         ]);
 
         const removedCount = cache.accountRegister.remove(
-          (acc) => acc.balance < 0
+          (acc) => acc.balance < 0,
         );
 
         expect(removedCount).toBe(1);
@@ -361,25 +361,25 @@ describe("ModernCacheService", () => {
           id: "entry-1",
           accountRegisterId: 1,
           amount: 100,
-          createdAt: moment("2024-01-01"),
+          createdAt: moment("2024-01-01").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-2",
           accountRegisterId: 1,
           amount: 200,
-          createdAt: moment("2024-01-02"),
+          createdAt: moment("2024-01-02").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-3",
           accountRegisterId: 2,
           amount: 50,
-          createdAt: moment("2024-01-03"),
+          createdAt: moment("2024-01-03").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-4",
           accountRegisterId: 1,
           amount: 300,
-          createdAt: moment("2024-01-04"),
+          createdAt: moment("2024-01-04").toDate(),
         }),
       ]);
     });
@@ -394,18 +394,18 @@ describe("ModernCacheService", () => {
       expect(result).toHaveLength(2);
       expect(
         result.every(
-          (entry) => entry.accountRegisterId === 1 && entry.amount > 150
-        )
+          (entry) => entry.accountRegisterId === 1 && entry.amount > 150,
+        ),
       ).toBe(true);
     });
 
     it("should sort in ascending order", () => {
       const result = cache.registerEntry.chain().simplesort("amount").data();
 
-      expect(result[0].amount).toBe(50);
-      expect(result[1].amount).toBe(100);
-      expect(result[2].amount).toBe(200);
-      expect(result[3].amount).toBe(300);
+      expect(result[0]!.amount).toBe(50);
+      expect(result[1]!.amount).toBe(100);
+      expect(result[2]!.amount).toBe(200);
+      expect(result[3]!.amount).toBe(300);
     });
 
     it("should sort in descending order", () => {
@@ -414,10 +414,10 @@ describe("ModernCacheService", () => {
         .simplesort("amount", true)
         .data();
 
-      expect(result[0].amount).toBe(300);
-      expect(result[1].amount).toBe(200);
-      expect(result[2].amount).toBe(100);
-      expect(result[3].amount).toBe(50);
+      expect(result[0]!.amount).toBe(300);
+      expect(result[1]!.amount).toBe(200);
+      expect(result[2]!.amount).toBe(100);
+      expect(result[3]!.amount).toBe(50);
     });
 
     it("should sort strings correctly", () => {
@@ -429,9 +429,9 @@ describe("ModernCacheService", () => {
 
       const result = cache.accountRegister.chain().simplesort("name").data();
 
-      expect(result[0].name).toBe("Alpha");
-      expect(result[1].name).toBe("Beta");
-      expect(result[2].name).toBe("Zebra");
+      expect(result[0]!.name).toBe("Alpha");
+      expect(result[1]!.name).toBe("Beta");
+      expect(result[2]!.name).toBe("Zebra");
     });
 
     it("should limit results", () => {
@@ -442,8 +442,8 @@ describe("ModernCacheService", () => {
         .data();
 
       expect(result).toHaveLength(2);
-      expect(result[0].amount).toBe(300);
-      expect(result[1].amount).toBe(200);
+      expect(result[0]!.amount).toBe(300);
+      expect(result[1]!.amount).toBe(200);
     });
 
     it("should combine multiple operations", () => {
@@ -455,8 +455,8 @@ describe("ModernCacheService", () => {
         .data();
 
       expect(result).toHaveLength(2);
-      expect(result[0].amount).toBe(300);
-      expect(result[1].amount).toBe(200);
+      expect(result[0]!.amount).toBe(300);
+      expect(result[1]!.amount).toBe(200);
       expect(result.every((entry) => entry.accountRegisterId === 1)).toBe(true);
     });
   });
@@ -490,7 +490,7 @@ describe("ModernCacheService", () => {
     it("should handle $eq operator", () => {
       const result = cache.registerEntry.find({ amount: { $eq: 100 } } as any);
       expect(result).toHaveLength(1);
-      expect(result[0].amount).toBe(100);
+      expect(result[0]!.amount).toBe(100);
     });
 
     it("should handle $ne operator", () => {
@@ -529,7 +529,7 @@ describe("ModernCacheService", () => {
       } as any);
       expect(result).toHaveLength(2);
       expect(result.every((entry) => [100, 300].includes(entry.amount))).toBe(
-        true
+        true,
       );
     });
 
@@ -539,38 +539,39 @@ describe("ModernCacheService", () => {
       } as any);
       expect(result).toHaveLength(2);
       expect(result.every((entry) => ![100, 300].includes(entry.amount))).toBe(
-        true
+        true,
       );
     });
 
     it("should handle $and operator with function predicate", () => {
       const result = cache.registerEntry.find(
-        (entry) => entry.amount > 100 && entry.isPending === true
+        (entry) => entry.amount > 100 && entry.isPending === true,
       );
       expect(result).toHaveLength(1);
-      expect(result[0].amount).toBe(300);
-      expect(result[0].isPending).toBe(true);
+      expect(result[0]!.amount).toBe(300);
+      expect(result[0]!.isPending).toBe(true);
     });
 
     it("should handle $or operator with function predicate", () => {
       const result = cache.registerEntry.find(
-        (entry) => entry.amount === 100 || entry.amount === 300
+        (entry) => entry.amount === 100 || entry.amount === 300,
       );
       expect(result).toHaveLength(2);
       expect(result.every((entry) => [100, 300].includes(entry.amount))).toBe(
-        true
+        true,
       );
     });
 
     it("should handle complex nested logic with function predicate", () => {
       const result = cache.registerEntry.find(
         (entry) =>
-          (entry.amount < 150 || entry.amount > 250) && entry.isPending === true
+          (entry.amount < 150 || entry.amount > 250) &&
+          entry.isPending === true,
       );
       expect(result).toHaveLength(2);
       expect(result.every((entry) => entry.isPending === true)).toBe(true);
       expect(
-        result.every((entry) => entry.amount < 150 || entry.amount > 250)
+        result.every((entry) => entry.amount < 150 || entry.amount > 250),
       ).toBe(true);
     });
   });
@@ -583,7 +584,7 @@ describe("ModernCacheService", () => {
           id: i + 1,
           accountId: `account-${i % 10}`,
           typeId: (i % 5) + 1,
-        })
+        }),
       );
       cache.accountRegister.insertMany(accounts);
 
@@ -600,7 +601,7 @@ describe("ModernCacheService", () => {
       cache.accountRegister.insert(account);
 
       expect(
-        cache.accountRegister.find({ accountId: "original" })
+        cache.accountRegister.find({ accountId: "original" }),
       ).toHaveLength(1);
 
       const updated = { ...account, accountId: "updated" };
@@ -608,7 +609,7 @@ describe("ModernCacheService", () => {
 
       // The updated item should be findable by new accountId
       expect(cache.accountRegister.find({ accountId: "updated" })).toHaveLength(
-        1
+        1,
       );
 
       // Verify the item was actually updated
@@ -623,16 +624,16 @@ describe("ModernCacheService", () => {
       ]);
 
       expect(cache.accountRegister.find({ accountId: "test-1" })).toHaveLength(
-        1
+        1,
       );
 
       cache.accountRegister.remove({ id: 1 });
 
       expect(cache.accountRegister.find({ accountId: "test-1" })).toHaveLength(
-        0
+        0,
       );
       expect(cache.accountRegister.find({ accountId: "test-2" })).toHaveLength(
-        1
+        1,
       );
     });
   });
@@ -643,14 +644,14 @@ describe("ModernCacheService", () => {
       expect(cache.accountRegister.findOne({ id: 1 })).toBeNull();
       expect(cache.accountRegister.findById(1)).toBeNull();
       expect(
-        cache.accountRegister.updateMany({ id: 1 }, { name: "test" })
+        cache.accountRegister.updateMany({ id: 1 }, { name: "test" }),
       ).toBe(0);
       expect(cache.accountRegister.remove({ id: 1 })).toBe(0);
     });
 
     it("should handle queries with no matches", () => {
       cache.accountRegister.insert(
-        createMockAccountRegister({ id: 1, name: "Test" })
+        createMockAccountRegister({ id: 1, name: "Test" }),
       );
 
       expect(cache.accountRegister.find({ name: "NotFound" })).toHaveLength(0);
@@ -665,7 +666,7 @@ describe("ModernCacheService", () => {
 
       const nullResults = cache.accountRegister.find({ plaidId: null });
       expect(nullResults).toHaveLength(1);
-      expect(nullResults[0].id).toBe(1);
+      expect(nullResults[0]!.id).toBe(1);
     });
 
     it("should handle updates on non-existent items", () => {
@@ -684,15 +685,15 @@ describe("ModernCacheService", () => {
       cache.registerEntry.insertMany([
         createMockRegisterEntry({
           id: "entry-1",
-          createdAt: moment("2024-01-03"),
+          createdAt: moment("2024-01-03").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-2",
-          createdAt: moment("2024-01-01"),
+          createdAt: moment("2024-01-01").toDate(),
         }),
         createMockRegisterEntry({
           id: "entry-3",
-          createdAt: moment("2024-01-02"),
+          createdAt: moment("2024-01-02").toDate(),
         }),
       ]);
 

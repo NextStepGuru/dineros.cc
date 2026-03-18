@@ -12,8 +12,8 @@ import { categories } from "./backup/categories";
 import { reoccurrences } from "./backup/reoccurrences";
 import { reoccurrenceSkips } from "./backup/reoccurrenceSkips";
 import { registerEntry } from "./backup/registerEntry";
-import HashService from "../server/services/HashService";
-import { log } from "../server/logger";
+import HashService from "../../server/services/HashService";
+import { log } from "../../server/logger";
 
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";

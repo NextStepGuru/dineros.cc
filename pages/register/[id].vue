@@ -5,7 +5,7 @@ import type { RegisterEntry } from "~/types/types";
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
-  () => import("~/components/modals/EditRegisterEntry.vue")
+  () => import("~/components/modals/EditRegisterEntry.vue"),
 );
 
 const overlay = useOverlay();
@@ -60,11 +60,11 @@ onMounted(() => {
 
 const mainAccountCount = computed(
   () =>
-    listStore.getAccountRegisters.filter((r) => !r.subAccountRegisterId).length
+    listStore.getAccountRegisters.filter((r) => !r.subAccountRegisterId).length,
 );
 
 const showAccountSelector = computed(
-  () => tableEntries.value.length > 0 || mainAccountCount.value > 1
+  () => tableEntries.value.length > 0 || mainAccountCount.value > 1,
 );
 
 // Account options for dropdown: label (name) + balanceFormatted for right-aligned balance in menu
@@ -88,12 +88,12 @@ function balanceColorClass(balance: number) {
 }
 
 const selectedAccountOption = computed(() =>
-  accountRegisterOptionsWithBalance.value.find((r) => r.id === accountRegisterId.value)
+  accountRegisterOptionsWithBalance.value.find(
+    (r) => r.id === accountRegisterId.value,
+  ),
 );
 
-const hasReoccurrences = computed(
-  () => listStore.getReoccurrences.length > 0
-);
+const hasReoccurrences = computed(() => listStore.getReoccurrences.length > 0);
 
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 
@@ -122,7 +122,7 @@ onBeforeMount(async () => {
 const accountRegisterId = ref<number>(
   route.params.id === "" || Array.isArray(route.params.id)
     ? 0
-    : parseInt(route.params.id)
+    : parseInt(route.params.id),
 );
 
 // Watch for changes to accountRegisterId and navigate to the new route
@@ -140,7 +140,7 @@ watch(authStore, async () => {
   }
   const verify = regs.filter(
     (item) =>
-      item.budgetId === authStore.getBudgetId && item.id === +route.params.id
+      item.budgetId === authStore.getBudgetId && item.id === +route.params.id,
   );
   if (!verify.length && regs.length > 0) {
     const target = regs[0].id;
@@ -320,7 +320,7 @@ watch(
   () => {
     refreshAccountEntries();
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const lowestEntry = computed(() => accountEntries?.value?.lowest);
@@ -328,19 +328,19 @@ const highestEntry = computed(() => accountEntries?.value?.highest);
 
 const currentAccountRegister = computed(() =>
   listStore.getAccountRegisters.find(
-    (item) => item.id === accountRegisterId.value
-  )
+    (item) => item.id === accountRegisterId.value,
+  ),
 );
 
 const currentType = computed(() =>
   listStore.getAccountTypes.find(
-    (item) => item.id === currentAccountRegister.value?.typeId
-  )
+    (item) => item.id === currentAccountRegister.value?.typeId,
+  ),
 );
 
 // Determine if any data is still loading
 const isLoading = computed(
-  () => isQuickLoading.value || isFullLoading.value || isInitialLoading.value
+  () => isQuickLoading.value || isFullLoading.value || isInitialLoading.value,
 );
 
 // Add scroll event listener when table is mounted
@@ -383,7 +383,7 @@ const columns: TableColumn<RegisterEntry>[] = [
       return h(
         "div",
         { class: "text-right" },
-        formatDate(row.getValue("createdAt"))
+        formatDate(row.getValue("createdAt")),
       );
     },
   },
@@ -397,8 +397,21 @@ const columns: TableColumn<RegisterEntry>[] = [
           class: "cursor-pointer font-bold dark:text-white",
           onClick: () => handleTableClick(row.original),
         },
-        row.getValue("description")
+        row.getValue("description"),
       );
+    },
+  },
+  {
+    accessorKey: "categoryId",
+    header: () => h("div", { class: "min-w-32" }, "Category"),
+    cell: ({ row }) => {
+      const categoryId = row.original.categoryId;
+      const name =
+        categoryId == null
+          ? "—"
+          : listStore.getCategories.find((c) => c.id === categoryId)?.name ??
+            "—";
+      return h("div", { class: "text-muted" }, name);
     },
   },
   {
@@ -417,7 +430,7 @@ const columns: TableColumn<RegisterEntry>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("amount"))
+        }).format(row.getValue("amount")),
       );
     },
   },
@@ -437,7 +450,7 @@ const columns: TableColumn<RegisterEntry>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("balance"))
+        }).format(row.getValue("balance")),
       );
     },
   },
@@ -483,6 +496,7 @@ function handleAddEntry() {
       reoccurrenceId: null,
       isBalanceEntry: false,
       isPending: true,
+      categoryId: null,
     },
   };
   const modal = overlay.create(ModalsEditRegisterEntry);
@@ -503,7 +517,7 @@ function scrollToLowestBalance() {
   const targetIndex = tableEntries.value.findIndex(
     (entry) =>
       entry.balance === lowestEntry.value.balance &&
-      entry.createdAt === lowestEntry.value.createdAt
+      entry.createdAt === lowestEntry.value.createdAt,
   );
 
   if (targetIndex !== -1 && tableRef.value) {
@@ -522,7 +536,7 @@ function scrollToLowestBalance() {
       setTimeout(() => {
         rows[targetIndex].classList.remove(
           "!bg-yellow-200",
-          "dark:!bg-yellow-800"
+          "dark:!bg-yellow-800",
         );
       }, 2000);
     }
@@ -566,10 +580,10 @@ const registerTableViewportEl = ref<HTMLElement | null>(null);
 const registerOnboardingViewportEl = ref<HTMLElement | null>(null);
 const registerTabsEl = ref<HTMLElement | null>(null);
 const registerTableViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)"
+  "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
 const registerOnboardingMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)"
+  "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
 let registerResizeObserver: ResizeObserver | null = null;
 let registerViewportFrameId: number | null = null;
@@ -587,7 +601,7 @@ function updateRegisterTableViewportMaxHeight() {
         registerTableViewportEl.value.getBoundingClientRect().top ?? 0;
       const available = Math.max(
         220,
-        Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing)
+        Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing),
       );
       registerTableViewportMaxHeight.value = `${available}px`;
     }
@@ -596,27 +610,24 @@ function updateRegisterTableViewportMaxHeight() {
         registerOnboardingViewportEl.value.getBoundingClientRect().top ?? 0;
       const available = Math.max(
         220,
-        Math.floor(window.innerHeight - top - tabsHeight - bottomSpacing)
+        Math.floor(window.innerHeight - top - tabsHeight - bottomSpacing),
       );
       registerOnboardingMaxHeight.value = `${available}px`;
     }
   });
 }
 
-watch(
-  [accountRegisterId, selectedTab],
-  async () => {
-    await nextTick();
-    updateRegisterTableViewportMaxHeight();
-  }
-);
+watch([accountRegisterId, selectedTab], async () => {
+  await nextTick();
+  updateRegisterTableViewportMaxHeight();
+});
 
 watch(
   () => tableEntries.value.length,
   async () => {
     await nextTick();
     updateRegisterTableViewportMaxHeight();
-  }
+  },
 );
 
 watch(showRegisterOnboarding, async (on) => {

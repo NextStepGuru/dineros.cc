@@ -1,11 +1,12 @@
 /* eslint-disable no-unused-vars */
-import type { JobsOptions } from "bullmq";
+import type { Job, JobsOptions } from "bullmq";
 import type Redis from "ioredis";
 import { dateTimeService } from "../services/forecast/DateTimeService";
 
-interface QueueConfig {
+/** Job data is typed per-queue (BackupJob, RecalculateJob, PlaidSyncJob, PlaidSyncBalanceJob). */
+interface QueueConfig<T = unknown> {
   name: string;
-  processor: (...args: unknown[]) => Promise<void>;
+  processor: (job: Job<T>) => Promise<void>;
 }
 
 class QueueManager {
@@ -34,10 +35,10 @@ class QueueManager {
 
     for (const config of this.queueConfigs) {
       if (this.connection) {
-        const queue = new Queue(config.name, { connection: this.connection });
-        const worker = new Worker(config.name, config.processor, {
-          connection: this.connection,
-        });
+        // Cast: app ioredis patch can differ from BullMQ's peer; compatible at runtime
+        const connection = this.connection as import("bullmq").ConnectionOptions;
+        const queue = new Queue(config.name, { connection });
+        const worker = new Worker(config.name, config.processor, { connection });
 
         this.queues.set(config.name, queue);
         this.workers.set(config.name, worker);
@@ -56,11 +57,11 @@ class QueueManager {
       } as const);
     }
 
-    const queue = this.queues.get(queueName);
+    const queue = this.queues.get(queueName) as import("bullmq").Queue | undefined;
     if (!queue) {
       throw new Error(`Queue ${queueName} not found`);
     }
-    return queue.add(queueName, data, opts);
+    return (queue as import("bullmq").Queue).add(queueName, data, opts);
   }
 
   // Method to check if queues are disabled (for testing)

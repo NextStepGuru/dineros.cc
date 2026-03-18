@@ -342,6 +342,15 @@ export const accountSchema = z.object({
   name: z.string(),
 });
 
+export const categorySchema = z.object({
+  id: z.string(),
+  subCategoryId: z.string().nullable(),
+  accountId: z.string().nullable(),
+  name: z.string(),
+  isArchived: z.boolean(),
+  updatedAt: z.coerce.date(),
+});
+
 export const registerEntrySchema = z.object({
   id: z.string().optional(),
   accountRegisterId: z.coerce.number().min(1),
@@ -353,6 +362,7 @@ export const registerEntrySchema = z.object({
   amount: z.coerce.number(),
   balance: z.coerce.number(),
   typeId: z.coerce.number().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
   isProjected: z.boolean().default(false),
   isReconciled: z.boolean().default(false),
   isCleared: z.boolean().default(false),

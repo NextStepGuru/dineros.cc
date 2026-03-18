@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -53,12 +53,32 @@ model User {
   settings         Json?
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  budgets  Budget[]
-  social   UserSocial[]
-  accounts UserAccount[]
-  country  Country?      @relation(fields: [countryId], references: [id])
+  budgets    Budget[]
+  social     UserSocial[]
+  accounts   UserAccount[]
+  country    Country?      @relation(fields: [countryId], references: [id])
+  plaidItems PlaidItem[]
 
   @@map("user")
+}
+
+model PlaidItem {
+  itemId    String   @unique @map("item_id") @db.VarChar(191)
+  userId    Int      @map("user_id") @db.UnsignedInt
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("plaid_item")
+}
+
+model PlaidSyncCursor {
+  itemId    String   @unique @map("item_id") @db.VarChar(191)
+  cursor    String   @db.Text
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("plaid_sync_cursor")
 }
 
 model UserAccount {
@@ -117,58 +137,58 @@ model Budget {
 }
 
 model AccountRegister {
-  id                      Int       @id @default(autoincrement()) @db.UnsignedInt
-  subAccountRegisterId    Int?      @map("sub_account_register_id") @db.UnsignedInt
-  accountId               String    @map("account_id")
-  typeId                  Int       @map("type_id") @db.UnsignedInt
-  budgetId                Int       @map("budget_id") @db.UnsignedInt
-  name                    String    @db.VarChar(500) /// @encrypted
-  balance                 Decimal   @default(0) @db.Decimal(19, 2)
-  creditLimit             Decimal?  @map("credit_limit") @db.Decimal(19, 2)
-  latestBalance           Decimal   @default(0) @map("latest_balance") @db.Decimal(19, 2)
-  minPayment              Decimal?  @map("min_payment") @db.Decimal(19, 2)
-  statementAt             DateTime  @map("statement_at")
-  statementIntervalId     Int       @default(3) @map("statement_interval_id") @db.UnsignedInt
-  apr1                    Decimal?  @db.Decimal(7, 5)
-  apr1StartAt             DateTime? @map("apr1_start_at")
-  apr2                    Decimal?  @db.Decimal(7, 5)
-  apr2StartAt             DateTime? @map("apr2_start_at")
-  apr3                    Decimal?  @db.Decimal(7, 5)
-  apr3StartAt             DateTime? @map("apr3_start_at")
-  targetAccountRegisterId Int?      @map("target_account_register_id")
-  collateralAssetRegisterId Int?    @map("collateral_asset_register_id") @db.UnsignedInt
-  loanStartAt             DateTime? @map("loan_start_at")
-  loanPaymentsPerYear     Int?      @map("loan_payments_per_year")
-  loanTotalYears          Int?      @map("loan_total_years")
-  loanOriginalAmount      Decimal?  @map("loan_original_amount") @db.Decimal(19, 2)
-  sortOrder               Int       @default(999) @map("sort_order") @db.UnsignedInt
-  loanPaymentSortOrder    Int       @default(999) @map("loan_payment_sort_order") @db.UnsignedInt
-  savingsGoalSortOrder    Int       @default(999) @map("savings_goal_sort_order") @db.UnsignedInt
-  accountSavingsGoal      Decimal?  @map("account_savings_goal") @db.Decimal(19, 2)
-  minAccountBalance       Decimal   @default(0) @map("min_account_balance") @db.Decimal(19, 2)
-  allowExtraPayment       Boolean   @default(false) @map("allow_extra_payment")
-  isArchived              Boolean   @default(false) @map("is_archived")
-  plaidId                 String?   @map("plaid_id") @db.VarChar(500) /// @encrypted
-  plaidAccessToken        String?   @map("plaid_access_token") @db.VarChar(500) /// @encrypted
-  plaidAccessTokenHash    String?   @map("plaid_access_token_hash") @db.VarChar(128) /// @encryption:hash(plaidAccessToken)?algorithm=sha512
-  plaidIdHash             String?   @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
-  plaidJson               Json?     @map("plaid_json")
-  plaidLastSyncAt         DateTime? @map("plaid_last_sync_at")
-  plaidBalanceLastSyncAt  DateTime? @map("plaid_balance_last_sync_at")
-  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                        Int       @id @default(autoincrement()) @db.UnsignedInt
+  subAccountRegisterId      Int?      @map("sub_account_register_id") @db.UnsignedInt
+  accountId                 String    @map("account_id")
+  typeId                    Int       @map("type_id") @db.UnsignedInt
+  budgetId                  Int       @map("budget_id") @db.UnsignedInt
+  name                      String    @db.VarChar(500) /// @encrypted
+  balance                   Decimal   @default(0) @db.Decimal(19, 2)
+  creditLimit               Decimal?  @map("credit_limit") @db.Decimal(19, 2)
+  latestBalance             Decimal   @default(0) @map("latest_balance") @db.Decimal(19, 2)
+  minPayment                Decimal?  @map("min_payment") @db.Decimal(19, 2)
+  statementAt               DateTime  @map("statement_at")
+  statementIntervalId       Int       @default(3) @map("statement_interval_id") @db.UnsignedInt
+  apr1                      Decimal?  @db.Decimal(7, 5)
+  apr1StartAt               DateTime? @map("apr1_start_at")
+  apr2                      Decimal?  @db.Decimal(7, 5)
+  apr2StartAt               DateTime? @map("apr2_start_at")
+  apr3                      Decimal?  @db.Decimal(7, 5)
+  apr3StartAt               DateTime? @map("apr3_start_at")
+  targetAccountRegisterId   Int?      @map("target_account_register_id")
+  collateralAssetRegisterId Int?      @map("collateral_asset_register_id") @db.UnsignedInt
+  loanStartAt               DateTime? @map("loan_start_at")
+  loanPaymentsPerYear       Int?      @map("loan_payments_per_year")
+  loanTotalYears            Int?      @map("loan_total_years")
+  loanOriginalAmount        Decimal?  @map("loan_original_amount") @db.Decimal(19, 2)
+  sortOrder                 Int       @default(999) @map("sort_order") @db.UnsignedInt
+  loanPaymentSortOrder      Int       @default(999) @map("loan_payment_sort_order") @db.UnsignedInt
+  savingsGoalSortOrder      Int       @default(999) @map("savings_goal_sort_order") @db.UnsignedInt
+  accountSavingsGoal        Decimal?  @map("account_savings_goal") @db.Decimal(19, 2)
+  minAccountBalance         Decimal   @default(0) @map("min_account_balance") @db.Decimal(19, 2)
+  allowExtraPayment         Boolean   @default(false) @map("allow_extra_payment")
+  isArchived                Boolean   @default(false) @map("is_archived")
+  plaidId                   String?   @map("plaid_id") @db.VarChar(500) /// @encrypted
+  plaidAccessToken          String?   @map("plaid_access_token") @db.VarChar(500) /// @encrypted
+  plaidAccessTokenHash      String?   @map("plaid_access_token_hash") @db.VarChar(128) /// @encryption:hash(plaidAccessToken)?algorithm=sha512
+  plaidIdHash               String?   @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
+  plaidJson                 Json?     @map("plaid_json")
+  plaidLastSyncAt           DateTime? @map("plaid_last_sync_at")
+  plaidBalanceLastSyncAt    DateTime? @map("plaid_balance_last_sync_at")
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  budget   Budget           @relation(fields: [budgetId], references: [id])
-  type     AccountType      @relation(fields: [typeId], references: [id])
-  account  Account          @relation(fields: [accountId], references: [id])
-  interval Interval         @relation(fields: [statementIntervalId], references: [id])
-  parent   AccountRegister? @relation("ar_children", fields: [subAccountRegisterId], references: [id])
-  collateralAsset AccountRegister? @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
+  budget              Budget            @relation(fields: [budgetId], references: [id])
+  type                AccountType       @relation(fields: [typeId], references: [id])
+  account             Account           @relation(fields: [accountId], references: [id])
+  interval            Interval          @relation(fields: [statementIntervalId], references: [id])
+  parent              AccountRegister?  @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+  collateralAsset     AccountRegister?  @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
   loansSecuredByAsset AccountRegister[] @relation("RegisterCollateral")
 
   entries       RegisterEntry[]
   reoccurrences Reoccurrence[]
   splitTargets  ReoccurrenceSplit[]
-  children      AccountRegister[] @relation("ar_children")
+  children      AccountRegister[]   @relation("ar_children")
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
@@ -217,6 +237,7 @@ model RegisterEntry {
   register     AccountRegister    @relation(fields: [accountRegisterId], references: [id])
   reoccurrence Reoccurrence?      @relation(fields: [reoccurrenceId], references: [id])
   type         RegisterEntryType? @relation(fields: [typeId], references: [id])
+  category     Category?          @relation(fields: [categoryId], references: [id])
 
   @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
   @@index([accountRegisterId, isCleared, isProjected, isManualEntry])
@@ -241,10 +262,11 @@ model Category {
   isArchived    Boolean  @default(false) @map("is_archived")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  account           Account?   @relation(fields: [accountId], references: [id])
-  parent            Category?  @relation("cat_children", fields: [subCategoryId], references: [id])
-  children          Category[] @relation("cat_children")
-  accountRegisterId Int?       @db.UnsignedInt
+  account           Account?        @relation(fields: [accountId], references: [id])
+  parent            Category?       @relation("cat_children", fields: [subCategoryId], references: [id])
+  children          Category[]      @relation("cat_children")
+  accountRegisterId Int?            @db.UnsignedInt
+  entries           RegisterEntry[]
 
   @@map("category")
 }
@@ -262,12 +284,12 @@ model Reoccurrence {
   totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
   elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
   amount                    Decimal   @db.Decimal(19, 2)
-  description               String   @db.VarChar(1500) /// @encrypted
+  description               String    @db.VarChar(1500) /// @encrypted
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  account  Account            @relation(fields: [accountId], references: [id])
-  register AccountRegister    @relation(fields: [accountRegisterId], references: [id])
-  interval Interval           @relation(fields: [intervalId], references: [id])
+  account  Account             @relation(fields: [accountId], references: [id])
+  register AccountRegister     @relation(fields: [accountRegisterId], references: [id])
+  interval Interval            @relation(fields: [intervalId], references: [id])
   entries  RegisterEntry[]
   skips    ReoccurrenceSkip[]
   splits   ReoccurrenceSplit[]
@@ -286,7 +308,7 @@ model ReoccurrenceSplit {
   sortOrder                 Int      @default(0) @map("sort_order") @db.UnsignedInt
   updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
 
-  reoccurrence   Reoccurrence   @relation(fields: [reoccurrenceId], references: [id])
+  reoccurrence   Reoccurrence    @relation(fields: [reoccurrenceId], references: [id])
   targetRegister AccountRegister @relation(fields: [transferAccountRegisterId], references: [id])
 
   @@index([reoccurrenceId])

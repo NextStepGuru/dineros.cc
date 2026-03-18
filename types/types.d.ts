@@ -40,6 +40,15 @@ export type Account = {
   name: string;
 };
 
+export type Category = {
+  id: string;
+  subCategoryId: string | null;
+  accountId: string | null;
+  name: string;
+  isArchived: boolean;
+  updatedAt: string;
+};
+
 export type Lists = {
   reoccurrences: Reoccurrence[];
   intervals: Interval[];
@@ -47,6 +56,7 @@ export type Lists = {
   accountRegisters: AccountRegister[];
   budgets: Budget[];
   accounts: Account[];
+  categories: Category[];
 };
 
 export type RegisterEntry = {
@@ -59,6 +69,7 @@ export type RegisterEntry = {
   amount: number;
   balance: number;
   typeId?: number | null;
+  categoryId?: string | null;
   isCleared: boolean;
   isReconciled: boolean;
   isProjected: boolean;

@@ -99,22 +99,40 @@ export default defineEventHandler(async (event) => {
     });
 
     const balance =
-      accountRegister.latestBalance - (pocketBalances._sum.balance || 0);
+      Number(accountRegister.latestBalance) -
+      Number(pocketBalances._sum.balance || 0);
 
     // Process entries (same as register endpoint)
     const balanceUpdated = recalculateRunningBalanceAndSort({
-      registerEntries,
+      registerEntries:
+        registerEntries as unknown as import("~/lib/sort").PartialRegisterEntry[],
       balance,
       type: accountRegister.type.isCredit ? "credit" : "debit",
     });
 
+    if (balanceUpdated.length === 0) {
+      return {
+        success: true,
+        message: "No entries to sync",
+        updatedCells: 0,
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+        data: {
+          totalEntries: 0,
+          lowestBalance: undefined,
+          highestBalance: undefined,
+          lastUpdated: dateTimeService.nowDate().toISOString(),
+        },
+      };
+    }
+
+    const firstEntry = balanceUpdated[0]!;
     const entryWithLowestBalance = balanceUpdated.reduce((minEntry, entry) => {
       return entry.balance < minEntry.balance ? entry : minEntry;
-    }, balanceUpdated[0]);
+    }, firstEntry);
 
     const entryWithHighestBalance = balanceUpdated.reduce((minEntry, entry) => {
       return entry.balance > minEntry.balance ? entry : minEntry;
-    }, balanceUpdated[0]);
+    }, firstEntry);
 
     // Format data for Google Sheets
     const formattedData = formatDataForSheets({
@@ -127,7 +145,7 @@ export default defineEventHandler(async (event) => {
     const auth = new google.auth.OAuth2(
       googleCredentials.client_id,
       googleCredentials.client_secret,
-      googleCredentials.redirect_uris[0]
+      googleCredentials.redirect_uris[0],
     );
 
     auth.setCredentials(googleToken);
@@ -165,7 +183,11 @@ export default defineEventHandler(async (event) => {
         },
       };
     } catch (sheetsError: any) {
-      log({ message: "Google Sheets API error:", data: sheetsError, level: "error" });
+      log({
+        message: "Google Sheets API error:",
+        data: sheetsError,
+        level: "error",
+      });
       setResponseStatus(event, 500);
       return {
         success: false,
@@ -218,7 +240,11 @@ function formatDataForSheets(registerData: {
       lowest?.balance || "N/A",
       "",
       lowest?.createdAt
-        ? dateTimeService.formatInTimezone(lowest.createdAt, "UTC", "YYYY-MM-DD")
+        ? dateTimeService.formatInTimezone(
+            lowest.createdAt,
+            "UTC",
+            "YYYY-MM-DD",
+          )
         : "N/A",
     ],
     [
@@ -226,11 +252,22 @@ function formatDataForSheets(registerData: {
       highest?.balance || "N/A",
       "",
       highest?.createdAt
-        ? dateTimeService.formatInTimezone(highest.createdAt, "UTC", "YYYY-MM-DD")
+        ? dateTimeService.formatInTimezone(
+            highest.createdAt,
+            "UTC",
+            "YYYY-MM-DD",
+          )
         : "N/A",
     ],
     ["Total Entries:", entries.length],
-    ["Last Updated:", dateTimeService.formatInTimezone(dateTimeService.now(), "UTC", "YYYY-MM-DD HH:mm:ss")],
+    [
+      "Last Updated:",
+      dateTimeService.formatInTimezone(
+        dateTimeService.now(),
+        "UTC",
+        "YYYY-MM-DD HH:mm:ss",
+      ),
+    ],
   ];
 
   return [headers, ...rows, ...summaryRows];

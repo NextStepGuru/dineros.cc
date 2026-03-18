@@ -61,8 +61,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(true);
@@ -116,8 +116,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(true);
@@ -153,8 +153,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(false);
@@ -189,8 +189,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(false);
@@ -230,8 +230,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(true);
@@ -276,8 +276,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType,
+        accountRegister as any,
+        accountType as any,
         { enableFuzzyMatching: false }
       );
 
@@ -312,8 +312,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
-        accountRegister,
-        accountType
+        accountRegister as any,
+        accountType as any
       );
 
       expect(result.isMatched).toBe(false);
@@ -377,7 +377,7 @@ describe("TransactionMatchingService", () => {
       mockDb.registerEntry.update.mockResolvedValue(updatedEntry);
 
       const result = await transactionMatchingService.updateExistingTransaction(
-        existingEntry,
+        existingEntry as any,
         transaction,
         "exact"
       );
@@ -418,7 +418,7 @@ describe("TransactionMatchingService", () => {
       mockDb.registerEntry.update.mockResolvedValue(updatedEntry);
 
       const result = await transactionMatchingService.updateExistingTransaction(
-        existingEntry,
+        existingEntry as any,
         transaction,
         "fuzzy"
       );
@@ -463,7 +463,6 @@ describe("TransactionMatchingService", () => {
       };
 
       const newEntry: RegisterEntry = {
-        id: "new-id",
         ...transactionData,
       } as RegisterEntry;
 
@@ -471,8 +470,8 @@ describe("TransactionMatchingService", () => {
 
       const result = await transactionMatchingService.createNewTransaction(
         transaction,
-        accountRegister,
-        accountType,
+        accountRegister as any,
+        accountType as any,
         transactionData
       );
 

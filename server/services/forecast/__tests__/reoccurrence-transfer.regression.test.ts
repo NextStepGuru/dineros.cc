@@ -27,7 +27,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockTransferService = { transferBetweenAccounts: vi.fn() };
 
     service = new ReoccurrenceService(
-      mockDb,
+      mockDb as any,
       mockCache,
       mockEntryService as any,
       mockTransferService as any,
@@ -68,7 +68,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 777, typeId: 1, balance: 1000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -100,7 +100,7 @@ describe("Reoccurrence transfer regressions", () => {
       });
 
       await service.processReoccurrences(
-        [reoccurrence],
+        [reoccurrence as any],
         new Date("2024-01-08T00:00:00.000Z"),
       );
 
@@ -121,7 +121,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 1, balance: 1000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -139,7 +139,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 1, balance: 1000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockEntryService.createEntry).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,7 +155,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 3, balance: -250 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -175,7 +175,7 @@ describe("Reoccurrence transfer regressions", () => {
       balance: -250,
     });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -193,7 +193,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(cached);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 3, balance: 0 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-08T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-08T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).not.toHaveBeenCalled();
     expect(mockEntryService.createEntry).not.toHaveBeenCalled();
@@ -208,7 +208,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 1, balance: 1000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-13T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-13T00:00:00.000Z"));
 
     const call = mockTransferService.transferBetweenAccounts.mock.calls[0][0];
     const adjusted = dateTimeService.createUTC(call.reoccurrence.lastAt);
@@ -226,7 +226,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 1, balance: 1000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-07T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-07T00:00:00.000Z"));
 
     const call = mockTransferService.transferBetweenAccounts.mock.calls[0][0];
     const adjusted = dateTimeService.createUTC(call.reoccurrence.lastAt);
@@ -243,7 +243,7 @@ describe("Reoccurrence transfer regressions", () => {
     mockCache.reoccurrence.findOne.mockReturnValue({ ...reoccurrence });
     mockCache.accountRegister.findOne.mockReturnValue({ id: 101, typeId: 1, balance: 5000 });
 
-    await service.processReoccurrences([reoccurrence], new Date("2024-01-29T00:00:00.000Z"));
+    await service.processReoccurrences([reoccurrence as any], new Date("2024-01-29T00:00:00.000Z"));
 
     expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledTimes(4);
     const dates = mockTransferService.transferBetweenAccounts.mock.calls.map((c: any[]) =>

@@ -117,16 +117,15 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.upsert as any).mockResolvedValue(
-        mockCreatedRegister
+        mockCreatedRegister,
       );
       (accountRegisterSchema.parse as any).mockReturnValue({
         ...mockCreatedRegister,
@@ -161,7 +160,7 @@ describe("Account Register API Endpoints", () => {
           where: expect.objectContaining({
             id: 1,
           }),
-        })
+        }),
       );
       expect(addRecalculateJob).toHaveBeenCalledWith({
         accountId: "account-123",
@@ -192,16 +191,15 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.upsert as any).mockResolvedValue(
-        mockUpdatedRegister
+        mockUpdatedRegister,
       );
       (accountRegisterSchema.parse as any).mockReturnValue({
         ...mockUpdatedRegister,
@@ -223,7 +221,7 @@ describe("Account Register API Endpoints", () => {
             balance: 2000,
           }),
           where: { id: 1 },
-        })
+        }),
       );
       expect(addRecalculateJob).toHaveBeenCalledWith({
         accountId: "account-123",
@@ -257,7 +255,7 @@ describe("Account Register API Endpoints", () => {
 
       const unauthorizedError = new Error("Account not found");
       (prisma.account.findFirstOrThrow as any).mockRejectedValue(
-        unauthorizedError
+        unauthorizedError,
       );
 
       await expect(accountRegisterPostHandler(mockEvent)).rejects.toThrow();
@@ -350,7 +348,7 @@ describe("Account Register API Endpoints", () => {
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.upsert as any).mockResolvedValue(
-        mockCreatedRegister
+        mockCreatedRegister,
       );
       (accountRegisterSchema.parse as any).mockReturnValue({
         ...mockCreatedRegister,
@@ -371,7 +369,7 @@ describe("Account Register API Endpoints", () => {
           where: expect.objectContaining({
             id: 1,
           }),
-        })
+        }),
       );
     });
 
@@ -398,16 +396,15 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.upsert as any).mockResolvedValue(
-        mockCreatedRegister
+        mockCreatedRegister,
       );
       (accountRegisterSchema.parse as any).mockReturnValue({
         ...mockCreatedRegister,
@@ -433,7 +430,7 @@ describe("Account Register API Endpoints", () => {
           where: expect.objectContaining({
             id: 1,
           }),
-        })
+        }),
       );
     });
 
@@ -458,16 +455,15 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.upsert as any).mockResolvedValue(
-        mockCreatedRegister
+        mockCreatedRegister,
       );
       (accountRegisterSchema.parse as any).mockReturnValue({
         ...mockCreatedRegister,
@@ -495,7 +491,7 @@ describe("Account Register API Endpoints", () => {
           where: expect.objectContaining({
             id: 1,
           }),
-        })
+        }),
       );
     });
   });
@@ -551,9 +547,8 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       (readBody as any).mockResolvedValue(mockBody);
       (global as any).readBody.mockResolvedValue(mockBody);
@@ -616,7 +611,7 @@ describe("Account Register API Endpoints", () => {
       (getUser as any).mockReturnValue(mockUser);
 
       await expect(accountRegisterSortHandler(mockEvent)).rejects.toThrow(
-        "sortMode must be 'visual', 'loan', or 'savings'"
+        "sortMode must be 'visual', 'loan', or 'savings'",
       );
       expect(handleApiError).toHaveBeenCalled();
     });
@@ -652,28 +647,29 @@ describe("Account Register API Endpoints", () => {
       const { getQuery } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (getQuery as any).mockReturnValue(mockQuery);
       (global as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
-        mockAccountRegister
+        mockAccountRegister,
       );
-      (prisma.$transaction as any).mockImplementation(async (callback) => {
-        return await callback({
-          reoccurrence: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
-          registerEntry: {
-            deleteMany: vi.fn().mockResolvedValue({ count: 10 }),
-          },
-          accountRegister: {
-            delete: vi.fn().mockResolvedValue(mockDeletedData),
-          },
-        });
-      });
+      (prisma.$transaction as any).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          return await callback({
+            reoccurrence: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
+            registerEntry: {
+              deleteMany: vi.fn().mockResolvedValue({ count: 10 }),
+            },
+            accountRegister: {
+              delete: vi.fn().mockResolvedValue(mockDeletedData),
+            },
+          });
+        },
+      );
       (accountRegisterSchema.parse as any).mockReturnValue(mockDeletedData);
 
       const result = await accountRegisterDeleteHandler(mockEvent);
@@ -712,7 +708,7 @@ describe("Account Register API Endpoints", () => {
 
       const unauthorizedError = new Error("Account register not found");
       (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
-        unauthorizedError
+        unauthorizedError,
       );
 
       await expect(accountRegisterDeleteHandler(mockEvent)).rejects.toThrow();
@@ -771,7 +767,7 @@ describe("Account Register API Endpoints", () => {
       (global as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
-        mockAccountRegister
+        mockAccountRegister,
       );
 
       const transactionError = new Error("Transaction failed");
@@ -801,7 +797,7 @@ describe("Account Register API Endpoints", () => {
       (global as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
-        mockAccountRegister
+        mockAccountRegister,
       );
 
       const mockTxn = {
@@ -812,9 +808,11 @@ describe("Account Register API Endpoints", () => {
         },
       };
 
-      (prisma.$transaction as any).mockImplementation(async (callback) => {
-        return await callback(mockTxn);
-      });
+      (prisma.$transaction as any).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          return await callback(mockTxn);
+        },
+      );
       (accountRegisterSchema.parse as any).mockReturnValue(mockAccountRegister);
 
       await accountRegisterDeleteHandler(mockEvent);
@@ -851,10 +849,13 @@ describe("Account Register API Endpoints", () => {
       (global as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
-        mockAccountRegister
+        mockAccountRegister,
       );
       (prisma.$transaction as any).mockImplementation(
-        async (callback, options) => {
+        async (
+          callback: (tx: unknown) => Promise<unknown>,
+          options: { maxWait?: number; timeout?: number },
+        ) => {
           expect(options).toEqual({
             maxWait: 20000,
             timeout: 60000,
@@ -870,7 +871,7 @@ describe("Account Register API Endpoints", () => {
               delete: vi.fn().mockResolvedValue(mockAccountRegister),
             },
           });
-        }
+        },
       );
       (accountRegisterSchema.parse as any).mockReturnValue(mockAccountRegister);
 
@@ -899,9 +900,8 @@ describe("Account Register API Endpoints", () => {
     });
 
     it("should trigger recalculation consistently", async () => {
-      const { addRecalculateJob } = await import(
-        "~/server/clients/queuesClient"
-      );
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       expect(addRecalculateJob).toBeDefined();
       expect(typeof addRecalculateJob).toBe("function");

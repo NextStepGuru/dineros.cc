@@ -65,6 +65,9 @@ vi.mock('~/server/clients/prismaClient', () => ({
     account: {
       findMany: vi.fn(),
     },
+    category: {
+      findMany: vi.fn(),
+    },
     $queryRaw: vi.fn(),
   },
 }));
@@ -249,6 +252,8 @@ describe('Core API Endpoints', () => {
         },
       ];
 
+      const mockCategories: any[] = [];
+
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
 
@@ -259,6 +264,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountType.findMany as any).mockResolvedValue(mockAccountTypes);
       (prisma.accountRegister.findMany as any).mockResolvedValue(mockAccountRegisters);
       (prisma.account.findMany as any).mockResolvedValue(mockAccounts);
+      (prisma.category.findMany as any).mockResolvedValue(mockCategories);
 
       const result = await listsHandler(mockEvent);
 
@@ -269,6 +275,7 @@ describe('Core API Endpoints', () => {
         accountRegisters: mockAccountRegisters,
         budgets: mockBudgets,
         accounts: mockAccounts,
+        categories: mockCategories,
       });
 
       expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith({
@@ -313,6 +320,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountType.findMany as any).mockResolvedValue([]);
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
+      (prisma.category.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 
@@ -346,6 +354,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountType.findMany as any).mockResolvedValue([]);
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
+      (prisma.category.findMany as any).mockResolvedValue([]);
 
       const result = await listsHandler(mockEvent);
 
@@ -356,6 +365,7 @@ describe('Core API Endpoints', () => {
         accountRegisters: [],
         budgets: [],
         accounts: [],
+        categories: [],
       });
     });
 
@@ -370,6 +380,12 @@ describe('Core API Endpoints', () => {
 
       const dbError = new Error('Database connection failed');
       (prisma.reoccurrence.findMany as any).mockRejectedValue(dbError);
+      (prisma.budget.findMany as any).mockResolvedValue([]);
+      (prisma.interval.findMany as any).mockResolvedValue([]);
+      (prisma.accountType.findMany as any).mockResolvedValue([]);
+      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
+      (prisma.account.findMany as any).mockResolvedValue([]);
+      (prisma.category.findMany as any).mockResolvedValue([]);
 
       await expect(listsHandler(mockEvent)).rejects.toThrow('An error occurred while fetching lists.');
 
@@ -389,6 +405,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountType.findMany as any).mockResolvedValue([]);
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
+      (prisma.category.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 
@@ -430,6 +447,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountType.findMany as any).mockResolvedValue([]);
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
+      (prisma.category.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 
