@@ -57,6 +57,13 @@ describe("auth middleware", () => {
     expect(mockGetHeader).not.toHaveBeenCalled();
   });
 
+  it("should not run auth for ignored exact route POST /api/account-signup", async () => {
+    const event = createEvent("/api/account-signup", "POST");
+    const result = await authHandler(event);
+    expect(result).toBeUndefined();
+    expect(mockGetHeader).not.toHaveBeenCalled();
+  });
+
   it("should return 401 when no token (no header, no cookie)", async () => {
     const event = createEvent("/api/user", "GET");
     mockGetHeader.mockReturnValue(undefined);

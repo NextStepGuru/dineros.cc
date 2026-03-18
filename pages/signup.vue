@@ -137,12 +137,14 @@ const handleSubmit = async ({
 
     if (error.value) {
       isSaving.value = false;
+      const msg =
+        error.value.data?.errors ??
+        error.value.data?.message ??
+        error.value?.message ??
+        "Registration failed.";
       toast.add({
         color: "error",
-        description:
-          error.value.data.errors ||
-          error.value?.message ||
-          "Registration failed.",
+        description: typeof msg === "string" ? msg : String(msg),
       });
       return;
     }

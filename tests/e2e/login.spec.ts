@@ -12,16 +12,16 @@ test.describe("Login Page E2E Tests", () => {
   test("should display login form", async ({ page }) => {
     // Check that the login form is visible
     await expect(
-      page.getByRole("heading", { name: /login to your account/i })
+      page.getByRole("heading", { name: /welcome back/i })
     ).toBeVisible();
     await expect(page.getByLabel(/email address/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /login/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
   test("should show validation errors for invalid input", async ({ page }) => {
     // Try to submit empty form
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click();
 
     // Should show validation errors (Nuxt UI validation)
     await expect(page.locator("body")).toBeVisible();
@@ -35,7 +35,7 @@ test.describe("Login Page E2E Tests", () => {
     await helpers.fillLoginForm("invalid@example.com", "wrongpassword");
 
     // Submit form
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click();
 
     // Should show error message (check for toast or error text)
     await expect(page.locator("body")).toBeVisible();
@@ -51,7 +51,7 @@ test.describe("Login Page E2E Tests", () => {
     await helpers.fillLoginForm("test@example.com", "password123");
 
     // Submit form
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click();
 
     // Should show 2FA input
     await expect(page.getByLabel(/code/i)).toBeVisible();
@@ -84,7 +84,7 @@ test.describe("Login Page E2E Tests", () => {
     await helpers.fillLoginForm("test@example.com", "password123");
 
     // Submit form
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click();
 
     // Wait for navigation or check for success state
     await page.waitForTimeout(2000);
@@ -108,7 +108,7 @@ test.describe("Login Page E2E Tests", () => {
     await helpers.fillLoginForm("test@example.com", "password123");
 
     // Submit form
-    await page.getByRole("button", { name: /login/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click();
 
     // Form values should be preserved
     await expect(page.getByLabel(/email address/i)).toHaveValue(

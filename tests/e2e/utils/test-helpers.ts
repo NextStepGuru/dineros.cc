@@ -27,7 +27,7 @@ export class TestHelpers {
    * Submit login form
    */
   async submitLoginForm() {
-    await this.page.getByRole("button", { name: /login/i }).click();
+    await this.page.getByRole("button", { name: /sign in/i }).click();
   }
 
   /**
