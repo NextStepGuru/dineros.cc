@@ -1,6 +1,191 @@
 import { z } from "zod";
 import { plaidRootSchema } from "./plaid";
 
+const mfaPasskeyPrivateSchema = z.object({
+  id: z.string().min(1),
+  publicKey: z.string().min(1),
+  counter: z.number().int().nonnegative().default(0),
+  transports: z.array(z.string()).optional(),
+  name: z.string().optional(),
+  createdAt: z.string().optional(),
+});
+
+const mfaPasskeyPublicSchema = z.object({
+  id: z.string().min(1),
+  transports: z.array(z.string()).optional(),
+  name: z.string().optional(),
+  createdAt: z.string().optional(),
+});
+
+const mfaTotpPrivateSchema = z.object({
+  isEnabled: z.boolean().default(false),
+  isVerified: z.boolean().default(false),
+  base32secret: z.string().optional(),
+  backupCodes: z.array(z.string()).optional(),
+});
+
+const mfaTotpPublicSchema = z.object({
+  isEnabled: z.boolean().default(false),
+  isVerified: z.boolean().default(false),
+});
+
+const mfaEmailOtpSchema = z.object({
+  isEnabled: z.boolean().default(false),
+  isVerified: z.boolean().default(false),
+});
+
+const mfaPrivateSchema = z.object({
+  totp: mfaTotpPrivateSchema.default({ isEnabled: false, isVerified: false }),
+  passkeys: z.array(mfaPasskeyPrivateSchema).default([]),
+  emailOtp: mfaEmailOtpSchema.default({ isEnabled: false, isVerified: false }),
+});
+
+const mfaPublicSchema = z.object({
+  totp: mfaTotpPublicSchema.default({ isEnabled: false, isVerified: false }),
+  passkeys: z.array(mfaPasskeyPublicSchema).default([]),
+  emailOtp: mfaEmailOtpSchema.default({ isEnabled: false, isVerified: false }),
+});
+
+type AnyRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is AnyRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeSettings(value: unknown, includePrivateMfaFields: boolean) {
+  const settings = isRecord(value) ? value : {};
+  const legacySpeakeasy = isRecord(settings.speakeasy) ? settings.speakeasy : {};
+  const mfa = isRecord(settings.mfa) ? settings.mfa : {};
+  const mfaTotp = isRecord(mfa.totp) ? mfa.totp : {};
+  const mfaEmailOtp = isRecord(mfa.emailOtp) ? mfa.emailOtp : {};
+
+  const fallbackTotp = {
+    isEnabled: Boolean(legacySpeakeasy.isEnabled),
+    isVerified: Boolean(legacySpeakeasy.isVerified),
+    ...(typeof legacySpeakeasy.base32secret === "string"
+      ? { base32secret: legacySpeakeasy.base32secret }
+      : {}),
+    ...(Array.isArray(legacySpeakeasy.backupCodes)
+      ? { backupCodes: legacySpeakeasy.backupCodes.filter((c) => typeof c === "string") }
+      : {}),
+  };
+
+  const normalizedTotp = {
+    ...fallbackTotp,
+    ...mfaTotp,
+  };
+
+  const passkeysSource = Array.isArray(mfa.passkeys) ? mfa.passkeys : [];
+  const normalizedPasskeys = passkeysSource
+    .filter((passkey): passkey is AnyRecord => isRecord(passkey))
+    .map((passkey) => {
+      const normalized = {
+        id: String(passkey.id || ""),
+        ...(Array.isArray(passkey.transports)
+          ? {
+              transports: passkey.transports
+                .filter((transport) => typeof transport === "string")
+                .map((transport) => String(transport)),
+            }
+          : {}),
+        ...(typeof passkey.name === "string" ? { name: passkey.name } : {}),
+        ...(typeof passkey.createdAt === "string"
+          ? { createdAt: passkey.createdAt }
+          : {}),
+      };
+
+      if (!includePrivateMfaFields) {
+        return normalized;
+      }
+
+      return {
+        ...normalized,
+        ...(typeof passkey.publicKey === "string"
+          ? { publicKey: passkey.publicKey }
+          : {}),
+        ...(typeof passkey.counter === "number" ? { counter: passkey.counter } : {}),
+      };
+    })
+    .filter((passkey) => passkey.id);
+
+  const normalizedEmailOtp = {
+    isEnabled: Boolean(mfaEmailOtp.isEnabled),
+    isVerified: Boolean(mfaEmailOtp.isVerified),
+  };
+
+  return {
+    ...settings,
+    speakeasy: {
+      isEnabled: Boolean(normalizedTotp.isEnabled),
+      isVerified: Boolean(normalizedTotp.isVerified),
+      ...(typeof normalizedTotp.base32secret === "string"
+        ? { base32secret: normalizedTotp.base32secret }
+        : {}),
+      ...(Array.isArray(normalizedTotp.backupCodes)
+        ? { backupCodes: normalizedTotp.backupCodes.filter((c) => typeof c === "string") }
+        : {}),
+    },
+    mfa: {
+      totp: normalizedTotp,
+      passkeys: normalizedPasskeys,
+      emailOtp: normalizedEmailOtp,
+    },
+  };
+}
+
+const publicUserSettingsSchema = z.preprocess(
+  (value) => normalizeSettings(value, false),
+  z
+    .object({
+      speakeasy: z
+        .object({
+          isEnabled: z.boolean().default(false),
+          isVerified: z.boolean().default(false),
+        })
+        .default({ isEnabled: false, isVerified: false }),
+      mfa: mfaPublicSchema.default({
+        totp: { isEnabled: false, isVerified: false },
+        passkeys: [],
+        emailOtp: { isEnabled: false, isVerified: false },
+      }),
+      plaid: z
+        .object({
+          isEnabled: z.boolean().default(false),
+          public_token: z.string().optional(),
+        })
+        .default({ isEnabled: false }),
+    })
+    .default({
+      speakeasy: { isEnabled: false, isVerified: false },
+      mfa: {
+        totp: { isEnabled: false, isVerified: false },
+        passkeys: [],
+        emailOtp: { isEnabled: false, isVerified: false },
+      },
+      plaid: { isEnabled: false },
+    })
+);
+
+const privateUserSettingsSchema = z.preprocess(
+  (value) => normalizeSettings(value, true),
+  z.object({
+    speakeasy: z
+      .object({
+        isEnabled: z.boolean().default(false),
+        isVerified: z.boolean().default(false),
+        base32secret: z.string().optional(),
+        backupCodes: z.array(z.string()).optional(),
+      })
+      .default({ isEnabled: false, isVerified: false }),
+    mfa: mfaPrivateSchema.default({
+      totp: { isEnabled: false, isVerified: false },
+      passkeys: [],
+      emailOtp: { isEnabled: false, isVerified: false },
+    }),
+    plaid: plaidRootSchema,
+  })
+);
+
 export const publicProfileSchema = z.object({
   id: z.number(),
   firstName: z.string().min(1, "First name is required"),
@@ -10,40 +195,12 @@ export const publicProfileSchema = z.object({
   countryId: z.number().nullable().optional(),
   timezoneOffset: z.number().nullable().optional(),
   isDaylightSaving: z.boolean().nullable().optional(),
-  settings: z
-    .object({
-      speakeasy: z
-        .object({
-          isEnabled: z.boolean().default(false),
-          isVerified: z.boolean().default(false),
-        })
-        .default({ isEnabled: false, isVerified: false }),
-      plaid: z
-        .object({
-          isEnabled: z.boolean().default(false),
-          public_token: z.string().optional(),
-        })
-        .default({ isEnabled: false }),
-    })
-    .default({
-      speakeasy: { isEnabled: false },
-      plaid: { isEnabled: false },
-    }),
+  settings: publicUserSettingsSchema,
 });
 
 export const privateUserSchema = publicProfileSchema.merge(
   z.object({
-    settings: z.object({
-      speakeasy: z
-        .object({
-          isEnabled: z.boolean().default(false),
-          isVerified: z.boolean().default(false),
-          base32secret: z.string().optional(),
-          backupCodes: z.array(z.string()).optional(),
-        })
-        .default({ isEnabled: false, isVerified: false }),
-      plaid: plaidRootSchema,
-    }),
+    settings: privateUserSettingsSchema,
   })
 );
 

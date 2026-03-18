@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
+import { startAuthentication } from "@simplewebauthn/browser";
 import { handleError } from "~/lib/utils";
 import { loginSchema } from "~/schema/zod";
 import type { User } from "~/types/types";
@@ -49,7 +50,17 @@ const formState = ref<Partial<LoginSchemaType>>({ email: "", password: "" });
 
 const isSaving = ref(false);
 const tokenChallengeRequired = ref(false);
+const mfaMethods = ref<Array<"totp" | "passkey" | "email">>([]);
+const selectedMfaMethod = ref<"totp" | "passkey" | "email">("totp");
+const emailCodeSent = ref(false);
 const loginFormRef = ref<{ submit: () => void } | null>(null);
+
+watch(selectedMfaMethod, (method) => {
+  formState.value.tokenChallenge = "";
+  if (method !== "email") {
+    emailCodeSent.value = false;
+  }
+});
 
 function onLoginClick() {
   const form = loginFormRef.value as { submit?: () => void } | null;
@@ -97,68 +108,177 @@ const handleSubmit = async ({
   try {
     isSaving.value = true;
     const $api = useNuxtApp().$api as typeof $fetch;
-    let data: LoginResponse | null = null;
-    let err: { value?: { statusCode?: number; data?: unknown } } = {
-      value: undefined,
+
+    const completeAuth = async (response: LoginResponse) => {
+      const result = processLoginResponse(response);
+      if (result.success && result.token) {
+        authTokenCookie.value = result.token;
+        authStore.setToken(result.token);
+        if (result.user) {
+          authStore.setUser(result.user as User);
+        }
+
+        await listStore.fetchLists();
+        if (listStore.getBudgets.length > 0) {
+          authStore.setBudgetId(listStore.getBudgets[0].id);
+        }
+        const redirectPath = getPostLoginRedirect(
+          listStore.getAccountRegisters,
+        );
+        toast.add({ color: "success", description: "Login successful!" });
+        window.location.assign(redirectPath);
+        return true;
+      }
+      return false;
     };
-    try {
-      data = (await $api("/api/login", {
-        method: "POST",
-        body: formData,
-      })) as LoginResponse;
-    } catch (e: unknown) {
-      err.value = e as { statusCode?: number; data?: unknown };
-    }
 
-    if (err.value) {
-      isSaving.value = false;
-      toast.add({
-        color: "error",
-        description: formatLoginError(err.value),
-      });
-      return;
-    }
-
-    // Use our testable login response processor
-    const result = processLoginResponse(data as LoginResponse);
-
-    if (result.success && result.token) {
-      // Store the token in a cookie
-      authTokenCookie.value = result.token;
-      authStore.setToken(result.token);
-
-      if (result.user) {
-        authStore.setUser(result.user);
+    if (!tokenChallengeRequired.value) {
+      let data: LoginResponse | null = null;
+      let err: { value?: { statusCode?: number; data?: unknown } } = {
+        value: undefined,
+      };
+      try {
+        data = (await $api("/api/login", {
+          method: "POST",
+          body: formData,
+        })) as LoginResponse;
+      } catch (e: unknown) {
+        err.value = e as { statusCode?: number; data?: unknown };
       }
 
-      // Fetch lists and redirect using testable logic
-      await listStore.fetchLists();
-      const budgets = listStore.getBudgets;
-      authStore.setBudgetId(listStore.getBudgets[0].id);
-      const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
-      toast.add({ color: "success", description: "Login successful!" });
-      // Full-page navigation to avoid Nuxt payload client throwing on undefined manifest (prerendered check)
-      window.location.assign(redirectPath);
+      if (err.value) {
+        isSaving.value = false;
+        toast.add({
+          color: "error",
+          description: formatLoginError(err.value),
+        });
+        return;
+      }
+
+      const processed = processLoginResponse(data as LoginResponse);
+      if (processed.requiresTwoFactor) {
+        tokenChallengeRequired.value = true;
+        mfaMethods.value = processed.mfaMethods?.length
+          ? processed.mfaMethods
+          : ["totp"];
+        selectedMfaMethod.value = mfaMethods.value.includes("totp")
+          ? "totp"
+          : mfaMethods.value[0];
+        emailCodeSent.value = false;
+        isSaving.value = false;
+        return;
+      }
+
+      const completed = await completeAuth(data as LoginResponse);
+      if (!completed) {
+        toast.add({
+          color: "error",
+          description: processed.errorMessage || "Invalid login credentials.",
+        });
+      }
+      isSaving.value = false;
       return;
-    } else if (result.requiresTwoFactor) {
+    }
+
+    if (selectedMfaMethod.value === "totp") {
+      if (!String(formState.value.tokenChallenge || "").trim()) {
+        toast.add({
+          color: "error",
+          description: "Enter your authentication code.",
+        });
+        isSaving.value = false;
+        return;
+      }
+
+      const data = (await $api("/api/mfa/totp/verify", {
+        method: "POST",
+        body: { token: String(formState.value.tokenChallenge || "").trim() },
+      })) as LoginResponse;
+      await completeAuth(data);
       isSaving.value = false;
-      tokenChallengeRequired.value = true;
-    } else {
+      return;
+    }
+
+    if (selectedMfaMethod.value === "email") {
+      const code = String(formState.value.tokenChallenge || "").trim();
+      if (!emailCodeSent.value) {
+        await $api("/api/mfa/email/send-code", { method: "POST" });
+        emailCodeSent.value = true;
+        toast.add({
+          color: "success",
+          description: "Verification code sent to your email.",
+        });
+        isSaving.value = false;
+        return;
+      }
+
+      if (!code) {
+        toast.add({
+          color: "error",
+          description: "Enter the email verification code.",
+        });
+        isSaving.value = false;
+        return;
+      }
+
+      const data = (await $api("/api/mfa/email/verify", {
+        method: "POST",
+        body: { code },
+      })) as LoginResponse;
+      await completeAuth(data);
       isSaving.value = false;
-      toast.add({
-        color: "error",
-        description: result.errorMessage || "Invalid login credentials.",
-      });
+      return;
     }
   } catch (error) {
     isSaving.value = false;
-    console.error("Error during login:", error);
     toast.add({
       color: "error",
       description: "An error occurred during login.",
     });
   }
 };
+
+async function startPasskeySignIn() {
+  try {
+    isSaving.value = true;
+    const $api = useNuxtApp().$api as typeof $fetch;
+    const options = await $api("/api/mfa/passkey/auth-options", {
+      method: "POST",
+    });
+    const assertion = await startAuthentication(options as any);
+    const data = (await $api("/api/mfa/passkey/verify", {
+      method: "POST",
+      body: { response: assertion },
+    })) as LoginResponse;
+    const result = processLoginResponse(data);
+    if (result.success && result.token) {
+      authTokenCookie.value = result.token;
+      authStore.setToken(result.token);
+      if (result.user) {
+        authStore.setUser(result.user as User);
+      }
+      await listStore.fetchLists();
+      if (listStore.getBudgets.length > 0) {
+        authStore.setBudgetId(listStore.getBudgets[0].id);
+      }
+      const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
+      toast.add({ color: "success", description: "Login successful!" });
+      window.location.assign(redirectPath);
+      return;
+    }
+    toast.add({
+      color: "error",
+      description: result.errorMessage || "Passkey verification failed.",
+    });
+  } catch (_error) {
+    toast.add({
+      color: "error",
+      description: "Unable to complete passkey sign-in.",
+    });
+  } finally {
+    isSaving.value = false;
+  }
+}
 </script>
 
 <template lang="pug">
@@ -172,14 +292,33 @@ const handleSubmit = async ({
             p(class="text-sm frog-text-muted") Sign in to continue forecasting, tracking, and planning with confidence.
 
         UForm(ref="loginFormRef" class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
+          UFormField(v-if="tokenChallengeRequired" label="Verification method" for="mfaMethod")
+            select(
+              id="mfaMethod"
+              v-model="selectedMfaMethod"
+              class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            )
+              option(v-for="method in mfaMethods" :key="method" :value="method")
+                | {{ method === 'totp' ? 'Authenticator app' : method === 'passkey' ? 'Security key / passkey' : 'Email code' }}
+
           UFormField(v-if="tokenChallengeRequired" label="Code" for="tokenChallenge")
             UInput(
               id="tokenChallenge"
               v-model="formState.tokenChallenge"
               type="text"
-              placeholder="Enter your two-factor authentication code"
+              :placeholder="selectedMfaMethod === 'email' ? 'Enter the code from your email' : 'Enter your two-factor authentication code'"
               class="w-full"
+              :disabled="selectedMfaMethod === 'passkey'"
             )
+          UButton(
+            v-if="tokenChallengeRequired && selectedMfaMethod === 'passkey'"
+            color="neutral"
+            size="lg"
+            type="button"
+            :disabled="isSaving"
+            :loading="isSaving"
+            @click="startPasskeySignIn"
+          ) Use security key / passkey
           UFormField(v-if="!tokenChallengeRequired" label="Email Address" for="email")
             UInput(
               id="email"
@@ -200,10 +339,10 @@ const handleSubmit = async ({
             color="primary"
             size="lg"
             type="button"
-            :disabled="isSaving"
+            :disabled="isSaving || (tokenChallengeRequired && selectedMfaMethod === 'passkey')"
             :loading="isSaving"
             @click="onLoginClick"
-          ) Sign in
+          ) {{ tokenChallengeRequired && selectedMfaMethod === 'email' && !emailCodeSent ? 'Send email code' : 'Sign in' }}
 
         template(#footer)
           div(class="text-sm text-center")

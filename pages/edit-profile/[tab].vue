@@ -10,22 +10,22 @@ const authStore = useAuthStore();
 // Lazy-load tab components so Plaid and other heavy deps load only when tab is selected
 const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   "/edit-profile/profile": defineAsyncComponent(
-    () => import("~/components/profile/EditProfileTab.vue")
+    () => import("~/components/profile/EditProfileTab.vue"),
   ),
   "/edit-profile/password": defineAsyncComponent(
-    () => import("~/components/profile/ChangePasswordTab.vue")
+    () => import("~/components/profile/ChangePasswordTab.vue"),
   ),
   "/edit-profile/sync-accounts": defineAsyncComponent(
-    () => import("~/components/profile/SyncAccountsTab.vue")
+    () => import("~/components/profile/SyncAccountsTab.vue"),
   ),
   "/edit-profile/two-factor-auth": defineAsyncComponent(
-    () => import("~/components/profile/TwoFactorAuthTab.vue")
+    () => import("~/components/profile/TwoFactorAuthTab.vue"),
   ),
   "/edit-profile/admin-settings": defineAsyncComponent(
-    () => import("~/components/profile/AdminSettingsTab.vue")
+    () => import("~/components/profile/AdminSettingsTab.vue"),
   ),
   "/edit-profile/debug-tools": defineAsyncComponent(
-    () => import("~/components/profile/DebugToolsTab.vue")
+    () => import("~/components/profile/DebugToolsTab.vue"),
   ),
 };
 

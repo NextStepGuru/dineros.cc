@@ -8,6 +8,11 @@ import JwtService from "../services/JwtService";
 
 const ignoredRoutes = [
   { type: "exact", path: "/api/login", method: "POST" },
+  { type: "exact", path: "/api/mfa/totp/verify", method: "POST" },
+  { type: "exact", path: "/api/mfa/email/send-code", method: "POST" },
+  { type: "exact", path: "/api/mfa/email/verify", method: "POST" },
+  { type: "exact", path: "/api/mfa/passkey/auth-options", method: "POST" },
+  { type: "exact", path: "/api/mfa/passkey/verify", method: "POST" },
   { type: "exact", path: "/api/account-signup", method: "POST" },
   { type: "exact", path: "/api/reset-password-with-code", method: "POST" },
   { type: "exact", path: "/api/forgot-password", method: "POST" },

@@ -10,11 +10,13 @@ export interface LoginResponse {
   token?: string;
   user?: any;
   twoFactorChallengeRequired?: boolean;
+  mfaMethods?: Array<"totp" | "passkey" | "email">;
 }
 
 export interface LoginResult {
   success: boolean;
   requiresTwoFactor: boolean;
+  mfaMethods?: Array<"totp" | "passkey" | "email">;
   token?: string;
   user?: any;
   errorMessage?: string;
@@ -39,6 +41,7 @@ export function processLoginResponse(response: LoginResponse): LoginResult {
     return {
       success: false,
       requiresTwoFactor: true,
+      mfaMethods: response.mfaMethods || [],
     };
   }
 
@@ -46,24 +49,26 @@ export function processLoginResponse(response: LoginResponse): LoginResult {
   return {
     success: false,
     requiresTwoFactor: false,
-    errorMessage: 'Invalid login credentials.',
+    errorMessage: "Invalid login credentials.",
   };
 }
 
 /**
  * Validate login credentials
  */
-export function validateLoginCredentials(credentials: LoginCredentials): string | null {
+export function validateLoginCredentials(
+  credentials: LoginCredentials,
+): string | null {
   if (!credentials.email) {
-    return 'Email is required';
+    return "Email is required";
   }
 
   if (!credentials.password && !credentials.tokenChallenge) {
-    return 'Password is required';
+    return "Password is required";
   }
 
-  if (credentials.email && !credentials.email.includes('@')) {
-    return 'Please enter a valid email address';
+  if (credentials.email && !credentials.email.includes("@")) {
+    return "Please enter a valid email address";
   }
 
   return null;
@@ -77,11 +82,11 @@ export function getPostLoginRedirect(accountRegisters: any[]): string {
   if (accountRegisters.length > 0) {
     const bySortOrder = [...accountRegisters].sort(
       (a, b) =>
-        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0)
+        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0),
     );
     return `/register/${bySortOrder[0].id}`;
   }
-  return '/account-registers?onboarding=1';
+  return "/account-registers?onboarding=1";
 }
 
 /**
@@ -90,7 +95,7 @@ export function getPostLoginRedirect(accountRegisters: any[]): string {
 export function formatLoginError(error: any): string {
   if (error?.data?.errors) {
     return Array.isArray(error.data.errors)
-      ? error.data.errors.join(', ')
+      ? error.data.errors.join(", ")
       : error.data.errors;
   }
 
@@ -98,5 +103,5 @@ export function formatLoginError(error: any): string {
     return error.message;
   }
 
-  return 'An error occurred during login.';
+  return "An error occurred during login.";
 }

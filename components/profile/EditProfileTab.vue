@@ -17,6 +17,7 @@ type ProfileSchemaType = z.infer<typeof publicProfileSchema>;
 
 const toast = useToast();
 const authStore = useAuthStore();
+const $api = useNuxtApp().$api as typeof $fetch;
 
 const formState = ref<Partial<User>>(authStore.getUser || {});
 const isProfileSaving = ref(false);
@@ -38,30 +39,15 @@ const countryOptions = computed(() => {
 onMounted(async () => {
   try {
     isLoadingCountries.value = true;
-
-    const { data, error } = await useAPI<Country[]>("/api/countries");
-
-    if (error.value) {
-      console.error("API error loading countries:", error.value);
-      // Set a fallback with at least United States
-      countries.value = [
-        { id: 840, name: "United States", code: "US", code3: "USA" },
-      ];
-      return;
-    }
-
-    if (data.value && data.value.length > 0) {
-      countries.value = data.value;
+    const list = await $api<Country[]>("/api/countries");
+    if (list?.length > 0) {
+      countries.value = list;
     } else {
-      console.warn("No countries data received from API");
-      // Set a fallback with at least United States
       countries.value = [
         { id: 840, name: "United States", code: "US", code3: "USA" },
       ];
     }
-  } catch (error) {
-    console.error("Failed to load countries:", error);
-    // Set a fallback with at least United States
+  } catch {
     countries.value = [
       { id: 840, name: "United States", code: "US", code3: "USA" },
     ];
@@ -273,44 +259,33 @@ const handleSubmit = async ({
 }: FormSubmitEvent<ProfileSchemaType>) => {
   try {
     isProfileSaving.value = true;
-    const { data: responseData, error } = await useAPI<User>("/api/user", {
+    const responseData = await $api<User>("/api/user", {
       method: "POST",
       body: formData,
     });
-
-    if (error?.value) {
-      isProfileSaving.value = false;
-      toast.add({
-        color: "error",
-        description: error.value.message || "Profile update failed.",
-      });
-      return;
-    }
-    formState.value.firstName = responseData.value?.firstName || "";
-    formState.value.lastName = responseData.value?.lastName || "";
-    formState.value.email = responseData.value?.email || "";
-    formState.value.countryId = responseData.value?.countryId || 840;
-    formState.value.timezoneOffset = responseData.value?.timezoneOffset || -300;
-    formState.value.isDaylightSaving =
-      responseData.value?.isDaylightSaving ?? true;
-
+    formState.value.firstName = responseData?.firstName || "";
+    formState.value.lastName = responseData?.lastName || "";
+    formState.value.email = responseData?.email || "";
+    formState.value.countryId = responseData?.countryId || 840;
+    formState.value.timezoneOffset = responseData?.timezoneOffset || -300;
+    formState.value.isDaylightSaving = responseData?.isDaylightSaving ?? true;
     toast.add({
       color: "success",
       description: "Profile updated successfully.",
     });
+  } catch (e: unknown) {
+    const msg =
+      e && typeof e === "object" && "data" in e
+        ? String((e as { data?: { message?: string } }).data?.message)
+        : e &&
+            typeof e === "object" &&
+            "message" in e &&
+            typeof (e as { message: string }).message === "string"
+          ? (e as { message: string }).message
+          : "An error occurred during profile update.";
+    toast.add({ color: "error", description: msg });
+  } finally {
     isProfileSaving.value = false;
-  } catch (error) {
-    isProfileSaving.value = false;
-    toast.add({
-      color: "error",
-      description:
-        error &&
-        typeof error === "object" &&
-        "message" in error &&
-        typeof error.message === "string"
-          ? error.message
-          : "An error occurred during profile update.",
-    });
   }
 };
 

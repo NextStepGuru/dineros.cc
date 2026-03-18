@@ -1,9 +1,10 @@
-import speakeasy from "speakeasy";
+import { verify } from "otplib";
 import { getUser } from "../lib/getUser";
 import { prisma } from "../clients/prismaClient";
 import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
 import { z } from "zod";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { withUpdatedTotp } from "~/server/lib/mfa";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -16,12 +17,12 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    if (!user.settings.speakeasy.base32secret) {
+    if (!user.settings.mfa.totp.base32secret) {
       return false;
     }
 
     // Check if the token is a backup code
-    const backupCodes = user.settings.speakeasy.backupCodes || [];
+    const backupCodes = user.settings.mfa.totp.backupCodes || [];
     const isBackupCode = backupCodes.includes(token);
 
     let verificationResult = false;
@@ -35,11 +36,9 @@ export default defineEventHandler(async (event) => {
         data: {
           settings: JSON.parse(
             JSON.stringify({
-              ...user.settings,
-              speakeasy: {
-                ...user.settings.speakeasy,
+              ...withUpdatedTotp(user.settings, {
                 backupCodes: updatedBackupCodes,
-              },
+              }),
             })
           ),
         },
@@ -48,12 +47,12 @@ export default defineEventHandler(async (event) => {
       verificationResult = true;
     } else {
       // Verify TOTP token
-      verificationResult = speakeasy.totp.verify({
-        secret: user.settings.speakeasy.base32secret,
-        encoding: "base32",
+      const result = await verify({
+        secret: user.settings.mfa.totp.base32secret,
         token,
-        window: 10,
+        epochTolerance: 300, // ±300s (10 periods), matches previous speakeasy window
       });
+      verificationResult = result.valid;
     }
 
     const updatedUser = await prisma.user.update({
@@ -61,11 +60,9 @@ export default defineEventHandler(async (event) => {
       data: {
         settings: JSON.parse(
           JSON.stringify({
-            ...user.settings,
-            speakeasy: {
-              ...user.settings.speakeasy,
+            ...withUpdatedTotp(user.settings, {
               isVerified: verificationResult,
-            },
+            }),
           })
         ),
       },

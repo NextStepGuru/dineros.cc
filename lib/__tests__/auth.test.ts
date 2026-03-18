@@ -139,12 +139,12 @@ describe('Authentication Utilities', () => {
       expect(result).toBe('/register/account-1');
     });
 
-    it('should redirect to base register page when no accounts', () => {
+    it('should redirect to account-registers onboarding when no accounts', () => {
       const accountRegisters: any[] = [];
 
       const result = getPostLoginRedirect(accountRegisters);
 
-      expect(result).toBe('/register');
+      expect(result).toBe('/account-registers?onboarding=1');
     });
   });
 

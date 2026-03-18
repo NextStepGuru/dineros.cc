@@ -16,10 +16,20 @@ export const useAuthStore = defineStore("authStore", {
     hasPlaidConnected: (state) =>
       state.user?.settings?.plaid?.isEnabled !== undefined &&
       state.user.settings.plaid.isEnabled === true,
-    has2faEnabled: (state) =>
-      state.user?.settings?.speakeasy?.isEnabled !== undefined &&
-      state.user.settings.speakeasy.isEnabled === true &&
-      state.user.settings.speakeasy.isVerified === true,
+    has2faEnabled: (state) => {
+      const mfa = state.user?.settings?.mfa;
+      if (mfa) {
+        const hasTotp = Boolean(mfa.totp?.isEnabled && mfa.totp?.isVerified);
+        const hasPasskey = Array.isArray(mfa.passkeys) && mfa.passkeys.length > 0;
+        const hasEmailOtp = Boolean(mfa.emailOtp?.isEnabled);
+        return hasTotp || hasPasskey || hasEmailOtp;
+      }
+
+      return Boolean(
+        state.user?.settings?.speakeasy?.isEnabled &&
+          state.user?.settings?.speakeasy?.isVerified
+      );
+    },
   },
   actions: {
     setBudgetId(budgetId: number | string) {

@@ -1,9 +1,14 @@
-import speakeasy from "speakeasy";
+import { generateSecret, generateURI } from "otplib";
 import qrcode from "qrcode";
 import { getUser } from "../lib/getUser";
 import { prisma } from "../clients/prismaClient";
 import { privateUserSchema } from "~/schema/zod";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { withUpdatedTotp } from "~/server/lib/mfa";
+
+const ISSUER = "Dineros.cc";
+const LOGO_URL =
+  "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -14,31 +19,24 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    if (
-      user.settings.speakeasy.isEnabled &&
-      user.settings.speakeasy.isVerified
-    ) {
+    if (user.settings.mfa.totp.isEnabled && user.settings.mfa.totp.isVerified) {
       throw new Error("Two-factor authentication is already enabled.");
     }
 
-    // Generate a unique secret for the user
-    const secret = speakeasy.generateSecret({
-      length: 512,
-      name: `${user.email}+Dineros.cc`,
-      issuer: "Dineros.cc",
+    const secret = generateSecret();
+    const uri = generateURI({
+      issuer: ISSUER,
+      label: user.email,
+      secret,
     });
-
-    if (!secret.otpauth_url) {
-      setResponseStatus(event, 400);
-      return { error: "Error generating OTP secret." };
-    }
+    const otpauthWithLogo = `${uri}&image=${encodeURIComponent(LOGO_URL)}`;
 
     // Generate backup codes for emergency access
     const backupCodes = Array.from({ length: 8 }, () =>
       Math.floor(100000 + Math.random() * 900000).toString()
     );
 
-    const imageUrl = await qrcode.toDataURL(secret.otpauth_url);
+    const imageUrl = await qrcode.toDataURL(otpauthWithLogo);
 
     await prisma.user.update({
       where: { id: userId },
@@ -46,11 +44,12 @@ export default defineEventHandler(async (event) => {
         settings: JSON.parse(
           JSON.stringify({
             ...(user.settings || {}),
-            speakeasy: {
-              base32secret: secret.base32,
+            ...withUpdatedTotp(user.settings, {
+              base32secret: secret,
               isEnabled: true,
-              backupCodes: backupCodes,
-            },
+              isVerified: false,
+              backupCodes,
+            }),
           })
         ),
       },

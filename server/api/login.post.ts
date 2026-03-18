@@ -1,19 +1,20 @@
-import speakeasy from "speakeasy";
+import { verify } from "otplib";
 import { createHash } from "node:crypto";
-import { readBody, setResponseStatus, setCookie } from "h3";
+import { readBody, setResponseStatus } from "h3";
 import { z } from "zod";
-import {
-  loginSchema,
-  privateUserSchema,
-  publicProfileSchema,
-} from "~/schema/zod";
+import { loginSchema, privateUserSchema } from "~/schema/zod";
 import env from "../env";
 import HashService from "../services/HashService";
-import JwtService from "../services/JwtService";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { withErrorHandler } from "~/server/lib/withErrorHandler";
-import { dateTimeService } from "~/server/services/forecast";
 import { log } from "~/server/logger";
+import {
+  clearPendingMfaSession,
+  createPendingMfaSession,
+  getEnabledMfaMethods,
+  withUpdatedTotp,
+} from "~/server/lib/mfa";
+import { completeLogin } from "~/server/lib/completeLogin";
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
@@ -56,10 +57,10 @@ async function loginHandler(event: any) {
             processEnvMatchesParsedEnc:
               enc.length === procEnc.length && fp(enc) === fp(procEnc),
             decryptionKeysCount: Array.isArray(env?.DB_DECRYPTION_KEYS)
-              ? env.DB_DECRYPTION_KEYS.length
+              ? (env?.DB_DECRYPTION_KEYS.length ?? 0)
               : 0,
             decryptionKeyFingerprints: Array.isArray(env?.DB_DECRYPTION_KEYS)
-              ? env.DB_DECRYPTION_KEYS.map((k: string) =>
+              ? env?.DB_DECRYPTION_KEYS?.map((k: string) =>
                   createHash("sha256").update(k).digest("hex").slice(0, 8),
                 )
               : [],
@@ -180,30 +181,36 @@ async function loginHandler(event: any) {
     return { errors: "Invalid email or password." };
   }
 
-  if (
-    user.settings.speakeasy.isEnabled &&
-    user.settings.speakeasy.isVerified &&
-    user.settings.speakeasy.base32secret &&
-    !tokenChallenge
-  ) {
-    log({
-      message: "[LOGIN][EMAIL] Two-factor challenge required",
-      level: "info",
-      data: {
+  const mfaMethods = getEnabledMfaMethods(user.settings);
+
+  if (mfaMethods.length > 0) {
+    if (!tokenChallenge) {
+      await createPendingMfaSession(event, {
         userId: user.id,
-        email: maskEmail(email),
-      },
-    });
-    setResponseStatus(event, 200);
-    return { twoFactorChallengeRequired: true };
-  } else if (
-    user.settings.speakeasy.isEnabled &&
-    user.settings.speakeasy.isVerified &&
-    user.settings.speakeasy.base32secret &&
-    tokenChallenge
-  ) {
+        email,
+        methods: mfaMethods,
+      });
+
+      log({
+        message: "[LOGIN][EMAIL] MFA challenge required",
+        level: "info",
+        data: {
+          userId: user.id,
+          email: maskEmail(email),
+          methods: mfaMethods,
+        },
+      });
+      setResponseStatus(event, 200);
+      return { twoFactorChallengeRequired: true, mfaMethods };
+    }
+
+    if (!mfaMethods.includes("totp")) {
+      setResponseStatus(event, 401);
+      return { errors: "Use an available two-factor method for this account." };
+    }
+
     // Check if the token is a backup code
-    const backupCodes = user.settings.speakeasy.backupCodes || [];
+    const backupCodes = user.settings.mfa.totp.backupCodes || [];
     const isBackupCode = backupCodes.includes(tokenChallenge);
 
     let verificationResult = false;
@@ -211,7 +218,7 @@ async function loginHandler(event: any) {
     if (isBackupCode) {
       // Remove the used backup code
       const updatedBackupCodes = backupCodes.filter(
-        (code) => code !== tokenChallenge
+        (code) => code !== tokenChallenge,
       );
 
       await PrismaDb.user.update({
@@ -219,12 +226,10 @@ async function loginHandler(event: any) {
         data: {
           settings: JSON.parse(
             JSON.stringify({
-              ...user.settings,
-              speakeasy: {
-                ...user.settings.speakeasy,
+              ...withUpdatedTotp(user.settings, {
                 backupCodes: updatedBackupCodes,
-              },
-            })
+              }),
+            }),
           ),
         },
       });
@@ -232,12 +237,17 @@ async function loginHandler(event: any) {
       verificationResult = true;
     } else {
       // Verify TOTP token
-      verificationResult = speakeasy.totp.verify({
-        secret: user.settings.speakeasy.base32secret,
-        encoding: "base32",
+      const totpSecret = user.settings.mfa.totp.base32secret;
+      if (!totpSecret) {
+        setResponseStatus(event, 401);
+        return { errors: "Invalid two-factor authentication token." };
+      }
+      const totpResult = await verify({
+        secret: totpSecret,
         token: tokenChallenge,
-        window: 10,
+        epochTolerance: 300,
       });
+      verificationResult = totpResult.valid;
     }
 
     log({
@@ -257,36 +267,19 @@ async function loginHandler(event: any) {
     }
   }
 
-  const jwt = new JwtService();
-  // Generate JWT token
-  const token = await jwt.sign({ userId: user.id });
-
-  await PrismaDb.user.update({
-    where: { id: user.id },
-    data: { lastAccessedAt: dateTimeService.nowDate() },
-  });
-
-  // Set the token as a cookie
-  setCookie(event, "authToken", token, {
-    secure: env.NODE_ENV === "production",
-    maxAge: 86400, // 24 hours - match client-side configuration
-    path: "/",
-    sameSite: "lax",
-    httpOnly: false, // Allow client-side access
-  });
+  await clearPendingMfaSession(event);
+  const loginResult = await completeLogin(event, user.id);
   log({
     message: "[LOGIN][EMAIL] Login successful",
     level: "info",
     data: {
       userId: user.id,
       email: maskEmail(email),
-      hasTwoFactorEnabled:
-        Boolean(user.settings?.speakeasy?.isEnabled) &&
-        Boolean(user.settings?.speakeasy?.isVerified),
+      hasTwoFactorEnabled: mfaMethods.length > 0,
     },
   });
   setResponseStatus(event, 200);
-  return { token, message: null, user: publicProfileSchema.parse(user) };
+  return loginResult;
 }
 
 export default withErrorHandler(loginHandler);
