@@ -1,5 +1,6 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import type { H3Event } from "h3";
+import { createError } from "h3";
 import { accountRegisterSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "../clients/queuesClient";
@@ -11,7 +12,8 @@ export default defineEventHandler(async (event: H3Event) => {
     const body = await readBody(event);
     const { userId } = getUser(event);
 
-    const {
+    const parsed = accountRegisterSchema.parse(body);
+    let {
       id,
       accountId,
       typeId,
@@ -29,6 +31,7 @@ export default defineEventHandler(async (event: H3Event) => {
       apr3,
       apr3StartAt,
       targetAccountRegisterId,
+      collateralAssetRegisterId,
       loanStartAt,
       loanPaymentsPerYear,
       loanTotalYears,
@@ -40,7 +43,72 @@ export default defineEventHandler(async (event: H3Event) => {
       allowExtraPayment,
       isArchived,
       subAccountRegisterId,
-    } = accountRegisterSchema.parse(body);
+    } = parsed;
+
+    if (
+      collateralAssetRegisterId == null ||
+      !Number.isFinite(collateralAssetRegisterId) ||
+      collateralAssetRegisterId <= 0
+    ) {
+      collateralAssetRegisterId = null;
+    }
+
+    const accountType = await PrismaDb.accountType.findUnique({
+      where: { id: typeId },
+    });
+    const isCreditType = accountType?.isCredit === true;
+    if (!isCreditType) {
+      collateralAssetRegisterId = null;
+    } else if (collateralAssetRegisterId != null) {
+      const asset = await PrismaDb.accountRegister.findFirst({
+        where: {
+          id: collateralAssetRegisterId,
+          accountId,
+          isArchived: false,
+          account: {
+            userAccounts: { some: { userId } },
+          },
+        },
+        include: { type: true },
+      });
+      if (!asset) {
+        throw createError({
+          statusCode: 400,
+          message: "Linked asset not found or not accessible.",
+        });
+      }
+      if (asset.type.isCredit) {
+        throw createError({
+          statusCode: 400,
+          message: "Linked collateral must be a non-credit (asset) account.",
+        });
+      }
+      if (asset.subAccountRegisterId != null) {
+        throw createError({
+          statusCode: 400,
+          message: "Linked asset must be a top-level account, not a pocket.",
+        });
+      }
+      if (id > 0 && collateralAssetRegisterId === id) {
+        throw createError({
+          statusCode: 400,
+          message: "Cannot link an account to itself as collateral.",
+        });
+      }
+      const otherLoan = await PrismaDb.accountRegister.findFirst({
+        where: {
+          collateralAssetRegisterId,
+          ...(id > 0 ? { id: { not: id } } : {}),
+        },
+      });
+      if (otherLoan) {
+        throw createError({
+          statusCode: 400,
+          message:
+            "That asset is already linked to another loan. Only one loan per asset.",
+        });
+      }
+    }
 
     // Can user create or update this account register?
     await PrismaDb.account.findFirstOrThrow({
@@ -72,6 +140,7 @@ export default defineEventHandler(async (event: H3Event) => {
         apr3,
         apr3StartAt,
         targetAccountRegisterId,
+        collateralAssetRegisterId,
         loanStartAt,
         loanPaymentsPerYear,
         loanTotalYears,
@@ -102,6 +171,7 @@ export default defineEventHandler(async (event: H3Event) => {
         apr3,
         apr3StartAt,
         targetAccountRegisterId,
+        collateralAssetRegisterId,
         loanStartAt,
         loanPaymentsPerYear,
         loanTotalYears,

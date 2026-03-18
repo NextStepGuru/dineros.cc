@@ -27,6 +27,9 @@ export default defineEventHandler(async (event) => {
     // Hash the password
     const hashedPassword = await new HashService().hash(password);
 
+    // Default country (840 = US) only if it exists; otherwise null to avoid FK violation when country table is empty
+    const defaultCountryId = (await PrismaDb.country.findUnique({ where: { id: 840 }, select: { id: true } }))?.id ?? null;
+
     // Use a transaction to ensure atomicity
     const result = await PrismaDb.$transaction(async (prisma) => {
       // Create new user
@@ -36,6 +39,7 @@ export default defineEventHandler(async (event) => {
           lastName,
           email,
           password: hashedPassword,
+          countryId: defaultCountryId,
           settings: {},
           config: {},
         },

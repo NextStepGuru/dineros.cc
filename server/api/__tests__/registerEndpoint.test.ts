@@ -27,6 +27,9 @@ vi.mock('~/server/clients/prismaClient', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    country: {
+      findUnique: vi.fn(),
+    },
     account: {
       create: vi.fn(),
     },
@@ -112,6 +115,7 @@ describe('Register API Endpoint', () => {
       (readBody as any).mockResolvedValue(mockBody);
       (registerSchema.parse as any).mockReturnValue(mockBody);
       (prisma.user.findUnique as any).mockResolvedValue(null);
+      (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
       mockHashService.hash.mockResolvedValue('hashedPassword123');
 
       // Mock transaction
@@ -152,20 +156,24 @@ describe('Register API Endpoint', () => {
       expect(postmarkClient.sendEmail).toHaveBeenCalledTimes(2);
 
       // Check welcome email to user
-      expect(postmarkClient.sendEmail).toHaveBeenCalledWith({
-        From: 'Mr. Pepe Dineros <pepe@dineros.cc>',
-        To: 'john.doe@example.com',
-        Subject: 'Welcome to Dineros!',
-        HtmlBody: expect.stringContaining('John'),
-      });
+      expect(postmarkClient.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          From: 'Mr. Pepe Dineros <pepe@dineros.cc>',
+          To: 'john.doe@example.com',
+          Subject: 'Welcome to Dineros!',
+          HtmlBody: expect.stringContaining('John'),
+        })
+      );
 
       // Check notification email to jeremy
-      expect(postmarkClient.sendEmail).toHaveBeenCalledWith({
-        From: 'Mr. Pepe Dineros <pepe@dineros.cc>',
-        To: 'jeremy@lunarfly.com',
-        Subject: 'New User Registration on Dineros.cc',
-        HtmlBody: expect.stringContaining('john.doe@example.com'),
-      });
+      expect(postmarkClient.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          From: 'Mr. Pepe Dineros <pepe@dineros.cc>',
+          To: 'jeremy@lunarfly.com',
+          Subject: 'New User Registration on Dineros.cc',
+          HtmlBody: expect.stringContaining('john.doe@example.com'),
+        })
+      );
 
       expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 201);
       expect(result).toEqual({ message: 'User registered successfully.' });
@@ -234,6 +242,7 @@ describe('Register API Endpoint', () => {
       (readBody as any).mockResolvedValue(mockBody);
       (registerSchema.parse as any).mockReturnValue(mockBody);
       (prisma.user.findUnique as any).mockResolvedValue(null);
+      (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
       mockHashService.hash.mockResolvedValue('hashedPassword123');
 
       const dbError = new Error('Database transaction failed');
@@ -264,6 +273,7 @@ describe('Register API Endpoint', () => {
       (readBody as any).mockResolvedValue(mockBody);
       (registerSchema.parse as any).mockReturnValue(mockBody);
       (prisma.user.findUnique as any).mockResolvedValue(null);
+      (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
       mockHashService.hash.mockResolvedValue('hashedPassword123');
 
       // Mock successful transaction

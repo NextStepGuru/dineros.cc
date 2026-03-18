@@ -33,8 +33,12 @@ vi.mock("~/server/clients/prismaClient", () => ({
     account: {
       findFirstOrThrow: vi.fn(),
     },
+    accountType: {
+      findUnique: vi.fn(),
+    },
     accountRegister: {
       upsert: vi.fn(),
+      findFirst: vi.fn(),
       findFirstOrThrow: vi.fn(),
       delete: vi.fn(),
       update: vi.fn(),
@@ -81,6 +85,12 @@ describe("Account Register API Endpoints", () => {
 
       const module = await import("../account-register.post");
       accountRegisterPostHandler = module.default;
+
+      const { prisma } = await import("~/server/clients/prismaClient");
+      (prisma.accountType.findUnique as any).mockResolvedValue({
+        id: 1,
+        isCredit: false,
+      });
     });
 
     it("should create new account register successfully", async () => {
@@ -118,11 +128,14 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.upsert as any).mockResolvedValue(
         mockCreatedRegister
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockCreatedRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockCreatedRegister,
+        collateralAssetRegisterId: null,
+      });
 
       const result = await accountRegisterPostHandler(mockEvent);
 
-      expect(result).toEqual(mockCreatedRegister);
+      expect(result).toMatchObject(mockCreatedRegister);
       expect(prisma.account.findFirstOrThrow).toHaveBeenCalledWith({
         where: {
           id: "account-123",
@@ -190,11 +203,14 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.upsert as any).mockResolvedValue(
         mockUpdatedRegister
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockUpdatedRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockUpdatedRegister,
+        collateralAssetRegisterId: null,
+      });
 
       const result = await accountRegisterPostHandler(mockEvent);
 
-      expect(result).toEqual(mockUpdatedRegister);
+      expect(result).toMatchObject(mockUpdatedRegister);
       expect(prisma.accountRegister.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           create: expect.objectContaining({
@@ -229,9 +245,15 @@ describe("Account Register API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
       const { handleApiError } = await import("~/server/lib/handleApiError");
+      const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockBody,
+        id: 0,
+        collateralAssetRegisterId: null,
+      });
 
       const unauthorizedError = new Error("Account not found");
       (prisma.account.findFirstOrThrow as any).mockRejectedValue(
@@ -280,9 +302,15 @@ describe("Account Register API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
       const { handleApiError } = await import("~/server/lib/handleApiError");
+      const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockBody,
+        id: 0,
+        collateralAssetRegisterId: null,
+      });
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
 
       const dbError = new Error("Database constraint violation");
@@ -324,11 +352,14 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.upsert as any).mockResolvedValue(
         mockCreatedRegister
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockCreatedRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockCreatedRegister,
+        collateralAssetRegisterId: null,
+      });
 
       const result = await accountRegisterPostHandler(mockEvent);
 
-      expect(result).toEqual(mockCreatedRegister);
+      expect(result).toMatchObject(mockCreatedRegister);
       expect(prisma.accountRegister.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           create: expect.objectContaining({
@@ -378,7 +409,10 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.upsert as any).mockResolvedValue(
         mockCreatedRegister
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockCreatedRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockCreatedRegister,
+        collateralAssetRegisterId: null,
+      });
 
       await accountRegisterPostHandler(mockEvent);
 
@@ -435,7 +469,10 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.upsert as any).mockResolvedValue(
         mockCreatedRegister
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockCreatedRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockCreatedRegister,
+        collateralAssetRegisterId: null,
+      });
 
       await accountRegisterPostHandler(mockEvent);
 

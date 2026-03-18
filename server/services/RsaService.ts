@@ -5,7 +5,7 @@ import { createId } from "@paralleldrive/cuid2";
 
 class RsaService {
   async getKey({ kid }: { kid: string }) {
-    const rsa = await prisma.rsa.findFirstOrThrow({
+    const rsa = await prisma.rsa.findFirst({
       where: { id: kid, isArchived: false },
     });
 

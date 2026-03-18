@@ -72,25 +72,23 @@ describe("RsaService", () => {
         isArchived: false,
       };
 
-      mockRsaDb.findFirstOrThrow.mockResolvedValue(mockRsa);
+      mockRsaDb.findFirst.mockResolvedValue(mockRsa);
 
       const result = await rsaService.getKey({ kid: "test-key-id" });
 
       expect(result).toEqual(mockRsa);
-      expect(mockRsaDb.findFirstOrThrow).toHaveBeenCalledWith({
+      expect(mockRsaDb.findFirst).toHaveBeenCalledWith({
         where: { id: "test-key-id", isArchived: false },
       });
     });
 
-    it("should throw error when key not found", async () => {
-      const notFoundError = new Error("RSA key not found");
-      mockRsaDb.findFirstOrThrow.mockRejectedValue(notFoundError);
+    it("should return null when key not found", async () => {
+      mockRsaDb.findFirst.mockResolvedValue(null);
 
-      await expect(
-        rsaService.getKey({ kid: "non-existent-key" })
-      ).rejects.toThrow(notFoundError);
+      const result = await rsaService.getKey({ kid: "non-existent-key" });
 
-      expect(mockRsaDb.findFirstOrThrow).toHaveBeenCalledWith({
+      expect(result).toBeNull();
+      expect(mockRsaDb.findFirst).toHaveBeenCalledWith({
         where: { id: "non-existent-key", isArchived: false },
       });
     });
