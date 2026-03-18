@@ -58,6 +58,9 @@ function normalizeAccountRegisterState(
     targetAccountRegisterId: toNullableNumber(
       accountRegister.targetAccountRegisterId
     ),
+    collateralAssetRegisterId: toNullableNumber(
+      accountRegister.collateralAssetRegisterId
+    ),
     loanPaymentsPerYear: toNullableNumber(accountRegister.loanPaymentsPerYear),
     loanTotalYears: toNullableNumber(accountRegister.loanTotalYears),
     loanOriginalAmount: toNullableNumber(accountRegister.loanOriginalAmount),
@@ -137,6 +140,44 @@ const statementAtString = computed({
 
 watch(props, () => {
   formState.value = normalizeAccountRegisterState(props.accountRegister);
+});
+
+watch(
+  () => formState.value.typeId,
+  () => {
+    if (!isSelectedAccountTypeCredit.value) {
+      formState.value.collateralAssetRegisterId = null;
+    }
+  }
+);
+
+const collateralAssetSelectItems = computed(() => {
+  const taken = new Set(
+    listStore.getAccountRegisters
+      .filter(
+        (r) =>
+          r.collateralAssetRegisterId != null && r.id !== formState.value.id
+      )
+      .map((r) => r.collateralAssetRegisterId as number)
+  );
+  const items: { id: number | null; name: string }[] = [
+    { id: null, name: "None" },
+  ];
+  for (const r of listStore.getAccountRegisters) {
+    if (r.id === formState.value.id) continue;
+    if (r.accountId !== formState.value.accountId) continue;
+    if (r.subAccountRegisterId) continue;
+    const t = listStore.getAccountTypes.find((x) => x.id === r.typeId);
+    if (t?.isCredit) continue;
+    if (
+      taken.has(r.id) &&
+      formState.value.collateralAssetRegisterId !== r.id
+    ) {
+      continue;
+    }
+    items.push({ id: r.id, name: r.name });
+  }
+  return items;
 });
 
 async function handleSubmit({
@@ -298,6 +339,20 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
           :format-options="formatCurrencyOptions"
           :step="0.01"
           class="w-full")
+
+      UFormField(
+        label="Linked asset (collateral)"
+        name="collateralAssetRegisterId"
+        v-if="isSelectedAccountTypeCredit"
+        hint="Optional. Pair this loan with an asset (e.g. home) for net equity on Accounts."
+      )
+        USelect(
+          v-model="formState.collateralAssetRegisterId"
+          class="w-full"
+          placeholder="None"
+          :items="collateralAssetSelectItems"
+          valueKey="id"
+          labelKey="name")
 
       UFormField(label="Statement Date" name="statementAt" v-if="isSelectedAccountTypeWithInterest")
         UInput(

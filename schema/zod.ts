@@ -263,6 +263,7 @@ export const accountRegisterSchema = z.object({
   apr3: z.coerce.number().nullable().default(null),
   apr3StartAt: z.coerce.date().nullable().default(null),
   targetAccountRegisterId: z.coerce.number().nullable().default(null),
+  collateralAssetRegisterId: z.coerce.number().nullable().default(null),
   loanStartAt: z.coerce.date().nullable().default(null),
   loanPaymentsPerYear: z.coerce.number().nullable().default(null),
   loanTotalYears: z.coerce.number().nullable().default(null),

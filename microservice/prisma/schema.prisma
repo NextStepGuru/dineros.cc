@@ -136,6 +136,7 @@ model AccountRegister {
   apr3                    Decimal?  @db.Decimal(7, 5)
   apr3StartAt             DateTime? @map("apr3_start_at")
   targetAccountRegisterId Int?      @map("target_account_register_id")
+  collateralAssetRegisterId Int?    @map("collateral_asset_register_id") @db.UnsignedInt
   loanStartAt             DateTime? @map("loan_start_at")
   loanPaymentsPerYear     Int?      @map("loan_payments_per_year")
   loanTotalYears          Int?      @map("loan_total_years")
@@ -161,12 +162,15 @@ model AccountRegister {
   account  Account          @relation(fields: [accountId], references: [id])
   interval Interval         @relation(fields: [statementIntervalId], references: [id])
   parent   AccountRegister? @relation("ar_children", fields: [subAccountRegisterId], references: [id])
+  collateralAsset AccountRegister? @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
+  loansSecuredByAsset AccountRegister[] @relation("RegisterCollateral")
 
   entries       RegisterEntry[]
   reoccurrences Reoccurrence[]
   splitTargets  ReoccurrenceSplit[]
   children      AccountRegister[] @relation("ar_children")
 
+  @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
   @@map("account_register")
 }

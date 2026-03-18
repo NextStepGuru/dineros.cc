@@ -611,6 +611,7 @@ function handleAddAccountRegister() {
       apr3: null,
       apr3StartAt: null,
       targetAccountRegisterId: null,
+      collateralAssetRegisterId: null,
       loanStartAt: null,
       loanPaymentsPerYear: null,
       loanTotalYears: null,
@@ -638,6 +639,65 @@ function formatCurrency(balance: number): string {
     style: "currency",
     currency: "USD",
   }).format(balance);
+}
+
+function isCreditRegister(reg: AccountRegister): boolean {
+  return (
+    listStore.getAccountTypes.find((t) => t.id === reg.typeId)?.isCredit ===
+    true
+  );
+}
+
+/** Debit / credit / net for accounts table (linked loan+asset or standalone). */
+function registerDebitCreditNet(
+  row: AccountRegister,
+  isSubRow: boolean
+): { debit: number | null; credit: number | null; net: number | null } {
+  if (isSubRow) {
+    return { debit: null, credit: null, net: null };
+  }
+  const registers = listStore.getAccountRegisters;
+  const linkedLoan = registers.find(
+    (r) =>
+      !r.subAccountRegisterId &&
+      r.collateralAssetRegisterId === row.id &&
+      r.id !== row.id
+  );
+  if (linkedLoan && !isCreditRegister(row)) {
+    const assetBal = +row.balance;
+    const loanBal = +linkedLoan.balance;
+    return {
+      debit: assetBal,
+      credit: Math.abs(loanBal),
+      net: assetBal - loanBal,
+    };
+  }
+  const collateralId = row.collateralAssetRegisterId;
+  if (collateralId && isCreditRegister(row) && !row.subAccountRegisterId) {
+    const asset = registers.find((r) => r.id === collateralId);
+    if (asset) {
+      const assetBal = +asset.balance;
+      const loanBal = +row.balance;
+      return {
+        debit: assetBal,
+        credit: Math.abs(loanBal),
+        net: assetBal - loanBal,
+      };
+    }
+  }
+  if (isCreditRegister(row)) {
+    const b = +row.balance;
+    return {
+      debit: null,
+      credit: Math.abs(b),
+      net: -Math.abs(b),
+    };
+  }
+  return {
+    debit: +row.balance,
+    credit: null,
+    net: +row.balance,
+  };
 }
 
 // Drag and drop functionality
@@ -858,6 +918,10 @@ const filteredAccountRegisters = computed(() => {
   return sortAccounts(filtered);
 });
 
+function mainRowDcn(row: AccountRegister) {
+  return registerDebitCreditNet(row, false);
+}
+
 // Only main accounts for draggable (no sub-accounts)
 const draggableAccountRegisters = ref<AccountRegister[]>([]);
 
@@ -999,11 +1063,14 @@ onBeforeUnmount(() => {
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold w-1/5") Balance
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Net
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
           tr(v-if="isDragging" class="h-2 bg-primary/20 border-2 border-dashed border-primary/60 transition-all duration-200")
-            td(colspan="4" class="p-0")
+            td(colspan="7" class="p-0")
               div(class="h-2 bg-linear-to-r from-(--frog-primary) to-(--frog-accent) animate-pulse")
 
           // Main accounts with their sub-accounts grouped together
@@ -1039,6 +1106,16 @@ onBeforeUnmount(() => {
                   div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                 div(:class="formatCurrencyClass(row.balance)") {{ formatCurrency(row.balance) }}
+              template(v-for="dcn in [mainRowDcn(row)]" :key="`dcn-${row.id}`")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
+                  span(v-if="dcn.debit != null" :class="formatCurrencyClass(dcn.debit)") {{ formatCurrency(dcn.debit) }}
+                  span(v-else class="frog-text-muted") —
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
+                  span(v-if="dcn.credit != null") {{ formatCurrency(dcn.credit) }}
+                  span(v-else class="frog-text-muted") —
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
+                  span(v-if="dcn.net != null" :class="formatCurrencyClass(dcn.net)") {{ formatCurrency(dcn.net) }}
+                  span(v-else class="frog-text-muted") —
 
             // Sub-accounts for this main account (draggable pocket accounts)
             template(v-if="!row.subAccountRegisterId && !collapsedParents.has(row.id)")
@@ -1071,4 +1148,10 @@ onBeforeUnmount(() => {
                     span {{ subRow.name }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                   div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
+                  span(class="frog-text-muted") —
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
+                  span(class="frog-text-muted") —
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
+                  span(class="frog-text-muted") —
 </template>
