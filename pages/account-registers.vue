@@ -654,7 +654,11 @@ function registerDebitCreditNet(
   isSubRow: boolean
 ): { debit: number | null; credit: number | null; net: number | null } {
   if (isSubRow) {
-    return { debit: null, credit: null, net: null };
+    const b = +row.balance;
+    if (b < 0) {
+      return { debit: Math.abs(b), credit: null, net: b };
+    }
+    return { debit: null, credit: b, net: b };
   }
   const registers = listStore.getAccountRegisters;
   const linkedLoan = registers.find(
@@ -665,11 +669,11 @@ function registerDebitCreditNet(
   );
   if (linkedLoan && !isCreditRegister(row)) {
     const assetBal = +row.balance;
-    const loanBal = +linkedLoan.balance;
+    const loanBalAbs = Math.abs(+linkedLoan.balance);
     return {
-      debit: assetBal,
-      credit: Math.abs(loanBal),
-      net: assetBal - loanBal,
+      debit: loanBalAbs,
+      credit: assetBal,
+      net: assetBal - loanBalAbs,
     };
   }
   const collateralId = row.collateralAssetRegisterId;
@@ -677,25 +681,25 @@ function registerDebitCreditNet(
     const asset = registers.find((r) => r.id === collateralId);
     if (asset) {
       const assetBal = +asset.balance;
-      const loanBal = +row.balance;
+      const loanBalAbs = Math.abs(+row.balance);
       return {
-        debit: assetBal,
-        credit: Math.abs(loanBal),
-        net: assetBal - loanBal,
+        debit: loanBalAbs,
+        credit: assetBal,
+        net: assetBal - loanBalAbs,
       };
     }
   }
   if (isCreditRegister(row)) {
     const b = +row.balance;
     return {
-      debit: null,
-      credit: Math.abs(b),
+      debit: Math.abs(b),
+      credit: null,
       net: -Math.abs(b),
     };
   }
   return {
-    debit: +row.balance,
-    credit: null,
+    debit: null,
+    credit: +row.balance,
     net: +row.balance,
   };
 }
@@ -733,11 +737,26 @@ const collapsedParents = ref<Set<number>>(new Set());
 // Sort mode state
 const activeSortMode = ref<"visual" | "loan" | "savings">("visual");
 
+const showCrossAccountSnapshot = ref(false);
+
 // Tab items for sort mode selection
 const tabItems = computed(() => [
   { key: "visual", label: "Visual Order", icon: "i-lucide-layout-grid" },
   { key: "loan", label: "Loan Payment", icon: "i-lucide-credit-card" },
   { key: "savings", label: "Savings Goal", icon: "i-lucide-target" },
+]);
+
+// Dropdown menu items for Sort button (options hidden until Sort is clicked)
+const sortMenuItems = computed(() => [
+  [
+    ...tabItems.value.map((item) => ({
+      label: item.label,
+      icon: item.icon,
+      onSelect: () => {
+        activeSortMode.value = item.key;
+      },
+    })),
+  ],
 ]);
 
 // Initialize all parents with pocket accounts as collapsed
@@ -922,6 +941,17 @@ function mainRowDcn(row: AccountRegister) {
   return registerDebitCreditNet(row, false);
 }
 
+function subRowDcn(subRow: AccountRegister) {
+  return registerDebitCreditNet(subRow, true);
+}
+
+/** True when at least one account has a linked asset (loan+asset pair exists). */
+const showDebitCreditColumns = computed(() =>
+  listStore.getAccountRegisters.some(
+    (r) => r.collateralAssetRegisterId != null && r.collateralAssetRegisterId > 0
+  )
+);
+
 // Only main accounts for draggable (no sub-accounts)
 const draggableAccountRegisters = ref<AccountRegister[]>([]);
 
@@ -944,18 +974,27 @@ const estimatedNetWorth = computed(() => {
   }, 0);
 });
 
-/** Main registers only: lowest balance + risk signal for cross-account snapshot */
+/** Main registers only: lowest computed balance + risk signal for cross-account snapshot */
 const accountLiquiditySnapshot = computed(() => {
   const mains = listStore.getAccountRegisters.filter(
     (r) => !r.subAccountRegisterId
   );
   if (mains.length === 0) return null;
-  let lowest = mains[0]!;
-  for (const r of mains) {
-    if (+r.balance < +lowest.balance) lowest = r;
+  const withNet = mains.map((r) => ({
+    register: r,
+    net: registerDebitCreditNet(r, false).net ?? 0,
+  }));
+  let lowest = withNet[0]!;
+  for (const item of withNet) {
+    if (item.net < lowest.net) lowest = item;
   }
-  const negativeCount = mains.filter((r) => +r.balance < 0).length;
-  return { lowest, negativeCount, mainCount: mains.length };
+  const negativeCount = withNet.filter((item) => item.net < 0).length;
+  return {
+    lowest: lowest.register,
+    lowestComputedBalance: lowest.net,
+    negativeCount,
+    mainCount: mains.length,
+  };
 });
 
 onMounted(async () => {
@@ -999,22 +1038,22 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="accountRegistersSectionEl" class="m-4")
-    // Sort mode tabs
-    div(class="mb-4")
-      div(class="flex space-x-1 frog-surface-elevated rounded-lg p-1")
-        button(
-          v-for="item in tabItems"
-          :key="item.key"
-          @click="activeSortMode = item.key"
-          :class="activeSortMode === item.key ? 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors frog-surface text-(--frog-text) shadow-sm' : 'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors frog-text-muted hover:text-(--frog-text)'"
-        )
-          UIcon(:name="item.icon" class="w-4 h-4")
-          span {{ item.label }}
-
-    div(class="w-full flex")
-      UButton(color="info" size="sm" class="mr-4" @click="handleAddAccountRegister") Add
-      UButton(variant="soft" size="sm" class="mr-4" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
+    div(class="w-full flex flex-wrap items-center gap-2 mb-4")
+      UButton(color="info" size="sm" @click="handleAddAccountRegister") Add
+      UDropdownMenu(:items="sortMenuItems")
+        UButton(variant="soft" size="sm") Sort
+      UButton(variant="soft" size="sm" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
       UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search" ref="search")
+      .ml-auto(
+        class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
+        role="button"
+        tabindex="0"
+        @click="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+        @keydown.enter.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+        @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+      )
+        span Your estimated net worth
+        b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
 
     UCard(v-if="showShortcuts" class="my-4")
       template(#header)
@@ -1034,19 +1073,16 @@ onBeforeUnmount(() => {
         li Add recurring entries for upcoming cash flow
       UButton(color="primary" size="sm" @click="handleAddAccountRegister") Add first account
 
-    .w-full(class="text-muted text-right")
-      span Your estimated net worth
-      b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
-    UCard(v-if="accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
+    UCard(v-if="showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
       template(#header)
         h3(class="font-semibold") Cross-account snapshot
       p(class="text-sm frog-text-muted")
         | Lowest balance among main accounts:&nbsp;
         b(class="frog-text") {{ accountLiquiditySnapshot.lowest.name }}
         | &nbsp;at&nbsp;
-        b(:class="formatCurrencyClass(+accountLiquiditySnapshot.lowest.balance)") {{ formatCurrency(+accountLiquiditySnapshot.lowest.balance) }}
+        b(:class="formatCurrencyClass(accountLiquiditySnapshot.lowestComputedBalance)") {{ formatCurrency(accountLiquiditySnapshot.lowestComputedBalance) }}
       p(v-if="accountLiquiditySnapshot.negativeCount > 0" class="text-sm mt-2 text-amber-700 dark:text-amber-300")
-        | {{ accountLiquiditySnapshot.negativeCount }} of {{ accountLiquiditySnapshot.mainCount }} main accounts are below zero — review registers and recurring items.
+        | {{ accountLiquiditySnapshot.negativeCount }} of {{ accountLiquiditySnapshot.mainCount }} main accounts have negative computed balance — review registers and recurring items.
       p(v-else class="text-sm mt-2 frog-text-muted") All main accounts are at or above zero right now.
       div(class="mt-3")
         UButton(
@@ -1062,15 +1098,14 @@ onBeforeUnmount(() => {
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
             th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold w-1/5") Balance
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Net
+            th(v-if="showDebitCreditColumns" class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
+            th(v-if="showDebitCreditColumns" class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
+            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
           tr(v-if="isDragging" class="h-2 bg-primary/20 border-2 border-dashed border-primary/60 transition-all duration-200")
-            td(colspan="7" class="p-0")
+            td(:colspan="showDebitCreditColumns ? 6 : 4" class="p-0")
               div(class="h-2 bg-linear-to-r from-(--frog-primary) to-(--frog-accent) animate-pulse")
 
           // Main accounts with their sub-accounts grouped together
@@ -1104,17 +1139,15 @@ onBeforeUnmount(() => {
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
                   div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
-                div(:class="formatCurrencyClass(row.balance)") {{ formatCurrency(row.balance) }}
               template(v-for="dcn in [mainRowDcn(row)]" :key="`dcn-${row.id}`")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
-                  span(v-if="dcn.debit != null" :class="formatCurrencyClass(dcn.debit)") {{ formatCurrency(dcn.debit) }}
+                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+                  span(v-if="dcn.debit != null" class="dark:text-red-300 text-red-700") −${{ formatCurrency(dcn.debit).replace(/^\$/, '') }}
                   span(v-else class="frog-text-muted") —
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
-                  span(v-if="dcn.credit != null") {{ formatCurrency(dcn.credit) }}
+                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+                  span(v-if="dcn.credit != null" class="dark:text-green-300 text-green-700") +${{ formatCurrency(dcn.credit).replace(/^\$/, '') }}
                   span(v-else class="frog-text-muted") —
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap text-right")
-                  span(v-if="dcn.net != null" :class="formatCurrencyClass(dcn.net)") {{ formatCurrency(dcn.net) }}
+                td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
+                  span(v-if="dcn.net != null" :class="dcn.net >= 0 ? 'dark:text-green-300 text-green-700' : 'dark:text-red-300 text-red-700'") {{ dcn.net >= 0 ? '+' : '−' }}${{ formatCurrency(Math.abs(dcn.net)).replace(/^\$/, '') }}
                   span(v-else class="frog-text-muted") —
 
             // Sub-accounts for this main account (draggable pocket accounts)
@@ -1146,12 +1179,14 @@ onBeforeUnmount(() => {
                     div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ subRow.name }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
-                  div(:class="formatCurrencyClass(subRow.balance)") {{ formatCurrency(subRow.balance) }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
-                  span(class="frog-text-muted") —
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
-                  span(class="frog-text-muted") —
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted text-right")
-                  span(class="frog-text-muted") —
+                template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")
+                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
+                    span(v-if="dcn.debit != null" class="dark:text-red-300 text-red-700") −${{ formatCurrency(dcn.debit).replace(/^\$/, '') }}
+                    span(v-else class="frog-text-muted") —
+                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
+                    span(v-if="dcn.credit != null" class="dark:text-green-300 text-green-700") +${{ formatCurrency(dcn.credit).replace(/^\$/, '') }}
+                    span(v-else class="frog-text-muted") —
+                  td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
+                    span(v-if="dcn.net != null" :class="dcn.net >= 0 ? 'dark:text-green-300 text-green-700' : 'dark:text-red-300 text-red-700'") {{ dcn.net >= 0 ? '+' : '−' }}${{ formatCurrency(Math.abs(dcn.net)).replace(/^\$/, '') }}
+                    span(v-else class="frog-text-muted") —
 </template>

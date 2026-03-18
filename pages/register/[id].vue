@@ -67,6 +67,30 @@ const showAccountSelector = computed(
   () => tableEntries.value.length > 0 || mainAccountCount.value > 1
 );
 
+// Account options for dropdown: label (name) + balanceFormatted for right-aligned balance in menu
+const accountRegisterOptionsWithBalance = computed(() => {
+  const formatted = formatAccountRegisters(listStore.getAccountRegisters);
+  return formatted.map((r) => {
+    const balanceRaw = Number(r.latestBalance ?? 0);
+    return {
+      ...r,
+      label: r.name,
+      balanceFormatted: formatCurrency(balanceRaw),
+      balanceRaw,
+    };
+  });
+});
+
+function balanceColorClass(balance: number) {
+  if (balance < 0) return "text-red-600 dark:text-red-400";
+  if (balance > 0) return "text-green-600 dark:text-green-400";
+  return "text-muted";
+}
+
+const selectedAccountOption = computed(() =>
+  accountRegisterOptionsWithBalance.value.find((r) => r.id === accountRegisterId.value)
+);
+
 const hasReoccurrences = computed(
   () => listStore.getReoccurrences.length > 0
 );
@@ -674,16 +698,28 @@ async function recalcAccount() {
       div(v-if="showAccountSelector" class="ml-auto flex justify-center items-center")
         div(class="text-sm font-medium frog-text-muted mt-2 mr-2 text-nowrap") Selected Account:
         ClientOnly
-          USelect(
+          USelectMenu(
             v-model="accountRegisterId"
+            value-key="id"
             size="xs"
             class="w-full md:w-64 my-0"
             placeholder="Select an Account"
-            :items="formatAccountRegisters(listStore.getAccountRegisters)"
-            valueKey="id"
-            labelKey="name")
+            :items="accountRegisterOptionsWithBalance"
+            :search-input="false")
+            template(#default)
+              span(class="truncate text-default")
+                template(v-if="selectedAccountOption")
+                  | {{ selectedAccountOption.label }}
+                  span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
+                span(v-else) …
+            template(#item-trailing="{ item }")
+              span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
           template(#fallback)
-            span(class="w-full md:w-64 my-0 text-sm text-default") {{ formatAccountRegisters(listStore.getAccountRegisters).find((r) => r.id === accountRegisterId)?.name ?? '…' }}
+            span(class="w-full md:w-64 my-0 text-sm text-default")
+              template(v-if="selectedAccountOption")
+                | {{ selectedAccountOption.label }}
+                span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
+              span(v-else) …
 
     .w-full(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
       span The lowest balance of&nbsp;
