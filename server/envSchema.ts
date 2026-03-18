@@ -8,6 +8,8 @@ const envSchema = z.object({
   PLAID_CLIENT_ID: z.string(),
   PLAID_SECRET: z.string(),
   POSTMARK_SERVER_TOKEN: z.string().optional().default(""),
+  /** BCC on signup welcome email (Postmark); comma-separated for multiple */
+  SIGNUP_WELCOME_BCC: z.string().optional().default("jeremy@nextstep.guru"),
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z
     .string()
