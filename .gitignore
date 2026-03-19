@@ -18,12 +18,15 @@ logs
 .fleet
 .idea
 
-# Local env files
+# Local env files (never commit real secrets)
 .env
+.env.*
 !.env.example
-
 !.env.project
 !.env.vault
+# Local test files that may contain paste of secrets
+test.txt
+
 *.csv
 /temp
 /prisma/backup

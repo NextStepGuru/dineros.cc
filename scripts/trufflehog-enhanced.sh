@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # Enhanced TruffleHog Security Scanner
-# Outputs file locations and detected secrets
+# Outputs file locations and detected secrets. Exits non-zero when any secret is found.
 
 set -e
+set -o pipefail
 
 # Find trufflehog command (check PATH first, then macOS-specific location)
 if command -v trufflehog &> /dev/null; then
@@ -17,8 +18,30 @@ else
   exit 1
 fi
 
-# Run scan and extract file locations with secrets
-$TRUFFLEHOG_CMD filesystem . -x .trufflehog_excludes.txt --no-update --no-verification 2>/dev/null | \
+# Use custom detectors (Plaid, env secrets) when present; run from repo root
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TRUFFLEHOG_CONFIG=""
+if [ -f "$REPO_ROOT/.trufflehog-detectors.yaml" ]; then
+  TRUFFLEHOG_CONFIG="--config=$REPO_ROOT/.trufflehog-detectors.yaml"
+fi
+
+# Catch more: no entropy filter, deeper decode. Set TRUFFLEHOG_STRICT=1 to use defaults (entropy filter, depth 5).
+if [[ "${TRUFFLEHOG_STRICT:-0}" = "1" ]]; then
+  ENTROPY_FLAG=""
+  DEPTH_FLAG=""
+else
+  ENTROPY_FLAG="--filter-entropy=0"
+  DEPTH_FLAG="--max-decode-depth=7"
+fi
+[[ -n "${TRUFFLEHOG_FILTER_ENTROPY:-}" ]] && ENTROPY_FLAG="--filter-entropy=$TRUFFLEHOG_FILTER_ENTROPY"
+[[ -n "${TRUFFLEHOG_DECODE_DEPTH:-}" ]] && DEPTH_FLAG="--max-decode-depth=$TRUFFLEHOG_DECODE_DEPTH"
+
+# Run scan. --fail exits 183 when any result found. --fail-on-scan-errors exits non-zero on scan errors.
+# shellcheck disable=SC2086
+$TRUFFLEHOG_CMD filesystem "$REPO_ROOT" -x "$REPO_ROOT/.trufflehog_excludes.txt" \
+  --no-update --no-verification --fail --fail-on-scan-errors \
+  --results=verified,unverified,unknown \
+  $ENTROPY_FLAG $DEPTH_FLAG $TRUFFLEHOG_CONFIG 2>&1 | \
 awk '
 /^File:/ {
     if (current_file != "") {

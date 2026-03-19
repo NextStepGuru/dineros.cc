@@ -1,0 +1,101 @@
+# Custom detectors for Plaid, DB keys, env-style secrets, and stack-specific leaks.
+# See: https://docs.trufflesecurity.com/custom-detectors
+#
+# Optional: entropy, exclude_words, exclude_regexes_match (see docs).
+detectors:
+  - name: DB encryption/decryption keys
+    description: prisma-field-encryption k1.aesgcm256 keys
+    keywords:
+      - DB_DECRYPTION_KEY
+      - DB_ENCRYPTION_KEY
+    regex:
+      value: '(?:DB_)?(?:DECRYPTION|ENCRYPTION)_KEY(?:_\d+)?\s*=\s*(k1\.aesgcm256\.[A-Za-z0-9+/=]+)'
+  - name: Plaid API credentials
+    description: Plaid API client ID and secret in env form
+    keywords:
+      - PLAID_SECRET
+      - PLAID_CLIENT_ID
+    regex:
+      value: 'PLAID_(?:SECRET|CLIENT_ID)\s*=\s*["\x27]([a-zA-Z0-9]{20,})["\x27]'
+  - name: Generic env secret (high-value variable names)
+    description: SECRET, API_KEY, PRIVATE_KEY, PASSWORD, _TOKEN style vars
+    keywords:
+      - _SECRET=
+      - _API_KEY=
+      - _PRIVATE_KEY=
+      - PASSWORD=
+      - _TOKEN=
+    regex:
+      value: '(?i)(?:SECRET|API_KEY|PRIVATE_KEY|PASSWORD|_TOKEN)\s*=\s*["\x27]?([a-zA-Z0-9_\-]{20,})["\x27]?'
+    exclude_words:
+      - "your-"
+      - "example"
+      - "placeholder"
+      - "changeme"
+      - "xxx"
+  - name: JWT and session secrets
+    description: JWT_SECRET, NUXT_SECRET, session secret style
+    keywords:
+      - JWT_SECRET
+      - NUXT_SECRET
+      - SESSION_SECRET
+      - SECRET_KEY_BASE
+    regex:
+      value: '(?i)(?:JWT|NUXT|SESSION)_SECRET|SECRET_KEY_BASE\s*=\s*["\x27]?([a-zA-Z0-9_\-+/=]{32,})["\x27]?'
+    exclude_words:
+      - "your-"
+      - "example"
+      - "replace-me"
+      - "generate-with"
+  - name: Postmark tokens
+    description: Postmark server token and webhook secret
+    keywords:
+      - POSTMARK_SERVER_TOKEN
+      - POSTMARK_WEBHOOK_SECRET
+    regex:
+      value: 'POSTMARK_(?:SERVER_TOKEN|WEBHOOK_SECRET)\s*=\s*["\x27]?([a-zA-Z0-9\-]{20,})["\x27]?'
+    exclude_words:
+      - "your-"
+  - name: Twilio credentials (env form)
+    description: Twilio auth token and account SID in env
+    keywords:
+      - TWILIO_AUTH_TOKEN
+      - TWILIO_ACCOUNT_SID
+    regex:
+      value: 'TWILIO_(?:AUTH_TOKEN|ACCOUNT_SID)\s*=\s*["\x27]?([a-zA-Z0-9]{20,})["\x27]?'
+    exclude_words:
+      - "your-"
+  - name: Redis and MySQL passwords (env)
+    description: REDIS_PASSWORD, MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD
+    keywords:
+      - REDIS_PASSWORD
+      - MYSQL_ROOT_PASSWORD
+      - MYSQL_PASSWORD
+    regex:
+      value: '(?:REDIS|MYSQL(?:_ROOT)?)_PASSWORD\s*=\s*["\x27]?([^\s"\x27]{8,})["\x27]?'
+    exclude_words:
+      - "your-"
+  - name: Database URL with embedded password
+    description: DATABASE_URL / MYSQL_URL with password in URL (captures the password segment)
+    keywords:
+      - DATABASE_URL=
+      - MYSQL_URL=
+    regex:
+      value: '(?:DATABASE|MYSQL)_URL\s*=\s*["\x27]?(?:mysql|postgres|postgresql)://[^:]+:([^\s@"\x27/]{8,})@'
+  - name: Nuxt UI Pro license
+    description: NUXT_UI_PRO_LICENSE key
+    keywords:
+      - NUXT_UI_PRO_LICENSE
+    regex:
+      value: 'NUXT_UI_PRO_LICENSE\s*=\s*["\x27]?([a-zA-Z0-9_\-]{24,})["\x27]?'
+    exclude_words:
+      - "your-"
+  - name: Cloak key (47ng)
+    description: CLOAK_KEY for @47ng/cloak
+    keywords:
+      - CLOAK_KEY
+    regex:
+      value: 'CLOAK_KEY\s*=\s*["\x27]?([a-zA-Z0-9+/=]{32,})["\x27]?'
+    exclude_words:
+      - "your-"
+      - "example"
