@@ -104,14 +104,15 @@ UModal(title="Match to existing recurrence" class="modal-mobile-fullscreen max-w
         v-if="filteredRecurrences.length"
         role="listbox"
         aria-label="Recurrences")
-        button.block.w-full.text-left.px-3.py-2.5.transition-colors(
+        button(
           v-for="r in filteredRecurrences"
           :key="r.id"
           type="button"
+          class="block w-full text-left px-3 py-2.5 transition-colors"
           :class="rowClasses(r)"
           @click="selectedId = r.id")
           .font-medium.text-sm {{ r.description }}
-          .text-xs.frog-text-muted.mt-0.5 {{ currencyFmt.format(Number(r.amount)) }}
+          .text-xs.frog-text-muted(class="mt-0.5") {{ currencyFmt.format(Number(r.amount)) }}
 
       p.text-sm.frog-text-muted.py-4.text-center(v-else-if="recurrencesForRegister.length === 0")
         | No recurrences exist for this register. Create one from the Reoccurrences page or use the repeat button on the register row.
