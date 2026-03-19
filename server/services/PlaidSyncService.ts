@@ -106,7 +106,7 @@ class PlaidSyncService {
           await this.transactionMatcher.updateExistingTransaction(
             matchResult.existingEntry,
             transaction,
-            matchResult.matchType as "exact" | "fuzzy",
+            matchResult.matchType as "exact" | "fuzzy" | "reoccurrence",
           );
           matchedCount++;
 
@@ -411,7 +411,7 @@ class PlaidSyncService {
             await this.transactionMatcher.updateExistingTransaction(
               matchResult.existingEntry,
               tx,
-              matchResult.matchType as "exact" | "fuzzy",
+              matchResult.matchType as "exact" | "fuzzy" | "reoccurrence",
             );
           } else {
             const transactionData = this.formatTransactionData(tx, ar, ar.type);

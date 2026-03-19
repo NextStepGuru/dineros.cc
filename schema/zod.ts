@@ -374,6 +374,12 @@ export const registerEntrySchema = z.object({
   createdAt: z.coerce.date().default(new Date()),
 });
 
+export const registerEntryMatchReoccurrenceSchema = z.object({
+  registerEntryId: z.string().min(1),
+  accountRegisterId: z.coerce.number().min(1),
+  reoccurrenceId: z.coerce.number().min(1),
+});
+
 export const passwordAndCodeSchema = z
   .object({
     resetCode: z.string(),

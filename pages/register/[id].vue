@@ -1,12 +1,24 @@
 <script setup lang="ts">
+import { h, resolveComponent } from "vue";
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
 import type { TableColumn } from "@nuxt/ui";
-import type { RegisterEntry } from "~/types/types";
+import type { RegisterEntry, Reoccurrence } from "~/types/types";
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
+import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
+import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
   () => import("~/components/modals/EditRegisterEntry.vue"),
 );
+const ModalsEditReoccurrence = defineAsyncComponent(
+  () => import("~/components/modals/EditReoccurrence.vue"),
+);
+const ModalsMatchRegisterEntryReoccurrence = defineAsyncComponent(
+  () => import("~/components/modals/MatchRegisterEntryReoccurrence.vue"),
+);
+
+const UButton = resolveComponent("UButton");
+const UTooltip = resolveComponent("UTooltip");
 
 const overlay = useOverlay();
 const route = useRoute();
@@ -22,6 +34,7 @@ definePageMeta({
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const { $api } = useNuxtApp();
 
 const REGISTER_ONBOARDING_DISMISS_KEY = "dineros_register_onboarding_dismissed";
 const REGISTER_RECALC_ONCE_KEY = "dineros_register_recalc_once";
@@ -306,6 +319,116 @@ const refreshAccountEntries = async () => {
   }
 };
 
+const reoccurrenceModal = overlay.create(ModalsEditReoccurrence);
+const matchToRecurrenceModal = overlay.create(ModalsMatchRegisterEntryReoccurrence);
+
+function ensureReoccurrenceDescription(text: string): string {
+  const t = text.trim();
+  if (t.length >= 3) return t;
+  if (t.length > 0) return `${t} ··`;
+  return "Bank transaction";
+}
+
+function openReoccurrenceFromPlaidEntry(entry: RegisterEntry) {
+  if (!entry.id) {
+    toast.add({
+      color: "error",
+      description: "This row cannot be linked yet.",
+    });
+    return;
+  }
+  const reg = listStore.getAccountRegisters.find(
+    (r) => r.id === entry.accountRegisterId,
+  );
+  const accountId = reg?.accountId;
+  if (!accountId) {
+    toast.add({
+      color: "error",
+      description: "Account not found for this register.",
+    });
+    return;
+  }
+  const monthInterval = listStore.getIntervals.find((i) =>
+    /month/i.test(i.name),
+  );
+  const defaultIntervalId = monthInterval?.id ?? 0;
+  if (!defaultIntervalId) {
+    toast.add({
+      color: "error",
+      description: "No billing interval available.",
+    });
+    return;
+  }
+
+  const lastAt = formatDate(entry.createdAt) || todayISOString.value;
+
+  const propsPayload: ModalReoccurrenceProps = {
+    title: "New recurrence from import",
+    description: "Adjust the schedule if needed, then save to link this row.",
+    cancel: () => reoccurrenceModal.close(),
+    reoccurrence: {
+      id: 0,
+      accountId,
+      accountRegisterId: entry.accountRegisterId,
+      description: ensureReoccurrenceDescription(entry.description ?? ""),
+      amount: Number(entry.amount),
+      intervalId: defaultIntervalId,
+      lastAt,
+      endAt: undefined,
+      intervalCount: 1,
+      adjustBeforeIfOnWeekend: false,
+      categoryId: entry.categoryId ?? null,
+      splits: [],
+    },
+    callback: async (created: Reoccurrence) => {
+      listStore.patchReoccurrence(created);
+      listStore.fetchLists();
+      try {
+        await ($api as typeof $fetch)("/api/register-entry", {
+          method: "patch",
+          body: {
+            registerEntryId: entry.id,
+            accountRegisterId: entry.accountRegisterId,
+            reoccurrenceId: created.id,
+          },
+        });
+        toast.add({
+          color: "success",
+          description: "Recurrence created and linked to this transaction.",
+        });
+        await refreshAccountEntries();
+      } catch {
+        toast.add({
+          color: "error",
+          description:
+            "Recurrence was saved but linking this row failed. Set recurrence from Edit entry.",
+        });
+      }
+      reoccurrenceModal.close();
+    },
+  };
+  reoccurrenceModal.open(propsPayload);
+}
+
+function openMatchToRecurrence(entry: RegisterEntry) {
+  if (!entry.id) {
+    toast.add({
+      color: "error",
+      description: "This row cannot be linked yet.",
+    });
+    return;
+  }
+  const payload: MatchRegisterEntryReoccurrenceProps = {
+    registerEntry: entry,
+    cancel: () => matchToRecurrenceModal.close(),
+    callback: async () => {
+      await refreshAccountEntries();
+      matchToRecurrenceModal.close();
+    },
+  };
+  matchToRecurrenceModal.open(payload);
+}
+
 // Computed status for compatibility
 const accountEntriesStatus = computed(() => {
   if (isQuickLoading.value) return "pending";
@@ -375,7 +498,64 @@ const stripedTheme = ref({
   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
 });
 
+/** Plaid-linked rows until cleared, reconciled, or matched to a recurrence (recurring-only rows have no plaidId). */
+function isPlaidImportAwaitingReview(entry: RegisterEntry): boolean {
+  if (!entry.plaidId) return false;
+  if (entry.isBalanceEntry) return false;
+  if (entry.reoccurrenceId != null) return false;
+  if (entry.isCleared || entry.isReconciled) return false;
+  return true;
+}
+
 const columns: TableColumn<RegisterEntry>[] = [
+  {
+    id: "importReview",
+    accessorFn: (row) => row.id ?? "",
+    header: () =>
+      h(
+        "div",
+        {
+          class: "w-7 text-center text-muted",
+          title:
+            "Amber dot: bank import not reviewed yet — clear, reconcile, or match to a recurrence.",
+        },
+        "",
+      ),
+    cell: ({ row }) => {
+      const show = isPlaidImportAwaitingReview(row.original);
+      const dotLabel =
+        "Bank import not reviewed yet. Clear, reconcile, or match to a recurrence using the row actions.";
+      return h("div", { class: "flex justify-center w-7" }, [
+        show
+          ? h(
+              UTooltip,
+              {
+                text: dotLabel,
+                delayDuration: 200,
+              },
+              {
+                default: () =>
+                  h(
+                    "span",
+                    {
+                      class:
+                        "inline-flex cursor-default items-center justify-center p-1.5 -m-1 rounded-sm",
+                    },
+                    [
+                      h("span", {
+                        class:
+                          "inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0",
+                        role: "img",
+                        "aria-label": dotLabel,
+                      }),
+                    ],
+                  ),
+              },
+            )
+          : h("span", { class: "inline-block size-2 shrink-0" }),
+      ]);
+    },
+  },
   {
     accessorKey: "createdAt",
     header: () => h("div", { class: "text-right" }, "Date"),
@@ -391,14 +571,69 @@ const columns: TableColumn<RegisterEntry>[] = [
     accessorKey: "description",
     header: () => h("div", { class: "min-w-lg" }, "Description"),
     cell: ({ row }) => {
-      return h(
-        "div",
-        {
-          class: "cursor-pointer font-bold dark:text-white",
-          onClick: () => handleTableClick(row.original),
-        },
-        row.getValue("description"),
-      );
+      const entry = row.original;
+      const showRecurBtn = isPlaidImportAwaitingReview(entry);
+      return h("div", { class: "flex items-center gap-1 min-w-0" }, [
+        h(
+          "div",
+          {
+            class:
+              "cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0",
+            onClick: () => handleTableClick(entry),
+          },
+          row.getValue("description"),
+        ),
+        ...(showRecurBtn
+          ? [
+              h(
+                UTooltip,
+                {
+                  text: "Create a recurring rule from this import and link this row to it.",
+                  delayDuration: 200,
+                },
+                {
+                  default: () =>
+                    h(UButton, {
+                      color: "neutral",
+                      variant: "ghost",
+                      size: "xs",
+                      icon: "i-lucide-repeat",
+                      class: "shrink-0",
+                      "aria-label":
+                        "Create recurrence from this import and link this transaction",
+                      onClick: (e: Event) => {
+                        e.stopPropagation();
+                        openReoccurrenceFromPlaidEntry(entry);
+                      },
+                    }),
+                },
+              ),
+              h(
+                UTooltip,
+                {
+                  text: "Match to an existing recurrence and remember this bank name for the next Plaid sync.",
+                  delayDuration: 200,
+                },
+                {
+                  default: () =>
+                    h(UButton, {
+                      color: "neutral",
+                      variant: "ghost",
+                      size: "xs",
+                      icon: "i-lucide-link",
+                      class: "shrink-0",
+                      "aria-label":
+                        "Match to existing recurrence and save name alias for future syncs",
+                      onClick: (e: Event) => {
+                        e.stopPropagation();
+                        openMatchToRecurrence(entry);
+                      },
+                    }),
+                },
+              ),
+            ]
+          : []),
+      ]);
     },
   },
   {
@@ -829,6 +1064,8 @@ async function recalcAccount() {
     div(v-else-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden" :style="{ maxHeight: registerTableViewportMaxHeight }")
       //- Table header skeleton
       div(class="flex border-b frog-border p-4")
+        div(class="w-7 shrink-0")
+          USkeleton(class="h-4 w-2 mx-auto")
         div(class="flex-1")
           USkeleton(class="h-4 w-16")
         div(class="flex-1")
@@ -840,6 +1077,8 @@ async function recalcAccount() {
 
       //- Table rows skeleton
       div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
+        div(class="w-7 shrink-0")
+          USkeleton(class="h-4 w-2 mx-auto")
         div(class="flex-1")
           USkeleton(class="h-4 w-20")
         div(class="flex-1")

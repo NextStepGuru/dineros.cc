@@ -134,6 +134,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "ReoccurrenceSplit",
  *       "isList": true
  *     },
+ *     "plaidNameAliases": {
+ *       "modelName": "ReoccurrencePlaidNameAlias",
+ *       "isList": true
+ *     },
  *     "children": {
  *       "modelName": "AccountRegister",
  *       "isList": true
