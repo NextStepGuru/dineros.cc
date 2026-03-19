@@ -23,7 +23,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     cache: ModernCacheService,
     loanCalculator: LoanCalculatorService,
     entryService: RegisterEntryService,
-    transferService: TransferService
+    transferService: TransferService,
   ) {
     void db;
     this.cache = cache;
@@ -59,7 +59,7 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   async processInterestCharges(
     accounts: CacheAccountRegister[],
-    forecastDate?: any
+    forecastDate?: any,
   ): Promise<void> {
     // Process interest for each account, handling all missed statement dates
     for (const account of accounts) {
@@ -72,19 +72,19 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   private async processAccountInterestCharge(
     accountRegister: CacheAccountRegister,
-    forecastDate?: any
+    forecastDate?: any,
   ): Promise<void> {
     // Calculate projected balance at the statement date for more accurate interest calculation
     const statementDate = forecastDate?.toDate() || dateTimeService.nowDate();
     const projectedBalance = getProjectedBalanceAtDate(
       this.cache,
       accountRegister.id,
-      dateTimeService.toDate(statementDate)
+      dateTimeService.toDate(statementDate),
     );
 
     const interest = await this.loanCalculator.calculateInterestForAccount(
       accountRegister,
-      projectedBalance
+      projectedBalance,
     );
 
     // Skip if no interest
@@ -93,7 +93,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
 
     const isCreditAccount = this.loanCalculator.isCreditAccount(
-      accountRegister.typeId
+      accountRegister.typeId,
     );
     const description = isCreditAccount ? "Interest Charge" : "Interest Earned";
     const intervalId = accountRegister.statementIntervalId;
@@ -123,6 +123,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         elapsedIntervals: null,
         updatedAt: dateTimeService.nowDate(),
         adjustBeforeIfOnWeekend: false,
+        categoryId: null,
       },
     });
 
@@ -133,7 +134,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     if (accountRegister.targetAccountRegisterId) {
       const paymentAmount = this.loanCalculator.calculatePaymentAmount(
         accountRegister,
-        Math.abs(interest)
+        Math.abs(interest),
       );
 
       if (paymentAmount > 0) {
@@ -158,6 +159,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             elapsedIntervals: null,
             updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
+            categoryId: null,
           },
         });
       }
@@ -165,7 +167,7 @@ export class AccountRegisterService implements IAccountRegisterService {
       // If there's no target account, create a direct payment entry
       const paymentAmount = this.loanCalculator.calculatePaymentAmount(
         accountRegister,
-        Math.abs(interest)
+        Math.abs(interest),
       );
 
       if (paymentAmount > 0) {
@@ -190,6 +192,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             elapsedIntervals: null,
             updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
+            categoryId: null,
           },
         });
       }
@@ -201,7 +204,7 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   async updateStatementDates(
     accounts: CacheAccountRegister[],
-    forecastDate?: any
+    forecastDate?: any,
   ): Promise<void> {
     // Add a simple flag to track if method is called
     (global as any).updateStatementDatesCalled = true;
@@ -214,7 +217,7 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   private async updateStatementDate(
     accountRegister: CacheAccountRegister,
-    forecastDate?: any
+    forecastDate?: any,
   ): Promise<void> {
     // Normalize both dates to UTC and set to start of day for comparison
     let statementAt = dateTimeService.set(
@@ -224,7 +227,7 @@ export class AccountRegisterService implements IAccountRegisterService {
         second: 0,
         milliseconds: 0,
       },
-      dateTimeService.createUTC(accountRegister.statementAt)
+      dateTimeService.createUTC(accountRegister.statementAt),
     );
     const comparisonDate = forecastDate
       ? dateTimeService.set(
@@ -234,7 +237,7 @@ export class AccountRegisterService implements IAccountRegisterService {
             second: 0,
             milliseconds: 0,
           },
-          dateTimeService.createUTC(forecastDate)
+          dateTimeService.createUTC(forecastDate),
         )
       : dateTimeService.set({
           hour: 0,
@@ -255,7 +258,7 @@ export class AccountRegisterService implements IAccountRegisterService {
       // Calculate next statement date based on interval
       const newStatementAt = this.calculateNextStatementDate(
         statementAt,
-        accountRegister.statementIntervalId
+        accountRegister.statementIntervalId,
       );
       // Always update in-memory cache to continue forecast processing.
       statementAt = dateTimeService.create(newStatementAt);
@@ -275,24 +278,27 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   private calculateNextStatementDate(
     currentStatementAt: any,
-    statementIntervalId: number
+    statementIntervalId: number,
   ): any {
     switch (statementIntervalId) {
-      case 1: { // Day
+      case 1: {
+        // Day
         // Use DateTime add method directly.
         const dailyMoment = dateTimeService.create(currentStatementAt);
         const dailyNextDay = dailyMoment.add(1, "day");
 
         return dailyNextDay;
       }
-      case 2: { // Week
+      case 2: {
+        // Week
         // Use DateTime add method directly.
         const weeklyMoment = dateTimeService.create(currentStatementAt);
         const weeklyNextDay = weeklyMoment.add(1, "week");
 
         return weeklyNextDay;
       }
-      case 3: { // Month
+      case 3: {
+        // Month
         // For monthly, manually construct the next month's date
         // Ensure we work in UTC to avoid timezone issues
         const currentMoment = dateTimeService.createUTC(currentStatementAt);
@@ -348,7 +354,8 @@ export class AccountRegisterService implements IAccountRegisterService {
 
         return dateTimeService.toDate(resultMoment);
       }
-      case 4: { // Year
+      case 4: {
+        // Year
         // Ensure we work in UTC to avoid timezone issues
         const yearlyMoment = dateTimeService.createUTC(currentStatementAt);
         const currentDay = yearlyMoment.date() as number;
@@ -374,7 +381,7 @@ export class AccountRegisterService implements IAccountRegisterService {
                 .createUTC()
                 .setYear(nextYear)
                 .setMonth(2)
-                .setDate(1)
+                .setDate(1),
             );
           }
         }
@@ -383,7 +390,8 @@ export class AccountRegisterService implements IAccountRegisterService {
         const yearlyNextDay = yearlyMoment.add(1, "year");
         return yearlyNextDay;
       }
-      case 5: { // Once (one-time)
+      case 5: {
+        // Once (one-time)
         // Use DateTime add method directly.
         const onceMoment = dateTimeService.create(currentStatementAt);
         const onceNextDay = onceMoment.add(1, "year"); // Default to yearly for one-time
@@ -425,7 +433,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     this._cachedInterestAccounts = this.cache.accountRegister.find(
       (account) =>
         account.balance !== 0 &&
-        (account.targetAccountRegisterId !== null || account.typeId === 2)
+        (account.targetAccountRegisterId !== null || account.typeId === 2),
     );
     this._cachedExtraPaymentAccounts = this.cache.accountRegister.find({
       allowExtraPayment: true,
@@ -445,7 +453,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     return this.cache.accountRegister.find(
       (account) =>
         account.balance !== 0 &&
-        (account.targetAccountRegisterId !== null || account.typeId === 2)
+        (account.targetAccountRegisterId !== null || account.typeId === 2),
     );
   }
 
@@ -463,7 +471,7 @@ export class AccountRegisterService implements IAccountRegisterService {
   }
 
   filterActiveAccounts(
-    accounts: CacheAccountRegister[]
+    accounts: CacheAccountRegister[],
   ): CacheAccountRegister[] {
     return accounts.filter((account) => this.isAccountActive(account));
   }

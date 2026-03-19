@@ -285,6 +285,7 @@ export const reoccurrenceSchema = z.object({
   transferAccountRegisterId: z.coerce.number().optional(),
   intervalCount: z.coerce.number().min(1).default(0),
   adjustBeforeIfOnWeekend: z.boolean().default(false),
+  categoryId: z.string().uuid().nullable().optional(),
   endAt: z.union([
     z.string(),
     z.date().transform((d) => d.toISOString()),

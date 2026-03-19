@@ -79,6 +79,7 @@ function handleAddReoccurrence() {
       endAt: undefined,
       intervalCount: 1,
       adjustBeforeIfOnWeekend: false,
+      categoryId: null,
       splits: [],
     },
   };
@@ -149,6 +150,16 @@ const columns: TableColumn<Reoccurrence>[] = [
     header: () => h("div", {}, "Interval"),
     cell: ({ row }) =>
       getIntervalLabel(row.getValue("intervalId"), listStore.getIntervals),
+  },
+  {
+    accessorKey: "categoryId",
+    header: () => h("div", {}, "Category"),
+    cell: ({ row }) => {
+      const id = row.getValue("categoryId") as string | null | undefined;
+      if (!id) return h("div", { class: "text-gray-500" }, "—");
+      const cat = listStore.getCategories.find((c) => c.id === id);
+      return h("div", {}, cat?.name ?? id);
+    },
   },
   {
     accessorKey: "description",

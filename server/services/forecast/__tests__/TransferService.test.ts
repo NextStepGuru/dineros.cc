@@ -133,6 +133,7 @@ describe("TransferService", () => {
         elapsedIntervals: null,
         updatedAt: new Date(),
         adjustBeforeIfOnWeekend: false,
+        categoryId: null,
       };
 
       service.transferBetweenAccounts({
@@ -162,6 +163,7 @@ describe("TransferService", () => {
         elapsedIntervals: null,
         updatedAt: new Date(),
         adjustBeforeIfOnWeekend: false,
+        categoryId: null,
       };
 
       service.transferBetweenAccounts({
@@ -198,6 +200,7 @@ describe("TransferService", () => {
         elapsedIntervals: null,
         updatedAt: new Date(),
         adjustBeforeIfOnWeekend: false,
+        categoryId: null,
       };
 
       service.transferBetweenAccountsWithDate({

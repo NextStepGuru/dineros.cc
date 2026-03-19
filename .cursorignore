@@ -8,3 +8,4 @@
 # dist/
 # coverage/
 # .env.local
+tsconfig.json

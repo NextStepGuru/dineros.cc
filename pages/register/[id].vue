@@ -409,8 +409,8 @@ const columns: TableColumn<RegisterEntry>[] = [
       const name =
         categoryId == null
           ? "—"
-          : listStore.getCategories.find((c) => c.id === categoryId)?.name ??
-            "—";
+          : (listStore.getCategories.find((c) => c.id === categoryId)?.name ??
+            "—");
       return h("div", { class: "text-muted" }, name);
     },
   },
@@ -890,7 +890,7 @@ async function recalcAccount() {
           role="tab"
           :aria-selected="selectedTab === 'future'"
           :class="isSelectedTab('future')"
-          class="min-h-11 min-w-[4.5rem] sm:min-h-0 sm:min-w-0 touch-manipulation"
+          class="min-h-11 min-w-18 sm:min-h-0 sm:min-w-0 touch-manipulation"
           @click="selectedTab = 'future'") Future
       li(role="presentation")
         button(
@@ -898,7 +898,7 @@ async function recalcAccount() {
           role="tab"
           :aria-selected="selectedTab === 'past'"
           :class="isSelectedTab('past')"
-          class="min-h-11 min-w-[4.5rem] sm:min-h-0 sm:min-w-0 touch-manipulation"
+          class="min-h-11 min-w-18 sm:min-h-0 sm:min-w-0 touch-manipulation"
           @click="selectedTab = 'past'") Past
 
 </template>

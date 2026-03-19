@@ -267,6 +267,7 @@ model Category {
   children          Category[]      @relation("cat_children")
   accountRegisterId Int?            @db.UnsignedInt
   entries           RegisterEntry[]
+  reoccurrences     Reoccurrence[]
 
   @@map("category")
 }
@@ -285,11 +286,13 @@ model Reoccurrence {
   elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
   amount                    Decimal   @db.Decimal(19, 2)
   description               String    @db.VarChar(1500) /// @encrypted
+  categoryId                String?   @map("category_id")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  account  Account             @relation(fields: [accountId], references: [id])
-  register AccountRegister     @relation(fields: [accountRegisterId], references: [id])
-  interval Interval            @relation(fields: [intervalId], references: [id])
+  account   Account             @relation(fields: [accountId], references: [id])
+  register  AccountRegister     @relation(fields: [accountRegisterId], references: [id])
+  interval  Interval            @relation(fields: [intervalId], references: [id])
+  category  Category?           @relation(fields: [categoryId], references: [id])
   entries  RegisterEntry[]
   skips    ReoccurrenceSkip[]
   splits   ReoccurrenceSplit[]

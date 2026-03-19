@@ -151,6 +151,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
         (reoccurrence as { intervalName?: string }).intervalName,
         dateTimeService.toDate(nextAt),
       );
+      const recurrenceCategoryId = reoccurrence.categoryId ?? null;
+
       if (reoccurrence.transferAccountRegisterId) {
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: reoccurrence.transferAccountRegisterId,
@@ -158,6 +160,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           amount: effectiveAmount,
           description: occurrenceDescription,
           reoccurrence: reoccurrenceForEntry,
+          categoryId: recurrenceCategoryId,
         });
       } else {
         this.entryService.createEntry({
@@ -166,6 +169,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           amount: effectiveAmount,
           reoccurrence: reoccurrenceForEntry,
           typeId: 9, // Reoccurrence Entry
+          categoryId: recurrenceCategoryId,
         });
       }
 
@@ -193,6 +197,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
           amount: Number(splitEntry.amount),
           description: splitDescription,
           reoccurrence: reoccurrenceForEntry,
+          categoryId: recurrenceCategoryId,
         });
       }
 

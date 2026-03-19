@@ -34,6 +34,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       isManualEntry = false,
       isPending,
       typeId,
+      categoryId = null,
+      reoccurrenceId: explicitReoccurrenceId,
     } = params;
 
     if (params.isBalanceEntry) {
@@ -98,7 +100,10 @@ export class RegisterEntryService implements IRegisterEntryService {
       amount: numericAmount, // convert to number to handle Decimal objects and strings
       balance: isBalanceEntry ? numericAmount : balance, // For balance entries, use amount as the opening balance
       createdAt,
-      reoccurrenceId: reoccurrence?.id || null,
+      reoccurrenceId:
+        explicitReoccurrenceId !== undefined
+          ? explicitReoccurrenceId
+          : reoccurrence?.id ?? null,
       typeId: typeId || null,
       isBalanceEntry,
       isPending: entryIsPending,
@@ -106,6 +111,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       isProjected: isBalanceEntry ? true : isManualEntry ? false : true,
       isManualEntry,
       isReconciled: false,
+      categoryId: categoryId ?? null,
     };
 
     this.cache.registerEntry.insert(entry);
