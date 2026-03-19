@@ -137,12 +137,14 @@ const handleSubmit = async ({
 
     if (error.value) {
       isSaving.value = false;
+      const msg =
+        error.value.data?.errors ??
+        error.value.data?.message ??
+        error.value?.message ??
+        "Registration failed.";
       toast.add({
         color: "error",
-        description:
-          error.value.data.errors ||
-          error.value?.message ||
-          "Registration failed.",
+        description: typeof msg === "string" ? msg : String(msg),
       });
       return;
     }
@@ -165,13 +167,11 @@ const handleSubmit = async ({
 
 <template lang="pug">
   section(class="auth-page flex items-center justify-center")
-    UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
-      template(#header)
-        .auth-card__header
-          UIcon(name="i-lucide-user-plus" class="size-10 text-primary")
-          h1(class="text-2xl font-bold") Create your account
-          p(class="text-sm frog-text-muted") Build your first predictive budget in minutes.
-
+    AuthFormCard(
+      icon="i-lucide-user-plus"
+      title="Create your account"
+      subtitle="Build your first predictive budget in minutes."
+    )
       UForm(:state="formState" :schema="signupSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
         UFormField(label="First Name" for="firstName")
           UInput(
@@ -235,7 +235,7 @@ const handleSubmit = async ({
         div(class="text-sm text-center")
           ul
             li
-              NuxtLink(to="/login" class="frog-link hover:underline")  Already have an account? Sign in
+              ULink(to="/login" class="frog-link hover:underline")  Already have an account? Sign in
             li
-              NuxtLink(to="/forgot-password" class="frog-link hover:underline")  Need help accessing your account?
+              ULink(to="/forgot-password" class="frog-link hover:underline")  Need help accessing your account?
 </template>

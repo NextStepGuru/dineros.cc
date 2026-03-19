@@ -57,13 +57,16 @@ useHead({
 
 <template lang="pug">
 div(class="legal-document" itemscope itemtype="https://schema.org/Article")
-  header(class="legal-document__header")
-    h1 Privacy Policy
-    p(class="legal-document__meta")
-      span(itemprop="author") Dineros Editorial Team
-      |  ·
-      time(itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z") Published March 14, 2026
-    span(class="legal-document__effective") Effective Date: March 14, 2026
+  UCard(class="mb-6")
+    header(class="legal-document__header")
+      h1 Privacy Policy
+      p(class="legal-document__meta")
+        span(itemprop="author") Dineros Editorial Team
+        |  ·
+        time(itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z") Published March 14, 2026
+      span(class="legal-document__effective") Effective Date: March 14, 2026
+
+  USeparator(class="my-6")
 
   div(class="legal-document__body")
     section

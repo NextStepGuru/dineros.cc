@@ -18,7 +18,6 @@ const envSchema = z.object({
     .transform((val: string) => parseInt(val, 10))
     .default(6379),
   NATS_URL: z.string().default("nats://localhost:4222"),
-  NUXT_UI_PRO_LICENSE: z.string(),
   NUXT_PUBLIC_SITE_URL: z.string().default("http://localhost:3000"),
   WEBAUTHN_RP_ID: z.string().optional(),
   WEBAUTHN_RP_NAME: z.string().default("Dineros.cc"),

@@ -1,11 +1,11 @@
-# GCP setup for this pipeline (Artifact Registry, not legacy GCR):
-# 0. Workload Identity principal must be allowed to impersonate the SA:
-#    gcloud iam service-accounts add-iam-policy-binding github-service-account@nextstepguru.iam.gserviceaccount.com \
+# Build and deploy only. PR checks (lint, typecheck, test, build, e2e, pre-commit) run in .github/workflows/pr.yml.
+#
+# GCP setup (Artifact Registry):
+# 0. Workload Identity: gcloud iam service-accounts add-iam-policy-binding github-service-account@nextstepguru.iam.gserviceaccount.com \
 #      --project=nextstepguru --role=roles/iam.workloadIdentityUser \
 #      --member="principalSet://iam.googleapis.com/projects/809557179036/locations/global/workloadIdentityPools/github-pool/attribute.repository/NextStepGuru/dineros.cc"
-# 1. Create Artifact Registry repo (one-time): gcloud artifacts repositories create dineros --repository-format=docker --location=us-central1 --description="Dineros images"
-# 2. SA needs roles/artifactregistry.writer (and roles/container.developer for Deploy). GKE node SA needs roles/artifactregistry.reader to pull images.
-# 3. Workload Identity: pool + provider already configured.
+# 1. Artifact Registry: gcloud artifacts repositories create dineros --repository-format=docker --location=us-central1
+# 2. SA: roles/artifactregistry.writer, roles/container.developer. GKE node SA: roles/artifactregistry.reader
 name: Build & Deploy
 
 on:
@@ -23,18 +23,18 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - id: "auth"
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         with:
           workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
       - name: Build and push main site
@@ -52,8 +52,6 @@ jobs:
           provenance: false
           sbom: false
           outputs: type=docker,dest=/tmp/build-result.json
-          build-args: |
-            NUXT_UI_PRO_LICENSE=${{ secrets.NUXT_UI_PRO_LICENSE }}
         env:
           CI: true
       - name: Check Docker build cache effectiveness
@@ -73,11 +71,11 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - id: "auth"
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         with:
           workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
@@ -88,7 +86,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
       - name: Build and push microservice
@@ -118,70 +116,23 @@ jobs:
           echo "   - Build time should improve on subsequent runs"
           echo "💡 Look for 'CACHED' in build logs above for cache hits"
 
-  Test:
-    runs-on: ubuntu-latest
-    name: Test
-    permissions:
-      contents: "read"
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
-      - name: Run tests (same as ci-local.sh --test-only)
-        run: ./scripts/ci-local.sh --test-only
-
-  Lint:
-    runs-on: ubuntu-latest
-    name: Lint
-    permissions:
-      contents: "read"
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
-      - name: Run lint (same as ci-local.sh --lint-only)
-        run: ./scripts/ci-local.sh --lint-only
-
-  PreCommit:
-    runs-on: ubuntu-latest
-    name: Pre-commit Security Checks
-    permissions:
-      contents: "read"
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-      - name: Install TruffleHog
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
-      - name: Install pre-commit
-        run: |
-          pip install pre-commit
-      - name: Run pre-commit hooks
-        run: |
-          pre-commit run --all-files --verbose
-
   Deploy:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Deploy
-    needs: [Build1, Build2, Test, Lint, PreCommit]
+    needs: [Build1, Build2]
     permissions:
       contents: "read"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - id: "auth"
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         with:
           workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
       - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v2"
+        uses: "google-github-actions/setup-gcloud@v3"
       - id: "get-credentials"
         uses: "google-github-actions/get-gke-credentials@v2"
         with:

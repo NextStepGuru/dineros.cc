@@ -42,8 +42,8 @@ const links = ref([
   {
     label: "See how it works",
     to: "#features",
-    icon: "",
-    trailing: false,
+    icon: undefined,
+    trailing: false as const,
     color: "primary" as const,
     variant: "soft" as const,
     class: "frog-cta",
@@ -75,15 +75,32 @@ const features = [
 
 <template>
   <div class="page-home">
-    <UPageHero
-      class="frog-hero flex items-center justify-center min-h-[calc(100vh-var(--ui-header-height))]"
-      title="See your money before it moves"
-      description="Dineros combines predictive budgeting, recurring transaction automation, and account-level forecasting so you can make better decisions earlier."
-      :links="links"
-      headline="Predictive Budgeting for Real Life"
-      orientation="horizontal">
-      <PepeHeroSvg class="w-md" />
-    </UPageHero>
+    <section
+      class="frog-hero flex min-h-[calc(100vh-var(--ui-header-height))] items-center justify-center">
+      <div
+        class="mx-auto flex w-full max-w-(--ui-container) flex-col gap-10 px-4 py-12 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-12 lg:px-8 lg:py-16">
+        <div class="min-w-0 flex-1 text-center lg:text-left">
+          <p
+            class="frog-subheading mb-2 text-sm font-semibold tracking-wide text-current uppercase opacity-90">
+            Predictive Budgeting for Real Life
+          </p>
+          <h1 class="frog-heading text-4xl font-bold tracking-tight sm:text-5xl">
+            See your money before it moves
+          </h1>
+          <p
+            class="frog-subheading mx-auto mt-4 max-w-xl text-lg lg:mx-0">
+            Dineros combines predictive budgeting, recurring transaction automation, and account-level
+            forecasting so you can make better decisions earlier.
+          </p>
+          <div class="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
+            <UButton v-for="(link, i) in links" :key="i" v-bind="link" />
+          </div>
+        </div>
+        <div class="flex shrink-0 justify-center lg:justify-end">
+          <PepeHeroSvg class="w-md" />
+        </div>
+      </div>
+    </section>
 
     <section
       id="features"
@@ -100,9 +117,10 @@ const features = [
         </p>
 
         <div class="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          <div
+          <UCard
             v-for="feature in features"
             :key="feature.title"
+            variant="subtle"
             class="frog-feature-card group relative rounded-2xl p-8 backdrop-blur transition">
             <div
               class="frog-feature-icon mb-4 inline-flex items-center justify-center rounded-xl p-3">
@@ -114,7 +132,7 @@ const features = [
             <p class="mt-2 text-sm leading-relaxed frog-subheading">
               {{ feature.description }}
             </p>
-          </div>
+          </UCard>
         </div>
 
         <p class="mt-10 text-center text-sm frog-subheading">

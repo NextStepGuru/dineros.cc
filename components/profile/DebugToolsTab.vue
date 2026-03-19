@@ -14,7 +14,13 @@ const isRunning = ref(false);
 const runningTask = ref("");
 
 // Debug tasks available
-const debugTasks = [
+const debugTasks: {
+  label: string;
+  value: string;
+  description: string;
+  color: "primary" | "secondary" | "success" | "info" | "warning" | "error";
+  icon: string;
+}[] = [
   {
     label: "Check Balance Entries",
     value: "check-balance-entries",

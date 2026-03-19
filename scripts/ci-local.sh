@@ -54,7 +54,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Docker image with Node.js 24.14.0 (matching GitHub Actions)
 NODE_VERSION="24.14.0"
-PNPM_VERSION="9"
+PNPM_VERSION="10.32.1"
 IMAGE_NAME="node:${NODE_VERSION}-bullseye"
 
 echo -e "${YELLOW}Using Docker image: ${IMAGE_NAME}${NC}"

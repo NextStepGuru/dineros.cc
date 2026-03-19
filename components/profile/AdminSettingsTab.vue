@@ -14,7 +14,13 @@ const isRunning = ref(false);
 const runningTask = ref("");
 
 // Admin tasks available
-const adminTasks = [
+const adminTasks: {
+  label: string;
+  value: string;
+  description: string;
+  color: "primary" | "secondary" | "success" | "info" | "warning" | "error";
+  icon: string;
+}[] = [
   {
     label: "Backup",
     value: "backup",

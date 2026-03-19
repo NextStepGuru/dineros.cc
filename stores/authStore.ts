@@ -20,14 +20,15 @@ export const useAuthStore = defineStore("authStore", {
       const mfa = state.user?.settings?.mfa;
       if (mfa) {
         const hasTotp = Boolean(mfa.totp?.isEnabled && mfa.totp?.isVerified);
-        const hasPasskey = Array.isArray(mfa.passkeys) && mfa.passkeys.length > 0;
+        const hasPasskey =
+          Array.isArray(mfa.passkeys) && mfa.passkeys.length > 0;
         const hasEmailOtp = Boolean(mfa.emailOtp?.isEnabled);
         return hasTotp || hasPasskey || hasEmailOtp;
       }
 
       return Boolean(
         state.user?.settings?.speakeasy?.isEnabled &&
-          state.user?.settings?.speakeasy?.isVerified
+        state.user?.settings?.speakeasy?.isVerified,
       );
     },
   },

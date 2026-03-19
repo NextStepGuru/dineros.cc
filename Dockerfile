@@ -20,8 +20,6 @@ ENV DATABASE_URL="mysql://build:build@localhost:3306/build"
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN pnpm prisma generate
 # Set environment for build
-ARG NUXT_UI_PRO_LICENSE
-ENV NUXT_UI_PRO_LICENSE=$NUXT_UI_PRO_LICENSE
 ENV NODE_ENV=production
 # Build the application
 RUN pnpm run build

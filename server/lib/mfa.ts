@@ -69,7 +69,9 @@ function toMfaSettings(settings: Record<string, any>): MfaSettings {
         : DEFAULT_MFA_SETTINGS.totp,
     passkeys: Array.isArray(mfa.passkeys) ? mfa.passkeys : [],
     emailOtp:
-      mfa.emailOtp && typeof mfa.emailOtp === "object" && !Array.isArray(mfa.emailOtp)
+      mfa.emailOtp &&
+      typeof mfa.emailOtp === "object" &&
+      !Array.isArray(mfa.emailOtp)
         ? {
             isEnabled: Boolean(mfa.emailOtp.isEnabled),
             isVerified: Boolean(mfa.emailOtp.isVerified),
@@ -78,7 +80,9 @@ function toMfaSettings(settings: Record<string, any>): MfaSettings {
   };
 }
 
-export function getEnabledMfaMethods(settings: Record<string, any>): MfaMethod[] {
+export function getEnabledMfaMethods(
+  settings: Record<string, any>,
+): MfaMethod[] {
   const mfa = toMfaSettings(settings);
   const methods: MfaMethod[] = [];
 
@@ -99,7 +103,7 @@ export function getEnabledMfaMethods(settings: Record<string, any>): MfaMethod[]
 
 export function withUpdatedTotp(
   settings: Record<string, any>,
-  totp: Partial<TotpSettings>
+  totp: Partial<TotpSettings>,
 ) {
   const current = toMfaSettings(settings).totp;
   const next = {
@@ -116,7 +120,9 @@ export function withUpdatedTotp(
       ...(typeof next.base32secret === "string"
         ? { base32secret: next.base32secret }
         : {}),
-      ...(Array.isArray(next.backupCodes) ? { backupCodes: next.backupCodes } : {}),
+      ...(Array.isArray(next.backupCodes)
+        ? { backupCodes: next.backupCodes }
+        : {}),
     },
     mfa: {
       ...toMfaSettings(settings),
@@ -127,7 +133,7 @@ export function withUpdatedTotp(
 
 export function withUpdatedEmailOtp(
   settings: Record<string, any>,
-  emailOtp: Partial<MfaSettings["emailOtp"]>
+  emailOtp: Partial<MfaSettings["emailOtp"]>,
 ) {
   return {
     ...settings,
@@ -143,7 +149,7 @@ export function withUpdatedEmailOtp(
 
 export function withUpdatedPasskeys(
   settings: Record<string, any>,
-  passkeys: MfaSettings["passkeys"]
+  passkeys: MfaSettings["passkeys"],
 ) {
   return {
     ...settings,
@@ -168,7 +174,7 @@ function emailOtpRateLimitRedisKey(userId: number) {
 
 export async function createPendingMfaSession(
   event: any,
-  data: Omit<PendingMfaSession, "id" | "createdAt">
+  data: Omit<PendingMfaSession, "id" | "createdAt">,
 ) {
   const sessionId = randomBytes(24).toString("hex");
   const session: PendingMfaSession = {
@@ -182,7 +188,7 @@ export async function createPendingMfaSession(
   await sharedRedisConnection.setex(
     pendingMfaRedisKey(sessionId),
     PENDING_MFA_TTL_SECONDS,
-    JSON.stringify(session)
+    JSON.stringify(session),
   );
 
   setCookie(event, PENDING_MFA_COOKIE, sessionId, {
@@ -217,7 +223,7 @@ export async function clearPendingMfaSession(event: any) {
     await sharedRedisConnection.del(
       pendingMfaRedisKey(sessionId),
       emailOtpRedisKey(sessionId),
-      `mfa:passkey:auth:${sessionId}`
+      `mfa:passkey:auth:${sessionId}`,
     );
   }
 
@@ -253,18 +259,18 @@ export async function canSendEmailOtp(userId: number) {
 
 export async function storeEmailOtpForSession(
   sessionId: string,
-  codeHash: string
+  codeHash: string,
 ) {
   await sharedRedisConnection.setex(
     emailOtpRedisKey(sessionId),
     EMAIL_OTP_TTL_SECONDS,
-    codeHash
+    codeHash,
   );
 }
 
 export async function verifyEmailOtpForSession(
   sessionId: string,
-  code: string
+  code: string,
 ) {
   const key = emailOtpRedisKey(sessionId);
   const expectedHash = await sharedRedisConnection.get(key);

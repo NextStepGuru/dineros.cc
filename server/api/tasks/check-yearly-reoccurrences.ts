@@ -1,3 +1,4 @@
+import { defineEventHandler } from "h3";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { log } from "~/server/logger";
 
@@ -44,30 +45,33 @@ export default defineEventHandler(async () => {
         lastAt: true,
         amount: true,
       },
-      orderBy: [
-        { intervalId: "asc" },
-        { lastAt: "asc" },
-      ],
+      orderBy: [{ intervalId: "asc" }, { lastAt: "asc" }],
     });
 
     // Group by interval type
-    const byInterval = allReoccurrences.reduce((acc, reoccurrence) => {
-      const intervalType = reoccurrence.intervalId;
-      if (!acc[intervalType]) {
-        acc[intervalType] = [];
-      }
-      acc[intervalType].push(reoccurrence);
-      return acc;
-    }, {} as Record<number, typeof allReoccurrences>);
+    const byInterval = allReoccurrences.reduce(
+      (acc, reoccurrence) => {
+        const intervalType = reoccurrence.intervalId;
+        if (!acc[intervalType]) {
+          acc[intervalType] = [];
+        }
+        acc[intervalType].push(reoccurrence);
+        return acc;
+      },
+      {} as Record<number, typeof allReoccurrences>,
+    );
 
     const result = {
       yearlyReoccurrences,
       totalYearly: yearlyReoccurrences.length,
       allReoccurrences: byInterval,
-      intervalCounts: Object.keys(byInterval).reduce((acc, intervalId) => {
-        acc[intervalId] = byInterval[parseInt(intervalId)].length;
-        return acc;
-      }, {} as Record<string, number>),
+      intervalCounts: Object.keys(byInterval).reduce(
+        (acc, intervalId) => {
+          acc[intervalId] = byInterval[parseInt(intervalId)].length;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
     };
 
     log({

@@ -14,7 +14,7 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     const result = recalculateRunningBalanceAndSort({
       registerEntries: randomSort<PartialRegisterEntry>(
-        cloneDeep(debitRegisterEntries)
+        cloneDeep(debitRegisterEntries),
       ).map((entry) => ({ ...entry, balance: 0 })),
       balance,
       type,
@@ -28,11 +28,11 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     // Should have proper order: cleared entries (chronological), balance entry, pending entries (reverse chronological)
     const clearedEntries = result.filter(
-      (r) => r.isCleared && !r.isBalanceEntry
+      (r) => r.isCleared && !r.isBalanceEntry,
     );
     const balanceEntries = result.filter((r) => r.isBalanceEntry);
     const pendingEntries = result.filter(
-      (r) => !r.isCleared && !r.isBalanceEntry
+      (r) => !r.isCleared && !r.isBalanceEntry,
     );
 
     expect(balanceEntries.length).toBe(1);
@@ -51,7 +51,7 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     const result = recalculateRunningBalanceAndSort({
       registerEntries: randomSort<PartialRegisterEntry>(
-        cloneDeep(creditRegisterEntries)
+        cloneDeep(creditRegisterEntries),
       ).map((entry) => ({ ...entry, balance: 0 })),
       balance,
       type,
@@ -65,11 +65,11 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     // Should have proper order: cleared entries (chronological), balance entry, pending entries (reverse chronological)
     const clearedEntries = result.filter(
-      (r) => r.isCleared && !r.isBalanceEntry
+      (r) => r.isCleared && !r.isBalanceEntry,
     );
     const balanceEntries = result.filter((r) => r.isBalanceEntry);
     const pendingEntries = result.filter(
-      (r) => !r.isCleared && !r.isBalanceEntry
+      (r) => !r.isCleared && !r.isBalanceEntry,
     );
 
     expect(balanceEntries.length).toBe(1);
@@ -187,7 +187,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Verify pending entries before balance are isProjected=0 and isPending=1
     expect(pendingBeforeBalance.length).toBe(2);
     expect(
-      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending)
+      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending),
     ).toBe(true);
 
     // Verify chronological order of pending entries before balance (older first)
@@ -296,7 +296,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Should have 3 pending entries before balance
     expect(pendingBeforeBalance.length).toBe(3);
     expect(
-      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending)
+      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending),
     ).toBe(true);
 
     // Verify chronological order (older first)
@@ -512,7 +512,7 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     // Find the manual entry with isMatched=false
     const manualEntryAfterBalance = entriesAfterBalance.find(
-      (r) => r.isManualEntry
+      (r) => r.isManualEntry,
     );
     expect(manualEntryAfterBalance).toBeDefined();
     expect(manualEntryAfterBalance!.isMatched).toBe(false);
@@ -613,7 +613,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Should have 2 manual entries before balance (both isMatched=true)
     expect(entriesBeforeBalance.length).toBe(2);
     expect(
-      entriesBeforeBalance.every((r) => r.isManualEntry && r.isMatched)
+      entriesBeforeBalance.every((r) => r.isManualEntry && r.isMatched),
     ).toBe(true);
 
     // Verify chronological order for entries before balance (older first)
@@ -627,7 +627,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Should have 2 manual entries after balance (both isMatched=false)
     expect(entriesAfterBalance.length).toBe(2);
     expect(
-      entriesAfterBalance.every((r) => r.isManualEntry && !r.isMatched)
+      entriesAfterBalance.every((r) => r.isManualEntry && !r.isMatched),
     ).toBe(true);
 
     // Verify chronological order for entries after balance (older first)
@@ -727,10 +727,10 @@ describe("recalculateRunningBalanceAndSort", () => {
 
     // Find pending and manual entries before balance
     const pendingBeforeBalance = entriesBeforeBalance.find(
-      (r) => !r.isProjected && r.isPending
+      (r) => !r.isProjected && r.isPending,
     );
     const manualBeforeBalance = entriesBeforeBalance.find(
-      (r) => r.isManualEntry && r.isMatched
+      (r) => r.isManualEntry && r.isMatched,
     );
 
     expect(pendingBeforeBalance).toBeDefined();
@@ -751,7 +751,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     expect(entriesAfterBalance.length).toBe(2);
 
     const manualAfterBalance = entriesAfterBalance.find(
-      (r) => r.isManualEntry && !r.isMatched
+      (r) => r.isManualEntry && !r.isMatched,
     );
     const projectedEntry = entriesAfterBalance.find((r) => r.isProjected);
 
@@ -927,7 +927,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
     const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
     const regularPendingIndex = result.findIndex(
-      (r) => !r.isManualEntry && r.isPending
+      (r) => !r.isManualEntry && r.isPending,
     );
 
     // Manual entry with isPending=true but isMatched=false should STILL go AFTER balance

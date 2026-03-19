@@ -14,8 +14,6 @@ cd "$(dirname "$0")/.."
 # Source specific environment variables from .env file if it exists
 if [ -f ".env" ]; then
   echo "Loading specific environment variables from .env file..."
-  # Load only the three required variables
-  export NUXT_UI_PRO_LICENSE=$(grep "^NUXT_UI_PRO_LICENSE=" .env | cut -d'=' -f2-)
   export DEPLOY_ENV=$(grep "^DEPLOY_ENV=" .env | cut -d'=' -f2-)
   export NODE_ENV=$(grep "^NODE_ENV=" .env | cut -d'=' -f2-)
 else
@@ -25,7 +23,6 @@ fi
 # Build Docker image with environment variables (Artifact Registry)
 IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$PROJECT_NAME:$PROJECT_VERSION
 docker build -t $IMAGE \
-    --build-arg NUXT_UI_PRO_LICENSE=${NUXT_UI_PRO_LICENSE} \
     --build-arg DEPLOY_ENV=${DEPLOY_ENV} \
     --build-arg NODE_ENV=${NODE_ENV:-production} \
     --platform linux/amd64 . || exit 1

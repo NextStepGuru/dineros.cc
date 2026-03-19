@@ -224,20 +224,6 @@ if (formState.value.isDaylightSaving === undefined) {
   formState.value.isDaylightSaving = true; // Default to daylight saving time
 }
 
-// Debug function to see what's happening
-const onTimezoneChange = (event: Event) => {
-  const target = event.target as HTMLSelectElement;
-  const value = parseInt(target.value);
-
-  formState.value.timezoneOffset = value;
-};
-
-// Helper function to get timezone name
-const getTimezoneName = (offset: number): string => {
-  const timezone = allTimezoneOptions.find((tz) => tz.value === offset);
-  return timezone?.name || "Unknown";
-};
-
 // Computed property for selected timezone info
 const selectedTimezoneInfo = computed(() => {
   if (!formState.value.timezoneOffset) return null;
@@ -324,33 +310,27 @@ div(class="max-w-md min-h-96 my-4 m-auto")
         class="w-full"
       )
     UFormField(label="Country" for="countryId")
-      select(
+      USelect(
+        id="countryId"
         v-model="formState.countryId"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="w-full"
+        :items="countryOptions"
+        value-key="value"
+        label-key="label"
+        :placeholder="isLoadingCountries ? 'Loading countries...' : 'Select your country'"
         :disabled="isProfileSaving || isLoadingCountries"
       )
-        option(value="" disabled) {{ isLoadingCountries ? 'Loading countries...' : 'Select your country' }}
-        option(
-          v-for="country in countryOptions"
-          :key="country.value"
-          :value="country.value"
-        ) {{ country.label }}
     UFormField(label="Timezone" for="timezoneOffset")
-      select(
+      USelectMenu(
+        id="timezoneOffset"
         v-model="formState.timezoneOffset"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="w-full"
+        :items="timezoneOptions"
+        value-key="value"
+        label-key="label"
+        placeholder="Select your timezone"
         :disabled="isProfileSaving"
-        @change="onTimezoneChange"
       )
-        option(value="" disabled) Select your timezone
-        option(
-          v-for="timezone in timezoneOptions"
-          :key="timezone.value"
-          :value="timezone.value"
-        ) {{ timezone.label }}
-
-      div.mt-2.text-sm.text-gray-600
-        | Current value: {{ formState.timezoneOffset }}
 
     UFormField(label="Daylight Saving Time" for="isDaylightSaving")
       UCheckbox(

@@ -3,7 +3,7 @@ import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
-import { log } from "../logger";
+import { log } from "../server/logger";
 
 const { PrismaClient, Prisma } = prismaPkg;
 const databaseUrl = process.env.DATABASE_URL;

@@ -128,32 +128,37 @@ const contactMethods = [
     value: "support@dineros.cc",
     href: "mailto:support@dineros.cc",
     icon: "i-lucide-mail",
+    external: false,
   },
   {
     label: "Privacy",
     value: "privacy@dineros.cc",
     href: "mailto:privacy@dineros.cc",
     icon: "i-lucide-shield",
+    external: false,
   },
   {
     label: "Legal",
     value: "legal@dineros.cc",
     href: "mailto:legal@dineros.cc",
     icon: "i-lucide-file-text",
+    external: false,
   },
   {
     label: "Phone",
     value: "615-261-8201",
     href: "tel:+16152618201",
     icon: "i-lucide-phone",
+    external: false,
   },
   {
     label: "Mailing address",
     value: "5753 Highway 85 North PMB 3496, Crestview, FL 32536",
     href: "https://maps.google.com/?q=5753+Highway+85+North+PMB+3496+Crestview+FL+32536",
     icon: "i-lucide-map-pin",
+    external: true,
   },
-];
+] as const;
 </script>
 
 <template>
@@ -236,25 +241,16 @@ const contactMethods = [
             />
           </UFormField>
           <UFormField label="Why are you contacting?" name="reason">
-            <label id="reason-label" for="reason" class="sr-only"
-              >Why are you contacting?</label
-            >
-            <select
+            <USelect
               id="reason"
               v-model="formState.reason"
               name="reason"
-              aria-labelledby="reason-label"
-              class="w-full rounded-md border border-default bg-default px-3 py-2 text-default"
-            >
-              <option disabled value="">Select a reason</option>
-              <option
-                v-for="option in contactReasonOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </option>
-            </select>
+              class="w-full"
+              placeholder="Select a reason"
+              :items="contactReasonOptions"
+              value-key="value"
+              label-key="label"
+            />
           </UFormField>
           <UFormField label="Subject" name="subject">
             <UInput
@@ -296,14 +292,14 @@ const contactMethods = [
                 <p class="text-sm font-medium frog-text-muted">
                   {{ method.label }}
                 </p>
-                <a
-                  :href="method.href"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <ULink
+                  :to="method.href"
+                  :target="method.external ? '_blank' : undefined"
+                  :rel="method.external ? 'noopener noreferrer' : undefined"
                   class="text-base frog-text hover:text-primary wrap-break-word"
                 >
                   {{ method.value }}
-                </a>
+                </ULink>
               </div>
             </li>
           </ul>
@@ -315,13 +311,13 @@ const contactMethods = [
         </p>
         <p class="text-sm frog-text-muted">
           Review our
-          <NuxtLink to="/privacy-policy" class="frog-link hover:underline">
+          <ULink to="/privacy-policy" class="frog-link hover:underline">
             Privacy Policy
-          </NuxtLink>
+          </ULink>
           and
-          <NuxtLink to="/terms-of-service" class="frog-link hover:underline">
+          <ULink to="/terms-of-service" class="frog-link hover:underline">
             Terms of Service
-          </NuxtLink>
+          </ULink>
           for full details.
         </p>
       </div>

@@ -1066,27 +1066,33 @@ onBeforeUnmount(() => {
 <template lang="pug">
   section(ref="accountRegistersSectionEl" class="m-4")
     div(class="w-full flex flex-wrap items-center gap-2 mb-4")
-      UButton(color="info" size="sm" @click="handleAddAccountRegister") Add
-      UButton(
-        variant="soft"
-        size="sm"
-        :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
-        @click="handleManageCategories"
-      ) Manage Categories
-      UDropdownMenu(:items="sortMenuItems")
-        UButton(variant="soft" size="sm") Sort
-      UButton(variant="soft" size="sm" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
-      UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search" ref="search")
-      .ml-auto(
-        class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
-        role="button"
-        tabindex="0"
-        @click="showCrossAccountSnapshot = !showCrossAccountSnapshot"
-        @keydown.enter.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
-        @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+      RegisterListToolbar(
+        v-model:global-filter="globalFilter"
+        v-model:show-shortcuts="showShortcuts"
+        :show-refresh="false"
+        filter-class="w-full md:max-w-48"
+        @add="handleAddAccountRegister"
       )
-        span Your estimated net worth
-        b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
+        template(#middle)
+          UButton(
+            variant="soft"
+            size="sm"
+            :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
+            @click="handleManageCategories"
+          ) Manage Categories
+          UDropdownMenu(:items="sortMenuItems")
+            UButton(variant="soft" size="sm") Sort
+        template(#trailing)
+          .ml-auto(
+            class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
+            role="button"
+            tabindex="0"
+            @click="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+            @keydown.enter.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+            @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+          )
+            span Your estimated net worth
+            b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
 
     UCard(v-if="showShortcuts" class="my-4")
       template(#header)

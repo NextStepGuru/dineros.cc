@@ -9,8 +9,9 @@ build
 coverage
 
 
-# Pre-commit configuration
+# Pre-commit and detector config (patterns could self-match)
 .pre-commit-config.yaml
+.trufflehog-detectors.yaml
 
 # Environment files (already in .gitignore)
 .env
@@ -46,7 +47,10 @@ nextstepguru-project.json
 # Node modules and dependencies
 .pnpm
 
-# Deployment files (removed to allow scanning)
+# K8s manifests (reference secret names via secretKeyRef, no inline values)
+\.deploy/
+# Docs with example env vars (remove to scan README)
+README\.md
 
 # Backup files with test keys that are not in git
 prisma/backup
