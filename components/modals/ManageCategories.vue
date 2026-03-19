@@ -112,7 +112,7 @@ UModal(
           :disabled="!newName?.trim() || isAdding"
         ) Add
 
-      ul.divide-y.dark:divide-gray-700
+      ul.divide-y(class="dark:divide-gray-700")
         li.p-2.flex.items-center.gap-2(
           v-for="cat in categoriesForAccount"
           :key="cat.id"
@@ -141,7 +141,7 @@ UModal(
               @click="archiveCategory(cat.id)"
             ) Archive
 
-      p.text-sm.text-gray-500.dark:text-gray-400(
+      p.text-sm.text-gray-500(class="dark:text-gray-400")(
         v-if="categoriesForAccount.length === 0 && !newName"
       )
         | No categories yet. Add one above.
