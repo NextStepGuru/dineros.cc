@@ -75,8 +75,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: npx prisma generate
       - run: pnpm build
-        env:
-          NUXT_UI_PRO_LICENSE: ${{ secrets.NUXT_UI_PRO_LICENSE }}
 
   e2e:
     runs-on: ubuntu-latest
@@ -131,8 +129,6 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            NUXT_UI_PRO_LICENSE=${{ secrets.NUXT_UI_PRO_LICENSE }}
         env:
           CI: true
 

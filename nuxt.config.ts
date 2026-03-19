@@ -49,6 +49,13 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    typescript: {
+      // customize tsconfig.server.json
+      tsConfig: {
+        exclude: ["microservice"],
+      },
+    },
+
     compressPublicAssets: true,
     routeRules: {
       "/_nuxt/**": {
@@ -110,12 +117,12 @@ export default defineNuxtConfig({
       },
     },
     optimizeDeps: {
-      include: ["zod"],
+      include: ["zod", "@simplewebauthn/browser"],
       exclude: ["fsevents"],
     },
   },
   modules: [
-    "@nuxt/ui-pro",
+    "@nuxt/ui",
     "@pinia/nuxt",
     "@nuxt/image",
     "@nuxt/eslint",
@@ -128,9 +135,15 @@ export default defineNuxtConfig({
     strict: false,
     typeCheck: false,
     shim: false,
-  },
-  uiPro: {
-    license: process.env.NUXT_UI_PRO_LICENSE || "",
+    tsConfig: {
+      exclude: ["microservice"],
+    },
+    sharedTsConfig: {
+      exclude: ["microservice"],
+    },
+    nodeTsConfig: {
+      exclude: ["microservice"],
+    },
   },
   // Only configure cron if not in test mode
   ...(process.env.NODE_ENV !== "test" && {

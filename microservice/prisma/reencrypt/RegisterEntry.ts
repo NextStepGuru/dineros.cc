@@ -2,7 +2,7 @@
 
 import type { PrismaClient, RegisterEntry } from "@prisma/client";
 import {
-  ProgressReportCallback,
+  type ProgressReportCallback,
   defaultProgressReport,
   visitRecords,
 } from "prisma-field-encryption/dist/generator/runtime";

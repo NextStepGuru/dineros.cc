@@ -34,29 +34,15 @@ if [[ ! -f .dockerignore ]]; then
 fi
 
 echo "Building (context: ., file: ./Dockerfile, .dockerignore applied, platform: $PLATFORM)..."
-if [[ -n "${NUXT_UI_PRO_LICENSE:-}" ]]; then
-  docker buildx build \
-    --file ./Dockerfile \
-    --platform "$PLATFORM" \
-    --cache-from "type=local,src=$CACHE_DIR" \
-    --cache-to "type=local,dest=$CACHE_DIR,mode=max" \
-    --provenance=false \
-    --sbom=false \
-    --load \
-    --tag "dineros:local" \
-    --build-arg "NUXT_UI_PRO_LICENSE=$NUXT_UI_PRO_LICENSE" \
-    .
-else
-  docker buildx build \
-    --file ./Dockerfile \
-    --platform "$PLATFORM" \
-    --cache-from "type=local,src=$CACHE_DIR" \
-    --cache-to "type=local,dest=$CACHE_DIR,mode=max" \
-    --provenance=false \
-    --sbom=false \
-    --load \
-    --tag "dineros:local" \
-    .
-fi
+docker buildx build \
+  --file ./Dockerfile \
+  --platform "$PLATFORM" \
+  --cache-from "type=local,src=$CACHE_DIR" \
+  --cache-to "type=local,dest=$CACHE_DIR,mode=max" \
+  --provenance=false \
+  --sbom=false \
+  --load \
+  --tag "dineros:local" \
+  .
 
 echo "Done. Image: dineros:local"

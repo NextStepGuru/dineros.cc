@@ -1,3 +1,4 @@
+import { defineEventHandler } from "h3";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { log } from "~/server/logger";
 
@@ -48,14 +49,17 @@ export default defineEventHandler(async () => {
     });
 
     // Group balance entries by account register
-    const balanceEntriesByAccount = balanceEntries.reduce((acc, entry) => {
-      const accountRegisterId = entry.accountRegisterId;
-      if (!acc[accountRegisterId]) {
-        acc[accountRegisterId] = [];
-      }
-      acc[accountRegisterId].push(entry);
-      return acc;
-    }, {} as Record<number, typeof balanceEntries>);
+    const balanceEntriesByAccount = balanceEntries.reduce(
+      (acc, entry) => {
+        const accountRegisterId = entry.accountRegisterId;
+        if (!acc[accountRegisterId]) {
+          acc[accountRegisterId] = [];
+        }
+        acc[accountRegisterId].push(entry);
+        return acc;
+      },
+      {} as Record<number, typeof balanceEntries>,
+    );
 
     const result = {
       totalBalanceEntries: balanceEntries.length,

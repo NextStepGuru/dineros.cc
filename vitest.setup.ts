@@ -29,7 +29,6 @@ process.env.JWT_SECRET = "test-jwt-secret-key";
 process.env.REDIS_HOST = "127.0.0.1";
 process.env.REDIS_PORT = "6379";
 process.env.NATS_URL = "nats://localhost:4222";
-process.env.NUXT_UI_PRO_LICENSE = "test-license-key";
 process.env.DEPLOY_ENV = "local";
 process.env.TEST_DATE = "2024-01-01T00:00:00.000Z";
 process.env.TEST_TIMEZONE = "UTC";

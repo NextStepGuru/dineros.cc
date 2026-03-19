@@ -62,7 +62,6 @@ build_main_project() {
         -e PLAID_SECRET=dummy \
         -e POSTMARK_SERVER_TOKEN=dummy \
         -e JWT_SECRET=dummy \
-        -e NUXT_UI_PRO_LICENSE=dummy \
         dineros-main:test
 
     if [ $? -eq 0 ]; then

@@ -82,14 +82,6 @@ detectors:
       - MYSQL_URL=
     regex:
       value: '(?:DATABASE|MYSQL)_URL\s*=\s*["\x27]?(?:mysql|postgres|postgresql)://[^:]+:([^\s@"\x27/]{8,})@'
-  - name: Nuxt UI Pro license
-    description: NUXT_UI_PRO_LICENSE key
-    keywords:
-      - NUXT_UI_PRO_LICENSE
-    regex:
-      value: 'NUXT_UI_PRO_LICENSE\s*=\s*["\x27]?([a-zA-Z0-9_\-]{24,})["\x27]?'
-    exclude_words:
-      - "your-"
   - name: Cloak key (47ng)
     description: CLOAK_KEY for @47ng/cloak
     keywords:

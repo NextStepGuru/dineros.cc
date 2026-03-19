@@ -1,3 +1,4 @@
+import { defineEventHandler } from "h3";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { log } from "~/server/logger";
 
@@ -36,13 +37,15 @@ export default defineEventHandler(async () => {
     });
 
     // Group by pending status
-    const pendingEntries = entries.filter(e => e.isPending);
-    const nonPendingEntries = entries.filter(e => !e.isPending);
+    const pendingEntries = entries.filter((e) => e.isPending);
+    const nonPendingEntries = entries.filter((e) => !e.isPending);
 
     // Count by type
-    const projectedPending = pendingEntries.filter(e => e.isProjected && !e.isManualEntry).length;
-    const manualPending = pendingEntries.filter(e => e.isManualEntry).length;
-    const balanceEntries = entries.filter(e => e.isBalanceEntry).length;
+    const projectedPending = pendingEntries.filter(
+      (e) => e.isProjected && !e.isManualEntry,
+    ).length;
+    const manualPending = pendingEntries.filter((e) => e.isManualEntry).length;
+    const balanceEntries = entries.filter((e) => e.isBalanceEntry).length;
 
     const result = {
       totalEntries: entries.length,

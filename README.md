@@ -11,6 +11,7 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 ## 🚀 Features
 
 ### 💰 **Core Financial Management**
+
 - **Predictive Budgeting**: Advanced forecasting engine with 5-10x performance improvements
 - **Real-time Spending Tracking**: Monitor expenses and income in real-time
 - **Multi-Account Support**: Manage checking, savings, credit cards, loans, and investment accounts
@@ -20,6 +21,7 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 - **Asset Tracking**: Houses, cars, and other valuable assets
 
 ### 🔧 **Technical Features**
+
 - **Modern Architecture**: Nuxt 3 with TypeScript and modular service design
 - **High-Performance Forecasting**: Custom ModernCacheService for lightning-fast calculations
 - **Microservice Support**: Separate microservice for specialized operations
@@ -30,6 +32,7 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 - **Two-Factor Authentication**: Enhanced security with TOTP support
 
 ### 📊 **Advanced Analytics**
+
 - **Financial Forecasting**: 5-year projections with scenario modeling
 - **Balance Tracking**: Real-time account balance monitoring
 - **Transfer Management**: Inter-account transfers with validation
@@ -39,11 +42,12 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 ## 🏗️ Architecture
 
 ### **Main Application**
+
 ```
 Frontend (Nuxt 3)
 ├── Pages & Components
 ├── State Management (Pinia)
-├── UI Components (@nuxt/ui-pro)
+├── UI Components (@nuxt/ui)
 └── API Integration
 
 Backend Services
@@ -56,6 +60,7 @@ Backend Services
 ```
 
 ### **Microservice Architecture**
+
 ```
 Main Application (Port 3000)
 ├── Web Interface
@@ -69,6 +74,7 @@ Microservice (Port 3001)
 ```
 
 ### **Forecast Engine (New Architecture)**
+
 ```
 ForecastEngine (Orchestrator)
 ├── DataLoaderService (Database → Cache)
@@ -83,13 +89,15 @@ ForecastEngine (Orchestrator)
 ## 🛠️ Technology Stack
 
 ### **Frontend**
+
 - **Nuxt 3**: Vue.js framework with SSR/SSG
 - **TypeScript**: Full type safety
-- **@nuxt/ui-pro**: Modern UI components
+- **@nuxt/ui**: Modern UI components
 - **Pinia**: State management
 - **Tailwind CSS**: Utility-first styling
 
 ### **Backend**
+
 - **Node.js 22+**: Runtime environment
 - **Prisma**: Database ORM with migrations
 - **PostgreSQL/MySQL**: Primary database
@@ -97,6 +105,7 @@ ForecastEngine (Orchestrator)
 - **BullMQ**: Job queue management
 
 ### **Infrastructure**
+
 - **Docker**: Containerization
 - **Docker Compose**: Local development
 - **Plaid API**: Bank account integration
@@ -106,6 +115,7 @@ ForecastEngine (Orchestrator)
 ## 📦 Installation & Setup
 
 ### **Prerequisites**
+
 - Node.js 22.0.0 or higher
 - Docker and Docker Compose
 - Git
@@ -113,12 +123,14 @@ ForecastEngine (Orchestrator)
 ### **Quick Start**
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/your-org/dineros.cc.git
 cd dineros.cc
 ```
 
 2. **Install dependencies**
+
 ```bash
 # Using pnpm (recommended)
 pnpm install
@@ -128,12 +140,14 @@ npm install
 ```
 
 3. **Set up environment variables**
+
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
 ```
 
 4. **Start development environment**
+
 ```bash
 # Start database and Redis
 docker-compose up -d
@@ -146,6 +160,7 @@ pnpm dev
 ```
 
 5. **Access the application**
+
 - Main app: http://localhost:3000
 - Microservice: http://localhost:3001
 
@@ -263,20 +278,17 @@ PLAID_SECRET="your-plaid-secret"
 
 # Email
 POSTMARK_API_KEY="your-postmark-api-key"
-
-# UI Pro License
-NUXT_UI_PRO_LICENSE="your-ui-pro-license"
 ```
 
 ## 📊 Performance
 
 ### **Forecast Engine Performance**
 
-| Dataset Size | Execution Time | Memory Usage | Improvement |
-|-------------|----------------|--------------|-------------|
-| Small (1 account, 10 entries) | < 50ms | < 5MB | 5x faster |
-| Medium (10 accounts, 1K entries) | < 500ms | < 25MB | 3x faster |
-| Large (50 accounts, 10K entries) | < 2s | < 100MB | 2x faster |
+| Dataset Size                     | Execution Time | Memory Usage | Improvement |
+| -------------------------------- | -------------- | ------------ | ----------- |
+| Small (1 account, 10 entries)    | < 50ms         | < 5MB        | 5x faster   |
+| Medium (10 accounts, 1K entries) | < 500ms        | < 25MB       | 3x faster   |
+| Large (50 accounts, 10K entries) | < 2s           | < 100MB      | 2x faster   |
 
 ### **Cache Performance**
 
@@ -287,12 +299,14 @@ NUXT_UI_PRO_LICENSE="your-ui-pro-license"
 ## 🔒 Security
 
 ### **Data Protection**
+
 - **Field-level Encryption**: Sensitive data encrypted at rest
 - **JWT Authentication**: Secure token-based authentication
 - **Two-Factor Authentication**: TOTP support for enhanced security
 - **HTTPS Enforcement**: Secure communication protocols
 
 ### **Compliance**
+
 - **GDPR Ready**: Data protection and privacy controls
 - **Financial Data Standards**: Secure handling of financial information
 - **Audit Logging**: Comprehensive activity tracking
@@ -330,16 +344,19 @@ NUXT_UI_PRO_LICENSE="your-ui-pro-license"
 ## 📚 Documentation
 
 ### **API Documentation**
+
 - **REST API**: `/api/` endpoints for all operations
 - **WebSocket API**: Real-time data synchronization
 - **Plaid Webhooks**: Bank account integration
 
 ### **Architecture Documentation**
+
 - **Forecast Engine**: [Forecast Engine README](server/services/forecast/README.md)
 - **Migration Guide**: [Migration Guide](server/services/forecast/migration-guide.md)
 - **Testing Guide**: [Testing Documentation](server/services/forecast/TESTING.md)
 
 ### **Development Guides**
+
 - **Quick Test Commands**: [Quick Test Guide](server/services/forecast/QUICK_TEST.md)
 - **Cache Analysis**: [Cache System Analysis](server/services/forecast/cache-analysis.md)
 
@@ -348,6 +365,7 @@ NUXT_UI_PRO_LICENSE="your-ui-pro-license"
 ### **Common Issues**
 
 **Database Connection Issues**
+
 ```bash
 # Check database status
 docker-compose ps
@@ -357,6 +375,7 @@ pnpm reset-database
 ```
 
 **Forecast Engine Performance**
+
 ```bash
 # Run performance tests
 npm run test:forecast:performance
@@ -366,6 +385,7 @@ npm run test:forecast
 ```
 
 **Docker Build Issues**
+
 ```bash
 # Test Docker builds
 ./build-test.sh
@@ -392,11 +412,13 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 ### **Getting Help**
+
 - **Issues**: Create an issue on GitHub
 - **Documentation**: Check the `/docs` directory
 - **Community**: Join our Discord/Telegram
 
 ### **Contact**
+
 - **Email**: support@dineros.cc
 - **Website**: https://dineros.cc
 - **Documentation**: https://docs.dineros.cc

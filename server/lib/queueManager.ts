@@ -3,20 +3,23 @@ import type { Job, JobsOptions } from "bullmq";
 import type Redis from "ioredis";
 import { dateTimeService } from "../services/forecast/DateTimeService";
 
-/** Job data is typed per-queue (BackupJob, RecalculateJob, PlaidSyncJob, PlaidSyncBalanceJob). */
-interface QueueConfig<T = unknown> {
+/**
+ * Registry entry for BullMQ: each worker only runs jobs for its queue, but TypeScript
+ * cannot express a heterogeneous list of per-payload processors without contravariance errors.
+ */
+export type QueueRegistryConfig = {
   name: string;
-  processor: (job: Job<T>) => Promise<void>;
-}
+  processor: (job: Job<unknown, any, string>) => Promise<void>;
+};
 
 class QueueManager {
   queues: Map<string, unknown> = new Map();
   workers: Map<string, unknown> = new Map();
   connection: Redis | null;
   isTestMode: boolean;
-  queueConfigs: QueueConfig[];
+  queueConfigs: QueueRegistryConfig[];
 
-  constructor(queueConfigs: QueueConfig[], connection: Redis) {
+  constructor(queueConfigs: QueueRegistryConfig[], connection: Redis) {
     this.queueConfigs = queueConfigs;
     this.connection = connection;
     this.isTestMode = process.env.NODE_ENV === "test";

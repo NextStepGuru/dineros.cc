@@ -1,4 +1,4 @@
-import QueueManager from "../lib/queueManager";
+import QueueManager, { type QueueRegistryConfig } from "../lib/queueManager";
 import type { BackupJob } from "../queues/backupQueue";
 import backup from "../queues/backupQueue";
 import type { RecalculateJob } from "../queues/recalculateQueue";
@@ -15,7 +15,7 @@ export const queueConfigs = [
   { name: recalculate.queueName, processor: recalculate.processor },
   { name: plaidSync.queueName, processor: plaidSync.processor },
   { name: plaidBalanceSync.queueName, processor: plaidBalanceSync.processor },
-];
+] as QueueRegistryConfig[];
 
 log({ message: `BullMQ Queues: ${queueConfigs.length}`, level: "info" });
 export const queueManager = new QueueManager(

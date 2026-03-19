@@ -3,7 +3,7 @@ import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
-import { log } from "~/server/logger";
+import { log } from "../server/logger";
 
 const { PrismaClient, Prisma } = prismaPkg;
 const databaseUrl = process.env.DATABASE_URL;
@@ -18,7 +18,7 @@ export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)
     .filter(
       (key) =>
-        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS",
+        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS"
     )
     .map((key) => process.env[key]!)
     .filter((value) => value !== undefined); // Ensure no undefined values
@@ -42,32 +42,22 @@ export const prisma = globalClient.$extends(
     dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
     decryptionKeys: dbDecryptionKeyValues,
-  }),
+  })
 ) as PrismaClientType;
 
 export const initializePrisma = async () => {
   try {
     await prisma.$connect();
-    log({
-      message: "Prisma client connected to the database.",
-      level: "debug",
-    });
+    log({ message: "Prisma client connected to the database.", level: "debug" });
   } catch (error) {
-    log({
-      message: "Error connecting Prisma client:",
-      data: error,
-      level: "error",
-    });
+    log({ message: "Error connecting Prisma client:", data: error, level: "error" });
   }
 };
 
 export const closePrisma = async () => {
   try {
     await prisma.$disconnect();
-    log({
-      message: "Prisma client disconnected successfully.",
-      level: "debug",
-    });
+    log({ message: "Prisma client disconnected successfully.", level: "debug" });
   } catch (error) {
     log({
       message: "Error disconnecting Prisma client:",

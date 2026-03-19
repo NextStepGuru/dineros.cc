@@ -158,11 +158,6 @@ spec:
                 secretKeyRef:
                   name: dineros-secrets
                   key: PLAID_SECRET
-            - name: NUXT_UI_PRO_LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: dineros-secrets
-                  key: NUXT_UI_PRO_LICENSE
             - name: DEBUG
               value: "dineros:*"
             - name: GOOGLE_APPLICATION_CREDENTIALS
