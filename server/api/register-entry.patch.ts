@@ -20,9 +20,10 @@ export default defineEventHandler(async (event: H3Event) => {
       }),
       isReconciled: z.boolean().optional(),
       isCleared: z.boolean().optional(),
+      reoccurrenceId: z.coerce.number().nullable().optional(),
     });
 
-    const { registerEntryId, accountRegisterId, isReconciled, isCleared } =
+    const { registerEntryId, accountRegisterId, isReconciled, isCleared, reoccurrenceId } =
       patchSchema.parse(body);
 
     // Can the user create or update a register entry for this account?
@@ -56,17 +57,55 @@ export default defineEventHandler(async (event: H3Event) => {
         });
       });
 
+    if (
+      reoccurrenceId !== undefined &&
+      reoccurrenceId !== null &&
+      reoccurrenceId > 0
+    ) {
+      await PrismaDb.reoccurrence.findFirstOrThrow({
+        where: {
+          id: reoccurrenceId,
+          accountRegisterId,
+          register: {
+            account: {
+              userAccounts: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    const data: {
+      hasBalanceReCalc: boolean;
+      isReconciled?: boolean;
+      isCleared?: boolean;
+      isPending?: boolean;
+      reoccurrenceId?: number | null;
+    } = { hasBalanceReCalc: true };
+
+    if (isReconciled !== undefined) {
+      data.isReconciled = isReconciled;
+    }
+    if (isCleared !== undefined) {
+      data.isCleared = isCleared;
+    }
+    if (isReconciled !== undefined || isCleared !== undefined) {
+      data.isPending = !!(isReconciled || isCleared);
+    }
+    if (reoccurrenceId !== undefined) {
+      data.reoccurrenceId = reoccurrenceId;
+    }
+
     const registerEntry = await PrismaDb.registerEntry
       .update({
         where: {
           id: registerEntryId,
         },
-        data: {
-          isReconciled,
-          isCleared,
-          isPending: !!(isReconciled || isCleared),
-          hasBalanceReCalc: true,
-        },
+        data,
       })
       .catch(() => {
         throw createError({

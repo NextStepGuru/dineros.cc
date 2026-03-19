@@ -95,6 +95,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "splits": {
  *       "modelName": "ReoccurrenceSplit",
  *       "isList": true
+ *     },
+ *     "plaidNameAliases": {
+ *       "modelName": "ReoccurrencePlaidNameAlias",
+ *       "isList": true
  *     }
  *   }
  * }

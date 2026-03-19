@@ -185,10 +185,11 @@ model AccountRegister {
   collateralAsset     AccountRegister?  @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
   loansSecuredByAsset AccountRegister[] @relation("RegisterCollateral")
 
-  entries       RegisterEntry[]
-  reoccurrences Reoccurrence[]
-  splitTargets  ReoccurrenceSplit[]
-  children      AccountRegister[]   @relation("ar_children")
+  entries            RegisterEntry[]
+  reoccurrences      Reoccurrence[]
+  splitTargets       ReoccurrenceSplit[]
+  plaidNameAliases   ReoccurrencePlaidNameAlias[]
+  children           AccountRegister[]   @relation("ar_children")
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
@@ -292,17 +293,34 @@ model Reoccurrence {
   categoryId                String?   @map("category_id")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  account   Account             @relation(fields: [accountId], references: [id])
-  register  AccountRegister     @relation(fields: [accountRegisterId], references: [id])
-  interval  Interval            @relation(fields: [intervalId], references: [id])
-  category  Category?           @relation(fields: [categoryId], references: [id])
-  entries  RegisterEntry[]
-  skips    ReoccurrenceSkip[]
-  splits   ReoccurrenceSplit[]
+  account          Account                      @relation(fields: [accountId], references: [id])
+  register         AccountRegister              @relation(fields: [accountRegisterId], references: [id])
+  interval         Interval                     @relation(fields: [intervalId], references: [id])
+  category         Category?                    @relation(fields: [categoryId], references: [id])
+  entries          RegisterEntry[]
+  skips            ReoccurrenceSkip[]
+  splits           ReoccurrenceSplit[]
+  plaidNameAliases ReoccurrencePlaidNameAlias[]
 
   @@index([accountId])
   @@index([accountId, lastAt])
   @@map("reoccurrence")
+}
+
+model ReoccurrencePlaidNameAlias {
+  id                Int      @id @default(autoincrement()) @db.UnsignedInt
+  accountRegisterId Int      @map("account_register_id") @db.UnsignedInt
+  normalizedName    String   @map("normalized_name") @db.VarChar(500)
+  reoccurrenceId    Int      @map("reoccurrence_id") @db.UnsignedInt
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  register     AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  reoccurrence Reoccurrence    @relation(fields: [reoccurrenceId], references: [id], onDelete: Cascade)
+
+  @@unique([accountRegisterId, normalizedName])
+  @@index([accountRegisterId])
+  @@map("reoccurrence_plaid_name_alias")
 }
 
 model ReoccurrenceSplit {

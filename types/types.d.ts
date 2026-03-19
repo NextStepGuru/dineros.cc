@@ -75,6 +75,8 @@ export type RegisterEntry = {
   isProjected: boolean;
   isBalanceEntry: boolean;
   isPending: boolean;
+  /** Set when the row is tied to a Plaid transaction (import or match). */
+  plaidId?: string | null;
 };
 
 export type PlaidAccount = z.infer<typeof plaidAccountSchema>;
