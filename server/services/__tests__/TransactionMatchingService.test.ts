@@ -20,8 +20,12 @@ describe("TransactionMatchingService", () => {
     mockDb = {
       registerEntry: {
         findFirst: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn(),
         create: vi.fn(),
+      },
+      reoccurrencePlaidNameAlias: {
+        findUnique: vi.fn().mockResolvedValue(null),
       },
     };
 
