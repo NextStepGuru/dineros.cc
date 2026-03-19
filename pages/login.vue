@@ -57,7 +57,6 @@ const tokenChallengeRequired = ref(false);
 const mfaMethods = ref<Array<"totp" | "passkey" | "email">>([]);
 const selectedMfaMethod = ref<"totp" | "passkey" | "email">("totp");
 const emailCodeSent = ref(false);
-const loginFormRef = ref<{ submit: () => void } | null>(null);
 
 watch(selectedMfaMethod, (method) => {
   formState.value.tokenChallenge = "";
@@ -65,18 +64,6 @@ watch(selectedMfaMethod, (method) => {
     emailCodeSent.value = false;
   }
 });
-
-function onLoginClick() {
-  const form = loginFormRef.value;
-  if (typeof form?.submit === "function") {
-    form.submit();
-  } else {
-    // Fallback: UForm submit event may not fire inside ClientOnly; call handler with current state
-    handleSubmit({
-      data: { ...formState.value },
-    } as FormSubmitEvent<LoginSchemaType>);
-  }
-}
 
 function onFormError(event: Parameters<typeof handleError>[0]) {
   handleError(event, toast);
@@ -295,7 +282,7 @@ async function startPasskeySignIn() {
         title="Welcome back"
         subtitle="Sign in to continue forecasting, tracking, and planning with confidence."
       )
-        UForm(ref="loginFormRef" class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
+        UForm(class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
           UFormField(v-if="tokenChallengeRequired" label="Verification method" for="mfaMethod")
             select(
               id="mfaMethod"
@@ -342,10 +329,9 @@ async function startPasskeySignIn() {
           UButton(
             color="primary"
             size="lg"
-            type="button"
+            type="submit"
             :disabled="isSaving || (tokenChallengeRequired && selectedMfaMethod === 'passkey')"
             :loading="isSaving"
-            @click="onLoginClick"
           ) {{ tokenChallengeRequired && selectedMfaMethod === 'email' && !emailCodeSent ? 'Send email code' : 'Sign in' }}
 
         template(#footer)

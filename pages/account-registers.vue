@@ -538,7 +538,10 @@ const showShortcuts = ref(false);
 const modal = overlay.create(ModalsEditAccountRegister);
 const categoriesModal = overlay.create(ModalsManageCategories);
 
+const selectedAccountRegisterId = ref<number | null>(null);
+
 function handleTableClick(data: AccountRegister) {
+  selectedAccountRegisterId.value = data.id;
   const editAccountRegister: ModelAccountRegisterProps = {
     id: data.id,
     title: `Edit '${data.name}' Account`,
@@ -641,7 +644,14 @@ function handleAddAccountRegister() {
 }
 
 function handleManageCategories() {
+  const selectedAccountId = selectedAccountRegisterId.value
+    ? listStore.getAccountRegisters.find(
+        (r) => r.id === selectedAccountRegisterId.value,
+      )?.accountId
+    : null;
+
   const accountId =
+    selectedAccountId ??
     listStore.getAccountRegisters[0]?.accountId ??
     listStore.getAccounts?.[0]?.id;
   if (!accountId) {
