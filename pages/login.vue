@@ -290,13 +290,11 @@ async function startPasskeySignIn() {
 <template lang="pug">
   section(class="auth-page flex items-center justify-center")
     ClientOnly
-      UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
-        template(#header)
-          .auth-card__header
-            UIcon(name="i-lucide-log-in" class="size-10 text-primary")
-            h1(class="text-2xl font-bold") Welcome back
-            p(class="text-sm frog-text-muted") Sign in to continue forecasting, tracking, and planning with confidence.
-
+      AuthFormCard(
+        icon="i-lucide-log-in"
+        title="Welcome back"
+        subtitle="Sign in to continue forecasting, tracking, and planning with confidence."
+      )
         UForm(ref="loginFormRef" class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
           UFormField(v-if="tokenChallengeRequired" label="Verification method" for="mfaMethod")
             select(
@@ -354,15 +352,11 @@ async function startPasskeySignIn() {
           div(class="text-sm text-center")
             ul
               li
-                NuxtLink(to="/signup" class="frog-link hover:underline")  New to Dineros? Create account
+                ULink(to="/signup" class="frog-link hover:underline")  New to Dineros? Create account
               li
-                NuxtLink(to="/forgot-password" class="frog-link hover:underline")  Forgot password?
+                ULink(to="/forgot-password" class="frog-link hover:underline")  Forgot password?
       template(#fallback)
-        UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
-          template(#header)
-            .auth-card__header
-              UIcon(name="i-lucide-log-in" class="size-10 text-primary")
-              h1(class="text-2xl font-bold") Welcome back
+        AuthFormCard(icon="i-lucide-log-in" title="Welcome back" :subtitle="null")
           div(class="flex justify-center py-8")
             UIcon(name="i-lucide-loader-2" class="animate-spin size-8 text-primary")
 </template>

@@ -294,7 +294,7 @@ defineShortcuts({
 </script>
 
 <template lang="pug">
-UModal(title="Edit Account Register" description="Edit Account Register" class="max-sm:!w-full max-sm:!h-full max-sm:!max-w-none max-sm:!max-h-none max-sm:!rounded-none")
+UModal(title="Edit Account Register" description="Edit Account Register" class="modal-mobile-fullscreen")
   template(#body)
     UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isSaving" ref="form")
       .flex.space-x-4

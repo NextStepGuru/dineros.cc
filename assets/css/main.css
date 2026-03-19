@@ -366,3 +366,14 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: inherit !important;
   transition: background-color 5000s ease-in-out 0s !important;
 }
+
+/* Shared Nuxt UI UModal mobile fullscreen (matches Tailwind max-sm / 639px) */
+@media (width < 40rem) {
+  .modal-mobile-fullscreen {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+}

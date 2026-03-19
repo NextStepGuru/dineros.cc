@@ -216,7 +216,7 @@ defineShortcuts({
 </script>
 
 <template lang="pug">
-UModal(title="Edit Reoccurrence" class="max-sm:w-full! max-sm:h-full! max-sm:max-w-none! max-sm:max-h-none! max-sm:rounded-none!")
+UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
   template(#body)
     UForm(:schema="reoccurrenceWithSplitsSchema" :state="formState" class="space-y-4" @submit="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving || isDeleting" ref="form")
       .flex.space-x-4

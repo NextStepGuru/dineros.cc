@@ -95,7 +95,7 @@ defineShortcuts({
 UModal(
   title="Manage Categories"
   description="Add, edit, or archive categories for this account."
-  class="max-sm:!w-full max-sm:!max-w-none"
+  class="modal-mobile-fullscreen"
 )
   template(#body)
     .space-y-4

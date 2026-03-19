@@ -53,12 +53,14 @@ useHead({
 
 <template lang="pug">
 section(class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" itemscope itemtype="https://schema.org/Article")
-  h1(class="text-3xl font-bold tracking-tight" itemprop="headline") About Dineros
-  p(class="mt-2 text-sm frog-text-muted")
-    | By
-    span(itemprop="author") Dineros Editorial Team
-    |  •
-    time(itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z") Published March 14, 2026
+  UCard(class="mb-8")
+    h1(class="text-3xl font-bold tracking-tight" itemprop="headline") About Dineros
+    p(class="mt-2 text-sm frog-text-muted")
+      | By
+      span(itemprop="author") Dineros Editorial Team
+      |  •
+      time(itemprop="datePublished" datetime="2026-03-14T00:00:00.000Z") Published March 14, 2026
+  USeparator(class="my-8")
   p(class="mt-4 text-base leading-7 frog-text")
     | Dineros is a predictive budgeting platform built to help people and teams
     | make better money decisions before issues happen.
@@ -104,9 +106,9 @@ section(class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" itemscope itemtype=
   p(class="mt-6 text-sm frog-text-muted")
     | Learn more about how we handle your information in our
     |
-    NuxtLink(to="/privacy-policy" class="frog-link hover:underline") Privacy Policy
+    ULink(to="/privacy-policy" class="frog-link hover:underline") Privacy Policy
     |  and review service rules in our
     |
-    NuxtLink(to="/terms-of-service" class="frog-link hover:underline") Terms of Service
+    ULink(to="/terms-of-service" class="frog-link hover:underline") Terms of Service
     | .
 </template>

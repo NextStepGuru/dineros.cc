@@ -700,11 +700,16 @@ async function recalcAccount() {
       v-if="tableEntries.length > 0 || showAccountSelector"
       class="flex-col mt-4 gap-2 md:flex-row md:flex-wrap md:items-center md:space-x-4")
       div(v-if="tableEntries.length > 0" class="w-full flex flex-wrap gap-2 items-center")
-        UButton(color="info" size="sm" @click="handleAddEntry") Add
-        UButton(size="sm" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
-        UButton(color="error" size="sm" @click="recalcAccount()" :loading="isRecalcAccountLoading" :aria-busy="isRecalcAccountLoading") Recalc
-        UButton(variant="soft" size="sm" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
-        UInput(v-model="globalFilter" size="sm" class="w-full min-w-[8rem] sm:max-w-48 lg:max-w-48 grow" placeholder="Filter..." id="search")
+        RegisterListToolbar(
+          v-model:global-filter="globalFilter"
+          v-model:show-shortcuts="showShortcuts"
+          :refresh-loading="isRefreshLoading"
+          filter-class="w-full min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+          @add="handleAddEntry"
+          @refresh="refreshAccountEntries"
+        )
+          template(#middle)
+            UButton(color="error" size="sm" @click="recalcAccount()" :loading="isRecalcAccountLoading" :aria-busy="isRecalcAccountLoading") Recalc
 
       div(v-if="showAccountSelector" class="ml-auto flex justify-center items-center")
         div(class="text-sm font-medium frog-text-muted mt-2 mr-2 text-nowrap") Selected Account:

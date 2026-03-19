@@ -117,9 +117,10 @@ const features = [
         </p>
 
         <div class="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          <div
+          <UCard
             v-for="feature in features"
             :key="feature.title"
+            variant="subtle"
             class="frog-feature-card group relative rounded-2xl p-8 backdrop-blur transition">
             <div
               class="frog-feature-icon mb-4 inline-flex items-center justify-center rounded-xl p-3">
@@ -131,7 +132,7 @@ const features = [
             <p class="mt-2 text-sm leading-relaxed frog-subheading">
               {{ feature.description }}
             </p>
-          </div>
+          </UCard>
         </div>
 
         <p class="mt-10 text-center text-sm frog-subheading">

@@ -66,8 +66,9 @@ const handleErrorForTemplate = handleError;
 </script>
 
 <template lang="pug">
-div(class="max-w-md min-h-96 my-4 m-auto")
-  h2(class="text-xl font-bold text-center") Change Password
+UCard(class="max-w-md min-h-96 my-4 m-auto")
+  template(#header)
+    h2(class="text-xl font-bold text-center") Change Password
 
   UForm(class="m-4 space-y-4" @submit.prevent="handlePasswordSubmit" :state="passwordState" :schema="passwordSchema" @error="handleError($event, toast)" :disabled="isPasswordChanging")
     UFormField(label="Password" for="newPassword")

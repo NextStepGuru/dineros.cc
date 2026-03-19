@@ -392,7 +392,7 @@ const transferDestinationAccounts = computed(() => {
 </script>
 
 <template lang="pug">
-UModal(title="Edit Register Entry" description="Edit Register Entry" class="max-sm:w-full! max-sm:h-full! max-sm:max-w-none! max-sm:max-h-none! max-sm:rounded-none!")
+UModal(title="Edit Register Entry" description="Edit Register Entry" class="modal-mobile-fullscreen")
   template(#body)
     // Apply Account Selection
     div(v-if="state.showApplySelection" class="space-y-4")

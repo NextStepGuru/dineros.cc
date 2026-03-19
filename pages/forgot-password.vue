@@ -87,13 +87,11 @@ const handleSubmit = async ({
 
 <template lang="pug">
   section(class="auth-page flex items-center justify-center")
-    UCard(class="auth-card w-full max-w-md p-8 rounded-2xl")
-      template(#header)
-        .auth-card__header
-          UIcon(name="i-lucide-key-round" class="size-10 text-primary")
-          h1(class="text-2xl font-bold") Recover your account
-          p(class="text-sm frog-text-muted") Enter your email and we will send a secure reset code.
-
+    AuthFormCard(
+      icon="i-lucide-key-round"
+      title="Recover your account"
+      subtitle="Enter your email and we will send a secure reset code."
+    )
       UForm(:state="formState" :schema="forgotPasswordSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
         UFormField(label="Email Address" for="email")
           UInput(
@@ -117,7 +115,7 @@ const handleSubmit = async ({
         div(class="text-sm text-center")
           ul
             li
-              NuxtLink(to="/signup" class="frog-link hover:underline")  Need an account? Create one
+              ULink(to="/signup" class="frog-link hover:underline")  Need an account? Create one
             li
-              NuxtLink(to="/login" class="frog-link hover:underline")  Back to sign in
+              ULink(to="/login" class="frog-link hover:underline")  Back to sign in
 </template>

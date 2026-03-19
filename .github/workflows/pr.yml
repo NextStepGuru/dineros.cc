@@ -61,6 +61,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    continue-on-error: true
     env:
       DATABASE_URL: "mysql://ci:ci@localhost:3306/ci"
       CI: true

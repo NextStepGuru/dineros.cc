@@ -1,7 +1,25 @@
 <script setup lang="ts">
 import type { PlaidLinkOptions } from "@jcss/vue-plaid-link";
 import { PlaidLink } from "@jcss/vue-plaid-link";
+import type { TableColumn } from "@nuxt/ui";
+import { h, resolveComponent } from "vue";
 import type { PlaidAccount, User } from "../../types/types";
+
+const UButton = resolveComponent("UButton");
+const USelect = resolveComponent("USelect");
+const UIcon = resolveComponent("UIcon");
+
+type SyncedAccountRow = {
+  id: number;
+  name: string;
+  balance: number;
+  plaidLastSyncAt: string | null;
+  type: { name: string; isCredit: boolean };
+};
+
+const stripedTheme = ref({
+  tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
+});
 
 const toast = useToast();
 const authStore = useAuthStore();
@@ -58,7 +76,7 @@ async function connectToPlaid() {
 }
 
 // Currently synced accounts
-const syncedAccounts = ref<any[]>([]);
+const syncedAccounts = ref<SyncedAccountRow[]>([]);
 async function loadSyncedAccounts() {
   isLoading.value = true;
   try {
@@ -67,7 +85,7 @@ async function loadSyncedAccounts() {
     );
 
     if (res?.value && !error?.value) {
-      syncedAccounts.value = res.value.accounts;
+      syncedAccounts.value = res.value.accounts as SyncedAccountRow[];
     } else if (error?.value) {
       // Only show error if it's not a "Plaid not enabled" error
       if (!error.value.message?.includes("not enabled")) {
@@ -253,6 +271,102 @@ function formatBalance(balance: number, isCredit: boolean) {
     return balance < 0 ? `-${formatted}` : `+${formatted}`;
   }
 }
+
+const syncedColumns = computed<TableColumn<SyncedAccountRow>[]>(() => {
+  void isDisconnecting.value;
+  return [
+    {
+      accessorKey: "name",
+      header: () => h("div", { class: "text-left" }, "Account Name"),
+      cell: ({ row }) => row.getValue("name"),
+    },
+    {
+      id: "accountType",
+      header: () => h("div", { class: "text-left" }, "Type"),
+      cell: ({ row }) => row.original.type?.name ?? "—",
+    },
+    {
+      id: "balance",
+      header: () => h("div", { class: "text-left" }, "Balance"),
+      cell: ({ row }) => {
+        const acc = row.original;
+        const cls =
+          acc.balance < 0 ? "frog-status-negative" : "frog-status-positive";
+        return h(
+          "div",
+          { class: cls },
+          formatBalance(acc.balance, acc.type.isCredit),
+        );
+      },
+    },
+    {
+      id: "lastSync",
+      header: () => h("div", { class: "text-left" }, "Last Sync"),
+      cell: ({ row }) => formatDate(row.original.plaidLastSyncAt),
+    },
+    {
+      id: "actions",
+      header: () => h("div", { class: "text-left" }, "Actions"),
+      cell: ({ row }) =>
+        h(
+          UButton,
+          {
+            color: "error",
+            size: "sm",
+            loading: isDisconnecting.value === row.original.id,
+            onClick: () => disconnectAccount(row.original.id),
+          },
+          { default: () => "Disconnect" },
+        ),
+    },
+  ];
+});
+
+const linkColumns = computed<TableColumn<PlaidAccount>[]>(() => {
+  void selectedAccounts.value;
+  void linkBankAccounts.value;
+  return [
+    {
+      accessorKey: "name",
+      header: () => h("div", { class: "text-left" }, "Plaid Account"),
+      cell: ({ row }) => row.getValue("name"),
+    },
+    {
+      accessorKey: "mask",
+      header: () => h("div", { class: "text-left" }, "Account Number"),
+      cell: ({ row }) => row.getValue("mask"),
+    },
+    {
+      id: "arrow",
+      header: () => h("div", {}),
+      cell: () =>
+        h(UIcon, {
+          name: "lucide:arrow-right-left",
+          class: "frog-text-muted",
+        }),
+    },
+    {
+      id: "linkTo",
+      header: () => h("div", { class: "text-left" }, "Link To"),
+      cell: ({ row }) => {
+        const plaidId = row.original.id;
+        return h(USelect, {
+          modelValue: selectedAccounts.value[plaidId],
+          "onUpdate:modelValue": (v: number | string | null) => {
+            selectedAccounts.value = {
+              ...selectedAccounts.value,
+              [plaidId]: v as number | null,
+            };
+          },
+          items: linkBankAccounts.value,
+          valueKey: "id",
+          labelKey: "name",
+          class: "w-full",
+        });
+      },
+    },
+  ];
+});
 </script>
 
 <template lang="pug">
@@ -275,62 +389,24 @@ div.p-4
     // Currently synced accounts
     div(v-if="syncedAccounts.length > 0")
       h3(class="text-lg font-semibold mb-4") Currently Synced Accounts
-      .overflow-x-auto
-        table(class="w-full mb-6")
-          thead(class="frog-surface-elevated")
-            tr
-              th.text-left.p-3 Account Name
-              th.text-left.p-3 Type
-              th.text-left.p-3 Balance
-              th.text-left.p-3 Last Sync
-              th.text-left.p-3 Actions
-          tbody
-            tr(
-              v-for="account in syncedAccounts"
-              :key="account.id"
-              class="border-b frog-border"
-            )
-              td.p-3 {{ account.name }}
-              td.p-3 {{ account.type.name }}
-              td.p-3(:class="account.balance < 0 ? 'frog-status-negative' : 'frog-status-positive'") {{ formatBalance(account.balance, account.type.isCredit) }}
-              td.p-3 {{ formatDate(account.plaidLastSyncAt) }}
-              td.p-3
-                UButton(
-                  color="error"
-                  size="sm"
-                  :loading="isDisconnecting === account.id"
-                  @click="disconnectAccount(account.id)"
-                ) Disconnect
+      .overflow-x-auto.mb-6
+        UTable(
+          class="w-full"
+          :data="syncedAccounts"
+          :columns="syncedColumns"
+          :ui="stripedTheme"
+        )
 
     // Available accounts to link (only show when Plaid is connected)
     div(v-if="authStore.hasPlaidConnected && availablePlaidAccounts.length > 0")
       h3(class="text-lg font-semibold mb-4 mt-8") Available Accounts to Link
       .overflow-x-auto
-        table(class="w-full")
-          thead(class="frog-surface-elevated")
-            tr
-              th.text-left.p-3 Plaid Account
-              th.text-left.p-3 Account Number
-              th.text-left.p-3
-              th.text-left.p-3 Link To
-          tbody
-            tr(
-              v-for="account in availablePlaidAccounts"
-              :key="account.id"
-              class="border-b frog-border"
-            )
-              td.p-3 {{ account.name }}
-              td.p-3 {{ account.mask }}
-              td.p-3
-                UIcon(name="lucide:arrow-right-left" class="frog-text-muted")
-              td.p-3
-                USelect(
-                  v-model="selectedAccounts[account.id]"
-                  :items="linkBankAccounts"
-                  value-key="id"
-                  label-key="name"
-                  class="w-full"
-                )
+        UTable(
+          class="w-full"
+          :data="availablePlaidAccounts"
+          :columns="linkColumns"
+          :ui="stripedTheme"
+        )
 
       .mt-4
         UButton(
