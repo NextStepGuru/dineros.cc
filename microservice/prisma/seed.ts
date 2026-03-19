@@ -12,8 +12,8 @@ import { categories } from "./backup/categories";
 import { reoccurrences } from "./backup/reoccurrences";
 import { reoccurrenceSkips } from "./backup/reoccurrenceSkips";
 import { registerEntry } from "./backup/registerEntry";
-import HashService from "../../server/services/HashService";
-import { log } from "../../server/logger";
+import HashService from "../server/services/HashService";
+import { log } from "../server/logger";
 
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
@@ -268,7 +268,7 @@ const getDbDecryptionKeyValues = (): string[] => {
   const keys = Object.keys(process.env)
     .filter(
       (key) =>
-        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS"
+        key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS",
     )
     .map((key) => process.env[key]!)
     .filter((value) => value !== undefined);
@@ -294,7 +294,7 @@ export const prisma = new PrismaClient({ adapter }).$extends(
     dmmf: normalizePrismaDmmfForFieldEncryption(Prisma.dmmf),
     encryptionKey: process.env.DB_ENCRYPTION_KEY,
     decryptionKeys: getDbDecryptionKeyValues(),
-  })
+  }),
 );
 
 async function main() {
