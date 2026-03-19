@@ -5,6 +5,7 @@ import {
   formatCurrencyOptions,
   formatAccountRegisters,
 } from "~/lib/utils";
+import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import { registerEntrySchema } from "~/schema/zod";
 import type { RegisterEntry } from "~/types/types";
 
@@ -74,16 +75,13 @@ const categorySelectItems = computed(() => {
     value: string | null;
     label: string;
   }[];
-  if (!accountIdForEntry.value) return base;
-  const forAccount = listStore.getCategories
-    .filter((c) => c.accountId === accountIdForEntry.value)
-    .map((c) => ({
-      id: c.id,
-      name: c.name,
-      value: c.id,
-      label: c.name,
-    }));
-  return [...base, ...forAccount];
+  return [
+    ...base,
+    ...buildSortedCategorySelectItems(
+      listStore.getCategories,
+      accountIdForEntry.value,
+    ),
+  ];
 });
 
 async function handleSubmit({
@@ -444,11 +442,12 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         UInput(v-model="formState.description" type="text" id="description" class="w-full" :disabled="formState.isProjected")
 
       UFormField(label="Category" name="categoryId")
-        USelect(
+        USelectMenu(
           v-model="formState.categoryId"
           :items="categorySelectItems"
           value-key="value"
           label-key="label"
+          :filter-fields="['label', 'name']"
           placeholder="None"
           class="w-full"
           :disabled="formState.isProjected")

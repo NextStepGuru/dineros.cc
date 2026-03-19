@@ -7,6 +7,7 @@ import {
   formatAccountRegisters,
   formatCurrencyOptions,
 } from "~/lib/utils";
+import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import type { Reoccurrence } from "~/types/types";
 
 import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
@@ -57,16 +58,13 @@ const categorySelectItems = computed(() => {
     value: string | null;
     label: string;
   }[];
-  if (!accountIdForReoccurrence.value) return base;
-  const forAccount = listStore.getCategories
-    .filter((c) => c.accountId === accountIdForReoccurrence.value)
-    .map((c) => ({
-      id: c.id,
-      name: c.name,
-      value: c.id,
-      label: c.name,
-    }));
-  return [...base, ...forAccount];
+  return [
+    ...base,
+    ...buildSortedCategorySelectItems(
+      listStore.getCategories,
+      accountIdForReoccurrence.value,
+    ),
+  ];
 });
 
 function syncFormStateFromProps() {
@@ -286,12 +284,13 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         UInput(v-model="formState.description" class="w-full")
 
       UFormField(label="Category" hint="applied to generated register entries" name="categoryId")
-        USelect(
+        USelectMenu(
           v-model="formState.categoryId"
           class="w-full"
           :items="categorySelectItems"
           value-key="value"
           label-key="label"
+          :filter-fields="['label', 'name']"
           placeholder="None")
 
       .flex(class="md:flex-row flex-col md:space-x-4 max-sm:space-y-4")

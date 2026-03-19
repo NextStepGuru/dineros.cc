@@ -254,6 +254,9 @@ model RegisterEntryType {
   @@map("register_entry_type")
 }
 
+// MySQL functional unique index `category_account_parent_name_uidx` on
+// (account_id, IFNULL(sub_category_id,''), name) — see migration
+// 20260319131120_seed_categories (not expressible in Prisma schema).
 model Category {
   id            String   @id @default(uuid())
   subCategoryId String?  @map("sub_category_id")
