@@ -273,6 +273,8 @@ export class ForecastEngine implements IForecastEngine {
           isPending: entry.isPending, // Preserve isPending status
           manualCreatedAt: entry.createdAt,
           typeId: entry.typeId, // Preserve typeId from existing entries
+          categoryId: entry.categoryId ?? null,
+          reoccurrenceId: entry.reoccurrenceId ?? null,
         });
       });
     } catch (error) {
@@ -421,6 +423,7 @@ export class ForecastEngine implements IForecastEngine {
         amount: item.amount,
         balance: item.balance,
         typeId: item.typeId,
+        categoryId: item.categoryId ?? null,
         isCleared: item.isCleared,
         isReconciled: item.isReconciled,
         isProjected: item.isProjected,

@@ -159,6 +159,8 @@ export interface CreateEntryParams {
   isManualEntry?: boolean;
   isPending?: boolean;
   typeId?: number; // RegisterEntryType ID
+  categoryId?: string | null;
+  reoccurrenceId?: number | null;
 }
 
 export interface TransferParams {
@@ -168,6 +170,8 @@ export interface TransferParams {
   description: string;
   reoccurrence?: Reoccurrence;
   fromDescription?: string;
+  /** Applied only to the source/outflow register entry */
+  categoryId?: string | null;
 }
 
 export interface InterestCalculationParams {

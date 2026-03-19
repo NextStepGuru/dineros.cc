@@ -27,6 +27,7 @@ export class TransferService implements ITransferService {
       description,
       reoccurrence,
       fromDescription,
+      categoryId: transferCategoryId,
     } = params;
 
     // Cap transfer to debt account so payment never exceeds balance
@@ -46,6 +47,7 @@ export class TransferService implements ITransferService {
       amount: effectiveAmount,
       reoccurrence,
       typeId: 6, // Transfer
+      categoryId: null,
     });
 
     // Create entry for source account (sending money)
@@ -56,6 +58,7 @@ export class TransferService implements ITransferService {
       amount: effectiveAmount * -1,
       reoccurrence,
       typeId: 6, // Transfer
+      categoryId: transferCategoryId ?? null,
     });
   }
 
@@ -70,6 +73,7 @@ export class TransferService implements ITransferService {
       reoccurrence,
       fromDescription,
       forecastDate,
+      categoryId: transferCategoryIdWithDate,
     } = params;
 
     // Cap transfer to debt account so payment never exceeds balance
@@ -90,6 +94,7 @@ export class TransferService implements ITransferService {
       reoccurrence,
       forecastDate,
       typeId: 6, // Transfer
+      categoryId: null,
     });
 
     // Create entry for source account (sending money)
@@ -101,6 +106,7 @@ export class TransferService implements ITransferService {
       reoccurrence,
       forecastDate,
       typeId: 6, // Transfer
+      categoryId: transferCategoryIdWithDate ?? null,
     });
   }
 
@@ -506,6 +512,7 @@ export class TransferService implements ITransferService {
           elapsedIntervals: null,
           updatedAt: dateTimeService.nowDate(),
           adjustBeforeIfOnWeekend: false,
+          categoryId: null,
         },
       });
       // Update remaining available amount

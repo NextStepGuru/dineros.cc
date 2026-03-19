@@ -22,6 +22,7 @@ export type CacheReoccurrence = {
   elapsedIntervals: number | null;
   updatedAt: Date;
   adjustBeforeIfOnWeekend: boolean;
+  categoryId?: string | null;
 };
 
 export type CacheAccountRegister = {
@@ -72,6 +73,7 @@ export type CacheRegisterEntry = {
   isProjected: boolean;
   isManualEntry: boolean;
   isReconciled: boolean;
+  categoryId?: string | null;
 };
 
 export type CacheReoccurrenceSkip = {

@@ -43,6 +43,32 @@ const accountRegisterOptions = computed(() =>
   formatAccountRegisters(listStore.getAccountRegisters),
 );
 
+const accountIdForReoccurrence = computed(() => {
+  const reg = listStore.getAccountRegisters.find(
+    (r) => r.id === formState.accountRegisterId,
+  );
+  return reg?.accountId ?? null;
+});
+
+const categorySelectItems = computed(() => {
+  const base = [{ id: null, name: "None", value: null, label: "None" }] as {
+    id: string | null;
+    name: string;
+    value: string | null;
+    label: string;
+  }[];
+  if (!accountIdForReoccurrence.value) return base;
+  const forAccount = listStore.getCategories
+    .filter((c) => c.accountId === accountIdForReoccurrence.value)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      value: c.id,
+      label: c.name,
+    }));
+  return [...base, ...forAccount];
+});
+
 function syncFormStateFromProps() {
   formState.id = props.reoccurrence.id;
   formState.accountId = props.reoccurrence.accountId;
@@ -57,6 +83,10 @@ function syncFormStateFromProps() {
   formState.intervalCount = props.reoccurrence.intervalCount;
   formState.adjustBeforeIfOnWeekend =
     props.reoccurrence.adjustBeforeIfOnWeekend;
+  formState.categoryId =
+    props.reoccurrence.categoryId === undefined
+      ? null
+      : props.reoccurrence.categoryId;
   splitsRef.value = (props.reoccurrence.splits ?? []).map((split) => ({
     ...split,
     amount: Number(split.amount),
@@ -254,6 +284,15 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
 
       UFormField(label="Description" name="description")
         UInput(v-model="formState.description" class="w-full")
+
+      UFormField(label="Category" hint="applied to generated register entries" name="categoryId")
+        USelect(
+          v-model="formState.categoryId"
+          class="w-full"
+          :items="categorySelectItems"
+          value-key="value"
+          label-key="label"
+          placeholder="None")
 
       .flex(class="md:flex-row flex-col md:space-x-4 max-sm:space-y-4")
         UFormField(label="Amount to Debit" name="amount")

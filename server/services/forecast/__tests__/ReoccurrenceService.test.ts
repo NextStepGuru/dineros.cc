@@ -74,6 +74,7 @@ describe("ReoccurrenceService", () => {
       transferAccountRegisterId: null,
       updatedAt: new Date(),
       adjustBeforeIfOnWeekend: false,
+      categoryId: null,
       ...overrides,
     } as ServiceReoccurrence;
   }
@@ -127,6 +128,7 @@ describe("ReoccurrenceService", () => {
         sourceAccountRegisterId: 1,
         amount: 100,
         description: "Test Reoccurrence",
+        categoryId: null,
         reoccurrence: expect.objectContaining({
           id: 1,
           accountId: "test-account",
@@ -164,6 +166,7 @@ describe("ReoccurrenceService", () => {
         accountRegisterId: 1,
         description: "Test Reoccurrence",
         amount: 100,
+        categoryId: null,
         reoccurrence: expect.objectContaining({
           id: 1,
           accountId: "test-account",

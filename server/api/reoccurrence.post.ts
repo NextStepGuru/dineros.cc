@@ -24,6 +24,7 @@ export default defineEventHandler(async (event: H3Event) => {
       lastAt,
       endAt,
       splits,
+      categoryId,
     } = reoccurrenceWithSplitsSchema.parse(body);
 
     // Can the user create or update a reoccurrence for this account register?
@@ -40,6 +41,15 @@ export default defineEventHandler(async (event: H3Event) => {
         },
       },
     });
+
+    if (categoryId) {
+      await PrismaDb.category.findFirstOrThrow({
+        where: {
+          id: categoryId,
+          accountId,
+        },
+      });
+    }
 
     const splitTargets = (splits ?? []).map((item) => item.transferAccountRegisterId);
     const accountIdsToValidate = Array.from(
@@ -117,6 +127,7 @@ export default defineEventHandler(async (event: H3Event) => {
           amount,
           lastAt: parsedLastAt,
           endAt: parsedEndAt,
+          categoryId: categoryId ?? null,
         },
         update: {
           accountId,
@@ -129,6 +140,7 @@ export default defineEventHandler(async (event: H3Event) => {
           amount,
           lastAt: parsedLastAt,
           endAt: parsedEndAt,
+          categoryId: categoryId ?? null,
         },
         where: {
           id,
