@@ -39,6 +39,11 @@ const items = computed(() => {
         active: route.path.startsWith("/reoccurrences"),
       },
       {
+        label: "Reports",
+        to: "/reports",
+        active: route.path.startsWith("/reports"),
+      },
+      {
         label: "Help",
         to: "/help",
         active: route.path.startsWith("/help"),

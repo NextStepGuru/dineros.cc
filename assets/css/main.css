@@ -66,6 +66,12 @@
   overflow: hidden;
 }
 
+/** Same app chrome as `.ui-main` pages but allows vertical document scroll (e.g. reports). */
+.ui-main-scroll {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
 .frog-surface {
   background-color: var(--frog-surface);
 }

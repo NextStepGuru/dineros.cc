@@ -7,7 +7,7 @@ export type CategorySelectItem = {
   label: string;
 };
 
-function categoryDropdownLabel(
+export function categoryDropdownLabel(
   catId: string,
   byId: Map<string, Category>,
 ): string {

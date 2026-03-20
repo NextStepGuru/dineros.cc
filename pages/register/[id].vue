@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { h, resolveComponent } from "vue";
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
+import {
+  buildSortedCategorySelectItems,
+  categoryDropdownLabel,
+  sortCategoriesForManageList,
+} from "~/lib/categorySelect";
+import {
+  CATEGORY_FILTER_ALL,
+  CATEGORY_FILTER_UNCATEGORIZED,
+  entryMatchesCategoryFilter,
+} from "~/lib/categoryFilter";
 import type { TableColumn } from "@nuxt/ui";
 import type {
   AccountRegister,
@@ -873,11 +883,68 @@ function isSelectedTab(tab: string) {
   return selectedTab.value === tab ? isActive : isInactive;
 }
 
+const globalFilter = ref("");
+const categoryFilter = ref(CATEGORY_FILTER_ALL);
+const tableRef = ref();
+
+const categoryFilterSelectItems = computed(() => {
+  const items: { label: string; value: string; name: string }[] = [
+    {
+      label: "All categories",
+      value: CATEGORY_FILTER_ALL,
+      name: "All categories",
+    },
+    {
+      label: "Uncategorized",
+      value: CATEGORY_FILTER_UNCATEGORIZED,
+      name: "Uncategorized",
+    },
+  ];
+  const accountId = currentAccountRegister.value?.accountId ?? null;
+  const byId = new Map(listStore.getCategories.map((c) => [c.id, c]));
+  const pool = accountId
+    ? listStore.getCategories.filter((c) => c.accountId === accountId)
+    : listStore.getCategories;
+  if (accountId && pool.length > 0) {
+    for (const row of buildSortedCategorySelectItems(
+      listStore.getCategories,
+      accountId,
+    )) {
+      items.push({
+        label: row.label,
+        value: row.value,
+        name: row.name,
+      });
+    }
+  } else {
+    for (const c of sortCategoriesForManageList(pool)) {
+      const label = categoryDropdownLabel(c.id, byId);
+      items.push({
+        label,
+        value: c.id,
+        name: c.name,
+      });
+    }
+  }
+  return items;
+});
+
+const registerRowsForTable = computed(() =>
+  tableEntries.value.filter((e) =>
+    entryMatchesCategoryFilter(e.categoryId, categoryFilter.value),
+  ),
+);
+
+watch(accountRegisterId, () => {
+  categoryFilter.value = CATEGORY_FILTER_ALL;
+});
+
 defineShortcuts({
   escape: {
     usingInput: true,
     handler: () => {
       globalFilter.value = "";
+      categoryFilter.value = CATEGORY_FILTER_ALL;
     },
   },
   meta_r: () => refreshAccountEntries(),
@@ -892,8 +959,6 @@ defineShortcuts({
   meta_shift_r: () => recalcAccount(),
 });
 
-const globalFilter = ref("");
-const tableRef = ref();
 const isRecalcAccountLoading = ref(false);
 const showShortcuts = ref(false);
 const recalcLiveMessage = ref("");
@@ -1044,6 +1109,19 @@ async function recalcAccount() {
           @add="handleAddEntry"
           @refresh="refreshAccountEntries"
         )
+          template(#trailing)
+            UTooltip(text="Filter by category" :delay-duration="150")
+              USelectMenu(
+                v-model="categoryFilter"
+                :items="categoryFilterSelectItems"
+                value-key="value"
+                label-key="label"
+                :filter-fields="['label', 'name']"
+                size="sm"
+                class="min-w-40 max-w-[16rem]"
+                placeholder="All categories"
+                search-placeholder="Search…"
+                aria-label="Filter by category")
           template(#middle)
             UDropdownMenu(:items="snapshotMenuItems")
               UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
@@ -1112,7 +1190,7 @@ async function recalcAccount() {
       template(#header)
         h3(class="font-semibold") Keyboard shortcuts
       ul(class="space-y-2 text-sm")
-        li Clear filter: ⎋
+        li Clear text &amp; category filters: ⎋
         li Add entry: ⌘ + A
         li Focus filter: ⌘ + F
         li Refresh register: ⌘ + R
@@ -1215,11 +1293,18 @@ async function recalcAccount() {
           USkeleton(class="h-4 w-16 ml-auto")
 
     div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
+      UAlert(
+        v-if="registerRowsForTable.length === 0"
+        class="mb-2"
+        color="neutral"
+        variant="subtle"
+        title="No rows match this category filter"
+        description="Choose All categories, Uncategorized, or another category.")
       UTable(
         ref="tableRef"
         :key="tableKey"
         class="h-full min-w-[min(100%,42rem)] sm:min-w-0"
-        :data="tableEntries"
+        :data="registerRowsForTable"
         sticky
         v-model:globalFilter="globalFilter"
         :ui="stripedTheme"
