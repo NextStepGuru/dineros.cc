@@ -24,18 +24,33 @@ export async function createTestDatabase(): Promise<PrismaClient> {
   const mockDb = {
     accountRegister: {
       create: vi.fn().mockImplementation(async (data: any) => {
+        const d = data.data;
+        const lb =
+          d.latestBalance !== undefined && d.latestBalance !== null
+            ? d.latestBalance
+            : (d.balance ?? 0);
+        const bal = d.balance !== undefined && d.balance !== null ? d.balance : lb;
         const accountRegister = {
-          ...data.data,
-          id: data.data.id || nextSyntheticId++,
+          ...d,
+          id: d.id || nextSyntheticId++,
+          budgetId: d.budgetId ?? 1,
+          balance: Number(bal),
+          latestBalance: Number(lb),
         };
         accountRegisters.push(accountRegister);
         return accountRegister;
       }),
       findMany: vi.fn().mockImplementation(async (query: any) => {
+        let list = accountRegisters;
         if (query?.where?.accountId) {
-          return accountRegisters.filter(ar => ar.accountId === query.where.accountId);
+          list = accountRegisters.filter(ar => ar.accountId === query.where.accountId);
         }
-        return accountRegisters;
+        // Return copies so loader always gets stable latestBalance/balance (avoids shared ref mutation)
+        return list.map((ar: any) => ({
+          ...ar,
+          latestBalance: ar.latestBalance ?? ar.balance ?? 0,
+          balance: ar.balance ?? ar.latestBalance ?? 0,
+        }));
       }),
       update: vi.fn(),
       updateMany: vi.fn(),

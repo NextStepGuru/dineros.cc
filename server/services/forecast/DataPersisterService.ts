@@ -174,6 +174,7 @@ export class DataPersisterService implements IDataPersisterService {
           skipDuplicates: true,
         });
       } catch {
+        // Errors are intentionally not rethrown (per-row create handles duplicates); consider logging err in non-test env for FK/bulk failures.
         forecastLogger.service(
           "DataPersisterService",
           `Using rate-limited fallback for chunk of ${chunk.length} entries`

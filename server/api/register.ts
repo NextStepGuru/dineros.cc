@@ -5,6 +5,7 @@ import { handleApiError } from "~/server/lib/handleApiError";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { dateTimeService } from "~/server/services/forecast";
 import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
+import { paginateFutureRegisterWindow } from "~/server/lib/registerFuturePagination";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -139,64 +140,12 @@ export default defineEventHandler(async (event) => {
           hasMore: pageSkip + pageSize < totalCount,
         };
       }
-      const balanceIdx = entries.findIndex((e) => e.isBalanceEntry);
-      const projectedIdx = entries.findIndex((e) => e.isProjected);
-      const anchorStart =
-        balanceIdx >= 0
-          ? balanceIdx
-          : projectedIdx >= 0
-            ? projectedIdx
-            : 0;
-      const sliceStart = anchorStart + pageSkip;
-
-      const entryDesc = (e: T) =>
-        typeof e.description === "string"
-          ? e.description
-          : e.description != null
-            ? String(e.description)
-            : "";
-
-      /** Loan/debt schedule: outgoing from payer has `sourceAccountRegisterId` = loan register; incoming to loan has `sourceAccountRegisterId` = payer. Optionally match legacy/extra-debt description patterns. */
-      const isLoanOrDebtPaymentType6 = (e: T) => {
-        if (e.typeId !== 6) return false;
-        const d = entryDesc(e);
-        if (d.startsWith("Savings goal contribution")) return false;
-        const sid = e.sourceAccountRegisterId;
-        if (sid != null && loanTransferPeerIds.has(sid)) return true;
-        return (
-          d.includes("Payment to") ||
-          d.startsWith("Transfer for Extra debt")
-        );
-      };
-
-      /** Ignore loan lines in cleared/before-balance — only consider from the Future anchor onward, or extension never runs. */
-      let transferAnchorIdx = -1;
-      for (let i = anchorStart; i < entries.length; i++) {
-        if (isLoanOrDebtPaymentType6(entries[i]!)) {
-          transferAnchorIdx = i;
-          break;
-        }
-      }
-
-      /** When many projected rows sort before the first loan/debt transfer, the default page misses type-6 rows. */
-      const LOAN_PAY_WINDOW_TAIL = 32;
-      const sliceEndDefault = sliceStart + pageSize;
-      let sliceEnd = sliceEndDefault;
-      if (
-        transferAnchorIdx >= 0 &&
-        sliceStart <= transferAnchorIdx &&
-        sliceEnd <= transferAnchorIdx
-      ) {
-        sliceEnd = Math.min(
-          entries.length,
-          transferAnchorIdx + 1 + LOAN_PAY_WINDOW_TAIL,
-        );
-      }
-
-      return {
-        paginated: entries.slice(sliceStart, sliceEnd),
-        hasMore: sliceEnd < entries.length,
-      };
+      return paginateFutureRegisterWindow(
+        entries,
+        pageSkip,
+        pageSize,
+        loanTransferPeerIds,
+      );
     };
 
     // For pagination, we need to load all records up to skip + take to calculate balances correctly

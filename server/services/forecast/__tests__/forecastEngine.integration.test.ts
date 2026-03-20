@@ -1,4 +1,11 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
 import { ModernCacheService } from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
@@ -492,6 +499,127 @@ describe("ForecastEngine Integration Tests", () => {
       balanceEntries.forEach((entry) => {
         expect(typeof entry.amount).toBe("number"); // Should be a valid number
       });
+    });
+  });
+
+  describe("Loan payment → persist (regression)", () => {
+    beforeEach(() => {
+      // "Now" before the forecast window so same-calendar-day logic does not mark the year's projected rows as pending (pending rows are excluded from persist).
+      dateTimeService.setNowOverride("2023-06-01T12:00:00.000Z");
+      testContext.startDate = dateTimeService
+        .createUTC("2024-01-01")
+        .toDate();
+      testContext.endDate = dateTimeService
+        .createUTC("2025-01-01")
+        .toDate();
+
+      // Type-5 loan + statement day inside the forecast window so interest → min payment transfer runs (synthetic reoccurrence id 0 in code path).
+      mockDb.accountRegister.findMany.mockResolvedValue([
+        {
+          id: 1,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "Checking Account",
+          balance: 10000,
+          latestBalance: 10000,
+          minPayment: null,
+          statementAt: dateTimeService.createUTC("2024-01-01").toDate(),
+          statementIntervalId: 3,
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: 12,
+          loanTotalYears: 30,
+          loanOriginalAmount: 20000,
+          loanPaymentSortOrder: 1,
+          savingsGoalSortOrder: 0,
+          accountSavingsGoal: null,
+          minAccountBalance: 500,
+          allowExtraPayment: true,
+          isArchived: false,
+          typeId: 1,
+          plaidId: null,
+        },
+        {
+          id: 2,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "RV Loan",
+          balance: -8000,
+          latestBalance: -8000,
+          minPayment: 200,
+          statementAt: dateTimeService.createUTC("2024-02-15").toDate(),
+          statementIntervalId: 3,
+          apr1: 0.06,
+          apr1StartAt: dateTimeService.createUTC("2020-01-01").toDate(),
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: 1,
+          loanStartAt: null,
+          loanPaymentsPerYear: 12,
+          loanTotalYears: 30,
+          loanOriginalAmount: 20000,
+          loanPaymentSortOrder: 1,
+          savingsGoalSortOrder: 0,
+          accountSavingsGoal: null,
+          minAccountBalance: null,
+          allowExtraPayment: false,
+          isArchived: false,
+          typeId: 5,
+          plaidId: null,
+        },
+      ]);
+    });
+
+    afterEach(() => {
+      dateTimeService.clearNowOverride();
+    });
+
+    it("createMany payload has no reoccurrenceId 0 and type-6 loan legs on payer and debt registers", async () => {
+      const createManyMock = vi.mocked(mockDb.registerEntry.createMany);
+
+      const result = await engine.recalculate(testContext);
+      expect(result.isSuccess).toBe(true);
+
+      const createMock = vi.mocked(mockDb.registerEntry.create);
+      const allRows = [
+        ...createManyMock.mock.calls.flatMap(
+          (call) => call[0].data as Record<string, unknown>[],
+        ),
+        ...createMock.mock.calls.map(
+          (call) => call[0].data as Record<string, unknown>,
+        ),
+      ];
+      expect(allRows.length).toBeGreaterThan(0);
+      const transferPair = result.registerEntries.filter(
+        (e) =>
+          e.typeId === 6 &&
+          ((Number(e.accountRegisterId) === 2 &&
+            Number(e.sourceAccountRegisterId) === 1) ||
+            (Number(e.accountRegisterId) === 1 &&
+              Number(e.sourceAccountRegisterId) === 2)),
+      );
+      expect(transferPair.length).toBeGreaterThanOrEqual(2);
+
+      for (const row of allRows) {
+        expect(row.reoccurrenceId).not.toBe(0);
+      }
+
+      const type6Rows = allRows.filter((r) => Number(r.typeId) === 6);
+      const byRegister = new Set(
+        type6Rows.map((r) =>
+          Number((r as { accountRegisterId?: unknown }).accountRegisterId),
+        ),
+      );
+      expect(byRegister.has(1)).toBe(true);
+      expect(byRegister.has(2)).toBe(true);
     });
   });
 

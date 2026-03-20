@@ -62,7 +62,6 @@ vi.mock("~/lib/sort", () => ({
   recalculateRunningBalanceAndSort: vi.fn(),
 }));
 
-
 vi.mock("papaparse", () => ({
   default: {
     parse: vi.fn(),
@@ -107,6 +106,7 @@ describe("Register and File Upload API Endpoints", () => {
         id: 1,
         balance: 1000,
         latestBalance: 1500,
+        targetAccountRegisterId: null as number | null,
         type: { isCredit: false },
       };
 
@@ -131,10 +131,6 @@ describe("Register and File Upload API Endpoints", () => {
         },
       ];
 
-      const mockPocketBalances = {
-        _sum: { balance: 200 },
-      };
-
       const mockBalanceUpdated = [
         { ...mockRegisterEntries[0], balance: 1300 },
         { ...mockRegisterEntries[1], balance: 1250 },
@@ -147,18 +143,26 @@ describe("Register and File Upload API Endpoints", () => {
       (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
-        mockAccountRegister
-      );
-      (prisma.registerEntry.findMany as any).mockResolvedValue(
-        mockRegisterEntries
+        mockAccountRegister,
       );
       (prisma.registerEntry.count as any).mockResolvedValue(2);
-      (prisma.accountRegister.aggregate as any).mockResolvedValue(
-        mockPocketBalances
+      (prisma.registerEntry.findMany as any).mockResolvedValue(
+        mockRegisterEntries,
       );
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
+      (prisma.accountRegister.findMany as any).mockImplementation(
+        (args: { where?: Record<string, unknown> }) => {
+          const w = args?.where ?? {};
+          if ("subAccountRegisterId" in w) {
+            return Promise.resolve([]);
+          }
+          if ("targetAccountRegisterId" in w && "accountId" in w) {
+            return Promise.resolve([]);
+          }
+          return Promise.resolve([]);
+        },
+      );
       (recalculateRunningBalanceAndSort as any).mockReturnValue(
-        mockBalanceUpdated
+        mockBalanceUpdated,
       );
 
       const result = await registerHandler(mockEvent);
@@ -172,11 +176,27 @@ describe("Register and File Upload API Endpoints", () => {
           balance: true,
           latestBalance: true,
           type: true,
+          targetAccountRegisterId: true,
         },
       });
+      expect(prisma.accountRegister.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            accountId: "account-123",
+            targetAccountRegisterId: 1,
+          },
+          select: { id: true },
+        }),
+      );
       expect(prisma.registerEntry.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           accountRegisterId: 1,
+          OR: [
+            { isCleared: false, isProjected: true },
+            { isProjected: false, isCleared: false, isPending: true },
+            { isBalanceEntry: true },
+            { isProjected: false, isManualEntry: true, isCleared: false },
+          ],
           register: {
             account: {
               is: {
@@ -191,17 +211,17 @@ describe("Register and File Upload API Endpoints", () => {
           },
         }),
         orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
-        take: 100, // Now loading all records up to skip + take
+        take: 2,
       });
       expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
         registerEntries: mockRegisterEntries,
-        balance: 1500, // latestBalance - 0 (no pocket balances)
+        balance: 1500,
         type: "debit",
       });
       expect(result).toEqual({
         entries: mockBalanceUpdated,
-        lowest: mockBalanceUpdated[1], // Entry with lower balance
-        highest: mockBalanceUpdated[0], // Entry with higher balance
+        lowest: mockBalanceUpdated[1],
+        highest: mockBalanceUpdated[0],
         skip: 0,
         focusedAt: new Date("2024-01-01T00:00:00.000Z"),
         take: 100,
@@ -210,6 +230,189 @@ describe("Register and File Upload API Endpoints", () => {
         hasMore: false,
         totalCount: 2,
       });
+    });
+
+    it("future: loads loan peer registers for the viewed accountRegisterId", async () => {
+      const mockEvent = {};
+      const mockQuery = {
+        accountId: "account-123",
+        accountRegisterId: "9",
+        focusedAt: "2024-01-01",
+        skip: "0",
+        take: "100",
+        direction: "future",
+        loadMode: "full",
+      };
+
+      const mockAccountRegister = {
+        id: 9,
+        balance: -1000,
+        latestBalance: -1000,
+        targetAccountRegisterId: 1,
+        type: { isCredit: false },
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
+
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
+      (prisma.registerEntry.count as any).mockResolvedValue(1);
+      (prisma.registerEntry.findMany as any).mockResolvedValue([
+        {
+          id: "e1",
+          description: "Bal",
+          amount: 0,
+          balance: 0,
+          seq: 1,
+          isBalanceEntry: true,
+          isProjected: true,
+          isCleared: false,
+          isPending: false,
+          isManualEntry: false,
+          typeId: null,
+          sourceAccountRegisterId: null,
+        },
+      ]);
+      (prisma.accountRegister.findMany as any).mockImplementation(
+        (args: { where?: Record<string, unknown> }) => {
+          const w = args?.where ?? {};
+          if ("subAccountRegisterId" in w) {
+            return Promise.resolve([]);
+          }
+          if ("targetAccountRegisterId" in w && "accountId" in w) {
+            expect(w.targetAccountRegisterId).toBe(9);
+            expect(w.accountId).toBe("account-123");
+            return Promise.resolve([]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+      (recalculateRunningBalanceAndSort as any).mockImplementation(
+        (x: { registerEntries: unknown[] }) => x.registerEntries,
+      );
+
+      await registerHandler(mockEvent);
+
+      expect(prisma.accountRegister.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            accountId: "account-123",
+            targetAccountRegisterId: 9,
+          },
+          select: { id: true },
+        }),
+      );
+    });
+
+    it("future: extends first page so loan transfer matched by peer id is not dropped after many type-6 rows", async () => {
+      const mockEvent = {};
+      const mockQuery = {
+        accountId: "account-123",
+        accountRegisterId: "1",
+        focusedAt: "2024-01-01",
+        skip: "0",
+        take: "500",
+        direction: "future",
+        loadMode: "full",
+      };
+
+      const mockAccountRegister = {
+        id: 1,
+        balance: 5000,
+        latestBalance: 5000,
+        targetAccountRegisterId: null as number | null,
+        type: { isCredit: false },
+      };
+
+      const baseRow = {
+        isCleared: false,
+        isPending: false,
+        isManualEntry: false,
+        isReconciled: false,
+      };
+
+      const fromDb: Record<string, unknown>[] = [
+        {
+          ...baseRow,
+          id: "bal",
+          description: "Balance",
+          amount: 5000,
+          balance: 5000,
+          seq: 1,
+          isBalanceEntry: true,
+          isProjected: true,
+          typeId: null,
+          sourceAccountRegisterId: null,
+        },
+      ];
+      for (let i = 0; i < 549; i++) {
+        fromDb.push({
+          ...baseRow,
+          id: `b${i}`,
+          description: "Transfer for Fuel",
+          amount: -1,
+          balance: 0,
+          seq: i + 2,
+          isBalanceEntry: false,
+          isProjected: true,
+          typeId: 6,
+          sourceAccountRegisterId: 70,
+        });
+      }
+      fromDb.push({
+        ...baseRow,
+        id: "loan",
+        description: "Transfer for Payment to RV",
+        amount: -200,
+        balance: 0,
+        seq: 552,
+        isBalanceEntry: false,
+        isProjected: true,
+        typeId: 6,
+        sourceAccountRegisterId: 9,
+      });
+
+      const sorted = fromDb.map((r) => ({ ...r }));
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
+
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
+      (prisma.registerEntry.count as any).mockResolvedValue(fromDb.length);
+      (prisma.registerEntry.findMany as any).mockResolvedValue(fromDb);
+      (prisma.accountRegister.findMany as any).mockImplementation(
+        (args: { where?: Record<string, unknown> }) => {
+          const w = args?.where ?? {};
+          if ("subAccountRegisterId" in w) {
+            return Promise.resolve([]);
+          }
+          if ("targetAccountRegisterId" in w && "accountId" in w) {
+            return Promise.resolve([{ id: 9 }]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+      (recalculateRunningBalanceAndSort as any).mockReturnValue(sorted);
+
+      const result = await registerHandler(mockEvent);
+
+      expect(result.entries.length).toBeGreaterThan(500);
+      expect(
+        result.entries.some(
+          (e: { id?: string }) => e.id === "loan" || e.description?.includes("RV"),
+        ),
+      ).toBe(true);
+      expect(result.hasMore).toBe(false);
     });
 
     it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
@@ -230,6 +433,7 @@ describe("Register and File Upload API Endpoints", () => {
           id: 1,
           balance: 1000,
           latestBalance: 1500,
+          targetAccountRegisterId: null as number | null,
           type: { isCredit: true },
         };
 
@@ -242,10 +446,6 @@ describe("Register and File Upload API Endpoints", () => {
             seq: 1,
           },
         ];
-
-        const mockPocketBalances = {
-          _sum: { balance: null },
-        };
 
         const mockBalanceUpdated = [
           { ...mockRegisterEntries[0], balance: 1500 },
@@ -260,31 +460,40 @@ describe("Register and File Upload API Endpoints", () => {
         (global as any).getQuery.mockReturnValue(mockQuery);
         (getUser as any).mockReturnValue({ userId: 123 });
         (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
-          mockAccountRegister
+          mockAccountRegister,
         );
+        (prisma.registerEntry.count as any).mockResolvedValue(2);
         (prisma.registerEntry.findMany as any).mockResolvedValue(
-          mockRegisterEntries
+          mockRegisterEntries,
         );
-        (prisma.accountRegister.aggregate as any).mockResolvedValue(
-          mockPocketBalances
+        (prisma.accountRegister.findMany as any).mockImplementation(
+          (args: { where?: Record<string, unknown> }) => {
+            const w = args?.where ?? {};
+            if ("subAccountRegisterId" in w) {
+              return Promise.resolve([]);
+            }
+            if ("targetAccountRegisterId" in w && "accountId" in w) {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([]);
+          },
         );
-        (prisma.accountRegister.findMany as any).mockResolvedValue([]);
         (recalculateRunningBalanceAndSort as any).mockReturnValue(
-          mockBalanceUpdated
+          mockBalanceUpdated,
         );
 
         const result = await registerHandler(mockEvent);
 
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            take: 50, // Quick mode correctly limits to 50
+            take: 2,
             orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
             where: expect.objectContaining({
               accountRegisterId: 1,
               OR: [
                 { isCleared: false, isProjected: true },
                 { isProjected: false, isCleared: false, isPending: true },
-                { isBalanceEntry: true, isCleared: false },
+                { isBalanceEntry: true },
                 { isProjected: false, isManualEntry: true, isCleared: false },
               ],
               register: {
@@ -298,7 +507,7 @@ describe("Register and File Upload API Endpoints", () => {
                 },
               },
             }),
-          })
+          }),
         );
         expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
           registerEntries: mockRegisterEntries,
@@ -342,6 +551,7 @@ describe("Register and File Upload API Endpoints", () => {
           id: 1,
           balance: 1000,
           latestBalance: 1500,
+          targetAccountRegisterId: null as number | null,
           type: { isCredit: false },
         };
 
@@ -353,15 +563,28 @@ describe("Register and File Upload API Endpoints", () => {
         (global as any).getQuery.mockReturnValue(mockQuery);
         (getUser as any).mockReturnValue({ userId: 123 });
         (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
-          mockAccountRegister
+          mockAccountRegister,
         );
+        (prisma.registerEntry.count as any).mockResolvedValue(0);
         (prisma.registerEntry.findMany as any).mockResolvedValue([]);
-        (prisma.accountRegister.aggregate as any).mockResolvedValue({
-          _sum: { balance: 0 },
-        });
-        (prisma.accountRegister.findMany as any).mockResolvedValue([]);
+        (prisma.accountRegister.findMany as any).mockImplementation(
+          (args: { where?: Record<string, unknown> }) => {
+            const w = args?.where ?? {};
+            if ("subAccountRegisterId" in w) {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([]);
+          },
+        );
 
         await registerHandler(mockEvent);
+
+        const peerLoanCalls = (prisma.accountRegister.findMany as any).mock.calls.filter(
+          (call: unknown[]) =>
+            call[0]?.where &&
+            "targetAccountRegisterId" in (call[0].where as object),
+        );
+        expect(peerLoanCalls.length).toBe(0);
 
         expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
           expect.objectContaining({

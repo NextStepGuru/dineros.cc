@@ -1,3 +1,4 @@
+import { userFriendlyApiError } from "~/lib/userFriendlyApiError";
 import { formatAccountRegisters } from "~/lib/utils";
 import type { CategoryReportResponse } from "~/server/services/reports/types";
 
@@ -81,11 +82,10 @@ export function useCategoryReports() {
       );
     } catch (e: unknown) {
       data.value = null;
-      const err = e as { data?: { statusMessage?: string }; message?: string };
-      const msg =
-        err?.data?.statusMessage ||
-        err?.message ||
-        "Could not load category report.";
+      const msg = userFriendlyApiError(
+        e,
+        "We couldn’t load this report. Please try again.",
+      );
       errorMessage.value = msg;
       toast.add({
         color: "error",

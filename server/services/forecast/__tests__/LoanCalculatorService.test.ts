@@ -851,7 +851,7 @@ describe("LoanCalculatorService", () => {
       expect(result).toBe(false);
     });
 
-    it("should handle NaN balance gracefully", () => {
+    it("should reject NaN balance (absoluteMoney throws)", () => {
       const statementDate = dateTimeService.create("2024-01-15");
       const account = createMockAccount({
         apr1: 0.05,
@@ -859,9 +859,9 @@ describe("LoanCalculatorService", () => {
         statementAt: statementDate.toDate(),
       });
 
-      const result = service.shouldProcessInterest(account, statementDate);
-
-      expect(result).toBe(true); // NaN balance is still considered non-zero, so interest is processed
+      expect(() => service.shouldProcessInterest(account, statementDate)).toThrow(
+        "Invalid monetary value: NaN",
+      );
     });
 
     it("should handle null statementAt gracefully", () => {
