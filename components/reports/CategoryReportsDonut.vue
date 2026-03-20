@@ -31,23 +31,34 @@ const gradientStyle = computed(() => {
 });
 
 const hasData = computed(() => segments.value.length > 0);
+
+const legendUsesTwoColumns = computed(() => segments.value.length > 5);
+
+const legendListClass = computed(() => {
+  const base = "list-none min-w-0 flex-1";
+  if (legendUsesTwoColumns.value) {
+    return `${base} grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2`;
+  }
+  return `${base} flex flex-col gap-2`;
+});
 </script>
 
 <template lang="pug">
 .flex.flex-col(class="md:flex-row md:items-start gap-8")
   .flex.flex-col.items-center.gap-2
-    .relative.rounded-full(class="w-52 h-52 shrink-0")
+    //- 13rem (w-52) × 1.2 — ring hole scaled to match
+    .relative.rounded-full(class="size-[15.6rem] shrink-0")
       .rounded-full.w-full.h-full.transition-opacity(
         class="ring-1 ring-default"
         :style="gradientStyle"
         :class="hasData ? 'opacity-100' : 'opacity-20'")
-      .absolute.rounded-full.bg-default(class="inset-8 ring-1 ring-default")
+      .absolute.rounded-full.bg-default(class="inset-[2.4rem] ring-1 ring-default")
     p.text-sm.frog-text-muted(v-if="!hasData") No activity to chart for this range.
 
-  ul.list-none(class="flex flex-col gap-2 min-w-0 flex-1" aria-label="Category breakdown")
-    li.flex.items-center.gap-2.min-w-0(
-      v-for="c in segments"
-      :key="c.categoryId ?? 'uncategorized'")
+  ul(:class="legendListClass" aria-label="Category breakdown")
+    li.flex.items-start.gap-2.min-w-0(
+      v-for="(c, idx) in segments"
+      :key="`${c.categoryId ?? 'uncategorized'}-${idx}`")
       span.rounded-full.shrink-0(class="w-3 h-3" :style="{ background: c.color }")
       .flex.flex-col.min-w-0.flex-1
         span.font-medium.truncate {{ c.segmentLabel }}
