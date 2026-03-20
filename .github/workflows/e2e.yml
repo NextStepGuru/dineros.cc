@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: true
+      E2E: "1"
       TZ: UTC
       NODE_ENV: development
       DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci"

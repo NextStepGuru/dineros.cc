@@ -153,4 +153,10 @@ export default defineNuxtConfig({
       jobsDir: "cron",
     },
   }),
+  // Playwright / CI dev server: skip remote font registry fetches (e.g. fonts.bunny.net) that can hang offline runners
+  ...(process.env.E2E === "1" && {
+    fonts: {
+      provider: "local",
+    },
+  }),
 });
