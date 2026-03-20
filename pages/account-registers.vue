@@ -564,8 +564,30 @@ const route = useRoute();
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const { $api } = useNuxtApp();
 const { today } = useToday();
 const showShortcuts = ref(false);
+
+const FORECAST_MONTHS_MAX = 24;
+const forecastMonthsAhead = ref(0);
+const forecastBalancesById = ref<Record<number, number> | null>(null);
+const forecastBalancesMeta = ref<{ asOf: string } | null>(null);
+const forecastBalancesLoading = ref(false);
+
+const forecastSliderLabel = computed(() => {
+  if (forecastMonthsAhead.value === 0) return "Current (live)";
+  if (forecastBalancesMeta.value?.asOf) {
+    return `End of ${formatDate(forecastBalancesMeta.value.asOf) ?? ""}`.trim();
+  }
+  return `+${forecastMonthsAhead.value} mo`;
+});
+
+watch(forecastMonthsAhead, (m) => {
+  if (m === 0) {
+    forecastBalancesMeta.value = null;
+    forecastBalancesById.value = null;
+  }
+});
 
 const registersForUi = computed(() =>
   snapshotMode.isSnapshotMode.value &&
@@ -579,6 +601,52 @@ const currentBudgetAccountId = computed(
     listStore.getAccountRegisters[0]?.accountId ??
     listStore.getAccounts?.[0]?.id ??
     null,
+);
+
+watch(
+  [
+    forecastMonthsAhead,
+    currentBudgetAccountId,
+    () => authStore.getBudgetId,
+    () => isSnapshotMode.value,
+  ],
+  async ([months, aid, budgetId, snap]) => {
+    if (snap) {
+      forecastBalancesById.value = null;
+      forecastBalancesMeta.value = null;
+      forecastBalancesLoading.value = false;
+      return;
+    }
+    if (months === 0 || !aid || !budgetId) {
+      forecastBalancesLoading.value = false;
+      return;
+    }
+
+    forecastBalancesLoading.value = true;
+    try {
+      const data = await ($api as typeof $fetch)<{
+        asOf: string;
+        balances: Record<number, number>;
+      }>("/api/account-registers/forecast-balances", {
+        query: {
+          accountId: aid,
+          budgetId,
+          monthsAhead: months,
+        },
+      });
+      forecastBalancesById.value = data.balances;
+      forecastBalancesMeta.value = { asOf: data.asOf };
+    } catch {
+      forecastBalancesById.value = null;
+      forecastBalancesMeta.value = null;
+      useToast().add({
+        color: "error",
+        description: "Could not load projected balances.",
+      });
+    } finally {
+      forecastBalancesLoading.value = false;
+    }
+  },
 );
 
 async function refreshSnapshotList() {
@@ -597,7 +665,6 @@ async function handleSaveSnapshot() {
     return;
   }
   const toast = useToast();
-  const { $api } = useNuxtApp();
   try {
     await ($api as typeof $fetch)("/api/snapshot", {
       method: "POST",
@@ -783,13 +850,25 @@ function isCreditRegister(reg: AccountRegister): boolean {
   );
 }
 
+function effectiveRegisterBalance(reg: AccountRegister): number {
+  if (
+    isSnapshotMode.value ||
+    forecastMonthsAhead.value === 0 ||
+    !forecastBalancesById.value
+  ) {
+    return +reg.balance;
+  }
+  const v = forecastBalancesById.value[reg.id];
+  return v !== undefined ? v : +reg.balance;
+}
+
 /** Debit / credit / net for accounts table (linked loan+asset or standalone). */
 function registerDebitCreditNet(
   row: AccountRegister,
   isSubRow: boolean,
 ): { debit: number | null; credit: number | null; net: number | null } {
   if (isSubRow) {
-    const b = +row.balance;
+    const b = effectiveRegisterBalance(row);
     if (b < 0) {
       return { debit: Math.abs(b), credit: null, net: b };
     }
@@ -803,8 +882,8 @@ function registerDebitCreditNet(
       r.id !== row.id,
   );
   if (linkedLoan && !isCreditRegister(row)) {
-    const assetBal = +row.balance;
-    const loanBalAbs = Math.abs(+linkedLoan.balance);
+    const assetBal = effectiveRegisterBalance(row);
+    const loanBalAbs = Math.abs(effectiveRegisterBalance(linkedLoan));
     return {
       debit: loanBalAbs,
       credit: assetBal,
@@ -815,8 +894,8 @@ function registerDebitCreditNet(
   if (collateralId && isCreditRegister(row) && !row.subAccountRegisterId) {
     const asset = registers.find((r) => r.id === collateralId);
     if (asset) {
-      const assetBal = +asset.balance;
-      const loanBalAbs = Math.abs(+row.balance);
+      const assetBal = effectiveRegisterBalance(asset);
+      const loanBalAbs = Math.abs(effectiveRegisterBalance(row));
       return {
         debit: loanBalAbs,
         credit: assetBal,
@@ -825,7 +904,7 @@ function registerDebitCreditNet(
     }
   }
   if (isCreditRegister(row)) {
-    const b = +row.balance;
+    const b = effectiveRegisterBalance(row);
     return {
       debit: Math.abs(b),
       credit: null,
@@ -834,13 +913,12 @@ function registerDebitCreditNet(
   }
   return {
     debit: null,
-    credit: +row.balance,
-    net: +row.balance,
+    credit: effectiveRegisterBalance(row),
+    net: effectiveRegisterBalance(row),
   };
 }
 
 // Drag and drop functionality
-const { $api } = useNuxtApp();
 const toast = useToast();
 
 // Drag and drop state
@@ -1119,7 +1197,7 @@ watch(
 const estimatedNetWorth = computed(() => {
   return registersForUi.value.reduce((acc, curr) => {
     if (curr.typeId !== 15) {
-      acc += +curr.balance;
+      acc += effectiveRegisterBalance(curr);
     }
 
     return acc;
@@ -1267,6 +1345,27 @@ onBeforeUnmount(() => {
           )
             span Your estimated net worth
             b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
+
+    div(
+      v-if="!isSnapshotMode && draggableAccountRegisters.length > 0"
+      class="w-full mb-4 flex flex-col gap-2 rounded-lg border border-default px-3 py-3 bg-elevated/40"
+    )
+      div(class="flex flex-col sm:flex-row sm:items-center gap-3")
+        div(class="flex-1 min-w-0")
+          div(class="text-sm text-highlighted font-medium") Projected balance (end of month)
+          input(
+            type="range"
+            class="w-full h-2 rounded-full cursor-pointer accent-primary"
+            :min="0"
+            :max="FORECAST_MONTHS_MAX"
+            step="1"
+            v-model.number="forecastMonthsAhead"
+            aria-label="Months ahead for projected balance"
+          )
+        div(class="flex items-center gap-2 shrink-0 text-sm")
+          span(class="frog-text-muted") {{ forecastSliderLabel }}
+          UIcon(v-if="forecastBalancesLoading" name="i-lucide-loader-2" class="animate-spin frog-text-muted")
+      p(class="text-xs frog-text-muted") Projected from forecast; run recalculate if numbers look stale.
 
     UCard(v-if="showShortcuts" class="my-4")
       template(#header)
