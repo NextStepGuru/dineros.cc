@@ -7,52 +7,54 @@ defineProps<{
 }>();
 
 function amtClass(v: number) {
-  return v < 0 ? "text-red-600 dark:text-red-400" : "";
+  return v < 0 ? "text-red-700 dark:text-red-300" : "";
 }
 </script>
 
 <template lang="pug">
 .table-wrap(
-  class="overflow-x-auto overflow-y-auto max-h-[min(65dvh,calc(100dvh-var(--ui-header-height)-12rem))] overscroll-y-contain rounded-md ring-1 ring-default/60"
+  class="relative overflow-auto w-full max-h-[min(65dvh,calc(100dvh-var(--ui-header-height)-12rem))] overscroll-y-contain"
 )
-  table.w-full.text-sm.border-separate.border-spacing-0
-    thead
-      tr.text-left
+  table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
+    thead(
+      class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented)"
+    )
+      tr(class="frog-surface-elevated")
         th(
-          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-left font-medium"
+          class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold"
         ) Category
         th(
-          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-right font-medium"
+          class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap"
         ) Total
         th(
-          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-right font-medium"
+          class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap"
         ) % of activity
         th(
-          class="sticky top-0 z-1 border-b border-default bg-default py-2 text-right font-medium"
+          class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap"
         ) #
-    tbody
+    tbody(class="w-full relative")
       template(v-for="g in groups" :key="String(g.parent.categoryId ?? 'uncategorized')")
-        tr.border-b.border-default(class="bg-elevated/25")
-          td(class="py-2 pr-4")
+        tr(class="border-b border-default bg-elevated/25")
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
             .flex.items-center.gap-2.min-w-0
               span.rounded-full.shrink-0(class="w-2.5 h-2.5" :style="{ background: g.parent.color }")
-              span.font-semibold.truncate {{ g.parent.name }}
+              span.font-semibold.frog-text.truncate {{ g.parent.name }}
           td(
-            class="py-2 pr-4 text-right tabular-nums"
+            class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap"
             :class="amtClass(g.parent.total)") {{ currencyFmt.format(g.parent.total) }}
-          td(class="py-2 pr-4 text-right tabular-nums") {{ g.parent.shareOfAbs.toFixed(1) }}%
-          td(class="py-2 text-right tabular-nums") {{ g.parent.count }}
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ g.parent.shareOfAbs.toFixed(1) }}%
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ g.parent.count }}
         tr(
           v-for="c in g.children"
           :key="c.categoryId"
           class="border-b border-default/50")
-          td(class="py-1.5 pr-4 pl-6")
+          td(class="p-2 sm:p-4 pl-4 sm:pl-8 text-xs sm:text-sm text-muted whitespace-nowrap")
             .flex.items-center.gap-2.min-w-0
               span.rounded-full.shrink-0(class="w-2 h-2 opacity-90" :style="{ background: c.color }")
-              span.text-muted.truncate {{ c.name }}
+              span.truncate {{ c.name }}
           td(
-            class="py-1.5 pr-4 text-right tabular-nums"
+            class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap"
             :class="amtClass(c.total)") {{ currencyFmt.format(c.total) }}
-          td(class="py-1.5 pr-4 text-right tabular-nums") {{ c.shareOfAbs.toFixed(1) }}%
-          td(class="py-1.5 text-right tabular-nums") {{ c.count }}
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ c.shareOfAbs.toFixed(1) }}%
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ c.count }}
 </template>

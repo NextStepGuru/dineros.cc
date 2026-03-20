@@ -21,6 +21,7 @@ import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEn
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
 import CombinedGlobalCategoryFilter from "~/components/filters/CombinedGlobalCategoryFilter.vue";
+import { useSnapshotMode } from "~/composables/useSnapshotMode";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
   () => import("~/components/modals/EditRegisterEntry.vue"),
@@ -120,7 +121,8 @@ onMounted(() => {
 
 const mainAccountCount = computed(
   () =>
-    registersForRegisterPage.value.filter((r) => !r.subAccountRegisterId).length,
+    registersForRegisterPage.value.filter((r) => !r.subAccountRegisterId)
+      .length,
 );
 
 const showAccountSelector = computed(
@@ -403,7 +405,9 @@ const refreshAccountEntries = async () => {
 };
 
 const reoccurrenceModal = overlay.create(ModalsEditReoccurrence);
-const matchToRecurrenceModal = overlay.create(ModalsMatchRegisterEntryReoccurrence);
+const matchToRecurrenceModal = overlay.create(
+  ModalsMatchRegisterEntryReoccurrence,
+);
 
 function ensureReoccurrenceDescription(text: string): string {
   const t = text.trim();
@@ -527,8 +531,9 @@ watch(
     selectedTab,
     () => snapshotMode.isSnapshotMode.value,
     () =>
-      snapshotMode.registerSnapshotIdByRegisterId.value[accountRegisterId.value] ??
-      0,
+      snapshotMode.registerSnapshotIdByRegisterId.value[
+        accountRegisterId.value
+      ] ?? 0,
   ],
   () => {
     void refreshAccountEntries();
@@ -606,11 +611,17 @@ const columns: TableColumn<RegisterEntry>[] = [
   {
     id: "importReview",
     accessorFn: (row) => row.id ?? "",
+    meta: {
+      class: {
+        th: "w-4 max-w-4 !px-0",
+        td: "w-4 max-w-4 !px-0",
+      },
+    },
     header: () =>
       h(
         "div",
         {
-          class: "w-7 text-center text-muted",
+          class: "w-4 text-center text-muted",
           title:
             "Amber dot: bank import not reviewed yet — clear, reconcile, or match to a recurrence.",
         },
@@ -653,18 +664,30 @@ const columns: TableColumn<RegisterEntry>[] = [
   },
   {
     accessorKey: "createdAt",
-    header: () => h("div", { class: "text-right" }, "Date"),
+    meta: {
+      class: {
+        th: "w-24 max-w-24 whitespace-nowrap !pl-0 !pr-2",
+        td: "w-24 max-w-24 whitespace-nowrap align-top !pl-0 !pr-2",
+      },
+    },
+    header: () => h("div", { class: "text-right tabular-nums" }, "Date"),
     cell: ({ row }) => {
       return h(
         "div",
-        { class: "text-right" },
+        { class: "text-right tabular-nums" },
         formatDate(row.getValue("createdAt")),
       );
     },
   },
   {
     accessorKey: "description",
-    header: () => h("div", { class: "min-w-96" }, "Description"),
+    meta: {
+      class: {
+        th: "w-full max-w-[42rem]",
+        td: "w-full max-w-[42rem]",
+      },
+    },
+    header: () => h("div", { class: "w-full max-w-[42rem]" }, "Description"),
     cell: ({ row }) => {
       const entry = row.original;
       const showRecurBtn = isPlaidImportAwaitingReview(entry);
