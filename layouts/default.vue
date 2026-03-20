@@ -5,7 +5,8 @@ const isFooterHidden = computed(() => {
   return (
     path.startsWith("/register/") ||
     path.startsWith("/account-registers") ||
-    path.startsWith("/reoccurrences")
+    path.startsWith("/reoccurrences") ||
+    path.startsWith("/reports")
   );
 });
 
@@ -17,7 +18,12 @@ useHead({
 onMounted(() => {
   watchEffect(() => {
     if (document.body) {
-      document.body.className = isFooterHidden.value ? "ui-main" : "";
+      const path = route.path;
+      if (path.startsWith("/reports")) {
+        document.body.className = "ui-main-scroll";
+      } else {
+        document.body.className = isFooterHidden.value ? "ui-main" : "";
+      }
     }
   });
 });

@@ -7,6 +7,15 @@ import {
   getAccountRegisterLabel,
   getIntervalLabel,
 } from "~/lib/utils";
+import {
+  sortCategoriesForManageList,
+  categoryDropdownLabel,
+} from "~/lib/categorySelect";
+import {
+  CATEGORY_FILTER_ALL,
+  CATEGORY_FILTER_UNCATEGORIZED,
+  entryMatchesCategoryFilter,
+} from "~/lib/categoryFilter";
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 
@@ -118,23 +127,6 @@ async function handleRecalculate() {
   }
 }
 
-defineShortcuts({
-  escape: {
-    usingInput: true,
-    handler: () => {
-      globalFilter.value = "";
-    },
-  },
-  meta_a: () => handleAddReoccurrence(),
-  meta_f: () => {
-    const search = document.getElementById("search");
-
-    if (search) {
-      search.focus();
-    }
-  },
-});
-
 const columns: TableColumn<Reoccurrence>[] = [
   {
     accessorKey: "accountRegisterId",
@@ -207,6 +199,58 @@ const columns: TableColumn<Reoccurrence>[] = [
 ];
 
 const globalFilter = ref("");
+const categoryFilter = ref(CATEGORY_FILTER_ALL);
+
+const categoryFilterSelectItems = computed(() => {
+  const items: { label: string; value: string; name: string }[] = [
+    {
+      label: "All categories",
+      value: CATEGORY_FILTER_ALL,
+      name: "All categories",
+    },
+    {
+      label: "Uncategorized",
+      value: CATEGORY_FILTER_UNCATEGORIZED,
+      name: "Uncategorized",
+    },
+  ];
+  const sorted = sortCategoriesForManageList(listStore.getCategories);
+  const byId = new Map(listStore.getCategories.map((c) => [c.id, c]));
+  for (const c of sorted) {
+    const label = categoryDropdownLabel(c.id, byId);
+    items.push({
+      label,
+      value: c.id,
+      name: c.name,
+    });
+  }
+  return items;
+});
+
+const reoccurrencesForTable = computed(() =>
+  listStore.getReoccurrences.filter((r) =>
+    entryMatchesCategoryFilter(r.categoryId, categoryFilter.value),
+  ),
+);
+
+defineShortcuts({
+  escape: {
+    usingInput: true,
+    handler: () => {
+      globalFilter.value = "";
+      categoryFilter.value = CATEGORY_FILTER_ALL;
+    },
+  },
+  meta_a: () => handleAddReoccurrence(),
+  meta_f: () => {
+    const search = document.getElementById("search");
+
+    if (search) {
+      search.focus();
+    }
+  },
+});
+
 const isRecalculating = ref(false);
 const sectionEl = ref<HTMLElement | null>(null);
 const controlsEl = ref<HTMLElement | null>(null);
@@ -321,12 +365,24 @@ onBeforeUnmount(() => {
           @click="showShortcuts = !showShortcuts"
         )
       UInput(v-model="globalFilter" size="sm" class="min-w-32 max-w-48 grow" placeholder="Filter..." id="search")
+      UTooltip(text="Filter by category" :delay-duration="150")
+        USelectMenu(
+          v-model="categoryFilter"
+          :items="categoryFilterSelectItems"
+          value-key="value"
+          label-key="label"
+          :filter-fields="['label', 'name']"
+          size="sm"
+          class="min-w-40 max-w-[16rem]"
+          placeholder="All categories"
+          search-placeholder="Search…"
+          aria-label="Filter by category")
 
     UCard(v-if="showShortcuts" class="mb-4")
       template(#header)
         h3(class="font-semibold") Keyboard shortcuts
       ul(class="space-y-2 text-sm")
-        li Clear filter: ⎋
+        li Clear text &amp; category filters: ⎋
         li Add reoccurrence: ⌘ + A
         li Focus filter: ⌘ + F
 
@@ -337,10 +393,17 @@ onBeforeUnmount(() => {
       UButton(color="primary" size="sm" @click="handleAddReoccurrence") Add first recurring entry
 
     div(v-if="listStore.getReoccurrences.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
+      UAlert(
+        v-if="listStore.getReoccurrences.length > 0 && reoccurrencesForTable.length === 0"
+        class="mb-2"
+        color="neutral"
+        variant="subtle"
+        title="No recurring items match this category filter"
+        description="Choose All categories, Uncategorized, or another category.")
       UTable(
         class="h-full"
         v-model:global-filter="globalFilter"
-        :data="listStore.getReoccurrences"
+        :data="reoccurrencesForTable"
         :columns="columns"
         sticky
         :ui="stripedTheme"
