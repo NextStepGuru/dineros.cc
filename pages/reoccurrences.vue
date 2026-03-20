@@ -286,11 +286,41 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="sectionEl" class="m-4")
-    div(ref="controlsEl" class="w-full flex mb-6")
-      UButton(color="info" size="sm" class="mr-4" @click="handleAddReoccurrence") Add
-      UButton(color="warning" size="sm" class="mr-4" @click="handleRecalculate" :loading="isRecalculating" :disabled="isRecalculating") {{ isRecalculating ? 'Recalculating...' : 'Recalc' }}
-      UButton(variant="soft" size="sm" class="mr-4" @click="showShortcuts = !showShortcuts") {{ showShortcuts ? "Hide shortcuts" : "Shortcuts" }}
-      UInput(v-model="globalFilter" size="sm" class="w-full md:max-w-48" placeholder="Filter..." id="search")
+    div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center mb-6")
+      UTooltip(text="Add recurring entry" :delay-duration="150")
+        UButton(
+          color="primary"
+          size="sm"
+          square
+          icon="i-lucide-plus"
+          title="Add recurring entry"
+          aria-label="Add recurring entry"
+          @click="handleAddReoccurrence"
+        )
+      UTooltip(text="Recalculate forecast" :delay-duration="150")
+        UButton(
+          color="warning"
+          size="sm"
+          square
+          icon="i-lucide-calculator"
+          title="Recalculate forecast"
+          aria-label="Recalculate forecast"
+          @click="handleRecalculate"
+          :loading="isRecalculating"
+          :disabled="isRecalculating"
+        )
+      UTooltip(:text="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'" :delay-duration="150")
+        UButton(
+          variant="soft"
+          size="sm"
+          square
+          icon="i-lucide-keyboard"
+          :color="showShortcuts ? 'primary' : 'neutral'"
+          :title="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
+          :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
+          @click="showShortcuts = !showShortcuts"
+        )
+      UInput(v-model="globalFilter" size="sm" class="min-w-32 max-w-48 grow" placeholder="Filter..." id="search")
 
     UCard(v-if="showShortcuts" class="mb-4")
       template(#header)

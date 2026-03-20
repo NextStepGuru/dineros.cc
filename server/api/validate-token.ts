@@ -1,8 +1,8 @@
 import { defineEventHandler, setResponseStatus, setCookie } from "h3";
-import { publicProfileSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import env from "../env";
+import { sessionUserFromDb } from "~/server/lib/sessionUserProfile";
 import JwtService from "../services/JwtService";
 import { handleApiError } from "~/server/lib/handleApiError";
 
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     return {
       token,
       message: null,
-      user: publicProfileSchema.parse(lookupUser),
+      user: sessionUserFromDb(lookupUser),
     };
   } catch (error) {
     handleApiError(error);

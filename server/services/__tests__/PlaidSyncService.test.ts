@@ -95,6 +95,34 @@ describe("PlaidSyncService", () => {
       expect(result.description).toBe("Test Transaction");
       expect(result.plaidId).toBe("test-id");
       expect(result.accountRegisterId).toBe(1);
+      expect(result.isPending).toBe(false);
+    });
+
+    it("should set isPending from Plaid pending flag", () => {
+      const transaction: Transaction = {
+        transaction_id: "test-id",
+        amount: 50,
+        name: "Pending",
+        date: "2024-01-01",
+        pending: true,
+      } as Transaction;
+
+      const accountRegister: AccountRegister = {
+        id: 1,
+        plaidId: "plaid-account-id",
+      } as AccountRegister;
+
+      const accountType: AccountType = {
+        isCredit: false,
+      } as AccountType;
+
+      const result = (plaidSyncService as any).formatTransactionData(
+        transaction,
+        accountRegister,
+        accountType
+      );
+
+      expect(result.isPending).toBe(true);
     });
 
     it("should format transaction data correctly for credit accounts", () => {
@@ -124,6 +152,7 @@ describe("PlaidSyncService", () => {
       expect(result.description).toBe("Test Transaction");
       expect(result.plaidId).toBe("test-id");
       expect(result.accountRegisterId).toBe(1);
+      expect(result.isPending).toBe(false);
     });
   });
 
@@ -245,7 +274,12 @@ describe("PlaidSyncService", () => {
       expect(result.errors).toHaveLength(0);
       expect(
         mockTransactionMatcher.updateExistingTransaction
-      ).toHaveBeenCalledWith(existingEntry, transaction, "exact");
+      ).toHaveBeenCalledWith(
+        existingEntry,
+        transaction,
+        "exact",
+        accountRegister.type
+      );
     });
 
     it("should update existing transaction when fuzzy match found", async () => {
@@ -288,7 +322,12 @@ describe("PlaidSyncService", () => {
       expect(result.errors).toHaveLength(0);
       expect(
         mockTransactionMatcher.updateExistingTransaction
-      ).toHaveBeenCalledWith(existingEntry, transaction, "fuzzy");
+      ).toHaveBeenCalledWith(
+        existingEntry,
+        transaction,
+        "fuzzy",
+        accountRegister.type
+      );
     });
 
     it("should handle errors gracefully", async () => {

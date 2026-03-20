@@ -64,6 +64,7 @@
     "husky": "^9.1.7",
     "nuxt-cron": "^1.8.0",
     "ofetch": "^1.5.1",
+    "openai": "^6.32.0",
     "otplib": "^13.3.0",
     "pkg-types": "^2.3.0",
     "prisma": "^7.5.0",

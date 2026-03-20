@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { dbUserForSession } from "./fixtures/dbUserForSession";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -40,14 +41,26 @@ vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock("~/schema/zod", () => ({
-  privateUserSchema: {
-    parse: vi.fn(),
-  },
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
+vi.mock("~/server/logger", () => ({
+  log: vi.fn(),
 }));
+
+vi.mock("~/schema/zod", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/schema/zod")>();
+  const mockPublicProfileParse = vi.fn();
+  return {
+    ...actual,
+    privateUserSchema: {
+      parse: vi.fn(),
+    },
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === "parse") return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
+  };
+});
 
 vi.mock("otplib", () => ({
   generateSecret: vi.fn(),
@@ -365,24 +378,13 @@ describe("Two-Factor Authentication API Endpoints", () => {
         },
       };
 
-      const mockUpdatedUser = {
-        id: 123,
-        email: "test@example.com",
-        firstName: "Test",
-        lastName: "User",
-      };
-
-      const mockParsedUser = {
-        id: 123,
-        email: "test@example.com",
-        firstName: "Test",
-        lastName: "User",
-      };
+      const mockUpdatedUser = dbUserForSession();
 
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { privateUserSchema, publicProfileSchema } = await import(
-        "~/schema/zod"
+      const { privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
       );
       const otplib = await import("otplib");
 
@@ -392,7 +394,6 @@ describe("Two-Factor Authentication API Endpoints", () => {
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
       (otplib.verify as any).mockResolvedValue({ valid: true });
       (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
@@ -414,7 +415,7 @@ describe("Two-Factor Authentication API Endpoints", () => {
           }),
         },
       });
-      expect(result).toEqual(mockParsedUser);
+      expect(result).toEqual(sessionUserFromDb(mockUpdatedUser));
     });
 
     it("should return false for invalid 2FA token", async () => {
@@ -438,18 +439,20 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { privateUserSchema, publicProfileSchema } = await import(
-        "~/schema/zod"
+      const { privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
       );
       const otplib = await import("otplib");
+
+      const updatedRow = dbUserForSession();
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       (privateUserSchema.parse as any).mockReturnValue(mockUser);
       (otplib.verify as any).mockResolvedValue({ valid: false });
-      (prisma.user.update as any).mockResolvedValue(mockUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockUser);
+      (prisma.user.update as any).mockResolvedValue(updatedRow);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
@@ -469,6 +472,7 @@ describe("Two-Factor Authentication API Endpoints", () => {
           }),
         },
       });
+      expect(result).toEqual(sessionUserFromDb(updatedRow));
     });
 
     it("should return false if user has no 2FA secret", async () => {

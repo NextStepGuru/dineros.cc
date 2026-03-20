@@ -1,4 +1,4 @@
-# Runs on PRs: e2e, unit tests, build, lint, pre-security checks.
+# Runs on PRs: unit tests, build, lint, pre-security checks. E2E: .github/workflows/e2e.yml (manual).
 name: PR Checks
 
 on:
@@ -58,44 +58,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: npx prisma generate
       - run: pnpm build
-
-  # e2e:
-  #   runs-on: ubuntu-latest
-  #   continue-on-error: true
-  #   env:
-  #     DATABASE_URL: "mysql://ci:ci@localhost:3306/ci"
-  #     CI: true
-  #   services:
-  #     mysql:
-  #       image: mysql:8
-  #       env:
-  #         MYSQL_ROOT_PASSWORD: root
-  #         MYSQL_DATABASE: ci
-  #         MYSQL_USER: ci
-  #         MYSQL_PASSWORD: ci
-  #       ports:
-  #         - 3306:3306
-  #       options: >-
-  #         --health-cmd="mysqladmin ping -h localhost"
-  #         --health-interval=10s
-  #         --health-timeout=5s
-  #         --health-retries=5
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - uses: pnpm/action-setup@v5
-  #       with:
-  #         version: "10.32.1"
-  #     - uses: actions/setup-node@v6
-  #       with:
-  #         node-version-file: ".nvmrc"
-  #         cache: "pnpm"
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: npx prisma generate
-  #     - name: Apply migrations
-  #       run: npx prisma migrate deploy
-  #     - name: Install Playwright browsers
-  #       run: pnpm exec playwright install --with-deps chromium
-  #     - run: pnpm test:e2e
 
   build-main-site-docker:
     runs-on: ubuntu-latest

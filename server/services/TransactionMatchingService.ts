@@ -297,14 +297,30 @@ class TransactionMatchingService {
     existingEntry: RegisterEntry,
     transaction: Transaction,
     matchType: "exact" | "fuzzy" | "reoccurrence",
+    accountType: AccountType,
   ): Promise<RegisterEntry> {
+    const isPending = transaction.pending === true;
+    const formattedAmount = accountType.isCredit
+      ? transaction.amount
+      : transaction.amount * -1;
+
+    const pendingStateChanged =
+      Boolean(existingEntry.isPending) !== isPending;
+
     const updateData: any = {
       plaidId: transaction.transaction_id,
       plaidJson: JSON.parse(JSON.stringify(transaction)),
+      isPending,
+      amount: formattedAmount,
+      hasBalanceReCalc: true,
       // Preserve existing description, don't overwrite with Plaid description
     };
 
-    if (matchType === "fuzzy" || matchType === "reoccurrence") {
+    if (
+      matchType === "fuzzy" ||
+      matchType === "reoccurrence" ||
+      pendingStateChanged
+    ) {
       updateData.createdAt = dateTimeService.toDate(
         dateTimeService.parseInput(transaction.date),
       );

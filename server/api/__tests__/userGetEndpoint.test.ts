@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { z } from "zod";
+import { dbUserForSession } from "./fixtures/dbUserForSession";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -43,13 +45,17 @@ vi.mock("~/server/clients/prismaClient", () => ({
   },
 }));
 
-vi.mock("~/schema/zod", () => {
-  const parse = vi.fn();
+vi.mock("~/schema/zod", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/schema/zod")>();
+  const mockPublicProfileParse = vi.fn();
   return {
-    publicProfileSchema: {
-      parse,
-      extend: vi.fn(() => ({ parse })),
-    },
+    ...actual,
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === "parse") return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
   };
 });
 
@@ -67,29 +73,16 @@ describe("User GET API Endpoint", () => {
 
   it("should successfully return user profile data", async () => {
     const mockEvent = {};
-    const mockUser = {
-      id: 123,
-      email: "test@example.com",
-      firstName: "Test",
-      lastName: "User",
-      createdAt: new Date("2024-01-01T00:00:00.000Z"),
-      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
-    };
-    const mockParsedUser = {
-      id: 123,
-      email: "test@example.com",
-      firstName: "Test",
-      lastName: "User",
-    };
+    const mockUser = dbUserForSession();
 
     const { getUser } = await import("~/server/lib/getUser");
     const { prisma } = await import("~/server/clients/prismaClient");
-    const { publicProfileSchema } = await import("~/schema/zod");
+    const { sessionUserFromDb } = await import(
+      "~/server/lib/sessionUserProfile"
+    );
 
-    // Set up mocks properly
     (getUser as any).mockReturnValue({ userId: 123 });
     (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
     const result = await userGetHandler(mockEvent);
 
@@ -97,8 +90,7 @@ describe("User GET API Endpoint", () => {
     expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 123 },
     });
-    expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUser);
-    expect(result).toEqual(mockParsedUser);
+    expect(result).toEqual(sessionUserFromDb(mockUser));
   });
 
   it("should handle user not found", async () => {
@@ -124,34 +116,27 @@ describe("User GET API Endpoint", () => {
 
   it("should handle schema validation errors", async () => {
     const mockEvent = {};
-    const mockUser = {
-      id: 123,
-      email: "invalid-email",
-      firstName: "Test",
-      lastName: "User",
-    };
+    const { password: _omit, ...row } = dbUserForSession();
+    const mockUser = row as Record<string, unknown>;
 
     const { getUser } = await import("~/server/lib/getUser");
     const { prisma } = await import("~/server/clients/prismaClient");
-    const { publicProfileSchema } = await import("~/schema/zod");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
     (getUser as any).mockReturnValue({ userId: 123 });
     (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (publicProfileSchema.parse as any).mockImplementation(() => {
-      throw new Error("Invalid email format");
+
+    (handleApiError as any).mockImplementation((err: unknown) => {
+      throw err;
     });
 
-    await expect(userGetHandler(mockEvent)).rejects.toThrow(
-      "Invalid email format"
-    );
+    await expect(userGetHandler(mockEvent)).rejects.toThrow();
 
     expect(getUser).toHaveBeenCalledWith(mockEvent);
     expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 123 },
     });
-    expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUser);
-    expect(handleApiError).toHaveBeenCalledWith(expect.any(Error));
+    expect(handleApiError).toHaveBeenCalledWith(expect.any(z.ZodError));
   });
 
   it("should handle database errors", async () => {

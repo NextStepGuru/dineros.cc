@@ -2,8 +2,7 @@
 const toast = useToast();
 const authStore = useAuthStore();
 
-// Ensure only userId = 1 can access this
-if (authStore.getUser?.id !== 1) {
+if (authStore.getUser?.isAdmin !== true) {
   throw createError({
     statusCode: 403,
     statusMessage: "Access Denied",

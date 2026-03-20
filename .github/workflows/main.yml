@@ -1,4 +1,4 @@
-# Build and deploy only. PR checks (lint, typecheck, test, build, e2e, pre-commit) run in .github/workflows/pr.yml.
+# Build and deploy only. PR checks (lint, test, build, pre-commit) run in .github/workflows/pr.yml; E2E is manual (e2e.yml).
 #
 # GCP setup (Artifact Registry):
 # 0. Workload Identity: gcloud iam service-accounts add-iam-policy-binding github-service-account@nextstepguru.iam.gserviceaccount.com \

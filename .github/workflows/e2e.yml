@@ -1,0 +1,61 @@
+# Run manually from Actions → E2E (Playwright) → Run workflow.
+# Kept separate from PR checks until stable.
+name: E2E (Playwright)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      TZ: UTC
+      NODE_ENV: development
+      DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci"
+      NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      DB_ENCRYPTION_KEY: "ci-e2e-encryption-key-placeholder-32bytes!!"
+      PLAID_CLIENT_ID: "ci-plaid-client-id"
+      PLAID_SECRET: "ci-plaid-secret"
+      REDIS_HOST: "127.0.0.1"
+      REDIS_PORT: "6379"
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ci
+          MYSQL_USER: ci
+          MYSQL_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: "10.32.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: npx prisma generate
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

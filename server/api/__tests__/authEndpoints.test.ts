@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { dbUserForSession } from "./fixtures/dbUserForSession";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -124,22 +125,30 @@ vi.mock("~/server/lib/withErrorHandler", () => ({
   }),
 }));
 
-vi.mock("~/schema/zod", () => ({
-  loginSchema: {
-    extend: vi.fn(() => ({
+vi.mock("~/schema/zod", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/schema/zod")>();
+  const mockPublicProfileParse = vi.fn();
+  return {
+    ...actual,
+    loginSchema: {
+      extend: vi.fn(() => ({
+        parse: vi.fn(),
+      })),
+    },
+    privateUserSchema: {
       parse: vi.fn(),
-    })),
-  },
-  privateUserSchema: {
-    parse: vi.fn(),
-  },
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
-  passwordAndCodeSchema: {
-    parse: vi.fn(),
-  },
-}));
+    },
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === "parse") return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
+    passwordAndCodeSchema: {
+      parse: vi.fn(),
+    },
+  };
+});
 
 describe("Authentication API Endpoints", () => {
   beforeEach(() => {
@@ -164,29 +173,14 @@ describe("Authentication API Endpoints", () => {
         password: "password123",
       };
 
-      const mockUser = {
-        id: 123,
-        email: "test@example.com",
-        password: "hashedPassword",
-        settings: {
-          speakeasy: {
-            isEnabled: false,
-            isVerified: false,
-            base32secret: null,
-          },
-        },
-      };
-
-      const mockParsedUser = {
-        id: 123,
-        email: "test@example.com",
-        name: "Test User",
-      };
+      const mockUser = dbUserForSession();
 
       const { readBody, setResponseStatus, setCookie } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { loginSchema, privateUserSchema, publicProfileSchema } =
-        await import("~/schema/zod");
+      const { loginSchema, privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
+      );
       const HashService = await import("~/server/services/HashService");
       const JwtService = await import("~/server/services/JwtService");
 
@@ -202,14 +196,13 @@ describe("Authentication API Endpoints", () => {
       mockHashService.verify.mockResolvedValue(true);
       mockJwtService.sign.mockResolvedValue("jwt-token");
       (prisma.user.update as any).mockResolvedValue(mockUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await loginHandler(mockEvent);
 
       expect(result).toEqual({
         token: "jwt-token",
         message: null,
-        user: mockParsedUser,
+        user: sessionUserFromDb(mockUser),
       });
       expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 200);
       expect(setCookie).toHaveBeenCalledWith(
@@ -232,29 +225,14 @@ describe("Authentication API Endpoints", () => {
         password: "password123",
       };
 
-      const mockUser = {
-        id: 123,
-        email: "test@example.com",
-        password: "hashedPassword",
-        settings: {
-          speakeasy: {
-            isEnabled: false,
-            isVerified: false,
-            base32secret: null,
-          },
-        },
-      };
-
-      const mockParsedUser = {
-        id: 123,
-        email: "test@example.com",
-        name: "Test User",
-      };
+      const mockUser = dbUserForSession();
 
       const { readBody, setResponseStatus, setCookie } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { loginSchema, privateUserSchema, publicProfileSchema } =
-        await import("~/schema/zod");
+      const { loginSchema, privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
+      );
 
       (readBody as any).mockResolvedValue(mockBody);
 
@@ -270,7 +248,6 @@ describe("Authentication API Endpoints", () => {
       mockHashService.verify.mockResolvedValue(true);
       mockJwtService.sign.mockResolvedValue("jwt-token");
       (prisma.user.update as any).mockResolvedValue(mockUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await loginHandler(mockEvent);
 
@@ -284,7 +261,7 @@ describe("Authentication API Endpoints", () => {
       expect(result).toEqual({
         token: "jwt-token",
         message: null,
-        user: mockParsedUser,
+        user: sessionUserFromDb(mockUser),
       });
       expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 200);
     });
@@ -420,10 +397,7 @@ describe("Authentication API Endpoints", () => {
         tokenChallenge: "123456",
       };
 
-      const mockUser = {
-        id: 123,
-        email: "test@example.com",
-        password: "hashedPassword",
+      const mockUser = dbUserForSession({
         settings: {
           mfa: {
             totp: {
@@ -440,19 +414,16 @@ describe("Authentication API Endpoints", () => {
             isVerified: true,
             base32secret: "secret123",
           },
+          plaid: { isEnabled: false },
         },
-      };
-
-      const mockParsedUser = {
-        id: 123,
-        email: "test@example.com",
-        name: "Test User",
-      };
+      });
 
       const { readBody, setResponseStatus, setCookie } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { loginSchema, privateUserSchema, publicProfileSchema } =
-        await import("~/schema/zod");
+      const { loginSchema, privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
+      );
       const HashService = await import("~/server/services/HashService");
       const JwtService = await import("~/server/services/JwtService");
       const otplib = await import("otplib");
@@ -471,14 +442,13 @@ describe("Authentication API Endpoints", () => {
       (otplib.verify as any).mockResolvedValue({ valid: true });
       mockJwtService.sign.mockResolvedValue("jwt-token");
       (prisma.user.update as any).mockResolvedValue(mockUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await loginHandler(mockEvent);
 
       expect(result).toEqual({
         token: "jwt-token",
         message: null,
-        user: mockParsedUser,
+        user: sessionUserFromDb(mockUser),
       });
       expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret123",

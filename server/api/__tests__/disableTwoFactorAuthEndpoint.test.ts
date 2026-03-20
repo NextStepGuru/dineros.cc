@@ -44,14 +44,26 @@ vi.mock("~/server/clients/prismaClient", () => ({
   },
 }));
 
-vi.mock("~/schema/zod", () => ({
-  privateUserSchema: {
-    parse: vi.fn(),
-  },
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
+vi.mock("~/server/logger", () => ({
+  log: vi.fn(),
 }));
+
+vi.mock("~/schema/zod", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/schema/zod")>();
+  const mockPublicProfileParse = vi.fn();
+  return {
+    ...actual,
+    privateUserSchema: {
+      parse: vi.fn(),
+    },
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === "parse") return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
+  };
+});
 
 describe("Disable Two-Factor Auth POST API Endpoint", () => {
   let disableTwoFactorAuthHandler: any;

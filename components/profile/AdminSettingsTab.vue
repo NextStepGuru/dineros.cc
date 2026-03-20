@@ -2,8 +2,7 @@
 const toast = useToast();
 const authStore = useAuthStore();
 
-// Ensure only userId = 1 can access this
-if (authStore.getUser?.id !== 1) {
+if (authStore.getUser?.isAdmin !== true) {
   throw createError({
     statusCode: 403,
     statusMessage: "Access Denied",
@@ -92,6 +91,12 @@ const runAdminTask = async (taskName: string) => {
 <template lang="pug">
 div(class="max-w-2xl min-h-96 my-4 m-auto")
   h2(class="text-xl font-bold text-center mb-6") Admin Tasks
+
+  div(class="text-center mb-6")
+    NuxtLink(
+      to="/edit-profile/openai-logs"
+      class="text-[var(--ui-primary)] underline text-sm"
+    ) OpenAI request logs
 
   div(class="space-y-6")
     // Task Buttons Grid

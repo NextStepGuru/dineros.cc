@@ -24,6 +24,10 @@ const envSchema = z.object({
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally
   TEST_DATE: z.string().optional(),
   TEST_TIMEZONE: z.string().optional(),
+  /** OpenAI API key; if unset, Plaid transaction enrichment is skipped. */
+  OPENAI_API_KEY: z.string().optional(),
+  /** Model for Plaid register-entry enrichment (default gpt-5-nano). */
+  OPENAI_PLAID_TX_MODEL: z.string().default("gpt-5-nano"),
 });
 
 export default envSchema;

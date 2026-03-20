@@ -29,6 +29,7 @@ model Account {
   registers     AccountRegister[]
   budgets       Budget[]
   categories    Category[]
+  snapshots     AccountSnapshot[]
 
   @@map("account")
 }
@@ -189,11 +190,64 @@ model AccountRegister {
   reoccurrences      Reoccurrence[]
   splitTargets       ReoccurrenceSplit[]
   plaidNameAliases   ReoccurrencePlaidNameAlias[]
-  children           AccountRegister[]   @relation("ar_children")
+  children           AccountRegister[]             @relation("ar_children")
+  snapshotRows       AccountRegisterSnapshot[]
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
   @@map("account_register")
+}
+
+model AccountSnapshot {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  accountId String   @map("account_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account   Account                   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  registers AccountRegisterSnapshot[]
+
+  @@index([accountId, createdAt])
+  @@map("account_snapshot")
+}
+
+model AccountRegisterSnapshot {
+  id                      Int      @id @default(autoincrement()) @db.UnsignedInt
+  snapshotId              Int      @map("snapshot_id") @db.UnsignedInt
+  accountRegisterId       Int      @map("account_register_id") @db.UnsignedInt
+  subAccountRegisterId    Int?     @map("sub_account_register_id") @db.UnsignedInt
+  collateralAssetRegisterId Int?   @map("collateral_asset_register_id") @db.UnsignedInt
+  name                    String   @db.VarChar(500)
+  balance                 Decimal  @default(0) @db.Decimal(19, 2)
+  latestBalance           Decimal  @default(0) @map("latest_balance") @db.Decimal(19, 2)
+  typeId                  Int      @map("type_id") @db.UnsignedInt
+
+  snapshot AccountSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  register AccountRegister        @relation(fields: [accountRegisterId], references: [id], onDelete: Restrict)
+  entries  RegisterEntrySnapshot[]
+
+  @@index([snapshotId])
+  @@index([accountRegisterId])
+  @@map("account_register_snapshot")
+}
+
+model RegisterEntrySnapshot {
+  id                 Int      @id @default(autoincrement()) @db.UnsignedInt
+  registerSnapshotId Int      @map("register_snapshot_id") @db.UnsignedInt
+  seq                Int?     @map("seq") @db.UnsignedInt
+  createdAt          DateTime @map("created_at")
+  description        String   @db.VarChar(1500)
+  amount             Decimal  @db.Decimal(19, 2)
+  balance            Decimal  @db.Decimal(19, 2)
+  isProjected        Boolean  @default(false) @map("is_projected")
+  isPending          Boolean  @default(false) @map("is_pending")
+  isBalanceEntry     Boolean  @default(false) @map("is_balance_entry")
+  isManualEntry      Boolean  @default(false) @map("is_manual_entry")
+  categoryId         String?  @map("category_id")
+
+  registerSnapshot AccountRegisterSnapshot @relation(fields: [registerSnapshotId], references: [id], onDelete: Cascade)
+
+  @@index([registerSnapshotId, createdAt])
+  @@map("register_entry_snapshot")
 }
 
 model AccountRegisterSummary {
@@ -385,4 +439,26 @@ model Rsa {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("rsa")
+}
+
+model OpenAiRequestLog {
+  id                  String   @id @default(uuid())
+  createdAt           DateTime @default(now()) @map("created_at")
+  purpose             String   @db.VarChar(191)
+  model               String   @db.VarChar(191)
+  promptTokens        Int?     @map("prompt_tokens")
+  completionTokens    Int?     @map("completion_tokens")
+  totalTokens         Int?     @map("total_tokens")
+  cachedPromptTokens  Int?     @map("cached_prompt_tokens")
+  openaiResponseId    String?  @map("openai_response_id") @db.VarChar(191)
+  finishReason        String?  @map("finish_reason") @db.VarChar(64)
+  durationMs          Int      @map("duration_ms")
+  success             Boolean
+  errorMessage        String?  @map("error_message") @db.Text
+  httpStatus          Int?     @map("http_status")
+  metadata            Json?
+
+  @@index([createdAt])
+  @@index([purpose])
+  @@map("openai_request_log")
 }
