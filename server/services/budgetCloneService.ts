@@ -274,4 +274,34 @@ export async function cloneBudget(
   if (aliasesToCreate.length > 0) {
     await tx.reoccurrencePlaidNameAlias.createMany({ data: aliasesToCreate });
   }
+
+  // 7) Clone SavingsGoals
+  const sourceGoals = await tx.savingsGoal.findMany({
+    where: { budgetId: sourceBudgetId, isArchived: false },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  for (const g of sourceGoals) {
+    const newSourceId = sourceRegisterIds.has(g.sourceAccountRegisterId)
+      ? registerIdMap.get(g.sourceAccountRegisterId)
+      : null;
+    const newTargetId = sourceRegisterIds.has(g.targetAccountRegisterId)
+      ? registerIdMap.get(g.targetAccountRegisterId)
+      : null;
+    if (newSourceId != null && newTargetId != null) {
+      await tx.savingsGoal.create({
+        data: {
+          accountId: g.accountId,
+          budgetId: targetBudgetId,
+          name: g.name,
+          targetAmount: g.targetAmount,
+          sourceAccountRegisterId: newSourceId,
+          targetAccountRegisterId: newTargetId,
+          priorityOverDebt: g.priorityOverDebt,
+          ignoreMinBalance: g.ignoreMinBalance,
+          sortOrder: g.sortOrder,
+        },
+      });
+    }
+  }
 }

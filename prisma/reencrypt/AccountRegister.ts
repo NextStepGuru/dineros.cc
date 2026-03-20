@@ -145,6 +145,14 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "snapshotRows": {
  *       "modelName": "AccountRegisterSnapshot",
  *       "isList": true
+ *     },
+ *     "sourceForSavingsGoals": {
+ *       "modelName": "SavingsGoal",
+ *       "isList": true
+ *     },
+ *     "targetForSavingsGoals": {
+ *       "modelName": "SavingsGoal",
+ *       "isList": true
  *     }
  *   }
  * }

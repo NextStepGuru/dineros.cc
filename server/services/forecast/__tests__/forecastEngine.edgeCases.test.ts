@@ -184,6 +184,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
 
       // Mock services to throw errors
       const mockTransferService = {
+        processHighPriorityGoals: vi.fn().mockResolvedValue(undefined),
         processExtraDebtPayments: vi
           .fn()
           .mockRejectedValue(new Error("Transfer failed")),
@@ -218,6 +219,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       const endDate = dt("2034-01-01"); // 10 years
 
       const mockTransferService = {
+        processHighPriorityGoals: vi.fn().mockResolvedValue(undefined),
         processExtraDebtPayments: vi.fn(),
         processSavingsGoals: vi.fn(),
       };
@@ -452,6 +454,9 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         reoccurrenceSplit: {
           findMany: vi.fn().mockResolvedValue([]),
         },
+        savingsGoal: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
         $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
         $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
@@ -490,6 +495,9 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
           findMany: vi.fn().mockResolvedValue([]),
         },
         reoccurrenceSplit: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        savingsGoal: {
           findMany: vi.fn().mockResolvedValue([]),
         },
         $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),

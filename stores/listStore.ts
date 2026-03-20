@@ -8,6 +8,7 @@ import type {
   Lists,
   Reoccurrence,
   Account,
+  SavingsGoal,
 } from "../types/types";
 
 export const useListStore = defineStore("listStore", {
@@ -19,6 +20,7 @@ export const useListStore = defineStore("listStore", {
     budgets: [] as Budget[],
     accounts: [] as Account[],
     categories: [] as Category[],
+    savingsGoals: [] as SavingsGoal[],
     isLoading: false,
   }),
   getters: {
@@ -65,6 +67,14 @@ export const useListStore = defineStore("listStore", {
       state.budgets.find((b) => b.isDefault) ?? state.budgets[0] ?? null,
     getAccounts: (state) => state.accounts,
     getCategories: (state) => state.categories,
+    getSavingsGoals: (state) =>
+      [...state.savingsGoals].sort((a, b) => a.sortOrder - b.sortOrder),
+    getSavingsGoalsForCurrentBudget: (state) => {
+      const authStore = useAuthStore();
+      return state.savingsGoals
+        .filter((g) => g.budgetId === authStore.getBudgetId)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+    },
     getIsListsLoading: (state) => state.isLoading,
   },
   actions: {
@@ -105,6 +115,31 @@ export const useListStore = defineStore("listStore", {
     },
     setCategories(categories: Category[]) {
       this.categories = categories;
+    },
+    setSavingsGoals(savingsGoals: SavingsGoal[]) {
+      this.savingsGoals = savingsGoals;
+    },
+    addSavingsGoal(savingsGoal: SavingsGoal) {
+      if (!this.savingsGoals.some((g) => g.id === savingsGoal.id)) {
+        this.savingsGoals.push(savingsGoal);
+      }
+    },
+    removeSavingsGoal(goalId: number) {
+      this.savingsGoals = this.savingsGoals.filter((g) => g.id !== goalId);
+    },
+    patchSavingsGoal(savingsGoal: SavingsGoal) {
+      const index = this.savingsGoals.findIndex((g) => g.id === savingsGoal.id);
+      if (index >= 0) {
+        this.savingsGoals[index] = { ...savingsGoal };
+      } else {
+        this.savingsGoals.push(savingsGoal);
+      }
+    },
+    updateSavingsGoalsOrder(goalIds: number[]) {
+      goalIds.forEach((id, index) => {
+        const g = this.savingsGoals.find((x) => x.id === id);
+        if (g) g.sortOrder = index;
+      });
     },
     patchAccountRegister(accountRegister: AccountRegister) {
       const index = this.accountRegisters.findIndex(
@@ -153,6 +188,7 @@ export const useListStore = defineStore("listStore", {
           this.setBudgets(data.budgets);
           this.setAccounts(data.accounts);
           this.setCategories(data.categories);
+          this.setSavingsGoals(data.savingsGoals ?? []);
         }
       } finally {
         this.isLoading = false;
@@ -166,6 +202,7 @@ export const useListStore = defineStore("listStore", {
       this.budgets = [];
       this.accounts = [];
       this.categories = [];
+      this.savingsGoals = [];
     },
   },
 });

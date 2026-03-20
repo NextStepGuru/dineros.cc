@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IDataLoaderService, ForecastContext, AccountData } from "./types";
-import type { CacheAccountRegister } from "./ModernCacheService";
+import type {
+  CacheAccountRegister,
+  CacheSavingsGoal,
+} from "./ModernCacheService";
 import { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
@@ -20,15 +23,23 @@ export class DataLoaderService implements IDataLoaderService {
     this.cache.reoccurrence.clear();
     this.cache.reoccurrenceSkip.clear();
     this.cache.reoccurrenceSplit.clear();
+    this.cache.savingsGoal.clear();
 
-    const [accountRegisters, registerEntries, reoccurrences, reoccurrenceSkips] =
-      await Promise.all([
-        this.loadAccountRegisters(context.accountId),
-        this.loadRegisterEntries(context.accountId),
-        this.loadReoccurrences(context.accountId),
-        this.loadReoccurrenceSkips(context.accountId),
-        this.loadReoccurrenceSplits(context.accountId),
-      ]);
+    const [
+      accountRegisters,
+      registerEntries,
+      reoccurrences,
+      reoccurrenceSkips,
+      ,
+      ,
+    ] = await Promise.all([
+      this.loadAccountRegisters(context.accountId),
+      this.loadRegisterEntries(context.accountId),
+      this.loadReoccurrences(context.accountId),
+      this.loadReoccurrenceSkips(context.accountId),
+      this.loadReoccurrenceSplits(context.accountId),
+      this.loadSavingsGoals(context.accountId),
+    ]);
 
     const minReoccurrenceDate = (() => {
       const dates = reoccurrences
@@ -203,6 +214,33 @@ export class DataLoaderService implements IDataLoaderService {
     });
 
     return reoccurrenceSplits;
+  }
+
+  private async loadSavingsGoals(accountId?: string): Promise<CacheSavingsGoal[]> {
+    const goals = await this.db.savingsGoal.findMany({
+      where: { accountId, isArchived: false },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const cacheGoals: CacheSavingsGoal[] = goals.map((g) => ({
+      id: g.id,
+      accountId: g.accountId,
+      budgetId: g.budgetId,
+      name: g.name,
+      targetAmount: Number(g.targetAmount),
+      sourceAccountRegisterId: g.sourceAccountRegisterId,
+      targetAccountRegisterId: g.targetAccountRegisterId,
+      priorityOverDebt: g.priorityOverDebt,
+      ignoreMinBalance: g.ignoreMinBalance,
+      sortOrder: g.sortOrder,
+      isArchived: g.isArchived,
+    }));
+
+    cacheGoals.forEach((goal) => {
+      this.cache.savingsGoal.insert(goal);
+    });
+
+    return cacheGoals;
   }
 
   async getMinReoccurrenceDate(accountId?: string): Promise<Date | null> {

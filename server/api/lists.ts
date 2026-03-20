@@ -17,44 +17,61 @@ export default defineEventHandler(async (event) => {
       },
     };
 
-    const [reoccurrences, budgets, intervals, accountTypes, accountRegisters, accounts, categories] =
-      await Promise.all([
-        PrismaDb.reoccurrence.findMany({
-          where: userAccountFilter,
-          include: {
-            splits: {
-              orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-            },
+    const [
+      reoccurrences,
+      budgets,
+      intervals,
+      accountTypes,
+      accountRegisters,
+      accounts,
+      categories,
+      savingsGoals,
+    ] = await Promise.all([
+      PrismaDb.reoccurrence.findMany({
+        where: userAccountFilter,
+        include: {
+          splits: {
+            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
           },
-          orderBy: [{ lastAt: "asc" }, { id: "asc" }],
-        }),
-        PrismaDb.budget.findMany({
-          where: { isArchived: false, userId: user.userId },
-        }),
-        PrismaDb.interval.findMany({}),
-        PrismaDb.accountType.findMany({}),
-        PrismaDb.accountRegister.findMany({
-          where: {
-            isArchived: false,
-            ...userAccountFilter,
-          },
-          orderBy: { sortOrder: "asc" },
-        }),
-        PrismaDb.account.findMany({
-          where: {
+        },
+        orderBy: [{ lastAt: "asc" }, { id: "asc" }],
+      }),
+      PrismaDb.budget.findMany({
+        where: { isArchived: false, userId: user.userId },
+      }),
+      PrismaDb.interval.findMany({}),
+      PrismaDb.accountType.findMany({}),
+      PrismaDb.accountRegister.findMany({
+        where: {
+          isArchived: false,
+          ...userAccountFilter,
+        },
+        orderBy: { sortOrder: "asc" },
+      }),
+      PrismaDb.account.findMany({
+        where: {
+          userAccounts: { some: { userId: user.userId } },
+        },
+      }),
+      PrismaDb.category.findMany({
+        where: {
+          isArchived: false,
+          account: {
             userAccounts: { some: { userId: user.userId } },
           },
-        }),
-        PrismaDb.category.findMany({
-          where: {
-            isArchived: false,
-            account: {
-              userAccounts: { some: { userId: user.userId } },
-            },
+        },
+        orderBy: { name: "asc" },
+      }),
+      PrismaDb.savingsGoal.findMany({
+        where: {
+          isArchived: false,
+          account: {
+            userAccounts: { some: { userId: user.userId } },
           },
-          orderBy: { name: "asc" },
-        }),
-      ]);
+        },
+        orderBy: { sortOrder: "asc" },
+      }),
+    ]);
 
     return {
       reoccurrences,
@@ -64,6 +81,7 @@ export default defineEventHandler(async (event) => {
       budgets,
       accounts,
       categories,
+      savingsGoals,
     };
   } catch (error) {
     handleApiError(error);

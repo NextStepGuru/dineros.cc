@@ -70,6 +70,9 @@ vi.mock('~/server/clients/prismaClient', () => ({
     category: {
       findMany: vi.fn(),
     },
+    savingsGoal: {
+      findMany: vi.fn(),
+    },
     $queryRaw: vi.fn(),
   },
 }));
@@ -256,6 +259,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue(mockAccountRegisters);
       (prisma.account.findMany as any).mockResolvedValue(mockAccounts);
       (prisma.category.findMany as any).mockResolvedValue(mockCategories);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       const result = await listsHandler(mockEvent);
 
@@ -267,6 +271,7 @@ describe('Core API Endpoints', () => {
         budgets: mockBudgets,
         accounts: mockAccounts,
         categories: mockCategories,
+        savingsGoals: [],
       });
 
       expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith({
@@ -312,6 +317,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 
@@ -346,6 +352,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       const result = await listsHandler(mockEvent);
 
@@ -357,6 +364,7 @@ describe('Core API Endpoints', () => {
         budgets: [],
         accounts: [],
         categories: [],
+        savingsGoals: [],
       });
     });
 
@@ -377,6 +385,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       await expect(listsHandler(mockEvent)).rejects.toThrow(
         'Database connection failed',
@@ -399,6 +408,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 
@@ -441,6 +451,7 @@ describe('Core API Endpoints', () => {
       (prisma.accountRegister.findMany as any).mockResolvedValue([]);
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
+      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       await listsHandler(mockEvent);
 

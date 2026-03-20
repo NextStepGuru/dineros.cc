@@ -17,6 +17,10 @@ function createMockTx() {
   const reoccurrenceSplit = { createMany: vi.fn() };
   const reoccurrenceSkip = { createMany: vi.fn() };
   const reoccurrencePlaidNameAlias = { createMany: vi.fn() };
+  const savingsGoal = {
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+  };
 
   const tx = {
     accountRegister,
@@ -25,8 +29,9 @@ function createMockTx() {
     reoccurrenceSplit,
     reoccurrenceSkip,
     reoccurrencePlaidNameAlias,
+    savingsGoal,
   };
-  return { tx, accountRegister, reoccurrence, registerEntry, reoccurrenceSplit, reoccurrenceSkip, reoccurrencePlaidNameAlias };
+  return { tx, accountRegister, reoccurrence, registerEntry, reoccurrenceSplit, reoccurrenceSkip, reoccurrencePlaidNameAlias, savingsGoal };
 }
 
 describe("budgetCloneService", () => {

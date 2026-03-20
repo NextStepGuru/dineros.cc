@@ -93,6 +93,20 @@ export type CacheReoccurrenceSplit = {
   sortOrder: number;
 };
 
+export type CacheSavingsGoal = {
+  id: number;
+  accountId: string;
+  budgetId: number;
+  name: string;
+  targetAmount: number;
+  sourceAccountRegisterId: number;
+  targetAccountRegisterId: number;
+  priorityOverDebt: boolean;
+  ignoreMinBalance: boolean;
+  sortOrder: number;
+  isArchived: boolean;
+};
+
 // Modern collection interface
 interface Collection<T> {
   insert(item: T): void;
@@ -379,6 +393,7 @@ export class ModernCacheService {
   public readonly registerEntry: Collection<CacheRegisterEntry>;
   public readonly reoccurrenceSkip: Collection<CacheReoccurrenceSkip>;
   public readonly reoccurrenceSplit: Collection<CacheReoccurrenceSplit>;
+  public readonly savingsGoal: Collection<CacheSavingsGoal>;
 
   constructor() {
     this.reoccurrence = new ModernCollection<CacheReoccurrence>();
@@ -388,6 +403,7 @@ export class ModernCacheService {
     );
     this.reoccurrenceSkip = new ModernCollection<CacheReoccurrenceSkip>();
     this.reoccurrenceSplit = new ModernCollection<CacheReoccurrenceSplit>();
+    this.savingsGoal = new ModernCollection<CacheSavingsGoal>();
 
     // Create indexes for commonly queried fields
     this.createOptimizedIndexes();
@@ -418,6 +434,11 @@ export class ModernCacheService {
     const reoccurrenceSplitCollection = this
       .reoccurrenceSplit as ModernCollection<CacheReoccurrenceSplit>;
     reoccurrenceSplitCollection.createIndex("reoccurrenceId");
+
+    const savingsGoalCollection = this
+      .savingsGoal as ModernCollection<CacheSavingsGoal>;
+    savingsGoalCollection.createIndex("sourceAccountRegisterId");
+    savingsGoalCollection.createIndex("priorityOverDebt");
   }
 
   // Utility methods for common operations
@@ -427,6 +448,7 @@ export class ModernCacheService {
     this.registerEntry.clear();
     this.reoccurrenceSkip.clear();
     this.reoccurrenceSplit.clear();
+    this.savingsGoal.clear();
   }
 
   getStats(): {
@@ -435,6 +457,7 @@ export class ModernCacheService {
     registerEntries: number;
     reoccurrenceSkips: number;
     reoccurrenceSplits: number;
+    savingsGoals: number;
   } {
     return {
       reoccurrences: this.reoccurrence.count(),
@@ -442,6 +465,7 @@ export class ModernCacheService {
       registerEntries: this.registerEntry.count(),
       reoccurrenceSkips: this.reoccurrenceSkip.count(),
       reoccurrenceSplits: this.reoccurrenceSplit.count(),
+      savingsGoals: this.savingsGoal.count(),
     };
   }
 }

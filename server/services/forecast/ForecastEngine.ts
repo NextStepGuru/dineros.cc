@@ -345,9 +345,15 @@ export class ForecastEngine implements IForecastEngine {
       // Statement advances only inside processAccountInterestCharge (one period per posted cycle).
       // Batch updateStatementDates here skipped interest rows by multi-advancing statementAt.
 
-      // Process extra debt payments AFTER reoccurrences and interest so projected balance reflects same-day outflows
+      // Process high-priority savings goals (priorityOverDebt) before extra debt payments
       const extraPaymentAccounts =
         this.accountService.getAccountsWithExtraPayments();
+      await this.transferService.processHighPriorityGoals(
+        extraPaymentAccounts,
+        currentDate.toDate()
+      );
+
+      // Process extra debt payments AFTER reoccurrences and interest so projected balance reflects same-day outflows
       await this.transferService.processExtraDebtPayments(
         extraPaymentAccounts,
         currentDate.toDate()

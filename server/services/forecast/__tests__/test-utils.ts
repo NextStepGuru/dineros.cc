@@ -163,6 +163,9 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    savingsGoal: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     $executeRaw: vi.fn().mockResolvedValue(undefined),
     $transaction: vi.fn((callback) => callback(mockDb)),
   } as any;

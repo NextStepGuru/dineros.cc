@@ -27,6 +27,9 @@ describe("DataLoaderService", () => {
       reoccurrenceSplit: {
         findMany: vi.fn().mockResolvedValue([]),
       },
+      savingsGoal: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
     };
 
     mockCache = new ModernCacheService();
