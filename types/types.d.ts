@@ -10,6 +10,7 @@ import {
   reoccurrenceSchema,
   reoccurrenceSplitSchema,
   reoccurrenceWithSplitsSchema,
+  savingsGoalSchema,
 } from "~/schema/zod";
 
 export type AccountType = {
@@ -52,6 +53,8 @@ export type Category = {
   updatedAt: string;
 };
 
+export type SavingsGoal = z.infer<typeof savingsGoalSchema>;
+
 export type Lists = {
   reoccurrences: Reoccurrence[];
   intervals: Interval[];
@@ -60,6 +63,7 @@ export type Lists = {
   budgets: Budget[];
   accounts: Account[];
   categories: Category[];
+  savingsGoals: SavingsGoal[];
 };
 
 export type AccountSnapshot = {

@@ -30,6 +30,7 @@ model Account {
   budgets       Budget[]
   categories    Category[]
   snapshots     AccountSnapshot[]
+  savingsGoals  SavingsGoal[]
 
   @@map("account")
 }
@@ -130,11 +131,37 @@ model Budget {
   isDefault  Boolean @default(false) @map("is_default")
   userId     Int?    @map("user_id") @db.UnsignedInt
 
-  account  Account           @relation(fields: [accountId], references: [id])
-  accounts AccountRegister[]
-  User     User?             @relation(fields: [userId], references: [id])
+  account      Account           @relation(fields: [accountId], references: [id])
+  accounts     AccountRegister[]
+  User         User?             @relation(fields: [userId], references: [id])
+  savingsGoals SavingsGoal[]
 
   @@map("budget")
+}
+
+model SavingsGoal {
+  id                        Int       @id @default(autoincrement()) @db.UnsignedInt
+  accountId                 String    @map("account_id")
+  budgetId                  Int       @map("budget_id") @db.UnsignedInt
+  name                      String    @db.VarChar(255)
+  targetAmount              Decimal   @map("target_amount") @db.Decimal(12, 2)
+  sourceAccountRegisterId   Int       @map("source_account_register_id") @db.UnsignedInt
+  targetAccountRegisterId   Int       @map("target_account_register_id") @db.UnsignedInt
+  priorityOverDebt          Boolean   @default(false) @map("priority_over_debt")
+  ignoreMinBalance          Boolean   @default(false) @map("ignore_min_balance")
+  sortOrder                 Int       @default(0) @map("sort_order") @db.UnsignedInt
+  isArchived                Boolean   @default(false) @map("is_archived")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+
+  account                 Account         @relation(fields: [accountId], references: [id])
+  budget                  Budget         @relation(fields: [budgetId], references: [id])
+  sourceAccountRegister   AccountRegister @relation("SavingsGoalSource", fields: [sourceAccountRegisterId], references: [id])
+  targetAccountRegister   AccountRegister @relation("SavingsGoalTarget", fields: [targetAccountRegisterId], references: [id])
+
+  @@index([accountId])
+  @@index([budgetId])
+  @@map("savings_goal")
 }
 
 model AccountRegister {
@@ -186,12 +213,14 @@ model AccountRegister {
   collateralAsset     AccountRegister?  @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
   loansSecuredByAsset AccountRegister[] @relation("RegisterCollateral")
 
-  entries            RegisterEntry[]
-  reoccurrences      Reoccurrence[]
-  splitTargets       ReoccurrenceSplit[]
-  plaidNameAliases   ReoccurrencePlaidNameAlias[]
-  children           AccountRegister[]             @relation("ar_children")
-  snapshotRows       AccountRegisterSnapshot[]
+  entries               RegisterEntry[]
+  reoccurrences         Reoccurrence[]
+  splitTargets          ReoccurrenceSplit[]
+  plaidNameAliases      ReoccurrencePlaidNameAlias[]
+  children              AccountRegister[]             @relation("ar_children")
+  snapshotRows          AccountRegisterSnapshot[]
+  sourceForSavingsGoals SavingsGoal[] @relation("SavingsGoalSource")
+  targetForSavingsGoals SavingsGoal[] @relation("SavingsGoalTarget")
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])

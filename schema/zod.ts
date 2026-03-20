@@ -346,6 +346,31 @@ export const renameBudgetSchema = z.object({
   name: z.string().min(1).max(255),
 });
 
+export const savingsGoalSchema = z.object({
+  id: z.number(),
+  accountId: z.string(),
+  budgetId: z.number(),
+  name: z.string().min(1).max(255),
+  targetAmount: z.number().positive(),
+  sourceAccountRegisterId: z.number(),
+  targetAccountRegisterId: z.number(),
+  priorityOverDebt: z.boolean(),
+  ignoreMinBalance: z.boolean(),
+  sortOrder: z.number(),
+  isArchived: z.boolean(),
+});
+
+export const createSavingsGoalSchema = z.object({
+  name: z.string().min(1).max(255),
+  targetAmount: z.number().positive(),
+  sourceAccountRegisterId: z.number(),
+  targetAccountRegisterId: z.number(),
+  priorityOverDebt: z.boolean().default(false),
+  ignoreMinBalance: z.boolean().default(false),
+});
+
+export const updateSavingsGoalSchema = createSavingsGoalSchema.partial();
+
 export const accountSchema = z.object({
   id: z.number(),
   name: z.string(),

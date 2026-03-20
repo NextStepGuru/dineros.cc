@@ -552,8 +552,67 @@ export class TransferService implements ITransferService {
   }
 
   /**
+   * Process high-priority savings goals (priorityOverDebt = true) before extra debt payments.
+   * Runs on 1st–3rd of month. Each goal pulls from its source account into its target register.
+   */
+  async processHighPriorityGoals(
+    sourceAccounts: CacheAccountRegister[],
+    targetDate: Date,
+  ): Promise<void> {
+    const dayOfMonth = dateTimeService.createUTC(targetDate).date() as number;
+    if (dayOfMonth !== 1 && dayOfMonth !== 2 && dayOfMonth !== 3) {
+      return;
+    }
+
+    for (const sourceAccount of sourceAccounts) {
+      const goals = this.cache.savingsGoal.find(
+        (g) =>
+          g.sourceAccountRegisterId === sourceAccount.id &&
+          g.priorityOverDebt === true,
+      );
+      if (goals.length === 0) continue;
+
+      const sorted = [...goals].sort((a, b) => a.sortOrder - b.sortOrder);
+      let projectedBalance = this.calculateProjectedBalanceAtDate(
+        sourceAccount.id,
+        targetDate,
+      );
+      const sourceMinBalance = Number(sourceAccount.minAccountBalance ?? 0);
+
+      for (const goal of sorted) {
+        const available = goal.ignoreMinBalance
+          ? projectedBalance
+          : Math.max(0, projectedBalance - sourceMinBalance);
+        if (available <= TransferService.MONEY_EPSILON) break;
+
+        const targetProjected = this.calculateProjectedBalanceAtDate(
+          goal.targetAccountRegisterId,
+          targetDate,
+        );
+        const remainingToGoal = Math.max(
+          0,
+          goal.targetAmount - targetProjected,
+        );
+        if (remainingToGoal <= TransferService.MONEY_EPSILON) continue;
+
+        const amount = Math.min(available, remainingToGoal);
+        this.transferBetweenAccountsWithDate({
+          targetAccountRegisterId: goal.targetAccountRegisterId,
+          sourceAccountRegisterId: sourceAccount.id,
+          amount,
+          description: `Goal: ${goal.name}`,
+          forecastDate: targetDate,
+        });
+
+        projectedBalance -= amount;
+      }
+    }
+  }
+
+  /**
    * Process savings goals after all debt is paid
-   * Uses savingsGoalSortOrder for priority and accountSavingsGoal for target amounts
+   * Uses savingsGoalSortOrder for priority and accountSavingsGoal for target amounts;
+   * also processes SavingsGoal records with priorityOverDebt = false.
    */
   async processSavingsGoals(
     sourceAccounts: CacheAccountRegister[],
@@ -640,42 +699,70 @@ export class TransferService implements ITransferService {
       (account) => (account.accountSavingsGoal ?? 0) > 0,
     );
 
+    const normalGoals = this.cache.savingsGoal.find(
+      (g) =>
+        g.sourceAccountRegisterId === sourceAccountId &&
+        g.priorityOverDebt === false,
+    );
+
+    type FundingTarget = {
+      targetRegisterId: number;
+      remainingToGoal: number;
+      sortOrder: number;
+      description: string;
+    };
+
+    const targets: FundingTarget[] = [];
+
+    for (const a of savingsGoalAccounts) {
+      const targetProj = this.calculateProjectedBalanceAtDate(a.id, targetDate);
+      const remaining = Math.max(0, (a.accountSavingsGoal ?? 0) - targetProj);
+      if (remaining > TransferService.MONEY_EPSILON) {
+        targets.push({
+          targetRegisterId: a.id,
+          remainingToGoal: remaining,
+          sortOrder: a.savingsGoalSortOrder,
+          description: `Savings goal contribution from ${sourceAccountRegister.name}`,
+        });
+      }
+    }
+
+    for (const g of normalGoals) {
+      const targetProj = this.calculateProjectedBalanceAtDate(
+        g.targetAccountRegisterId,
+        targetDate,
+      );
+      const remaining = Math.max(0, g.targetAmount - targetProj);
+      if (remaining > TransferService.MONEY_EPSILON) {
+        targets.push({
+          targetRegisterId: g.targetAccountRegisterId,
+          remainingToGoal: remaining,
+          sortOrder: g.sortOrder,
+          description: `Goal: ${g.name}`,
+        });
+      }
+    }
+
+    targets.sort((a, b) => a.sortOrder - b.sortOrder);
+
     forecastLogger.serviceDebug(
       "TransferService",
-      `Savings goal account search:`,
+      `Savings goal targets:`,
       {
         savingsGoalAccountsCount: savingsGoalAccounts.length,
+        normalGoalsCount: normalGoals.length,
+        targetsCount: targets.length,
         sourceAccountId: sourceAccountRegister.id,
-        sourceAccountBalance: sourceAccountRegister.balance,
-        savingsGoalAccounts: savingsGoalAccounts.map((a) => ({
-          id: a.id,
-          name: a.name,
-          balance: a.balance,
-          savingsGoal: a.accountSavingsGoal,
-          savingsGoalSortOrder: a.savingsGoalSortOrder,
-        })),
       },
     );
 
-    if (savingsGoalAccounts.length === 0) {
+    if (targets.length === 0) {
       forecastLogger.serviceDebug(
         "TransferService",
-        `Savings goal: No savings goal accounts found`,
+        `Savings goal: No targets to fund`,
       );
       return false;
     }
-
-    // Sort by savings goal sort order (lower values first) then by remaining goal amount
-    const sortedSavingsGoalAccounts = savingsGoalAccounts.sort((a, b) => {
-      // First sort by savingsGoalSortOrder (lower values first)
-      if (a.savingsGoalSortOrder !== b.savingsGoalSortOrder) {
-        return a.savingsGoalSortOrder - b.savingsGoalSortOrder;
-      }
-      // Then by remaining goal amount (highest remaining first)
-      const aRemaining = (a.accountSavingsGoal || 0) - a.balance;
-      const bRemaining = (b.accountSavingsGoal || 0) - b.balance;
-      return bRemaining - aRemaining;
-    });
 
     // Calculate available amount above minimum balance using PROJECTED balance
     let remainingAvailableAmount =
@@ -694,35 +781,20 @@ export class TransferService implements ITransferService {
     let totalSavingsMade = 0;
     let savingsProcessed = 0;
 
-    // Fund savings goals in priority order until all available funds are used
-    for (const savingsAccountRegister of sortedSavingsGoalAccounts) {
-      if (remainingAvailableAmount <= 0) {
-        break; // No more funds available
-      }
+    for (const t of targets) {
+      if (remainingAvailableAmount <= 0) break;
 
-      // Calculate how much more is needed to reach the savings goal
-      const currentBalance = savingsAccountRegister.balance;
-      const savingsGoal = savingsAccountRegister.accountSavingsGoal || 0;
-      const remainingToGoal = savingsGoal - currentBalance;
-
-      if (remainingToGoal <= 0) {
-        continue; // This savings goal is already reached
-      }
-
-      let savingsAmount = Math.min(remainingAvailableAmount, remainingToGoal);
-
-      // Execute the transfer with the correct forecast date
+      const amount = Math.min(remainingAvailableAmount, t.remainingToGoal);
       this.transferBetweenAccountsWithDate({
-        targetAccountRegisterId: savingsAccountRegister.id,
+        targetAccountRegisterId: t.targetRegisterId,
         sourceAccountRegisterId: sourceAccountRegister.id,
-        amount: savingsAmount,
-        description: `Savings goal contribution from ${sourceAccountRegister.name}`,
+        amount,
+        description: t.description,
         forecastDate: targetDate,
       });
 
-      // Update remaining available amount
-      remainingAvailableAmount -= savingsAmount;
-      totalSavingsMade += savingsAmount;
+      remainingAvailableAmount -= amount;
+      totalSavingsMade += amount;
       savingsProcessed++;
     }
 
