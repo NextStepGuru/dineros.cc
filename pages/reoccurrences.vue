@@ -18,6 +18,7 @@ import {
 } from "~/lib/categoryFilter";
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
+import CombinedGlobalCategoryFilter from "~/components/filters/CombinedGlobalCategoryFilter.vue";
 
 const ModalsEditReoccurrence = defineAsyncComponent(
   () => import("~/components/modals/EditReoccurrence.vue")
@@ -30,7 +31,12 @@ definePageMeta({
 const listStore = useListStore();
 const toast = useToast();
 
-const stripedTheme = ref({
+/** Root `overflow-auto` + table `overflow-clip` break sticky headers when the real scroll is the outer wrapper. */
+const tableUi = ref({
+  root: "!overflow-visible relative min-h-0",
+  base: "!overflow-visible min-w-full",
+  /** `tbody` uses `isolate` in the default theme; keep header above row backgrounds while sticky. */
+  thead: "!z-30",
   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
 });
 
@@ -200,6 +206,10 @@ const columns: TableColumn<Reoccurrence>[] = [
 
 const globalFilter = ref("");
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
+const combinedTableFilterRef = ref<{
+  collapse: () => void;
+  expandAndFocus: () => Promise<void>;
+} | null>(null);
 
 const categoryFilterSelectItems = computed(() => {
   const items: { label: string; value: string; name: string }[] = [
@@ -229,7 +239,11 @@ const categoryFilterSelectItems = computed(() => {
 
 const reoccurrencesForTable = computed(() =>
   listStore.getReoccurrences.filter((r) =>
-    entryMatchesCategoryFilter(r.categoryId, categoryFilter.value),
+    entryMatchesCategoryFilter(
+      r.categoryId,
+      categoryFilter.value,
+      listStore.getCategories,
+    ),
   ),
 );
 
@@ -239,15 +253,12 @@ defineShortcuts({
     handler: () => {
       globalFilter.value = "";
       categoryFilter.value = CATEGORY_FILTER_ALL;
+      combinedTableFilterRef.value?.collapse();
     },
   },
   meta_a: () => handleAddReoccurrence(),
   meta_f: () => {
-    const search = document.getElementById("search");
-
-    if (search) {
-      search.focus();
-    }
+    void combinedTableFilterRef.value?.expandAndFocus();
   },
 });
 
@@ -364,19 +375,13 @@ onBeforeUnmount(() => {
           :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
           @click="showShortcuts = !showShortcuts"
         )
-      UInput(v-model="globalFilter" size="sm" class="min-w-32 max-w-48 grow" placeholder="Filter..." id="search")
-      UTooltip(text="Filter by category" :delay-duration="150")
-        USelectMenu(
-          v-model="categoryFilter"
-          :items="categoryFilterSelectItems"
-          value-key="value"
-          label-key="label"
-          :filter-fields="['label', 'name']"
-          size="sm"
-          class="min-w-40 max-w-[16rem]"
-          placeholder="All categories"
-          search-placeholder="Search…"
-          aria-label="Filter by category")
+      CombinedGlobalCategoryFilter(
+        ref="combinedTableFilterRef"
+        v-model:global-filter="globalFilter"
+        v-model:category-filter="categoryFilter"
+        :category-items="categoryFilterSelectItems"
+        filter-input-id="search"
+      )
 
     UCard(v-if="showShortcuts" class="mb-4")
       template(#header)
@@ -384,7 +389,7 @@ onBeforeUnmount(() => {
       ul(class="space-y-2 text-sm")
         li Clear text &amp; category filters: ⎋
         li Add reoccurrence: ⌘ + A
-        li Focus filter: ⌘ + F
+        li Open filters &amp; focus search: ⌘ + F
 
     UCard(v-if="listStore.getReoccurrences.length === 0 && !listStore.getIsListsLoading" class="mb-4")
       template(#header)
@@ -406,7 +411,7 @@ onBeforeUnmount(() => {
         :data="reoccurrencesForTable"
         :columns="columns"
         sticky
-        :ui="stripedTheme"
+        :ui="tableUi"
         :loading="listStore.getIsListsLoading"
         loading-color="primary"
         loading-animation="carousel")

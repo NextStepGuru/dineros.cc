@@ -1,11 +1,4 @@
 <script setup lang="ts">
-const error = useError();
-
-const statusCode = computed(() => error.value?.statusCode ?? 500);
-const statusMessage = computed(
-  () => error.value?.statusMessage || "Something went wrong."
-);
-
 async function goHome() {
   await clearError({ redirect: "/" });
 }
@@ -24,10 +17,9 @@ section(class="min-h-[calc(100dvh-var(--ui-header-height))] flex items-center ju
         h1(class="text-xl font-semibold") We hit a snag
     div(class="space-y-3")
       p(class="frog-text-muted")
-        span(class="font-semibold") Error {{ statusCode }}:
-        span &nbsp;{{ statusMessage }}
-      p(class="frog-text-muted")
-        | Try returning home, signing in again, or contacting support if this keeps happening.
+        | We couldn’t finish loading this page — something went wrong on our side. That’s usually temporary.
+      p(class="frog-text-muted text-sm")
+        | Try going home or signing in again. If it keeps happening, contact support below and we’ll help.
       div(class="flex flex-wrap gap-3 pt-2")
         UButton(color="primary" @click="goHome") Go home
         UButton(variant="soft" @click="goLogin") Go to login

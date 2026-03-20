@@ -37,7 +37,7 @@ onMounted(() => {
     ) Skip to main content
     XHeader
 
-    UMain#main-content(tabindex="-1" :class="route.path === '/' ? 'w-full' : 'max-w-[var(--ui-container)] mx-auto'")
+    UMain#main-content(tabindex="-1" :class="route.path === '/' ? 'w-full' : 'max-w-(--ui-container) mx-auto'")
       NuxtPage
 
     USeparator(v-if="!isFooterHidden" type="dashed" class="h-px pt-0 px-4")

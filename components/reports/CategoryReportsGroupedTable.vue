@@ -12,14 +12,24 @@ function amtClass(v: number) {
 </script>
 
 <template lang="pug">
-.table-wrap.overflow-x-auto
-  table.w-full.text-sm
+.table-wrap(
+  class="overflow-x-auto overflow-y-auto max-h-[min(65dvh,calc(100dvh-var(--ui-header-height)-12rem))] overscroll-y-contain rounded-md ring-1 ring-default/60"
+)
+  table.w-full.text-sm.border-separate.border-spacing-0
     thead
-      tr.border-b.border-default.text-left
-        th(class="py-2 pr-4 font-medium") Category
-        th(class="py-2 pr-4 text-right font-medium") Total
-        th(class="py-2 pr-4 text-right font-medium") % of activity
-        th(class="py-2 text-right font-medium") #
+      tr.text-left
+        th(
+          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-left font-medium"
+        ) Category
+        th(
+          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-right font-medium"
+        ) Total
+        th(
+          class="sticky top-0 z-1 border-b border-default bg-default py-2 pr-4 text-right font-medium"
+        ) % of activity
+        th(
+          class="sticky top-0 z-1 border-b border-default bg-default py-2 text-right font-medium"
+        ) #
     tbody
       template(v-for="g in groups" :key="String(g.parent.categoryId ?? 'uncategorized')")
         tr.border-b.border-default(class="bg-elevated/25")

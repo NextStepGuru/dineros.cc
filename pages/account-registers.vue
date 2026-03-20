@@ -1305,15 +1305,15 @@ onBeforeUnmount(() => {
           :to="`/register/${accountLiquiditySnapshot.lowest.id}`") Open lowest-balance register
 
     div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
-      table(class="w-full min-w-full text-xs sm:text-sm")
-        thead(class="[&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented) sticky top-0 inset-x-0 bg-(--ui-bg)/75 z-1 backdrop-blur w-full")
+      table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
+        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented)")
           tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
-            th(v-if="showDebitCreditColumns" class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
-            th(v-if="showDebitCreditColumns" class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
-            th(class="px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
+            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
+            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
+            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
+            th(v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
+            th(v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
+            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
