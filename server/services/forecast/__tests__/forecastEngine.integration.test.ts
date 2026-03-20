@@ -47,6 +47,9 @@ const mockDb = {
   reoccurrenceSplit: {
     findMany: vi.fn(),
   },
+  savingsGoal: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
   $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
   $executeRaw: vi.fn().mockResolvedValue(undefined),
 } as any;
@@ -162,6 +165,8 @@ describe("ForecastEngine Integration Tests", () => {
         isReconciled: false,
       },
     ]);
+
+    mockDb.savingsGoal.findMany.mockResolvedValue([]);
 
     // Mock reoccurrences
     mockDb.reoccurrence.findMany.mockResolvedValue([

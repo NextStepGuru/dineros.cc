@@ -34,6 +34,9 @@ describe("Balance Arithmetic Regression Tests", () => {
       reoccurrenceSplit: {
         findMany: vi.fn().mockResolvedValue([]),
       },
+      savingsGoal: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
       $executeRaw: vi.fn().mockResolvedValue(undefined),
     };
