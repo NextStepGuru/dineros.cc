@@ -1,6 +1,6 @@
 import { formatDate } from "~/lib/utils";
-import type { AccountRegister } from "~/types/types";
 import type {
+  AccountRegister,
   AccountSnapshot,
   AccountSnapshotDetail,
   AccountSnapshotRegisterRow,

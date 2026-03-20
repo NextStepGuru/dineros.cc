@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { dateTimeService } from "~/server/services/forecast";
 
 const paramsSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -73,7 +74,7 @@ export default defineEventHandler(async (event) => {
       lowest: lowest ?? undefined,
       highest: highest ?? undefined,
       skip: 0,
-      focusedAt: new Date().toISOString(),
+      focusedAt: dateTimeService.nowDate().toISOString(),
       take: entries.length,
       loadMode: "snapshot" as const,
       isPartialLoad: false,

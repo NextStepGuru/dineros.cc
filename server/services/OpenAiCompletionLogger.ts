@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type OpenAI from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import { prisma } from "~/server/clients/prismaClient";
+import { dateTimeService } from "~/server/services/forecast";
 import { log } from "~/server/logger";
 
 const ERROR_MESSAGE_MAX = 8000;
@@ -13,13 +14,13 @@ export async function loggedChatCompletion(params: {
   metadata?: Prisma.InputJsonValue;
 }): Promise<ChatCompletion> {
   const { client, body, purpose, metadata } = params;
-  const start = Date.now();
+  const start = dateTimeService.now();
   const modelName =
     typeof body.model === "string" ? body.model : "unknown";
 
   try {
     const response = await client.chat.completions.create(body);
-    const durationMs = Date.now() - start;
+    const durationMs = dateTimeService.now() - start;
     const usage = response.usage;
     let cachedPromptTokens: number | null = null;
     if (
@@ -72,7 +73,7 @@ export async function loggedChatCompletion(params: {
 
     return response;
   } catch (err: unknown) {
-    const durationMs = Date.now() - start;
+    const durationMs = dateTimeService.now() - start;
     const message =
       err instanceof Error
         ? err.message
