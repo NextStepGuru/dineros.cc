@@ -1,5 +1,6 @@
 import { createError } from "h3";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
+import { dateTimeService } from "~/server/services/forecast";
 import type {
   CategoryReportQuery,
   CategoryReportResponse,
@@ -11,11 +12,11 @@ const TRANSFER_TYPE_ID = 6;
 const UNCATEGORIZED_ID = "__uncategorized__";
 
 function utcDayStart(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00.000Z`);
+  return dateTimeService.createUTC(`${isoDate}T00:00:00.000Z`).toDate();
 }
 
 function utcDayEnd(isoDate: string): Date {
-  return new Date(`${isoDate}T23:59:59.999Z`);
+  return dateTimeService.createUTC(`${isoDate}T23:59:59.999Z`).toDate();
 }
 
 /** Match legacy interest sign correction from `server/api/register.ts` */
@@ -225,7 +226,7 @@ export async function getCategoryReport(params: {
   let totalOut = 0;
   let sumAbs = 0;
   let transactionCount = 0;
-  for (const [key, { total, count }] of buckets) {
+  for (const [, { total, count }] of buckets) {
     transactionCount += count;
     if (total > 0) totalIn += total;
     if (total < 0) totalOut += total;
