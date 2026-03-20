@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createPinia, setActivePinia, defineStore } from "pinia";
 import type { User } from "~/types/types";
 
@@ -22,6 +22,11 @@ vi.stubGlobal("process", { ...process, client: false });
 describe("authStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.mocked(console.log).mockRestore();
   });
 
   it("getters reflect initial state", () => {

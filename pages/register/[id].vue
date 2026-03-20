@@ -2,7 +2,11 @@
 import { h, resolveComponent } from "vue";
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
 import type { TableColumn } from "@nuxt/ui";
-import type { RegisterEntry, Reoccurrence } from "~/types/types";
+import type {
+  AccountRegister,
+  RegisterEntry,
+  Reoccurrence,
+} from "~/types/types";
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
@@ -35,6 +39,38 @@ definePageMeta({
 const listStore = useListStore();
 const authStore = useAuthStore();
 const { $api } = useNuxtApp();
+const snapshotMode = useSnapshotMode();
+const {
+  isSnapshotMode,
+  activeSnapshotCreatedAt,
+  selectedSnapshotValue,
+  snapshotViewItems,
+  exitSnapshotView,
+} = snapshotMode;
+const selectedSnapshotLabel = computed(
+  () =>
+    snapshotViewItems.value.find((i) => i.value === selectedSnapshotValue.value)
+      ?.label ?? "Live",
+);
+const snapshotMenuItems = computed(() => [
+  snapshotViewItems.value.map((item) => ({
+    label: item.label,
+    icon:
+      selectedSnapshotValue.value === item.value
+        ? "i-lucide-check"
+        : "i-lucide-circle",
+    onSelect: () => {
+      selectedSnapshotValue.value = item.value;
+    },
+  })),
+]);
+
+const registersForRegisterPage = computed((): AccountRegister[] =>
+  snapshotMode.isSnapshotMode.value &&
+  snapshotMode.syntheticAccountRegisters.value.length > 0
+    ? snapshotMode.syntheticAccountRegisters.value
+    : listStore.getAccountRegisters,
+);
 
 const REGISTER_ONBOARDING_DISMISS_KEY = "dineros_register_onboarding_dismissed";
 const REGISTER_RECALC_ONCE_KEY = "dineros_register_recalc_once";
@@ -73,7 +109,7 @@ onMounted(() => {
 
 const mainAccountCount = computed(
   () =>
-    listStore.getAccountRegisters.filter((r) => !r.subAccountRegisterId).length,
+    registersForRegisterPage.value.filter((r) => !r.subAccountRegisterId).length,
 );
 
 const showAccountSelector = computed(
@@ -82,7 +118,7 @@ const showAccountSelector = computed(
 
 // Account options for dropdown: label (name) + balanceFormatted for right-aligned balance in menu
 const accountRegisterOptionsWithBalance = computed(() => {
-  const formatted = formatAccountRegisters(listStore.getAccountRegisters);
+  const formatted = formatAccountRegisters(registersForRegisterPage.value);
   return formatted.map((r) => {
     const balanceRaw = Number(r.latestBalance ?? 0);
     return {
@@ -111,6 +147,7 @@ const hasReoccurrences = computed(() => listStore.getReoccurrences.length > 0);
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 
 const showRegisterOnboarding = computed(() => {
+  if (snapshotMode.isSnapshotMode.value) return false;
   if (onboardingDismissed.value) return false;
   if (!listStore.getAccountRegisters.length) return false;
   if (isInitialLoading.value) return false;
@@ -194,6 +231,40 @@ const loadInitialEntries = async () => {
   hasMoreData.value = true;
   tableEntries.value = [];
   try {
+    if (snapshotMode.isSnapshotMode.value) {
+      const rsid =
+        snapshotMode.registerSnapshotIdByRegisterId.value[
+          accountRegisterId.value
+        ];
+      if (!rsid) {
+        accountEntries.value = {
+          entries: [],
+          lowest: {} as RegisterEntry,
+          highest: {} as RegisterEntry,
+        };
+        hasMoreData.value = false;
+        tableKey.value++;
+        return;
+      }
+      const data = await (useNuxtApp().$api as typeof $fetch)<{
+        entries: RegisterEntry[];
+        lowest?: RegisterEntry;
+        highest?: RegisterEntry;
+      }>(`/api/snapshot-register/${rsid}`);
+      if (data) {
+        accountEntries.value = {
+          entries: [...(data.entries || [])],
+          lowest: data.lowest ?? ({} as RegisterEntry),
+          highest: data.highest ?? ({} as RegisterEntry),
+        };
+        tableEntries.value = data.entries ? [...data.entries] : [];
+        hasMoreData.value = false;
+        currentSkip.value = data.entries?.length || 0;
+        tableKey.value++;
+      }
+      return;
+    }
+
     // use $api (not useAPI) so request resolves; useAPI/useFetch was hanging after nav (Nuxt 4)
     const data = await (useNuxtApp().$api as typeof $fetch)<{
       entries: RegisterEntry[];
@@ -236,6 +307,7 @@ const loadInitialEntries = async () => {
 
 // Load more data for infinite scrolling
 const loadMoreEntries = async () => {
+  if (snapshotMode.isSnapshotMode.value) return;
   if (isLoadingMore.value || !hasMoreData.value) return;
 
   isLoadingMore.value = true;
@@ -337,7 +409,7 @@ function openReoccurrenceFromPlaidEntry(entry: RegisterEntry) {
     });
     return;
   }
-  const reg = listStore.getAccountRegisters.find(
+  const reg = registersForRegisterPage.value.find(
     (r) => r.id === entry.accountRegisterId,
   );
   const accountId = reg?.accountId;
@@ -437,11 +509,18 @@ const accountEntriesStatus = computed(() => {
   return "idle";
 });
 
-// Trigger loading when accountRegisterId or selectedTab changes
+// Trigger loading when accountRegisterId or selectedTab changes (or snapshot / mapping)
 watch(
-  [accountRegisterId, selectedTab],
+  [
+    accountRegisterId,
+    selectedTab,
+    () => snapshotMode.isSnapshotMode.value,
+    () =>
+      snapshotMode.registerSnapshotIdByRegisterId.value[accountRegisterId.value] ??
+      0,
+  ],
   () => {
-    refreshAccountEntries();
+    void refreshAccountEntries();
   },
   { immediate: true },
 );
@@ -450,7 +529,7 @@ const lowestEntry = computed(() => accountEntries?.value?.lowest);
 const highestEntry = computed(() => accountEntries?.value?.highest);
 
 const currentAccountRegister = computed(() =>
-  listStore.getAccountRegisters.find(
+  registersForRegisterPage.value.find(
     (item) => item.id === accountRegisterId.value,
   ),
 );
@@ -500,6 +579,7 @@ const stripedTheme = ref({
 
 /** Plaid-linked rows until cleared, reconciled, or matched to a recurrence (recurring-only rows have no plaidId). */
 function isPlaidImportAwaitingReview(entry: RegisterEntry): boolean {
+  if (entry.id?.startsWith("snap-")) return false;
   if (!entry.plaidId) return false;
   if (entry.isBalanceEntry) return false;
   if (entry.reoccurrenceId != null) return false;
@@ -693,6 +773,7 @@ const columns: TableColumn<RegisterEntry>[] = [
 const modal = overlay.create(ModalsEditRegisterEntry);
 
 function handleTableClick(data: RegisterEntry) {
+  if (snapshotMode.isSnapshotMode.value) return;
   const editRegistryEntryProps: ModalRegisterEntryProps = {
     title: `Edit Entry`,
     description: "",
@@ -711,6 +792,7 @@ function handleTableClick(data: RegisterEntry) {
 }
 
 function handleAddEntry() {
+  if (snapshotMode.isSnapshotMode.value) return;
   const editRegistryEntryProps: ModalRegisterEntryProps = {
     title: `Add Entry`,
     description: "",
@@ -746,13 +828,18 @@ function formatCurrency(amount: number) {
 }
 
 function scrollToLowestBalance() {
-  if (!lowestEntry.value || !tableEntries.value.length) return;
+  if (
+    !lowestEntry.value ||
+    !Number.isFinite(Number(lowestEntry.value.balance)) ||
+    !tableEntries.value.length
+  )
+    return;
 
   // Find the index of the first entry with the lowest balance
   const targetIndex = tableEntries.value.findIndex(
     (entry) =>
-      entry.balance === lowestEntry.value.balance &&
-      entry.createdAt === lowestEntry.value.createdAt,
+      entry.balance === lowestEntry.value!.balance &&
+      entry.createdAt === lowestEntry.value!.createdAt,
   );
 
   if (targetIndex !== -1 && tableRef.value) {
@@ -880,6 +967,7 @@ watch(showShortcuts, async () => {
 });
 
 async function recalcAccount() {
+  if (snapshotMode.isSnapshotMode.value) return;
   if (isRecalcAccountLoading.value) return; // Prevent multiple simultaneous calls
 
   isRecalcAccountLoading.value = true;
@@ -931,56 +1019,94 @@ async function recalcAccount() {
       class="sr-only"
       aria-live="polite"
       aria-atomic="true") {{ recalcLiveMessage }}
+    UAlert(
+      v-if="isSnapshotMode && activeSnapshotCreatedAt"
+      color="info"
+      variant="subtle"
+      class="mt-4"
+      :title="`Viewing snapshot (${formatDate(activeSnapshotCreatedAt) ?? ''})`"
+    )
+      template(#description)
+        .flex.flex-wrap.gap-2.items-center
+          span Read-only projected register as captured.
+          UButton(size="xs" variant="soft" @click="exitSnapshotView") Exit snapshot
     .flex(
       v-if="tableEntries.length > 0 || showAccountSelector"
-      class="flex-col mt-4 gap-2 md:flex-row md:flex-wrap md:items-center md:space-x-4")
-      div(v-if="tableEntries.length > 0" class="w-full flex flex-wrap gap-2 items-center")
+      class="mt-4 gap-2 items-center flex-wrap xl:flex-nowrap")
+      div(v-if="tableEntries.length > 0" class="min-w-0 flex-1 flex items-center gap-2")
         RegisterListToolbar(
           v-model:global-filter="globalFilter"
           v-model:show-shortcuts="showShortcuts"
+          :show-add="!isSnapshotMode"
+          :show-refresh="!isSnapshotMode"
           :refresh-loading="isRefreshLoading"
-          filter-class="w-full min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+          filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
           @add="handleAddEntry"
           @refresh="refreshAccountEntries"
         )
           template(#middle)
-            UButton(color="error" size="sm" @click="recalcAccount()" :loading="isRecalcAccountLoading" :aria-busy="isRecalcAccountLoading") Recalc
+            UDropdownMenu(:items="snapshotMenuItems")
+              UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+                UButton(
+                  variant="soft"
+                  size="sm"
+                  square
+                  icon="i-lucide-camera"
+                  :color="isSnapshotMode ? 'primary' : 'neutral'"
+                  :title="`Snapshot view: ${selectedSnapshotLabel}`"
+                  :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+                )
+            UTooltip(v-if="!isSnapshotMode" text="Recalculate forecast" :delay-duration="150")
+              UButton(
+                color="error"
+                size="sm"
+                square
+                icon="i-lucide-calculator"
+                title="Recalculate forecast"
+                aria-label="Recalculate forecast"
+                @click="recalcAccount()"
+                :loading="isRecalcAccountLoading"
+                :aria-busy="isRecalcAccountLoading"
+              )
 
-      div(v-if="showAccountSelector" class="ml-auto flex justify-center items-center")
-        div(class="text-sm font-medium frog-text-muted mt-2 mr-2 text-nowrap") Selected Account:
-        ClientOnly
-          USelectMenu(
-            v-model="accountRegisterId"
-            value-key="id"
-            size="xs"
-            class="w-full md:w-64 my-0"
-            placeholder="Select an Account"
-            :items="accountRegisterOptionsWithBalance"
-            :search-input="false")
-            template(#default)
-              span(class="truncate text-default")
+      div(
+        v-if="showAccountSelector || (lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId) || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
+        class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
+      )
+        div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
+          div(class="text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
+          ClientOnly
+            USelectMenu(
+              v-model="accountRegisterId"
+              value-key="id"
+              size="xs"
+              class="w-44 sm:w-52 md:w-56 my-0 max-w-[38vw] sm:max-w-none"
+              placeholder="Select an Account"
+              :items="accountRegisterOptionsWithBalance"
+              :search-input="false")
+              template(#default)
+                span(class="truncate text-default")
+                  template(v-if="selectedAccountOption")
+                    | {{ selectedAccountOption.label }}
+                    span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
+                  span(v-else) …
+              template(#item-trailing="{ item }")
+                span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
+            template(#fallback)
+              span(class="w-full md:w-64 my-0 text-sm text-default")
                 template(v-if="selectedAccountOption")
                   | {{ selectedAccountOption.label }}
                   span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
                 span(v-else) …
-            template(#item-trailing="{ item }")
-              span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
-          template(#fallback)
-            span(class="w-full md:w-64 my-0 text-sm text-default")
-              template(v-if="selectedAccountOption")
-                | {{ selectedAccountOption.label }}
-                span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
-              span(v-else) …
 
-    .w-full(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
-      span The lowest balance of&nbsp;
-      b(@click="scrollToLowestBalance" class="cursor-pointer frog-link") {{ formatCurrency(lowestEntry.balance) }}&nbsp;
-      span &nbsp;on
-      b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
-    .w-full(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
-      span The loan will be paid off on
-      b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
-    .w-full(class="text-muted text-right" v-else="") &nbsp;
+        div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
+          span The lowest balance of&nbsp;
+          b(@click="scrollToLowestBalance" class="cursor-pointer frog-link") {{ formatCurrency(lowestEntry.balance) }}&nbsp;
+          span &nbsp;on
+          b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
+        div(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
+          span The loan will be paid off on
+          b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
 
     UCard(v-if="showShortcuts" class="mb-4")
       template(#header)
@@ -1116,9 +1242,9 @@ async function recalcAccount() {
     // div(v-if="!hasMoreData && tableEntries.length > 0" class="flex justify-center items-center py-4 text-sm text-gray-500 dark:text-gray-400")
       span No more entries to load
 
-    //- Tabs (shown after at least one entry exists)
+    //- Tabs (shown after at least one entry exists; hidden in snapshot — data is future-only)
     ul(
-      v-if="tableEntries.length > 0"
+      v-if="tableEntries.length > 0 && !isSnapshotMode"
       ref="registerTabsEl"
       class="flex flex-wrap gap-2 -mt-1 ml-1 sm:ml-5 mb-5"
       role="tablist"

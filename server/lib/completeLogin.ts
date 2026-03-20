@@ -1,7 +1,7 @@
 import { setCookie } from "h3";
-import { publicProfileSchema } from "~/schema/zod";
 import { prisma } from "~/server/clients/prismaClient";
 import env from "~/server/env";
+import { sessionUserFromDb } from "~/server/lib/sessionUserProfile";
 import JwtService from "~/server/services/JwtService";
 import { dateTimeService } from "~/server/services/forecast";
 
@@ -22,5 +22,5 @@ export async function completeLogin(event: any, userId: number) {
     httpOnly: false,
   });
 
-  return { token, message: null, user: publicProfileSchema.parse(updatedUser) };
+  return { token, message: null, user: sessionUserFromDb(updatedUser) };
 }

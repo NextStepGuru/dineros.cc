@@ -15,8 +15,17 @@ import {
 } from "~/server/clients/queuesClient";
 import { dateTimeService } from "./forecast/DateTimeService";
 import TransactionMatchingService from "./TransactionMatchingService";
+import PlaidTransactionEnrichmentService from "./PlaidTransactionEnrichmentService";
 
 const DAYS_REQUESTED = 3;
+
+/** Posted Plaid txn may include the `transaction_id` of the pending txn it replaced. */
+function pendingTransactionIdIfPosted(tx: Transaction): string | null {
+  if (tx.pending === true) return null;
+  const raw = (tx as { pending_transaction_id?: string | null })
+    .pending_transaction_id;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
 
 interface SyncResult {
   newTransactions: number;
@@ -29,15 +38,19 @@ class PlaidSyncService {
   db: PrismaClient;
   client: PlaidApi;
   transactionMatcher: TransactionMatchingService;
+  plaidEnrichment: PlaidTransactionEnrichmentService;
 
   constructor(db: PrismaClient = PrismaDb as PrismaClient) {
     this.db = db;
     this.client = new PlaidApi(configuration);
     this.transactionMatcher = new TransactionMatchingService(db);
+    this.plaidEnrichment = new PlaidTransactionEnrichmentService(db);
   }
 
   /**
-   * Formats transaction data based on account register type
+   * Formats transaction data based on account register type.
+   * Pending: Plaid `transaction.pending === true` (bank hold / not yet posted).
+   * Posted: `pending === false` or omitted; align with `register_entry.isPending`.
    */
   private formatTransactionData(
     transaction: Transaction,
@@ -63,8 +76,36 @@ class PlaidSyncService {
       ),
       description: formattedName,
       isProjected: false,
-      isPending: true,
+      isPending: transaction.pending === true,
       hasBalanceReCalc: true,
+    };
+  }
+
+  private async buildTransactionDataForCreate(
+    transaction: Transaction,
+    accountRegister: AccountRegister & { type: AccountType },
+    enrichmentUserId: number | null,
+  ) {
+    const base = this.formatTransactionData(
+      transaction,
+      accountRegister,
+      accountRegister.type,
+    );
+    const { description, categoryId } = await this.plaidEnrichment.enrich({
+      transaction,
+      accountRegisterId: accountRegister.id,
+      accountId: accountRegister.accountId,
+      context: {
+        userId: enrichmentUserId,
+        accountRegisterId: accountRegister.id,
+        accountId: accountRegister.accountId,
+        plaidTransactionId: transaction.transaction_id,
+      },
+    });
+    return {
+      ...base,
+      description,
+      ...(categoryId ? { categoryId } : {}),
     };
   }
 
@@ -74,13 +115,75 @@ class PlaidSyncService {
   private async syncTransactionsForAccount(
     accountRegister: AccountRegister & { type: AccountType },
     transactions: Transaction[],
+    userIdByAccountId: Map<string, number> = new Map(),
   ): Promise<{ newCount: number; matchedCount: number; errors: string[] }> {
     let newCount = 0;
     let matchedCount = 0;
     const errors: string[] = [];
 
+    const pendingIdsSuperseded = new Set<string>();
+    for (const t of transactions) {
+      const pid = pendingTransactionIdIfPosted(t);
+      if (pid) pendingIdsSuperseded.add(pid);
+    }
+
     for (const transaction of transactions) {
       try {
+        if (
+          transaction.pending === true &&
+          pendingIdsSuperseded.has(transaction.transaction_id)
+        ) {
+          log({
+            message:
+              "Skipping superseded pending Plaid transaction (posted in same batch)",
+            data: {
+              transactionId: transaction.transaction_id,
+              accountRegisterId: accountRegister.id,
+            },
+            level: "debug",
+          });
+          continue;
+        }
+
+        const postedPendingId = pendingTransactionIdIfPosted(transaction);
+        if (postedPendingId) {
+          const existingPendingRow = await this.db.registerEntry.findFirst({
+            where: {
+              accountRegisterId: accountRegister.id,
+              plaidId: postedPendingId,
+            },
+          });
+          if (existingPendingRow) {
+            await this.transactionMatcher.updateExistingTransaction(
+              existingPendingRow,
+              transaction,
+              "exact",
+              accountRegister.type,
+            );
+            matchedCount++;
+            log({
+              message: "Plaid pending→posted: updated register entry in place",
+              data: {
+                accountRegisterId: accountRegister.id,
+                pendingTransactionId: postedPendingId,
+                postedTransactionId: transaction.transaction_id,
+              },
+              level: "info",
+            });
+            continue;
+          }
+          log({
+            message:
+              "Plaid pending→posted: no existing row for pending_transaction_id, using normal match",
+            data: {
+              accountRegisterId: accountRegister.id,
+              pendingTransactionId: postedPendingId,
+              postedTransactionId: transaction.transaction_id,
+            },
+            level: "debug",
+          });
+        }
+
         const matchResult = await this.transactionMatcher.matchTransaction(
           transaction,
           accountRegister,
@@ -107,6 +210,7 @@ class PlaidSyncService {
             matchResult.existingEntry,
             transaction,
             matchResult.matchType as "exact" | "fuzzy" | "reoccurrence",
+            accountRegister.type,
           );
           matchedCount++;
 
@@ -121,10 +225,12 @@ class PlaidSyncService {
           });
         } else {
           // Create new transaction
-          const transactionData = this.formatTransactionData(
+          const enrichmentUserId =
+            userIdByAccountId.get(accountRegister.accountId) ?? null;
+          const transactionData = await this.buildTransactionDataForCreate(
             transaction,
             accountRegister,
-            accountRegister.type,
+            enrichmentUserId,
           );
 
           await this.transactionMatcher.createNewTransaction(
@@ -277,6 +383,20 @@ class PlaidSyncService {
       accountRegisters.map((ar) => [ar.plaidId, ar]),
     );
 
+    const distinctAccountIds = [
+      ...new Set(accountRegisters.map((ar) => ar.accountId)),
+    ];
+    const userAccountLinks = await this.db.userAccount.findMany({
+      where: { accountId: { in: distinctAccountIds } },
+      select: { accountId: true, userId: true },
+    });
+    const userIdByAccountId = new Map<string, number>();
+    for (const link of userAccountLinks) {
+      if (!userIdByAccountId.has(link.accountId)) {
+        userIdByAccountId.set(link.accountId, link.userId);
+      }
+    }
+
     // Group transactions by account
     const transactionsByAccount = new Map<string, Transaction[]>();
     for (const transaction of transactions) {
@@ -304,6 +424,7 @@ class PlaidSyncService {
       const result = await this.syncTransactionsForAccount(
         accountRegister,
         accountTransactions,
+        userIdByAccountId,
       );
 
       totalNew += result.newCount;
@@ -347,6 +468,14 @@ class PlaidSyncService {
     return settings?.plaid?.access_token ?? null;
   }
 
+  private async getItemOwnerUserId(itemId: string): Promise<number | null> {
+    const row = await PrismaDb.plaidItem.findUnique({
+      where: { itemId },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
+  }
+
   /**
    * Sync transactions for one Item using /transactions/sync (cursor-based).
    * Applies added, modified, removed; persists cursor.
@@ -361,6 +490,8 @@ class PlaidSyncService {
       });
       return;
     }
+
+    const itemOwnerUserId = await this.getItemOwnerUserId(itemId);
 
     const cursorRow = await PrismaDb.plaidSyncCursor.findUnique({
       where: { itemId },
@@ -397,6 +528,45 @@ class PlaidSyncService {
         const ar = registerByPlaidAccountId.get(tx.account_id);
         if (!ar) continue;
         try {
+          const postedPendingId = pendingTransactionIdIfPosted(tx);
+          if (postedPendingId) {
+            const existingPendingRow = await this.db.registerEntry.findFirst({
+              where: {
+                accountRegisterId: ar.id,
+                plaidId: postedPendingId,
+              },
+            });
+            if (existingPendingRow) {
+              await this.transactionMatcher.updateExistingTransaction(
+                existingPendingRow,
+                tx,
+                "exact",
+                ar.type,
+              );
+              log({
+                message:
+                  "syncItemWithTransactionsSync: pending→posted updated in place",
+                data: {
+                  accountRegisterId: ar.id,
+                  pendingTransactionId: postedPendingId,
+                  postedTransactionId: tx.transaction_id,
+                },
+                level: "info",
+              });
+              continue;
+            }
+            log({
+              message:
+                "syncItemWithTransactionsSync: pending→posted no row, normal match",
+              data: {
+                accountRegisterId: ar.id,
+                pendingTransactionId: postedPendingId,
+                postedTransactionId: tx.transaction_id,
+              },
+              level: "debug",
+            });
+          }
+
           const matchResult = await this.transactionMatcher.matchTransaction(
             tx,
             ar,
@@ -412,9 +582,14 @@ class PlaidSyncService {
               matchResult.existingEntry,
               tx,
               matchResult.matchType as "exact" | "fuzzy" | "reoccurrence",
+              ar.type,
             );
           } else {
-            const transactionData = this.formatTransactionData(tx, ar, ar.type);
+            const transactionData = await this.buildTransactionDataForCreate(
+              tx,
+              ar,
+              itemOwnerUserId,
+            );
             await this.transactionMatcher.createNewTransaction(
               tx,
               ar,
@@ -443,6 +618,7 @@ class PlaidSyncService {
               existing,
               tx,
               "exact",
+              ar.type,
             );
           }
         } catch (err) {

@@ -27,15 +27,20 @@ const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   "/edit-profile/debug-tools": defineAsyncComponent(
     () => import("~/components/profile/DebugToolsTab.vue"),
   ),
+  "/edit-profile/openai-logs": defineAsyncComponent(
+    () => import("~/components/profile/OpenAiLogsTab.vue"),
+  ),
 };
+
+const adminOnlyPaths = new Set([
+  "/edit-profile/admin-settings",
+  "/edit-profile/debug-tools",
+  "/edit-profile/openai-logs",
+]);
 
 const currentTabComponent = computed(() => {
   const path = route.path;
-  if (
-    (path === "/edit-profile/admin-settings" ||
-      path === "/edit-profile/debug-tools") &&
-    authStore.getUser?.id !== 1
-  ) {
+  if (adminOnlyPaths.has(path) && authStore.getUser?.isAdmin !== true) {
     return null;
   }
   return tabComponents[path] ?? null;
@@ -66,12 +71,16 @@ const navigationItems = computed(() => {
     },
   ];
 
-  // Add hidden tabs for userId = 1
-  if (authStore.getUser?.id === 1) {
+  if (authStore.getUser?.isAdmin === true) {
     baseItems.push({
       label: "Admin",
       to: "/edit-profile/admin-settings",
       active: route.path.startsWith("/edit-profile/admin-settings"),
+    });
+    baseItems.push({
+      label: "OpenAI logs",
+      to: "/edit-profile/openai-logs",
+      active: route.path.startsWith("/edit-profile/openai-logs"),
     });
   }
 

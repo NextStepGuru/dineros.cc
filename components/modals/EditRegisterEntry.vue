@@ -46,6 +46,92 @@ const props = defineProps<ModalRegisterEntryProps>();
 
 const formState = ref<RegisterEntry>(props.registerEntry);
 
+type RegisterEntryPlaidPayload = {
+  plaidJson: unknown;
+  plaidId: string;
+  updatedAt: string;
+  isPending: boolean;
+};
+
+const modalTab = ref<"edit" | "plaid">("edit");
+const plaidSyncLoading = ref(false);
+const plaidSyncData = ref<RegisterEntryPlaidPayload | null>(null);
+const plaidSyncFetchKey = ref<string | null>(null);
+
+const hasPlaidEntry = computed(() => {
+  const id = formState.value.id;
+  const pid = formState.value.plaidId;
+  return Boolean(id && pid != null && String(pid).trim() !== "");
+});
+
+const isPlaidTabActive = computed(
+  () => hasPlaidEntry.value && modalTab.value === "plaid",
+);
+
+const plaidJsonText = computed(() => {
+  if (!plaidSyncData.value?.plaidJson) {
+    return "(no Plaid JSON stored)";
+  }
+  try {
+    return JSON.stringify(plaidSyncData.value.plaidJson, null, 2);
+  } catch {
+    return String(plaidSyncData.value.plaidJson);
+  }
+});
+
+function resetPlaidSyncPanel() {
+  modalTab.value = "edit";
+  plaidSyncLoading.value = false;
+  plaidSyncData.value = null;
+  plaidSyncFetchKey.value = null;
+}
+
+async function loadPlaidSyncIfNeeded() {
+  const id = formState.value.id;
+  const accountRegisterId = formState.value.accountRegisterId;
+  if (!id || !formState.value.plaidId) return;
+
+  const key = `${id}:${accountRegisterId}`;
+  if (plaidSyncFetchKey.value === key && plaidSyncData.value) return;
+
+  plaidSyncLoading.value = true;
+  plaidSyncData.value = null;
+  try {
+    const data = await $api<RegisterEntryPlaidPayload>(
+      `/api/register-entry/${id}/plaid`,
+      {
+        query: { accountRegisterId },
+      },
+    ).catch((error) => handleError(error, toast));
+    if (data) {
+      plaidSyncData.value = data;
+      plaidSyncFetchKey.value = key;
+    }
+  } finally {
+    plaidSyncLoading.value = false;
+  }
+}
+
+function selectPlaidTab() {
+  modalTab.value = "plaid";
+  void loadPlaidSyncIfNeeded();
+}
+
+async function copyPlaidJson() {
+  try {
+    await navigator.clipboard.writeText(plaidJsonText.value);
+    toast.add({
+      color: "success",
+      description: "Plaid JSON copied to clipboard.",
+    });
+  } catch {
+    toast.add({
+      color: "error",
+      description: "Could not copy to clipboard.",
+    });
+  }
+}
+
 const isNewEntry = computed(() => {
   const isNew = !formState.value.id;
   return isNew;
@@ -59,6 +145,7 @@ watch(props, () => {
   state.isTransferMode = false;
   selectedTransferAccountRegisterId.value = 0;
   transferTargetDescription.value = "";
+  resetPlaidSyncPanel();
 });
 
 const accountIdForEntry = computed(() => {
@@ -415,76 +502,115 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         p(v-else-if="selectedApplyAccountRegisterId")
           | ⚠️ This will create a transfer: the inverse amount will be applied to the selected account and this entry will be marked as cleared
 
-    // Regular Edit Form
-    UForm(
-      v-else
-      class="space-y-4"
-      @submit.prevent="handleSubmit"
-      :state="formState"
-      @error="handleError($event, toast)"
-      :disabled="isDisabled"
-      ref="form")
+    div(v-else class="space-y-4")
+      // Tab bar (Plaid-linked saved entries only)
+      div(v-if="hasPlaidEntry" class="flex flex-wrap gap-2")
+        UButton(
+          size="sm"
+          :variant="modalTab === 'edit' ? 'solid' : 'outline'"
+          @click="modalTab = 'edit'"
+          class="cursor-pointer"
+        ) Edit
+        UButton(
+          size="sm"
+          :variant="modalTab === 'plaid' ? 'solid' : 'outline'"
+          @click="selectPlaidTab"
+          class="cursor-pointer"
+        ) Plaid sync
 
-      // Transfer Mode Toggle (only for new entries)
-      div(v-if="isNewEntry" class="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg")
-        p(class="text-xs text-gray-500") Debug: isNewEntry = {{ isNewEntry }}, id = {{ formState.id }}
-        UCheckbox(v-model="state.isTransferMode" @change="toggleTransferMode")
-        label(class="text-sm font-medium cursor-pointer" @click="toggleTransferMode") Create Transfer Between Accounts
+      // Plaid payload (lazy-loaded)
+      div(v-if="hasPlaidEntry && modalTab === 'plaid'" class="space-y-3")
 
-      // Transfer Mode Info
-      div(v-if="state.isTransferMode && isNewEntry" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
-        p(class="text-sm text-blue-700 dark:text-blue-300 mb-2")
-          | 💡 Transfer mode creates two entries: money going out of this account and money going into the destination account.
-        p(class="text-xs text-blue-600 dark:text-blue-400")
-          | The amount will be deducted from the current account and added to the destination account.
+        p(class="text-xs text-gray-600 dark:text-gray-400")
+          | Last synced payload from Plaid for this entry. Edited description, category, or amount here may differ until the next sync updates this snapshot.
 
-      UFormField(label="Description" name="description")
-        UInput(v-model="formState.description" type="text" id="description" class="w-full" :disabled="formState.isProjected")
+        div(class="flex flex-wrap gap-2 items-center")
+          span(v-if="plaidSyncData" class="text-xs text-gray-500")
+            | Updated {{ plaidSyncData.updatedAt }} · pending (Plaid): {{ plaidSyncData.isPending }}
+          UButton(
+            size="sm"
+            variant="outline"
+            @click="copyPlaidJson"
+            :disabled="plaidSyncLoading || !plaidSyncData"
+            class="cursor-pointer"
+          ) Copy JSON
 
-      UFormField(label="Category" name="categoryId")
-        USelectMenu(
-          v-model="formState.categoryId"
-          :items="categorySelectItems"
-          value-key="value"
-          label-key="label"
-          :filter-fields="['label', 'name']"
-          placeholder="None"
-          class="w-full"
-          :disabled="formState.isProjected")
+        div(v-if="plaidSyncLoading" class="text-sm text-gray-500") Loading Plaid data…
 
-      // Transfer destination and description (only in transfer mode for new entries)
-      div(v-if="state.isTransferMode && isNewEntry" class="space-y-4")
-        UFormField(label="Destination Account")
-          USelect(
-            v-model="selectedTransferAccountRegisterId"
-            :items="transferDestinationAccounts"
-            value-key="id"
+        pre(
+          v-else
+          class="max-h-96 overflow-auto rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 text-xs font-mono whitespace-pre-wrap wrap-break-word") {{ plaidJsonText }}
+
+      // Regular Edit Form
+      UForm(
+        v-if="!hasPlaidEntry || modalTab === 'edit'"
+        class="space-y-4"
+        @submit.prevent="handleSubmit"
+        :state="formState"
+        @error="handleError($event, toast)"
+        :disabled="isDisabled"
+        ref="form")
+
+        // Transfer Mode Toggle (only for new entries)
+        div(v-if="isNewEntry" class="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg")
+          p(class="text-xs text-gray-500") Debug: isNewEntry = {{ isNewEntry }}, id = {{ formState.id }}
+          UCheckbox(v-model="state.isTransferMode" @change="toggleTransferMode")
+          label(class="text-sm font-medium cursor-pointer" @click="toggleTransferMode") Create Transfer Between Accounts
+
+        // Transfer Mode Info
+        div(v-if="state.isTransferMode && isNewEntry" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
+          p(class="text-sm text-blue-700 dark:text-blue-300 mb-2")
+            | 💡 Transfer mode creates two entries: money going out of this account and money going into the destination account.
+          p(class="text-xs text-blue-600 dark:text-blue-400")
+            | The amount will be deducted from the current account and added to the destination account.
+
+        UFormField(label="Description" name="description")
+          UInput(v-model="formState.description" type="text" id="description" class="w-full" :disabled="formState.isProjected")
+
+        UFormField(label="Category" name="categoryId")
+          USelectMenu(
+            v-model="formState.categoryId"
+            :items="categorySelectItems"
+            value-key="value"
             label-key="label"
-            placeholder="Select destination account"
-            class="w-full")
-
-        UFormField(label="Destination Description (Optional)")
-          UInput(
-            v-model="transferTargetDescription"
-            type="text"
-            placeholder="Leave empty to auto-generate"
-            class="w-full")
-
-        div(class="text-xs text-gray-500 dark:text-gray-400")
-          p(v-if="!transferTargetDescription")
-            | Auto-generated: "Transfer from {{ listStore.getAccountRegisters.find(a => a.id === formState.accountRegisterId)?.name }}"
-
-      .flex.space-x-4
-        UFormField(label="Amount" name="amount")
-          UInputNumber(
-            v-model="formState.amount"
-            :format-options="formatCurrencyOptions"
-            :step="0.01"
-            id="amount"
+            :filter-fields="['label', 'name']"
+            placeholder="None"
             class="w-full"
             :disabled="formState.isProjected")
-        UFormField(label="Entry At" name="createdAt" class="flex-1")
-          UInput(v-model="formState.createdAt" type="date" class="w-full" :disabled="formState.isProjected")
+
+        // Transfer destination and description (only in transfer mode for new entries)
+        div(v-if="state.isTransferMode && isNewEntry" class="space-y-4")
+          UFormField(label="Destination Account")
+            USelect(
+              v-model="selectedTransferAccountRegisterId"
+              :items="transferDestinationAccounts"
+              value-key="id"
+              label-key="label"
+              placeholder="Select destination account"
+              class="w-full")
+
+          UFormField(label="Destination Description (Optional)")
+            UInput(
+              v-model="transferTargetDescription"
+              type="text"
+              placeholder="Leave empty to auto-generate"
+              class="w-full")
+
+          div(class="text-xs text-gray-500 dark:text-gray-400")
+            p(v-if="!transferTargetDescription")
+              | Auto-generated: "Transfer from {{ listStore.getAccountRegisters.find(a => a.id === formState.accountRegisterId)?.name }}"
+
+        .flex.space-x-4
+          UFormField(label="Amount" name="amount")
+            UInputNumber(
+              v-model="formState.amount"
+              :format-options="formatCurrencyOptions"
+              :step="0.01"
+              id="amount"
+              class="w-full"
+              :disabled="formState.isProjected")
+          UFormField(label="Entry At" name="createdAt" class="flex-1")
+            UInput(v-model="formState.createdAt" type="date" class="w-full" :disabled="formState.isProjected")
 
   template(#footer)
     // Apply Selection Footer
@@ -510,7 +636,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         color="primary"
         @click.prevent="form?.submit()"
         :loading="state.isSaving"
-        :disabled="isDisabled || (state.isTransferMode && isNewEntry && !selectedTransferAccountRegisterId)"
+        :disabled="isDisabled || isPlaidTabActive || (state.isTransferMode && isNewEntry && !selectedTransferAccountRegisterId)"
         class="cursor-pointer"
       ) {{ state.isTransferMode && isNewEntry ? 'Create Transfer' : 'Save' }}
 
@@ -519,7 +645,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         @click="markAsCleared"
         :loading="state.isClearing"
-        :disabled="isDisabled"
+        :disabled="isDisabled || isPlaidTabActive"
         class="cursor-pointer"
       ) Clear
 
@@ -528,7 +654,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         @click="initiateApply"
         :loading="state.isApplying"
-        :disabled="isDisabled"
+        :disabled="isDisabled || isPlaidTabActive"
         class="cursor-pointer"
       ) Apply
 
@@ -536,7 +662,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         color="error"
         @click="confirmDelete"
         :loading="state.isDeleting"
-        :disabled="isDisabled"
+        :disabled="isDisabled || isPlaidTabActive"
         v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         class="cursor-pointer"
       ) Delete
@@ -545,7 +671,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         color="error"
         @click="skipRegisterEntry"
         :loading="state.isSkipping"
-        :disabled="isDisabled"
+        :disabled="isDisabled || isPlaidTabActive"
         class="cursor-pointer"
         v-if="formState.id && formState.reoccurrenceId && formState.isProjected"
       ) Skip Reoccurrence

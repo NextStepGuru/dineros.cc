@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { dbUserForSession } from './fixtures/dbUserForSession';
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -61,17 +62,25 @@ vi.mock('~/server/lib/handleApiError', () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', () => ({
-  passwordSchema: {
-    parse: vi.fn(),
-  },
-  publicProfileSchema: {
-    parse: vi.fn(),
-  },
-  privateUserSchema: {
-    parse: vi.fn(),
-  },
-}));
+vi.mock('~/schema/zod', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/schema/zod')>();
+  const mockPublicProfileParse = vi.fn();
+  return {
+    ...actual,
+    passwordSchema: {
+      parse: vi.fn(),
+    },
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === 'parse') return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
+    privateUserSchema: {
+      parse: vi.fn(),
+    },
+  };
+});
 
 // Create mock service classes
 const mockHashService = {
@@ -107,28 +116,18 @@ describe('Additional API Endpoints Coverage', () => {
 
     it('should validate token and return refreshed token with user data', async () => {
       const mockEvent = {};
-      const mockUser = {
-        id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-      };
-      const mockParsedUser = {
-        id: 123,
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-      };
+      const mockUser = dbUserForSession();
 
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { publicProfileSchema } = await import('~/schema/zod');
       const { setCookie, setResponseStatus } = await import('h3');
+      const { sessionUserFromDb } = await import(
+        '~/server/lib/sessionUserProfile'
+      );
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
       mockJwtService.sign.mockResolvedValue('new-jwt-token');
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
 
       const result = await validateTokenHandler(mockEvent);
 
@@ -148,7 +147,7 @@ describe('Additional API Endpoints Coverage', () => {
       expect(result).toEqual({
         token: 'new-jwt-token',
         message: null,
-        user: mockParsedUser,
+        user: sessionUserFromDb(mockUser),
       });
     });
 

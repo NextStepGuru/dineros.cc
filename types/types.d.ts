@@ -24,7 +24,10 @@ export type ReoccurrenceSplit = z.infer<typeof reoccurrenceSplitSchema>;
 export type Reoccurrence = z.infer<typeof reoccurrenceWithSplitsSchema>;
 export type Interval = z.infer<typeof intervalSchema>;
 export type AccountRegister = z.infer<typeof accountRegisterSchema>;
-export type User = z.infer<typeof publicProfileSchema>;
+export type User = z.infer<typeof publicProfileSchema> & {
+  /** Present on `/api/user`; omitted on some other profile responses. */
+  isAdmin?: boolean;
+};
 
 export type Budget = {
   id: number;
@@ -57,6 +60,31 @@ export type Lists = {
   budgets: Budget[];
   accounts: Account[];
   categories: Category[];
+};
+
+export type AccountSnapshot = {
+  id: number;
+  accountId: string;
+  createdAt: string;
+};
+
+/** Row returned from GET /api/snapshot/:id for each register at snapshot time */
+export type AccountSnapshotRegisterRow = {
+  registerSnapshotId: number;
+  accountRegisterId: number;
+  subAccountRegisterId: number | null;
+  collateralAssetRegisterId: number | null;
+  name: string;
+  balance: number;
+  latestBalance: number;
+  typeId: number;
+};
+
+export type AccountSnapshotDetail = {
+  id: number;
+  accountId: string;
+  createdAt: string;
+  registers: AccountSnapshotRegisterRow[];
 };
 
 export type RegisterEntry = {

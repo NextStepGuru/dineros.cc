@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { z } from 'zod';
+import { dbUserForSession } from './fixtures/dbUserForSession';
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -80,13 +82,17 @@ vi.mock('~/server/lib/handleApiError', () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', () => {
-  const parse = vi.fn();
+vi.mock('~/schema/zod', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/schema/zod')>();
+  const mockPublicProfileParse = vi.fn();
   return {
-    publicProfileSchema: {
-      parse,
-      extend: vi.fn(() => ({ parse })),
-    },
+    ...actual,
+    publicProfileSchema: new Proxy(actual.publicProfileSchema, {
+      get(target, prop, receiver) {
+        if (prop === 'parse') return mockPublicProfileParse;
+        return Reflect.get(target, prop, receiver);
+      },
+    }),
   };
 });
 
@@ -106,25 +112,16 @@ describe('Core API Endpoints', () => {
 
     it('should return user profile for authenticated user', async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
-      const mockUser = {
-        id: 123,
-        email: 'test@example.com',
-        name: 'Test User',
-        createdAt: new Date('2023-01-01'),
-      };
-      const mockParsedProfile = {
-        id: 123,
-        email: 'test@example.com',
-        name: 'Test User',
-      };
+      const mockUser = dbUserForSession();
 
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { publicProfileSchema } = await import('~/schema/zod');
+      const { sessionUserFromDb } = await import(
+        '~/server/lib/sessionUserProfile'
+      );
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedProfile);
 
       const result = await userGetHandler(mockEvent);
 
@@ -132,8 +129,7 @@ describe('Core API Endpoints', () => {
       expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 123 },
       });
-      expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUser);
-      expect(result).toEqual(mockParsedProfile);
+      expect(result).toEqual(sessionUserFromDb(mockUser));
     });
 
     it('should handle user not found error', async () => {
@@ -170,28 +166,23 @@ describe('Core API Endpoints', () => {
 
     it('should handle schema validation errors', async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
-      const mockUser = {
-        id: 123,
-        email: 'invalid-email',
-        name: null, // Invalid data
-      };
+      const { password: _omit, ...row } = dbUserForSession();
+      const mockUser = row as Record<string, unknown>;
 
       const { getUser } = await import('~/server/lib/getUser');
       const { prisma } = await import('~/server/clients/prismaClient');
-      const { publicProfileSchema } = await import('~/schema/zod');
       const { handleApiError } = await import('~/server/lib/handleApiError');
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
 
-      const validationError = new Error('Schema validation failed');
-      (publicProfileSchema.parse as any).mockImplementation(() => {
-        throw validationError;
+      (handleApiError as any).mockImplementation((err: unknown) => {
+        throw err;
       });
 
-      await expect(userGetHandler(mockEvent)).rejects.toThrow('Schema validation failed');
+      await expect(userGetHandler(mockEvent)).rejects.toThrow();
 
-      expect(handleApiError).toHaveBeenCalledWith(validationError);
+      expect(handleApiError).toHaveBeenCalledWith(expect.any(z.ZodError));
     });
   });
 
@@ -387,7 +378,9 @@ describe('Core API Endpoints', () => {
       (prisma.account.findMany as any).mockResolvedValue([]);
       (prisma.category.findMany as any).mockResolvedValue([]);
 
-      await expect(listsHandler(mockEvent)).rejects.toThrow('An error occurred while fetching lists.');
+      await expect(listsHandler(mockEvent)).rejects.toThrow(
+        'Database connection failed',
+      );
 
       expect(handleApiError).toHaveBeenCalledWith(dbError);
     });

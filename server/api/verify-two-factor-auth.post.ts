@@ -1,10 +1,11 @@
 import { verify } from "otplib";
 import { getUser } from "../lib/getUser";
 import { prisma } from "../clients/prismaClient";
-import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
+import { privateUserSchema } from "~/schema/zod";
 import { z } from "zod";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { withUpdatedTotp } from "~/server/lib/mfa";
+import { sessionUserFromDb } from "~/server/lib/sessionUserProfile";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return publicProfileSchema.parse(updatedUser);
+    return sessionUserFromDb(updatedUser);
   } catch (error) {
     handleApiError(error);
 

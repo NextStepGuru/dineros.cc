@@ -2,7 +2,7 @@
 import type { TableColumn } from "@nuxt/ui";
 import type { AccountRegister } from "~/types/types";
 import { useListStore } from "../stores/listStore";
-import { getAccountTypeLabel } from "~/lib/utils";
+import { formatDate, getAccountTypeLabel } from "~/lib/utils";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
 
 const ModalsEditAccountRegister = defineAsyncComponent(
@@ -17,8 +17,38 @@ definePageMeta({
   middleware: "auth",
 });
 
+const snapshotMode = useSnapshotMode();
+const {
+  isSnapshotMode,
+  activeSnapshotCreatedAt,
+  selectedSnapshotValue,
+  snapshotViewItems,
+  exitSnapshotView,
+} = snapshotMode;
+const selectedSnapshotLabel = computed(
+  () =>
+    snapshotViewItems.value.find((i) => i.value === selectedSnapshotValue.value)
+      ?.label ?? "Live",
+);
+const snapshotMenuItems = computed(() => [
+  snapshotViewItems.value.map((item) => ({
+    label: item.label,
+    icon:
+      selectedSnapshotValue.value === item.value
+        ? "i-lucide-check"
+        : "i-lucide-circle",
+    onSelect: () => {
+      selectedSnapshotValue.value = item.value;
+    },
+  })),
+]);
+
 // Drag and drop functions (defined early to ensure availability)
 function handleDragStart(event: DragEvent, index: number) {
+  if (snapshotMode.isSnapshotMode.value) {
+    event.preventDefault();
+    return;
+  }
   draggedIndex.value = index;
   isDragging.value = true;
 
@@ -50,6 +80,7 @@ function handleDragStart(event: DragEvent, index: number) {
 
 // Touch event handlers for mobile (long-press to drag, short tap to click)
 function handleTouchStart(event: TouchEvent, index: number) {
+  if (snapshotMode.isSnapshotMode.value) return;
   if (event.touches.length > 1) return;
 
   const touch = event.touches[0];
@@ -192,6 +223,10 @@ function handlePocketDragStart(
   subRow: AccountRegister,
   parentId: number,
 ) {
+  if (snapshotMode.isSnapshotMode.value) {
+    event.preventDefault();
+    return;
+  }
   draggedIndex.value = `sub-${subRow.id}`;
   isDragging.value = true;
   if (event.dataTransfer) {
@@ -291,6 +326,7 @@ function handlePocketTouchStart(
   subRow: AccountRegister,
   parentId: number,
 ) {
+  if (snapshotMode.isSnapshotMode.value) return;
   if (event.touches.length > 1) return;
 
   const touch = event.touches[0];
@@ -531,6 +567,67 @@ const authStore = useAuthStore();
 const { today } = useToday();
 const showShortcuts = ref(false);
 
+const registersForUi = computed(() =>
+  snapshotMode.isSnapshotMode.value &&
+  snapshotMode.syntheticAccountRegisters.value.length > 0
+    ? snapshotMode.syntheticAccountRegisters.value
+    : listStore.getAccountRegisters,
+);
+
+const currentBudgetAccountId = computed(
+  () =>
+    listStore.getAccountRegisters[0]?.accountId ??
+    listStore.getAccounts?.[0]?.id ??
+    null,
+);
+
+async function refreshSnapshotList() {
+  const aid = currentBudgetAccountId.value;
+  if (!aid) return;
+  await snapshotMode.fetchSnapshots(aid);
+}
+
+async function handleSaveSnapshot() {
+  const aid = currentBudgetAccountId.value;
+  if (!aid) {
+    useToast().add({
+      color: "error",
+      description: "No account selected.",
+    });
+    return;
+  }
+  const toast = useToast();
+  const { $api } = useNuxtApp();
+  try {
+    await ($api as typeof $fetch)("/api/snapshot", {
+      method: "POST",
+      body: { accountId: aid },
+    });
+    toast.add({
+      color: "success",
+      description: "Snapshot saved.",
+    });
+    await refreshSnapshotList();
+  } catch {
+    toast.add({
+      color: "error",
+      description: "Failed to save snapshot.",
+    });
+  }
+}
+
+
+const isSavingSnapshot = ref(false);
+
+async function handleSaveSnapshotClick() {
+  isSavingSnapshot.value = true;
+  try {
+    await handleSaveSnapshot();
+  } finally {
+    isSavingSnapshot.value = false;
+  }
+}
+
 // const stripedTheme = ref({
 //   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
 // });
@@ -541,6 +638,7 @@ const categoriesModal = overlay.create(ModalsManageCategories);
 const selectedAccountRegisterId = ref<number | null>(null);
 
 function handleTableClick(data: AccountRegister) {
+  if (snapshotMode.isSnapshotMode.value) return;
   selectedAccountRegisterId.value = data.id;
   const editAccountRegister: ModelAccountRegisterProps = {
     id: data.id,
@@ -599,6 +697,7 @@ const columns: TableColumn<AccountRegister>[] = [
 ];
 
 function handleAddAccountRegister() {
+  if (snapshotMode.isSnapshotMode.value) return;
   const addAccountRegister: ModelAccountRegisterProps = {
     id: 0,
     title: `Add Account`,
@@ -696,7 +795,7 @@ function registerDebitCreditNet(
     }
     return { debit: null, credit: b, net: b };
   }
-  const registers = listStore.getAccountRegisters;
+  const registers = registersForUi.value;
   const linkedLoan = registers.find(
     (r) =>
       !r.subAccountRegisterId &&
@@ -772,6 +871,22 @@ const collapsedParents = ref<Set<number>>(new Set());
 
 // Sort mode state
 const activeSortMode = ref<"visual" | "loan" | "savings">("visual");
+
+function pocketSubs(parentId: number) {
+  const mode = activeSortMode.value;
+  return registersForUi.value
+    .filter((f) => f.subAccountRegisterId === parentId)
+    .sort((a, b) => {
+      switch (mode) {
+        case "loan":
+          return a.loanPaymentSortOrder - b.loanPaymentSortOrder;
+        case "savings":
+          return a.savingsGoalSortOrder - b.savingsGoalSortOrder;
+        default:
+          return a.sortOrder - b.sortOrder;
+      }
+    });
+}
 
 const showCrossAccountSnapshot = ref(false);
 
@@ -965,7 +1080,7 @@ function updateAccountRegistersViewportMaxHeight() {
 
 const filteredAccountRegisters = computed(() => {
   const filterText = globalFilter.value.toLowerCase();
-  const filtered = listStore.getAccountRegisters.filter((f) => {
+  const filtered = registersForUi.value.filter((f) => {
     const matchesFilter =
       !filterText || f.name.toLowerCase().includes(filterText);
     return matchesFilter && !f.subAccountRegisterId;
@@ -983,7 +1098,7 @@ function subRowDcn(subRow: AccountRegister) {
 
 /** True when at least one account has a linked asset (loan+asset pair exists). */
 const showDebitCreditColumns = computed(() =>
-  listStore.getAccountRegisters.some(
+  registersForUi.value.some(
     (r) =>
       r.collateralAssetRegisterId != null && r.collateralAssetRegisterId > 0,
   ),
@@ -1002,7 +1117,7 @@ watch(
 );
 
 const estimatedNetWorth = computed(() => {
-  return listStore.getAccountRegisters.reduce((acc, curr) => {
+  return registersForUi.value.reduce((acc, curr) => {
     if (curr.typeId !== 15) {
       acc += +curr.balance;
     }
@@ -1013,7 +1128,7 @@ const estimatedNetWorth = computed(() => {
 
 /** Main registers only: lowest computed balance + risk signal for cross-account snapshot */
 const accountLiquiditySnapshot = computed(() => {
-  const mains = listStore.getAccountRegisters.filter(
+  const mains = registersForUi.value.filter(
     (r) => !r.subAccountRegisterId,
   );
   if (mains.length === 0) return null;
@@ -1075,23 +1190,72 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="accountRegistersSectionEl" class="m-4")
-    div(class="w-full flex flex-wrap items-center gap-2 mb-4")
+    UAlert(
+      v-if="isSnapshotMode && activeSnapshotCreatedAt"
+      color="info"
+      variant="subtle"
+      class="mb-4"
+      :title="`Viewing snapshot (${formatDate(activeSnapshotCreatedAt) ?? ''})`"
+    )
+      template(#description)
+        .flex.flex-wrap.gap-2.items-center
+          span Read-only — balances and registers as captured.
+          UButton(size="xs" variant="soft" @click="exitSnapshotView") Exit snapshot
+    div(class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
         v-model:show-shortcuts="showShortcuts"
+        :show-add="!isSnapshotMode"
         :show-refresh="false"
-        filter-class="w-full md:max-w-48"
+        filter-class="min-w-[8rem] md:max-w-48 grow"
         @add="handleAddAccountRegister"
       )
         template(#middle)
-          UButton(
-            variant="soft"
-            size="sm"
-            :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
-            @click="handleManageCategories"
-          ) Manage Categories
+          UTooltip(text="Manage categories" :delay-duration="150")
+            UButton(
+              color="info"
+              size="sm"
+              square
+              icon="i-lucide-tags"
+              title="Manage categories"
+              aria-label="Manage categories"
+              :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
+              @click="handleManageCategories"
+            )
+          UTooltip(text="Save snapshot" :delay-duration="150")
+            UButton(
+              color="success"
+              size="sm"
+              square
+              icon="i-lucide-save"
+              title="Save snapshot"
+              aria-label="Save snapshot"
+              :loading="isSavingSnapshot"
+              :disabled="!currentBudgetAccountId || !!isSnapshotMode"
+              @click="handleSaveSnapshotClick"
+            )
           UDropdownMenu(:items="sortMenuItems")
-            UButton(variant="soft" size="sm") Sort
+            UTooltip(text="Sort accounts" :delay-duration="150")
+              UButton(
+                color="warning"
+                size="sm"
+                square
+                icon="i-lucide-arrow-up-down"
+                title="Sort accounts"
+                aria-label="Sort accounts"
+                :disabled="!!isSnapshotMode"
+              )
+          UDropdownMenu(:items="snapshotMenuItems")
+            UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+              UButton(
+                variant="soft"
+                size="sm"
+                square
+                icon="i-lucide-camera"
+                :color="isSnapshotMode ? 'primary' : 'neutral'"
+                :title="`Snapshot view: ${selectedSnapshotLabel}`"
+                :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+              )
         template(#trailing)
           .ml-auto(
             class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
@@ -1162,7 +1326,7 @@ onBeforeUnmount(() => {
             // Main account row (draggable)
             tr(
               :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 transition-all duration-200 ease-in-out ${isDragging && draggedIndex === index ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-yellow-50 dark:bg-yellow-900/20' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-t-2 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === index && isDragging ? 'border-t-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== index ? 'hover:bg-blue-100 dark:hover:bg-blue-800/30' : ''}`"
-              draggable="true"
+              :draggable="!isSnapshotMode"
               @dragstart="handleDragStart($event, index)"
               @dragover="handleDragOver($event, index)"
               @dragleave="handleDragLeave($event)"
@@ -1174,14 +1338,15 @@ onBeforeUnmount(() => {
               style="touch-action: pan-y;"
             )
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
-                a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                a(
+                  v-if="!isSnapshotMode"
+                  class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                   UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-                  //- span(class="hidden sm:inline text-xs text-gray-500 ml-1") Drag
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
                 div(class="flex items-center")
                   div(
-                    v-if="listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length > 0"
+                    v-if="pocketSubs(row.id).length > 0"
                     @click="togglePocketAccounts(row.id)"
                     class="cursor-pointer mr-2 transition-transform duration-200 hover:scale-110"
                     :class="collapsedParents.has(row.id) ? 'rotate-0' : 'rotate-90'"
@@ -1202,10 +1367,10 @@ onBeforeUnmount(() => {
             // Sub-accounts for this main account (draggable pocket accounts)
             template(v-if="!row.subAccountRegisterId && !collapsedParents.has(row.id)")
               tr(
-                v-for="(subRow, subIndex) in listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).sort((a, b) => getSortField(a) - getSortField(b))"
+                v-for="(subRow, subIndex) in pocketSubs(row.id)"
                 :key="`sub-${subRow.id}`"
-                :class="`odd:bg-gray-200 even:bg-gray-150 dark:odd:bg-gray-600 dark:even:bg-gray-500 transition-all duration-200 ease-in-out border-l-2 border-green-200 dark:border-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === listStore.getAccountRegisters.filter(f => f.subAccountRegisterId === row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
-                draggable="true"
+                :class="`odd:bg-gray-200 even:bg-gray-150 dark:odd:bg-gray-600 dark:even:bg-gray-500 transition-all duration-200 ease-in-out border-l-2 border-green-200 dark:border-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === pocketSubs(row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
+                :draggable="!isSnapshotMode"
                 @dragstart="handlePocketDragStart($event, subRow, row.id)"
                 @dragover="handlePocketDragOver($event, subRow, row.id)"
                 @dragleave="handlePocketDragLeave($event)"
@@ -1216,7 +1381,9 @@ onBeforeUnmount(() => {
                 @touchend="handlePocketTouchEnd($event, subRow, row.id)"
                 style="touch-action: pan-y;")
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
-                  a(class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
+                  a(
+                    v-if="!isSnapshotMode"
+                    class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                   div(class="flex items-center")

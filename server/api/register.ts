@@ -136,6 +136,10 @@ export default defineEventHandler(async (event) => {
       take: skip + effectiveTake,
     });
 
+    const registerEntriesWithoutPlaidJson = allRegisterEntries.map(
+      ({ plaidJson: _plaidJson, ...rest }) => rest,
+    );
+
     const pocketBalances = await PrismaDb.accountRegister.findMany({
       where: {
         subAccountRegisterId: accountRegisterId,
@@ -168,11 +172,13 @@ export default defineEventHandler(async (event) => {
     // For quick mode, skip expensive sorting and return basic data
     if (isQuickMode) {
       // Convert Decimal values to numbers for the sort function
-      const convertedEntries = allRegisterEntries.map((entry) => ({
-        ...entry,
-        amount: toAmount(entry),
-        balance: Number(entry.balance),
-      }));
+      const convertedEntries = registerEntriesWithoutPlaidJson.map(
+        (entry) => ({
+          ...entry,
+          amount: toAmount(entry),
+          balance: Number(entry.balance),
+        }),
+      );
 
       // Full mode: expensive but complete processing
       let balanceUpdated = recalculateRunningBalanceAndSort({
@@ -241,11 +247,13 @@ export default defineEventHandler(async (event) => {
     }
 
     // Convert Decimal values to numbers for the sort function (toAmount corrects legacy interest sign for credit)
-    const convertedEntries = allRegisterEntries.map((entry) => ({
-      ...entry,
-      amount: toAmount(entry),
-      balance: Number(entry.balance),
-    }));
+    const convertedEntries = registerEntriesWithoutPlaidJson.map(
+      (entry) => ({
+        ...entry,
+        amount: toAmount(entry),
+        balance: Number(entry.balance),
+      }),
+    );
 
     // Full mode: expensive but complete processing
     let balanceUpdated = recalculateRunningBalanceAndSort({

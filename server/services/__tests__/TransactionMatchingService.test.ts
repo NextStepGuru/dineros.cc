@@ -380,10 +380,13 @@ describe("TransactionMatchingService", () => {
 
       mockDb.registerEntry.update.mockResolvedValue(updatedEntry);
 
+      const accountType = { isCredit: false } as AccountType;
+
       const result = await transactionMatchingService.updateExistingTransaction(
         existingEntry as any,
         transaction,
-        "exact"
+        "exact",
+        accountType
       );
 
       expect(result).toBe(updatedEntry);
@@ -392,6 +395,9 @@ describe("TransactionMatchingService", () => {
         data: {
           plaidId: "test-id",
           plaidJson: JSON.parse(JSON.stringify(transaction)),
+          isPending: false,
+          amount: -100,
+          hasBalanceReCalc: true,
           // description is preserved, not updated
         },
       });
@@ -421,10 +427,13 @@ describe("TransactionMatchingService", () => {
 
       mockDb.registerEntry.update.mockResolvedValue(updatedEntry);
 
+      const accountType = { isCredit: false } as AccountType;
+
       const result = await transactionMatchingService.updateExistingTransaction(
         existingEntry as any,
         transaction,
-        "fuzzy"
+        "fuzzy",
+        accountType
       );
 
       expect(result).toBe(updatedEntry);
@@ -433,6 +442,9 @@ describe("TransactionMatchingService", () => {
         data: {
           plaidId: "test-id",
           plaidJson: JSON.parse(JSON.stringify(transaction)),
+          isPending: false,
+          amount: -100,
+          hasBalanceReCalc: true,
           // description is preserved, not updated
           createdAt: new Date("2024-01-01T00:00:00.000Z"),
         },
