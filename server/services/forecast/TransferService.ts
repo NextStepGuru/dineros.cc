@@ -83,7 +83,9 @@ export class TransferService implements ITransferService {
       const amountOwed = Math.abs(+targetForCap.balance);
       if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
     }
-    if (effectiveAmount <= TransferService.MONEY_EPSILON) return;
+    if (effectiveAmount <= TransferService.MONEY_EPSILON) {
+      return;
+    }
 
     // Create entry for target account (receiving money)
     this.entryService.createEntry({

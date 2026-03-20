@@ -53,60 +53,108 @@ export default defineEventHandler(async (event: H3Event) => {
       collateralAssetRegisterId = null;
     }
 
+    if (
+      targetAccountRegisterId == null ||
+      !Number.isFinite(targetAccountRegisterId) ||
+      targetAccountRegisterId <= 0
+    ) {
+      targetAccountRegisterId = null;
+    }
+
     const accountType = await PrismaDb.accountType.findUnique({
       where: { id: typeId },
     });
     const isCreditType = accountType?.isCredit === true;
     if (!isCreditType) {
       collateralAssetRegisterId = null;
-    } else if (collateralAssetRegisterId != null) {
-      const asset = await PrismaDb.accountRegister.findFirst({
-        where: {
-          id: collateralAssetRegisterId,
-          accountId,
-          isArchived: false,
-          account: {
-            userAccounts: { some: { userId } },
+      targetAccountRegisterId = null;
+    } else {
+      if (targetAccountRegisterId != null) {
+        const payer = await PrismaDb.accountRegister.findFirst({
+          where: {
+            id: targetAccountRegisterId,
+            accountId,
+            isArchived: false,
+            account: {
+              userAccounts: { some: { userId } },
+            },
           },
-        },
-        include: { type: true },
-      });
-      if (!asset) {
-        throw createError({
-          statusCode: 400,
-          message: "Linked asset not found or not accessible.",
+          include: { type: true },
         });
+        if (!payer) {
+          throw createError({
+            statusCode: 400,
+            message: "Payment source account not found or not accessible.",
+          });
+        }
+        if (payer.type.isCredit) {
+          throw createError({
+            statusCode: 400,
+            message: "Payment source must be a non-credit (asset) account.",
+          });
+        }
+        if (payer.subAccountRegisterId != null) {
+          throw createError({
+            statusCode: 400,
+            message: "Payment source must be a top-level account, not a pocket.",
+          });
+        }
+        if (id > 0 && targetAccountRegisterId === id) {
+          throw createError({
+            statusCode: 400,
+            message: "Cannot use this loan or card as its own payment source.",
+          });
+        }
       }
-      if (asset.type.isCredit) {
-        throw createError({
-          statusCode: 400,
-          message: "Linked collateral must be a non-credit (asset) account.",
+      if (collateralAssetRegisterId != null) {
+        const asset = await PrismaDb.accountRegister.findFirst({
+          where: {
+            id: collateralAssetRegisterId,
+            accountId,
+            isArchived: false,
+            account: {
+              userAccounts: { some: { userId } },
+            },
+          },
+          include: { type: true },
         });
-      }
-      if (asset.subAccountRegisterId != null) {
-        throw createError({
-          statusCode: 400,
-          message: "Linked asset must be a top-level account, not a pocket.",
+        if (!asset) {
+          throw createError({
+            statusCode: 400,
+            message: "Linked asset not found or not accessible.",
+          });
+        }
+        if (asset.type.isCredit) {
+          throw createError({
+            statusCode: 400,
+            message: "Linked collateral must be a non-credit (asset) account.",
+          });
+        }
+        if (asset.subAccountRegisterId != null) {
+          throw createError({
+            statusCode: 400,
+            message: "Linked asset must be a top-level account, not a pocket.",
+          });
+        }
+        if (id > 0 && collateralAssetRegisterId === id) {
+          throw createError({
+            statusCode: 400,
+            message: "Cannot link an account to itself as collateral.",
+          });
+        }
+        const otherLoan = await PrismaDb.accountRegister.findFirst({
+          where: {
+            collateralAssetRegisterId,
+            ...(id > 0 ? { id: { not: id } } : {}),
+          },
         });
-      }
-      if (id > 0 && collateralAssetRegisterId === id) {
-        throw createError({
-          statusCode: 400,
-          message: "Cannot link an account to itself as collateral.",
-        });
-      }
-      const otherLoan = await PrismaDb.accountRegister.findFirst({
-        where: {
-          collateralAssetRegisterId,
-          ...(id > 0 ? { id: { not: id } } : {}),
-        },
-      });
-      if (otherLoan) {
-        throw createError({
-          statusCode: 400,
-          message:
-            "That asset is already linked to another loan. Only one loan per asset.",
-        });
+        if (otherLoan) {
+          throw createError({
+            statusCode: 400,
+            message:
+              "That asset is already linked to another loan. Only one loan per asset.",
+          });
+        }
       }
     }
 

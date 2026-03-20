@@ -245,11 +245,12 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       dateTimeService.clone(statementDate)
     );
 
-    // Check if account has APR and balance
+    // Check if account has APR and balance (match transfer epsilon — float noise near zero)
     const hasAPR = this.determineCurrentAPR(accountRegister, checkDate) > 0;
-    const hasBalance = accountRegister.balance !== 0;
+    const hasBalance = absoluteMoney(accountRegister.balance) > 0.005;
 
-    // Process interest on the exact statement date
+    // Exact calendar match: statementAt is advanced one period per posted cycle, so the next
+    // due date is always the next month/week/etc. (multi-advance in updateStatementDate was skipping months.)
     const isOnStatementDate =
       dateTimeService.formatDate(normalizedCheckDate, "YYYY-MM-DD") ===
       dateTimeService.formatDate(normalizedStatementDate, "YYYY-MM-DD");

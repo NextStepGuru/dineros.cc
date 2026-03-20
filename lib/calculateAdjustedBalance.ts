@@ -5,7 +5,6 @@ export function calculateAdjustedBalance(
   mainBalance: any, // Prisma Decimal or number
   pocketBalances: Array<{ balance: any }> | null | undefined // Array of pocket balance entries
 ): number {
-  // Validate mainBalance - handle null/undefined as 0
   const mainBalanceNum =
     mainBalance === null || mainBalance === undefined ? 0 : Number(mainBalance);
   if (isNaN(mainBalanceNum)) {
@@ -14,7 +13,6 @@ export function calculateAdjustedBalance(
     );
   }
 
-  // Validate pocketBalances array
   const balancesArray = pocketBalances || [];
   if (!Array.isArray(balancesArray)) {
     throw new Error(
@@ -29,7 +27,6 @@ export function calculateAdjustedBalance(
       );
     }
 
-    // Handle null/undefined balance as 0
     const balance =
       pocket.balance === null || pocket.balance === undefined
         ? 0
@@ -40,7 +37,6 @@ export function calculateAdjustedBalance(
       );
     }
 
-    // Only include positive balances, set negative balances to 0
     return sum + Math.max(0, balance);
   }, 0);
 

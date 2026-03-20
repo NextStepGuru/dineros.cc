@@ -87,6 +87,16 @@ Follow the **pr** skill: resolve owner/repo from `origin`, `head` = current bran
 
 Title: user PR title or generated headline per above. Body: user PR body or generated summary per above. Always pass a body when using `gh pr create` or MCP if one was generated or provided.
 
+### Enable auto-merge (squash)
+
+After the PR is created, enable auto-merge with squash strategy:
+
+```bash
+gh pr merge <PR_NUMBER> --auto --squash
+```
+
+This ensures the PR merges automatically once all required status checks pass.
+
 ## Reference
 
 Reuse behavior from **branch**, **commit** (but here always `git add -A`), **push**, and **pr** skills in this repo’s `.cursor/skills/`.

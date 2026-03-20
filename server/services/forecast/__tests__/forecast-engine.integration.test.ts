@@ -285,7 +285,9 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
         accountId,
         name: "Checking Account",
         typeId: 1, // Checking account type
+        budgetId: 1,
         balance: 1000,
+        latestBalance: 1000,
         statementAt: dt().add(1, "month").toDate(),
       },
     });
@@ -344,7 +346,9 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
       accountId,
       name: "Savings",
       typeId: 1,
+      budgetId: 1,
       balance: 0,
+      latestBalance: 0,
       statementAt: new Date("2024-06-01T00:00:00.000Z"),
     },
   });

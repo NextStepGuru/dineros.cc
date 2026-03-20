@@ -120,6 +120,28 @@ describe("DataPersisterService", () => {
       });
     });
 
+    it("passes null reoccurrenceId in createMany payload (loan payment legs must not send synthetic 0)", async () => {
+      const entries = [
+        createMockEntry({
+          id: "loan-transfer-leg",
+          reoccurrenceId: null,
+          description: "Transfer for Payment to RV",
+          typeId: 6,
+          isProjected: true,
+        }),
+      ];
+
+      vi.spyOn(mockDb.registerEntry, "createMany").mockResolvedValue({
+        count: 1,
+      });
+
+      await service.persistForecastResults(entries);
+
+      const createManyArgs = (mockDb.registerEntry.createMany as any).mock
+        .calls[0][0];
+      expect(createManyArgs.data[0].reoccurrenceId).toBeNull();
+    });
+
     it("should fallback to individual creates when createMany fails", async () => {
       const entries = [
         createMockEntry({ id: "entry-1" }),
@@ -144,6 +166,32 @@ describe("DataPersisterService", () => {
           "Using rate-limited fallback for chunk of 2 entries",
         ),
       );
+    });
+
+    it("fallback create keeps null reoccurrenceId on loan transfer-shaped rows", async () => {
+      const entries = [
+        createMockEntry({
+          id: "loan-transfer-source-leg",
+          typeId: 6,
+          reoccurrenceId: null,
+          description: "Transfer for Payment to RV Loan",
+          sourceAccountRegisterId: 2,
+          isProjected: true,
+        }),
+      ];
+
+      vi.spyOn(mockDb.registerEntry, "createMany").mockRejectedValue(
+        new Error("Bulk insert failed"),
+      );
+      vi.spyOn(mockDb.registerEntry, "create").mockResolvedValue({});
+
+      await service.persistForecastResults(entries);
+
+      expect(mockDb.registerEntry.create).toHaveBeenCalledTimes(1);
+      const createData = (mockDb.registerEntry.create as any).mock.calls[0][0]
+        .data;
+      expect(createData.reoccurrenceId).toBeNull();
+      expect(createData.typeId).toBe(6);
     });
 
     it("should handle individual create failures gracefully", async () => {
