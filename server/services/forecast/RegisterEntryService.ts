@@ -32,6 +32,7 @@ export class RegisterEntryService implements IRegisterEntryService {
       forecastDate,
       isBalanceEntry = false,
       isManualEntry = false,
+      isProjected: isProjectedOverride,
       isPending,
       typeId,
       categoryId = null,
@@ -103,12 +104,19 @@ export class RegisterEntryService implements IRegisterEntryService {
       reoccurrenceId:
         explicitReoccurrenceId !== undefined
           ? explicitReoccurrenceId
-          : reoccurrence?.id ?? null,
+          : (reoccurrence?.id || null),
       typeId: typeId || null,
       isBalanceEntry,
       isPending: entryIsPending,
       isCleared: false,
-      isProjected: isBalanceEntry ? true : isManualEntry ? false : true,
+      isProjected:
+        isProjectedOverride !== undefined
+          ? isProjectedOverride
+          : isBalanceEntry
+            ? true
+            : isManualEntry
+              ? false
+              : true,
       isManualEntry,
       isReconciled: false,
       categoryId: categoryId ?? null,

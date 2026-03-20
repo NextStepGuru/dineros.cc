@@ -41,6 +41,9 @@ const parentOptions = computed(() => {
 });
 
 const newName = ref("");
+const newNameInputRef = ref<null | { inputRef?: HTMLInputElement | null; $el?: HTMLElement }>(
+  null,
+);
 const newParentId = ref<string | null>(null);
 const isAdding = ref(false);
 const savingId = ref<string | null>(null);
@@ -57,13 +60,20 @@ function cancelEdit() {
   editName.value = "";
 }
 
-/** Pug cannot parse `.find` inside multi-line `{{ }}`; keep hint in script. */
-function categoryParentHint(cat: Category): string {
-  if (!cat.subCategoryId) return "";
-  const parent = categoriesForAccount.value.find(
-    (c) => c.id === cat.subCategoryId,
-  );
-  return `— child of ${parent?.name ?? "unknown"}`;
+function focusNewCategoryNameInput() {
+  nextTick(() => {
+    const comp = newNameInputRef.value;
+    const input =
+      comp?.inputRef ?? comp?.$el?.querySelector?.("input") ?? null;
+    if (!input) return;
+    input.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    input.focus();
+  });
+}
+
+function presetParentForNew(parentId: string) {
+  newParentId.value = parentId;
+  focusNewCategoryNameInput();
 }
 
 async function saveEdit() {
@@ -140,6 +150,7 @@ UModal(
       form.flex.flex-col.gap-2(@submit.prevent="addCategory")
         .flex.gap-2
           UInput(
+            ref="newNameInputRef"
             v-model="newName"
             placeholder="New category name"
             class="flex-1"
@@ -165,6 +176,7 @@ UModal(
         li.p-2.flex.items-center.gap-2(
           v-for="cat in categoriesForAccountSorted"
           :key="cat.id"
+          :class="cat.subCategoryId ? 'pl-4 sm:pl-6 ml-2 border-l border-gray-200 dark:border-gray-600' : ''"
         )
           template(v-if="editingId === cat.id")
             UInput(
@@ -176,12 +188,16 @@ UModal(
             UButton(size="xs" @click="saveEdit" :loading="savingId === cat.id") Save
             UButton(size="xs" color="neutral" variant="ghost" @click="cancelEdit") Cancel
           template(v-else)
-            span.flex-1.inline-flex.flex-wrap.items-baseline.gap-x-1
-              span {{ cat.name }}
-              span(
-                v-if="cat.subCategoryId"
-                class="text-xs text-gray-500 dark:text-gray-400"
-              ) {{ categoryParentHint(cat) }}
+            span.flex-1.min-w-0.truncate {{ cat.name }}
+            UButton(
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              icon="i-lucide-plus"
+              :title="'Add subcategory under ' + cat.name"
+              :aria-label="'Set parent to ' + cat.name + ' for new category'"
+              @click="presetParentForNew(cat.id)"
+            )
             UButton(
               size="xs"
               variant="ghost"

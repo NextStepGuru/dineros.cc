@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateAdjustedBalance } from "../calculateAdjustedBalance";
+import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 
 describe("calculateAdjustedBalance", () => {
   it("should handle empty pocket balances array", () => {

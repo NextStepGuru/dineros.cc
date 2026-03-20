@@ -37,3 +37,13 @@ gh pr create --base <base> --head <head> --title "<title>" [--body "<body>"]
 ```
 
 Requires `gh` installed and authenticated (`gh auth status`). If not authenticated, tell the user to run `gh auth login`.
+
+## Enable auto-merge (squash)
+
+After the PR is created, enable auto-merge with squash strategy:
+
+```bash
+gh pr merge <PR_NUMBER> --auto --squash
+```
+
+This ensures the PR merges automatically once all required status checks pass.

@@ -15,6 +15,7 @@ import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { DateTime } from "./DateTime";
+
 const { Prisma } = prismaPkg;
 
 export class ForecastEngine implements IForecastEngine {
@@ -121,6 +122,11 @@ export class ForecastEngine implements IForecastEngine {
       // 6. Load existing manual entries into the timeline
       await this.loadExistingEntries(accountData);
 
+      this.accountService.alignStatementAtForForecastStart(
+        startDate,
+        activeAccountRegisters,
+      );
+
       this.accountService.clearPendingStatementAtUpdates();
 
       // 7. Process forecast day by day
@@ -145,7 +151,8 @@ export class ForecastEngine implements IForecastEngine {
       );
 
       const entriesToPersist = processedResults.filter(
-        (e) => !e.isManualEntry && !e.isPending
+        (e) =>
+          !e.isManualEntry && !e.isPending && e.isProjected
       );
 
       forecastLogger.info(
@@ -270,6 +277,7 @@ export class ForecastEngine implements IForecastEngine {
           amount: entry.amount,
           isManualEntry: entry.isManualEntry,
           isBalanceEntry: entry.isBalanceEntry,
+          isProjected: entry.isProjected,
           isPending: entry.isPending, // Preserve isPending status
           manualCreatedAt: entry.createdAt,
           typeId: entry.typeId, // Preserve typeId from existing entries
@@ -331,14 +339,11 @@ export class ForecastEngine implements IForecastEngine {
       const interestAccounts = this.accountService.getInterestBearingAccounts();
       await this.accountService.processInterestCharges(
         interestAccounts,
-        currentDate
+        currentDate.toDate()
       );
 
-      // Update statement dates after processing interest to advance to next statement date
-      await this.accountService.updateStatementDates(
-        interestAccounts,
-        currentDate
-      );
+      // Statement advances only inside processAccountInterestCharge (one period per posted cycle).
+      // Batch updateStatementDates here skipped interest rows by multi-advancing statementAt.
 
       // Process extra debt payments AFTER reoccurrences and interest so projected balance reflects same-day outflows
       const extraPaymentAccounts =

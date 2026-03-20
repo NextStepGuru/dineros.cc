@@ -1,7 +1,7 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { createError } from "h3";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
-import { calculateAdjustedBalance } from "~/server/lib/calculateAdjustedBalance";
+import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 
 /** Same OR filter as `server/api/register.ts` for `direction: "future"`. */
 export const futureRegisterEntryWhere = {

@@ -8,6 +8,7 @@ import { RegisterEntryService } from "./RegisterEntryService";
 import { TransferService } from "./TransferService";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
+import { absoluteMoney } from "../../../lib/bankers-rounding";
 
 const { Prisma } = prismaPkg;
 
@@ -38,6 +39,64 @@ export class AccountRegisterService implements IAccountRegisterService {
 
   clearPendingStatementAtUpdates(): void {
     this._pendingStatementAtUpdates = [];
+  }
+
+  alignStatementAtForForecastStart(
+    startDate: any,
+    accountRegisters: CacheAccountRegister[],
+  ): void {
+    const startNorm = dateTimeService.set(
+      {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      dateTimeService.clone(startDate),
+    );
+    const startEpoch = dateTimeService.toDate(startNorm).getTime();
+
+    for (const ar of accountRegisters) {
+      if (!ar.statementAt || ar.isArchived) continue;
+      const interestEligible =
+        absoluteMoney(ar.balance) > 0.005 &&
+        (ar.targetAccountRegisterId !== null || ar.typeId === 2);
+      if (!interestEligible) continue;
+
+      let st = dateTimeService.toDate(
+        dateTimeService.set(
+          {
+            hour: 0,
+            minute: 0,
+            second: 0,
+            milliseconds: 0,
+          },
+          dateTimeService.createUTC(ar.statementAt),
+        ),
+      );
+
+      let guard = 0;
+      while (st.getTime() < startEpoch && guard < 500) {
+        const next = this.calculateNextStatementDate(
+          dateTimeService.create(st),
+          ar.statementIntervalId,
+        );
+        st = dateTimeService.toDate(
+          dateTimeService.set(
+            {
+              hour: 0,
+              minute: 0,
+              second: 0,
+              milliseconds: 0,
+            },
+            dateTimeService.createUTC(next),
+          ),
+        );
+        guard += 1;
+      }
+      ar.statementAt = st;
+      this.cache.accountRegister.update(ar);
+    }
   }
 
   updateBalance(accountId: number, amount: number): void {
@@ -74,12 +133,16 @@ export class AccountRegisterService implements IAccountRegisterService {
     accountRegister: CacheAccountRegister,
     forecastDate?: any,
   ): Promise<void> {
-    // Calculate projected balance at the statement date for more accurate interest calculation
-    const statementDate = forecastDate?.toDate() || dateTimeService.nowDate();
+    const accrualDate = dateTimeService.toDate(
+      dateTimeService.set(
+        { hour: 0, minute: 0, second: 0, milliseconds: 0 },
+        dateTimeService.createUTC(accountRegister.statementAt),
+      ),
+    );
     const projectedBalance = getProjectedBalanceAtDate(
       this.cache,
       accountRegister.id,
-      dateTimeService.toDate(statementDate),
+      accrualDate,
     );
 
     const interest = await this.loanCalculator.calculateInterestForAccount(
@@ -87,8 +150,8 @@ export class AccountRegisterService implements IAccountRegisterService {
       projectedBalance,
     );
 
-    // Skip if no interest
     if (interest === 0) {
+      await this.updateStatementDate(accountRegister, forecastDate);
       return;
     }
 
@@ -106,7 +169,7 @@ export class AccountRegisterService implements IAccountRegisterService {
       sourceAccountRegisterId:
         accountRegister.targetAccountRegisterId || undefined,
       amount: Number(interest),
-      forecastDate: forecastDate?.toDate(), // Use forecast date for proper timeline placement
+      forecastDate: accrualDate,
       typeId: isCreditAccount ? 2 : 3, // Interest Charge (2) or Interest Earned (3)
       reoccurrence: {
         accountId: "",
@@ -127,8 +190,8 @@ export class AccountRegisterService implements IAccountRegisterService {
       },
     });
 
-    // Update account balance with interest
-    this.updateBalance(accountRegister.id, Number(interest));
+    // Balance already updated in RegisterEntryService.createEntry — do not call updateBalance here
+    // (double-counting inflated loan balance and could skew payment caps).
 
     // If there's a target account, create a transfer payment
     if (accountRegister.targetAccountRegisterId) {
@@ -143,7 +206,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           sourceAccountRegisterId: accountRegister.targetAccountRegisterId,
           amount: Number(paymentAmount),
           description: `Payment to ${accountRegister.name}`,
-          forecastDate: forecastDate?.toDate(),
+          forecastDate: accrualDate,
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
@@ -175,7 +238,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           accountRegisterId: accountRegister.id,
           description: `Payment for ${accountRegister.name}`,
           amount: Number(paymentAmount),
-          forecastDate: forecastDate?.toDate(),
+          forecastDate: accrualDate,
           typeId: 4, // Loan Payment
           reoccurrence: {
             accountId: "",
@@ -254,13 +317,12 @@ export class AccountRegisterService implements IAccountRegisterService {
     });
 
     let updated = false;
-    while (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
-      // Calculate next statement date based on interval
+    // One interval per call — multi-period catch-up is handled by processInterestCharges' while loop.
+    if (dateTimeService.isSameOrAfter(comparisonDate, statementAt)) {
       const newStatementAt = this.calculateNextStatementDate(
         statementAt,
         accountRegister.statementIntervalId,
       );
-      // Always update in-memory cache to continue forecast processing.
       statementAt = dateTimeService.create(newStatementAt);
       accountRegister.statementAt = dateTimeService.toDate(statementAt);
       updated = true;
@@ -432,7 +494,7 @@ export class AccountRegisterService implements IAccountRegisterService {
   initTimelineAccountCaches(): void {
     this._cachedInterestAccounts = this.cache.accountRegister.find(
       (account) =>
-        account.balance !== 0 &&
+        absoluteMoney(account.balance) > 0.005 &&
         (account.targetAccountRegisterId !== null || account.typeId === 2),
     );
     this._cachedExtraPaymentAccounts = this.cache.accountRegister.find({
@@ -452,7 +514,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
     return this.cache.accountRegister.find(
       (account) =>
-        account.balance !== 0 &&
+        absoluteMoney(account.balance) > 0.005 &&
         (account.targetAccountRegisterId !== null || account.typeId === 2),
     );
   }

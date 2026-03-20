@@ -243,42 +243,16 @@ export class DataPersisterService implements IDataPersisterService {
     calculatedEntries: CacheRegisterEntry[],
     tx?: ForecastTransactionClient
   ): Promise<void> {
-    const entriesToUpdate = calculatedEntries.filter(
-      (entry) =>
-        entry.isPending ||
-        entry.isManualEntry ||
-        (entry.isProjected && entry.isCleared === false)
-    );
+    if (calculatedEntries.length === 0) return;
 
-    if (entriesToUpdate.length === 0) return;
-
-    const entriesByAccount = entriesToUpdate.reduce((acc, entry) => {
-      if (!acc[entry.accountRegisterId]) {
-        acc[entry.accountRegisterId] = [];
-      }
-      acc[entry.accountRegisterId].push(entry);
-      return acc;
-    }, {} as Record<number, CacheRegisterEntry[]>);
-
-    const idBalancePairs: { id: string; balance: number }[] = [];
-    for (const entries of Object.values(entriesByAccount)) {
-      const sorted = [...entries].sort((a, b) => {
-        const dateA = dateTimeService.toDate(a.createdAt);
-        const dateB = dateTimeService.toDate(b.createdAt);
-        const timeDiff = dateA.getTime() - dateB.getTime();
-        if (timeDiff !== 0) return timeDiff;
-        return b.amount - a.amount;
-      });
-      let running = 0;
-      let minRunning = Number.POSITIVE_INFINITY;
-      let maxRunning = Number.NEGATIVE_INFINITY;
-      for (const entry of sorted) {
-        running += entry.amount;
-        if (running < minRunning) minRunning = running;
-        if (running > maxRunning) maxRunning = running;
-        idBalancePairs.push({ id: entry.id, balance: running });
-      }
-    }
+    // Persist running balances for every row in the forecast result. Projected inserts/reordering
+    // change cumulative balances for earlier non-projected lines too; updating only a subset left
+    // those rows stale in the DB.
+    const idBalancePairs: { id: string; balance: number }[] =
+      calculatedEntries.map((entry) => ({
+        id: entry.id,
+        balance: Number(entry.balance),
+      }));
 
     const db = this.client(tx);
     const caseParts = idBalancePairs.map(

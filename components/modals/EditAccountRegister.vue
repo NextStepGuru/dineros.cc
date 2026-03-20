@@ -149,9 +149,26 @@ watch(
   () => {
     if (!isSelectedAccountTypeCredit.value) {
       formState.value.collateralAssetRegisterId = null;
+      formState.value.targetAccountRegisterId = null;
     }
   },
 );
+
+/** Checking/savings/etc. registers that can fund loan or card payments (same account, top-level, non-credit). */
+const loanPaymentSourceSelectItems = computed(() => {
+  const items: { id: number | null; name: string }[] = [
+    { id: null, name: "None" },
+  ];
+  for (const r of listStore.getAccountRegisters) {
+    if (r.id === formState.value.id) continue;
+    if (r.accountId !== formState.value.accountId) continue;
+    if (r.subAccountRegisterId) continue;
+    const t = listStore.getAccountTypes.find((x) => x.id === r.typeId);
+    if (t?.isCredit) continue;
+    items.push({ id: r.id, name: r.name });
+  }
+  return items;
+});
 
 const collateralAssetSelectItems = computed(() => {
   const taken = new Set(
@@ -338,6 +355,20 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
           :format-options="formatCurrencyOptions"
           :step="0.01"
           class="w-full")
+
+      UFormField(
+        label="Pay from account"
+        name="targetAccountRegisterId"
+        v-if="isSelectedAccountTypeCredit"
+        hint="Optional. The account (e.g. checking) used for minimum and forecasted loan or card payments."
+      )
+        USelect(
+          v-model="formState.targetAccountRegisterId"
+          class="w-full"
+          placeholder="None"
+          :items="loanPaymentSourceSelectItems"
+          valueKey="id"
+          labelKey="name")
 
       UFormField(
         label="Linked asset (collateral)"

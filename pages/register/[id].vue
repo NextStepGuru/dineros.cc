@@ -6,6 +6,7 @@ import {
   categoryDropdownLabel,
   sortCategoriesForManageList,
 } from "~/lib/categorySelect";
+import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 import {
   CATEGORY_FILTER_ALL,
   CATEGORY_FILTER_UNCATEGORIZED,
@@ -133,7 +134,13 @@ const showAccountSelector = computed(
 const accountRegisterOptionsWithBalance = computed(() => {
   const formatted = formatAccountRegisters(registersForRegisterPage.value);
   return formatted.map((r) => {
-    const balanceRaw = Number(r.latestBalance ?? 0);
+    const pockets = !r.subAccountRegisterId
+      ? formatted.filter((p) => p.subAccountRegisterId === r.id)
+      : [];
+    const balanceRaw =
+      pockets.length > 0
+        ? calculateAdjustedBalance(r.latestBalance ?? 0, pockets)
+        : Number(r.latestBalance ?? 0);
     return {
       ...r,
       label: r.name,
@@ -287,6 +294,9 @@ const loadInitialEntries = async () => {
       hasMore: boolean;
     }>("/api/register", {
       query: {
+        accountId: registersForRegisterPage.value.find(
+          (r) => r.id === accountRegisterId.value,
+        )?.accountId,
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
         loadMode: "full",
@@ -333,6 +343,9 @@ const loadMoreEntries = async () => {
       hasMore: boolean;
     }>("/api/register", {
       query: {
+        accountId: registersForRegisterPage.value.find(
+          (r) => r.id === accountRegisterId.value,
+        )?.accountId,
         accountRegisterId: accountRegisterId.value,
         direction: selectedTab.value,
         loadMode: "full",
@@ -1193,18 +1206,18 @@ async function recalcAccount() {
               :items="accountRegisterOptionsWithBalance"
               :search-input="false")
               template(#default)
-                span(class="truncate text-default")
+                span(class="inline-flex items-center gap-2 min-w-0 max-w-full text-default")
                   template(v-if="selectedAccountOption")
-                    | {{ selectedAccountOption.label }}
-                    span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
+                    span(class="truncate min-w-0") {{ selectedAccountOption.label }}
+                    span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                   span(v-else) …
               template(#item-trailing="{ item }")
                 span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
             template(#fallback)
-              span(class="w-full md:w-64 my-0 text-sm text-default")
+              span(class="inline-flex items-center gap-2 min-w-0 w-full md:w-64 my-0 text-sm text-default")
                 template(v-if="selectedAccountOption")
-                  | {{ selectedAccountOption.label }}
-                  span(:class="balanceColorClass(selectedAccountOption.balanceRaw)" class="tabular-nums") {{ selectedAccountOption.balanceFormatted }}
+                  span(class="truncate min-w-0") {{ selectedAccountOption.label }}
+                  span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                 span(v-else) …
 
         div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")

@@ -34,6 +34,11 @@ export interface IDataLoaderService {
 
 export interface IAccountRegisterService {
   initTimelineAccountCaches(): void;
+  /** Move statementAt forward to the first due date on/after forecast start (no interest posted). */
+  alignStatementAtForForecastStart(
+    startDate: any,
+    accountRegisters: CacheAccountRegister[],
+  ): void;
   updateBalance(accountId: number, amount: number): void;
   getAccount(accountId: number): CacheAccountRegister | null;
   processInterestCharges(
@@ -157,6 +162,8 @@ export interface CreateEntryParams {
   forecastDate?: Date; // Explicit forecast date for proper timeline placement
   isBalanceEntry?: boolean;
   isManualEntry?: boolean;
+  /** When set (e.g. loading existing DB rows), overrides default projected flag */
+  isProjected?: boolean;
   isPending?: boolean;
   typeId?: number; // RegisterEntryType ID
   categoryId?: string | null;
