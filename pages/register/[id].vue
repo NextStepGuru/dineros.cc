@@ -1071,7 +1071,7 @@ async function recalcAccount() {
 
       div(
         v-if="showAccountSelector || (lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId) || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
-        class="ml-auto shrink min-w-0 flex flex-col items-end gap-1"
+        class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
       )
         div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
           div(class="text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
