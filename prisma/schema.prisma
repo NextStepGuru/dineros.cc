@@ -203,6 +203,12 @@ model AccountRegister {
   plaidJson                 Json?     @map("plaid_json")
   plaidLastSyncAt           DateTime? @map("plaid_last_sync_at")
   plaidBalanceLastSyncAt    DateTime? @map("plaid_balance_last_sync_at")
+  depreciationRate         Decimal?  @map("depreciation_rate") @db.Decimal(7, 5)
+  depreciationMethod       String?   @map("depreciation_method") @db.VarChar(30)
+  assetOriginalValue        Decimal?  @map("asset_original_value") @db.Decimal(19, 2)
+  assetResidualValue        Decimal?  @map("asset_residual_value") @db.Decimal(19, 2)
+  assetUsefulLifeYears      Int?      @map("asset_useful_life_years")
+  assetStartAt              DateTime? @map("asset_start_at")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budget              Budget            @relation(fields: [budgetId], references: [id])

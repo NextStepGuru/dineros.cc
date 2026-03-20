@@ -54,6 +54,12 @@ export type CacheAccountRegister = {
   allowExtraPayment: boolean;
   isArchived: boolean;
   plaidId: string | null;
+  depreciationRate: number | null | undefined | Decimal;
+  depreciationMethod: string | null;
+  assetOriginalValue: number | null | undefined | Decimal;
+  assetResidualValue: number | null | undefined | Decimal;
+  assetUsefulLifeYears: number | null;
+  assetStartAt: Date | null;
 };
 
 export type CacheRegisterEntry = {

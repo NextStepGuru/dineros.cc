@@ -11,6 +11,7 @@ import { RegisterEntryService } from "./RegisterEntryService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { TransferService } from "./TransferService";
 import { DataPersisterService } from "./DataPersisterService";
+import { AssetDepreciationService } from "./AssetDepreciationService";
 import { IS_CREDIT_TYPE_IDS } from "../../../consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
@@ -26,6 +27,7 @@ export class ForecastEngine implements IForecastEngine {
   private entryService: RegisterEntryService;
   private loanCalculator: LoanCalculatorService;
   private transferService: TransferService;
+  private assetService: AssetDepreciationService;
   private dataPersister: DataPersisterService;
 
   constructor(private db: PrismaClient) {
@@ -46,6 +48,10 @@ export class ForecastEngine implements IForecastEngine {
       this.cache,
       this.entryService,
       this.transferService
+    );
+    this.assetService = new AssetDepreciationService(
+      this.cache,
+      this.entryService
     );
     this.dataPersister = new DataPersisterService(db);
   }
@@ -344,6 +350,14 @@ export class ForecastEngine implements IForecastEngine {
 
       // Statement advances only inside processAccountInterestCharge (one period per posted cycle).
       // Batch updateStatementDates here skipped interest rows by multi-advancing statementAt.
+
+      // Process asset depreciation/appreciation AFTER interest charges
+      const depreciatingAssets = this.assetService.getDepreciatingAssets();
+      const appreciatingAssets = this.assetService.getAppreciatingAssets();
+      await this.assetService.processAssetValueChanges(
+        [...depreciatingAssets, ...appreciatingAssets],
+        currentDate.toDate()
+      );
 
       // Process high-priority savings goals (priorityOverDebt) before extra debt payments
       const extraPaymentAccounts =
