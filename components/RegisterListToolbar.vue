@@ -68,13 +68,15 @@ const emit = defineEmits<{
         @click="showShortcuts = !showShortcuts"
       />
     </UTooltip>
-    <UInput
-      :id="filterInputId"
-      v-model="globalFilter"
-      size="sm"
-      :class="filterClass"
-      placeholder="Filter..."
-    />
+    <slot name="filter">
+      <UInput
+        :id="filterInputId"
+        v-model="globalFilter"
+        size="sm"
+        :class="filterClass"
+        placeholder="Filter..."
+      />
+    </slot>
     <slot name="trailing" />
   </div>
 </template>

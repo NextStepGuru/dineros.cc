@@ -20,6 +20,8 @@ import type {
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
+import CombinedGlobalCategoryFilter from "~/components/filters/CombinedGlobalCategoryFilter.vue";
+import { useSnapshotMode } from "~/composables/useSnapshotMode";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
   () => import("~/components/modals/EditRegisterEntry.vue"),
@@ -119,7 +121,8 @@ onMounted(() => {
 
 const mainAccountCount = computed(
   () =>
-    registersForRegisterPage.value.filter((r) => !r.subAccountRegisterId).length,
+    registersForRegisterPage.value.filter((r) => !r.subAccountRegisterId)
+      .length,
 );
 
 const showAccountSelector = computed(
@@ -402,7 +405,9 @@ const refreshAccountEntries = async () => {
 };
 
 const reoccurrenceModal = overlay.create(ModalsEditReoccurrence);
-const matchToRecurrenceModal = overlay.create(ModalsMatchRegisterEntryReoccurrence);
+const matchToRecurrenceModal = overlay.create(
+  ModalsMatchRegisterEntryReoccurrence,
+);
 
 function ensureReoccurrenceDescription(text: string): string {
   const t = text.trim();
@@ -526,8 +531,9 @@ watch(
     selectedTab,
     () => snapshotMode.isSnapshotMode.value,
     () =>
-      snapshotMode.registerSnapshotIdByRegisterId.value[accountRegisterId.value] ??
-      0,
+      snapshotMode.registerSnapshotIdByRegisterId.value[
+        accountRegisterId.value
+      ] ?? 0,
   ],
   () => {
     void refreshAccountEntries();
@@ -583,7 +589,11 @@ onUnmounted(() => {
   }
 });
 
-const stripedTheme = ref({
+/** See `reoccurrences.vue` — inner overflow/clipping breaks thead sticky vs outer scroll viewport. */
+const tableUi = ref({
+  root: "!overflow-visible relative min-h-0",
+  base: "!overflow-visible min-w-full",
+  thead: "!z-30",
   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
 });
 
@@ -601,11 +611,17 @@ const columns: TableColumn<RegisterEntry>[] = [
   {
     id: "importReview",
     accessorFn: (row) => row.id ?? "",
+    meta: {
+      class: {
+        th: "w-4 max-w-4 !px-0",
+        td: "w-4 max-w-4 !px-0",
+      },
+    },
     header: () =>
       h(
         "div",
         {
-          class: "w-7 text-center text-muted",
+          class: "w-4 text-center text-muted",
           title:
             "Amber dot: bank import not reviewed yet — clear, reconcile, or match to a recurrence.",
         },
@@ -648,18 +664,30 @@ const columns: TableColumn<RegisterEntry>[] = [
   },
   {
     accessorKey: "createdAt",
-    header: () => h("div", { class: "text-right" }, "Date"),
+    meta: {
+      class: {
+        th: "w-24 max-w-24 whitespace-nowrap !pl-0 !pr-2",
+        td: "w-24 max-w-24 whitespace-nowrap align-top !pl-0 !pr-2",
+      },
+    },
+    header: () => h("div", { class: "text-right tabular-nums" }, "Date"),
     cell: ({ row }) => {
       return h(
         "div",
-        { class: "text-right" },
+        { class: "text-right tabular-nums" },
         formatDate(row.getValue("createdAt")),
       );
     },
   },
   {
     accessorKey: "description",
-    header: () => h("div", { class: "min-w-lg" }, "Description"),
+    meta: {
+      class: {
+        th: "w-full max-w-[42rem]",
+        td: "w-full max-w-[42rem]",
+      },
+    },
+    header: () => h("div", { class: "w-full max-w-[42rem]" }, "Description"),
     cell: ({ row }) => {
       const entry = row.original;
       const showRecurBtn = isPlaidImportAwaitingReview(entry);
@@ -886,6 +914,10 @@ function isSelectedTab(tab: string) {
 const globalFilter = ref("");
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 const tableRef = ref();
+const combinedTableFilterRef = ref<{
+  collapse: () => void;
+  expandAndFocus: () => Promise<void>;
+} | null>(null);
 
 const categoryFilterSelectItems = computed(() => {
   const items: { label: string; value: string; name: string }[] = [
@@ -931,12 +963,17 @@ const categoryFilterSelectItems = computed(() => {
 
 const registerRowsForTable = computed(() =>
   tableEntries.value.filter((e) =>
-    entryMatchesCategoryFilter(e.categoryId, categoryFilter.value),
+    entryMatchesCategoryFilter(
+      e.categoryId,
+      categoryFilter.value,
+      listStore.getCategories,
+    ),
   ),
 );
 
 watch(accountRegisterId, () => {
   categoryFilter.value = CATEGORY_FILTER_ALL;
+  combinedTableFilterRef.value?.collapse();
 });
 
 defineShortcuts({
@@ -945,16 +982,13 @@ defineShortcuts({
     handler: () => {
       globalFilter.value = "";
       categoryFilter.value = CATEGORY_FILTER_ALL;
+      combinedTableFilterRef.value?.collapse();
     },
   },
   meta_r: () => refreshAccountEntries(),
   meta_a: () => handleAddEntry(),
   meta_f: () => {
-    const search = document.getElementById("search");
-
-    if (search) {
-      search.focus();
-    }
+    void combinedTableFilterRef.value?.expandAndFocus();
   },
   meta_shift_r: () => recalcAccount(),
 });
@@ -1109,19 +1143,15 @@ async function recalcAccount() {
           @add="handleAddEntry"
           @refresh="refreshAccountEntries"
         )
-          template(#trailing)
-            UTooltip(text="Filter by category" :delay-duration="150")
-              USelectMenu(
-                v-model="categoryFilter"
-                :items="categoryFilterSelectItems"
-                value-key="value"
-                label-key="label"
-                :filter-fields="['label', 'name']"
-                size="sm"
-                class="min-w-40 max-w-[16rem]"
-                placeholder="All categories"
-                search-placeholder="Search…"
-                aria-label="Filter by category")
+          template(#filter)
+            CombinedGlobalCategoryFilter(
+              ref="combinedTableFilterRef"
+              v-model:global-filter="globalFilter"
+              v-model:category-filter="categoryFilter"
+              :category-items="categoryFilterSelectItems"
+              filter-input-id="search"
+              input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+            )
           template(#middle)
             UDropdownMenu(:items="snapshotMenuItems")
               UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
@@ -1192,7 +1222,7 @@ async function recalcAccount() {
       ul(class="space-y-2 text-sm")
         li Clear text &amp; category filters: ⎋
         li Add entry: ⌘ + A
-        li Focus filter: ⌘ + F
+        li Open filters &amp; focus search: ⌘ + F
         li Refresh register: ⌘ + R
         li Recalculate forecast: ⌘ + Shift + R
 
@@ -1307,7 +1337,7 @@ async function recalcAccount() {
         :data="registerRowsForTable"
         sticky
         v-model:globalFilter="globalFilter"
-        :ui="stripedTheme"
+        :ui="tableUi"
         :columns="columns"
         :loading="accountEntriesStatus === 'pending'"
         loading-color="primary"
