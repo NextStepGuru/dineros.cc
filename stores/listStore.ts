@@ -31,6 +31,23 @@ export const useListStore = defineStore("listStore", {
         return 0;
       });
     },
+    getReoccurrencesForCurrentBudget: (state) => {
+      const authStore = useAuthStore();
+      const registerIds = new Set(
+        state.accountRegisters
+          .filter((ar) => ar.budgetId === authStore.getBudgetId)
+          .map((ar) => ar.id),
+      );
+      return state.reoccurrences
+        .filter((r) => registerIds.has(r.accountRegisterId))
+        .sort((a, b) => {
+          if (a.lastAt < b.lastAt) return -1;
+          if (a.lastAt > b.lastAt) return 1;
+          if (a.description < b.description) return -1;
+          if (a.description > b.description) return 1;
+          return 0;
+        });
+    },
     getIntervals: (state) => state.intervals,
     getAccountTypes: (state) => state.accountTypes,
     getAccountRegisters: (state) => {
@@ -44,6 +61,8 @@ export const useListStore = defineStore("listStore", {
         );
     },
     getBudgets: (state) => state.budgets,
+    getDefaultBudget: (state) =>
+      state.budgets.find((b) => b.isDefault) ?? state.budgets[0] ?? null,
     getAccounts: (state) => state.accounts,
     getCategories: (state) => state.categories,
     getIsListsLoading: (state) => state.isLoading,
@@ -63,6 +82,23 @@ export const useListStore = defineStore("listStore", {
     },
     setBudgets(budgets: Budget[]) {
       this.budgets = budgets;
+    },
+    addBudget(budget: Budget) {
+      if (!this.budgets.some((b) => b.id === budget.id)) {
+        this.budgets.push(budget);
+      }
+    },
+    removeBudget(budgetId: number) {
+      this.budgets = this.budgets.filter((b) => b.id !== budgetId);
+      this.accountRegisters = this.accountRegisters.filter(
+        (ar) => ar.budgetId !== budgetId,
+      );
+    },
+    updateBudget(budget: Budget) {
+      const index = this.budgets.findIndex((b) => b.id === budget.id);
+      if (index >= 0) {
+        this.budgets[index] = { ...budget };
+      }
     },
     setAccounts(accounts: Account[]) {
       this.accounts = accounts;

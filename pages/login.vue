@@ -110,9 +110,8 @@ const handleSubmit = async ({
         }
 
         await listStore.fetchLists();
-        if (listStore.getBudgets.length > 0) {
-          authStore.setBudgetId(listStore.getBudgets[0].id);
-        }
+        const defaultBudget = listStore.getDefaultBudget;
+        if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
         const redirectPath = getPostLoginRedirect(
           listStore.getAccountRegisters,
         );

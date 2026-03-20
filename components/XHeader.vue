@@ -1,11 +1,70 @@
 <script setup lang="ts">
-import type { User } from "~/types/types";
+import type { User, Budget } from "~/types/types";
 import { formatAccountRegisters } from "~/lib/utils";
+import type { BudgetManagerProps } from "~/components/modals/BudgetManager.vue";
+
+const ModalsBudgetManager = defineAsyncComponent(
+  () => import("~/components/modals/BudgetManager.vue"),
+);
 
 const authStore = useAuthStore();
 const listStore = useListStore();
 const toast = useToast();
 const route = useRoute();
+const overlay = useOverlay();
+const budgetModal = overlay.create(ModalsBudgetManager);
+
+const currentBudgetName = computed(
+  () =>
+    listStore.getBudgets.find((b) => b.id === authStore.getBudgetId)?.name ??
+    "Select budget",
+);
+
+function selectBudget(id: number) {
+  authStore.setBudgetId(id);
+  listStore.fetchLists();
+  const firstRegister = listStore.getAccountRegisters[0];
+  if (firstRegister && route.path.startsWith("/register/")) {
+    navigateTo(`/register/${firstRegister.id}`);
+  }
+}
+
+function openBudgetModal(
+  mode: BudgetManagerProps["mode"],
+  budget: Budget | null,
+) {
+  budgetModal.open({
+    mode,
+    budget,
+    callback: () => {
+      budgetModal.close();
+      listStore.fetchLists();
+    },
+    cancel: () => budgetModal.close(),
+  });
+}
+
+function budgetMenuItems(b: Budget) {
+  return [
+    [
+      {
+        label: "Rename",
+        icon: "i-lucide-pencil",
+        onSelect: () => openBudgetModal("rename", b),
+      },
+      {
+        label: "Reset from default",
+        icon: "i-lucide-rotate-ccw",
+        onSelect: () => openBudgetModal("reset", b),
+      },
+      {
+        label: "Delete",
+        icon: "i-lucide-trash-2",
+        onSelect: () => openBudgetModal("delete", b),
+      },
+    ],
+  ];
+}
 
 const authTokenCookie = useCookie("authToken", {
   secure: false,
@@ -23,7 +82,8 @@ const items = computed(() => {
         label: "Register",
         to: `${
           listStore.getAccountRegisters.length
-            ? "/register/" + formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
+            ? "/register/" +
+              formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
             : "/account-registers?onboarding=1"
         }`,
         active: route.path.startsWith("/register"),
@@ -91,7 +151,9 @@ function logout() {
 async function pollData() {
   const $api = useNuxtApp().$api as typeof $fetch;
   try {
-    const data = await $api<{ token: string; user?: User }>("/api/validate-token");
+    const data = await $api<{ token: string; user?: User }>(
+      "/api/validate-token",
+    );
 
     if (data && "token" in data) {
       const token = data.token;
@@ -110,7 +172,9 @@ async function pollData() {
     const err = e as { data?: { errors?: unknown }; message?: string };
     toast.add({
       color: "error",
-      description: err?.data?.errors ? String(err.data.errors) : err?.message || "Login failed.",
+      description: err?.data?.errors
+        ? String(err.data.errors)
+        : err?.message || "Login failed.",
     });
   }
 }
@@ -147,10 +211,6 @@ onBeforeUnmount(() => {
     stop();
   }
 });
-const selectedBudgetId = computed({
-  get: () => authStore.getBudgetId,
-  set: (value) => authStore.setBudgetId(value),
-});
 </script>
 
 <template lang="pug">
@@ -163,15 +223,50 @@ UHeader(
   UNavigationMenu(:items="items"  class="flex flex-col md:flex-row")
 
   template(#right)
-    USelect(
-      v-if="authStore.getIsUserLoggedIn && listStore.getBudgets.length > 1"
-      v-model="selectedBudgetId"
-      size="xs"
+    UPopover(
+      v-if="authStore.getIsUserLoggedIn && listStore.getBudgets.length > 0"
       class="my-0 mr-4"
-      placeholder="Select budget"
-      :items="listStore.getBudgets"
-      valueKey="id"
-      labelKey="name")
+      :content="{ align: 'end', sideOffset: 4 }")
+      UButton(
+        size="xs"
+        variant="soft"
+        color="neutral"
+        class="min-w-0 max-w-48")
+        span.truncate {{ currentBudgetName }}
+        UIcon(name="i-lucide-chevron-down" class="ml-1 shrink-0")
+      template(#content="{ close }")
+        .flex.flex-col.p-1.min-w-48
+          div(
+            v-for="b in listStore.getBudgets"
+            :key="b.id"
+            class="flex items-center justify-between gap-2 py-2 px-2 rounded cursor-pointer hover:bg-elevated"
+            :class="{ 'bg-primary/15': b.id === authStore.getBudgetId }"
+            @click="selectBudget(b.id); close()")
+            span.truncate.flex-1 {{ b.name }}
+            UBadge(
+              v-if="b.isDefault"
+              size="xs"
+              color="neutral"
+              variant="subtle") Default
+            UDropdownMenu(
+              v-else
+              :items="budgetMenuItems(b)"
+              @click.stop)
+              UButton(
+                size="xs"
+                icon="i-lucide-more-horizontal"
+                square
+                variant="ghost"
+                color="neutral"
+                @click.stop)
+          USeparator.my-1
+          UButton(
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="justify-start"
+            icon="i-lucide-plus"
+            @click="openBudgetModal('create', null); close()") Create budget
     ULink(
       @click="logout"
       color="neutral"

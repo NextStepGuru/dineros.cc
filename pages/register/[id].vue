@@ -162,7 +162,7 @@ const selectedAccountOption = computed(() =>
   ),
 );
 
-const hasReoccurrences = computed(() => listStore.getReoccurrences.length > 0);
+const hasReoccurrences = computed(() => listStore.getReoccurrencesForCurrentBudget.length > 0);
 
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 

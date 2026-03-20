@@ -338,6 +338,14 @@ export const budgetSchema = z.object({
   userId: z.number().nullable(),
 });
 
+export const createBudgetSchema = z.object({
+  name: z.string().min(1).max(255),
+});
+
+export const renameBudgetSchema = z.object({
+  name: z.string().min(1).max(255),
+});
+
 export const accountSchema = z.object({
   id: z.number(),
   name: z.string(),

@@ -70,6 +70,56 @@ describe("listStore", () => {
     expect(store.getBudgets[0].name).toBe("Default");
   });
 
+  it("addBudget adds new budget and does not duplicate same id", () => {
+    const store = useListStore();
+    const budget: Budget = {
+      id: 2,
+      accountId: "a",
+      name: "Vacation",
+      isArchived: false,
+      isDefault: false,
+      userId: 1,
+    } as Budget;
+    store.addBudget(budget);
+    expect(store.getBudgets).toHaveLength(1);
+    expect(store.getBudgets[0].name).toBe("Vacation");
+    store.addBudget(budget);
+    expect(store.getBudgets).toHaveLength(1);
+  });
+
+  it("removeBudget removes budget and its accountRegisters", () => {
+    const store = useListStore();
+    store.setBudgets([
+      { id: 1, accountId: "a", name: "Default", isArchived: false, isDefault: true, userId: 1 } as Budget,
+      { id: 2, accountId: "a", name: "Other", isArchived: false, isDefault: false, userId: 1 } as Budget,
+    ]);
+    store.setAccountRegisters([
+      { id: 10, accountId: "a", name: "Reg1", budgetId: 1, sortOrder: 0 } as AccountRegister,
+      { id: 20, accountId: "a", name: "Reg2", budgetId: 2, sortOrder: 0 } as AccountRegister,
+    ]);
+    store.removeBudget(2);
+    expect(store.getBudgets).toHaveLength(1);
+    expect(store.getBudgets[0].id).toBe(1);
+    expect(store.accountRegisters).toHaveLength(1);
+    expect(store.accountRegisters[0].budgetId).toBe(1);
+  });
+
+  it("updateBudget updates existing budget by id", () => {
+    const store = useListStore();
+    store.setBudgets([
+      { id: 1, accountId: "a", name: "Default", isArchived: false, isDefault: true, userId: 1 } as Budget,
+    ]);
+    store.updateBudget({
+      id: 1,
+      accountId: "a",
+      name: "New Name",
+      isArchived: false,
+      isDefault: true,
+      userId: 1,
+    } as Budget);
+    expect(store.getBudgets[0].name).toBe("New Name");
+  });
+
   it("getAccountRegisters filters by authStore budgetId", () => {
     const authStore = useAuthStore();
     authStore.setBudgetId(2);

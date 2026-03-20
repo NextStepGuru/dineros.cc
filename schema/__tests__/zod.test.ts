@@ -12,6 +12,8 @@ import {
   intervalSchema,
   accountTypeSchema,
   budgetSchema,
+  createBudgetSchema,
+  renameBudgetSchema,
   accountSchema,
 } from "../zod";
 
@@ -347,6 +349,42 @@ describe("schema/zod", () => {
         userId: 123,
       });
       expect(result.userId).toBe(123);
+    });
+  });
+
+  describe("createBudgetSchema", () => {
+    it("accepts valid name", () => {
+      const result = createBudgetSchema.parse({ name: "Vacation" });
+      expect(result.name).toBe("Vacation");
+    });
+    it("rejects empty string", () => {
+      expect(() => createBudgetSchema.parse({ name: "" })).toThrow();
+    });
+    it("rejects missing name", () => {
+      expect(() => createBudgetSchema.parse({})).toThrow();
+    });
+    it("rejects name longer than 255", () => {
+      expect(() =>
+        createBudgetSchema.parse({ name: "a".repeat(256) })
+      ).toThrow();
+    });
+  });
+
+  describe("renameBudgetSchema", () => {
+    it("accepts valid name", () => {
+      const result = renameBudgetSchema.parse({ name: "Vacation" });
+      expect(result.name).toBe("Vacation");
+    });
+    it("rejects empty string", () => {
+      expect(() => renameBudgetSchema.parse({ name: "" })).toThrow();
+    });
+    it("rejects missing name", () => {
+      expect(() => renameBudgetSchema.parse({})).toThrow();
+    });
+    it("rejects name longer than 255", () => {
+      expect(() =>
+        renameBudgetSchema.parse({ name: "a".repeat(256) })
+      ).toThrow();
     });
   });
 
