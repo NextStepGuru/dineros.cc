@@ -21,7 +21,7 @@ const isSaving = ref(false);
 const currencyFmt = new Intl.NumberFormat("en-US", formatCurrencyOptions);
 
 const recurrencesForRegister = computed(() =>
-  listStore.getReoccurrences.filter(
+  listStore.getReoccurrencesForCurrentBudget.filter(
     (r) => r.accountRegisterId === props.registerEntry.accountRegisterId,
   ),
 );

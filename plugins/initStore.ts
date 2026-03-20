@@ -6,7 +6,8 @@ export default defineNuxtPlugin(async () => {
     await authStore.validateLogin();
     if (authStore.isLoggedIn) {
       await listStore.fetchLists();
-      authStore.setBudgetId(listStore.getBudgets[0].id);
+      const defaultBudget = listStore.getDefaultBudget;
+      if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
     }
   } catch (error) {
     console.log({

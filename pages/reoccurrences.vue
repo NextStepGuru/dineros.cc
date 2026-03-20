@@ -238,7 +238,7 @@ const categoryFilterSelectItems = computed(() => {
 });
 
 const reoccurrencesForTable = computed(() =>
-  listStore.getReoccurrences.filter((r) =>
+  listStore.getReoccurrencesForCurrentBudget.filter((r) =>
     entryMatchesCategoryFilter(
       r.categoryId,
       categoryFilter.value,
@@ -317,7 +317,7 @@ watch(
 );
 
 watch(
-  () => listStore.getReoccurrences.length,
+  () => listStore.getReoccurrencesForCurrentBudget.length,
   async () => {
     await nextTick();
     updateTableViewportMaxHeight();
@@ -391,15 +391,15 @@ onBeforeUnmount(() => {
         li Add reoccurrence: ⌘ + A
         li Open filters &amp; focus search: ⌘ + F
 
-    UCard(v-if="listStore.getReoccurrences.length === 0 && !listStore.getIsListsLoading" class="mb-4")
+    UCard(v-if="listStore.getReoccurrencesForCurrentBudget.length === 0 && !listStore.getIsListsLoading" class="mb-4")
       template(#header)
         h3(class="font-semibold") No recurring entries yet
       p(class="frog-text-muted mb-4") Add recurring income and bills so forecasts stay accurate without manual entry.
       UButton(color="primary" size="sm" @click="handleAddReoccurrence") Add first recurring entry
 
-    div(v-if="listStore.getReoccurrences.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
+    div(v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
       UAlert(
-        v-if="listStore.getReoccurrences.length > 0 && reoccurrencesForTable.length === 0"
+        v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 && reoccurrencesForTable.length === 0"
         class="mb-2"
         color="neutral"
         variant="subtle"
