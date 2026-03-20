@@ -27,15 +27,24 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         const d = data.data;
         const lb =
           d.latestBalance !== undefined && d.latestBalance !== null
-            ? d.latestBalance
-            : (d.balance ?? 0);
-        const bal = d.balance !== undefined && d.balance !== null ? d.balance : lb;
+            ? Number(d.latestBalance)
+            : (d.balance !== undefined && d.balance !== null ? Number(d.balance) : 0);
+        const bal =
+          d.balance !== undefined && d.balance !== null
+            ? Number(d.balance)
+            : lb;
         const accountRegister = {
           ...d,
           id: d.id || nextSyntheticId++,
           budgetId: d.budgetId ?? 1,
-          balance: Number(bal),
-          latestBalance: Number(lb),
+          balance: bal,
+          latestBalance: lb,
+          depreciationRate: d.depreciationRate ?? null,
+          depreciationMethod: d.depreciationMethod ?? null,
+          assetOriginalValue: d.assetOriginalValue ?? null,
+          assetResidualValue: d.assetResidualValue ?? null,
+          assetUsefulLifeYears: d.assetUsefulLifeYears ?? null,
+          assetStartAt: d.assetStartAt ?? null,
         };
         accountRegisters.push(accountRegister);
         return accountRegister;
@@ -45,11 +54,18 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         if (query?.where?.accountId) {
           list = accountRegisters.filter(ar => ar.accountId === query.where.accountId);
         }
-        // Return copies so loader always gets stable latestBalance/balance (avoids shared ref mutation)
+        // Return copies so loader always gets stable latestBalance/balance (avoids shared ref mutation).
+        // Explicit numeric coercion so DataLoader and asset tests get correct values.
         return list.map((ar: any) => ({
           ...ar,
-          latestBalance: ar.latestBalance ?? ar.balance ?? 0,
-          balance: ar.balance ?? ar.latestBalance ?? 0,
+          balance: Number(ar.balance ?? ar.latestBalance ?? 0),
+          latestBalance: Number(ar.latestBalance ?? ar.balance ?? 0),
+          depreciationRate: ar.depreciationRate ?? null,
+          depreciationMethod: ar.depreciationMethod ?? null,
+          assetOriginalValue: ar.assetOriginalValue ?? null,
+          assetResidualValue: ar.assetResidualValue ?? null,
+          assetUsefulLifeYears: ar.assetUsefulLifeYears ?? null,
+          assetStartAt: ar.assetStartAt ?? null,
         }));
       }),
       update: vi.fn(),

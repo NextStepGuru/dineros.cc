@@ -967,6 +967,7 @@ function pocketSubs(parentId: number) {
 }
 
 const showCrossAccountSnapshot = ref(false);
+const showProjectedBalanceTimeline = ref(false);
 
 // Tab items for sort mode selection
 const tabItems = computed(() => [
@@ -1334,6 +1335,18 @@ onBeforeUnmount(() => {
                 :title="`Snapshot view: ${selectedSnapshotLabel}`"
                 :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
               )
+          UTooltip(text="Projected balance (end of month)" :delay-duration="150")
+            UButton(
+              variant="soft"
+              size="sm"
+              square
+              icon="i-lucide-line-chart"
+              :color="showProjectedBalanceTimeline ? 'primary' : 'neutral'"
+              title="Projected balance timeline"
+              aria-label="Toggle projected balance timeline"
+              :disabled="!!isSnapshotMode || draggableAccountRegisters.length === 0"
+              @click="showProjectedBalanceTimeline = !showProjectedBalanceTimeline"
+            )
         template(#trailing)
           .ml-auto(
             class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
@@ -1347,7 +1360,7 @@ onBeforeUnmount(() => {
             b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
 
     div(
-      v-if="!isSnapshotMode && draggableAccountRegisters.length > 0"
+      v-if="showProjectedBalanceTimeline && !isSnapshotMode && draggableAccountRegisters.length > 0"
       class="w-full mb-4 flex flex-col gap-2 rounded-lg border border-default px-3 py-3 bg-elevated/40"
     )
       div(class="flex flex-col sm:flex-row sm:items-center gap-3")

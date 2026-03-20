@@ -275,6 +275,12 @@ export const accountRegisterSchema = z.object({
   minAccountBalance: z.coerce.number().default(0),
   allowExtraPayment: z.boolean().default(false),
   isArchived: z.boolean().default(false),
+  depreciationRate: z.coerce.number().nullable().default(null),
+  depreciationMethod: z.string().nullable().default(null),
+  assetOriginalValue: z.coerce.number().nullable().default(null),
+  assetResidualValue: z.coerce.number().nullable().default(null),
+  assetUsefulLifeYears: z.coerce.number().nullable().default(null),
+  assetStartAt: z.coerce.date().nullable().default(null),
 });
 
 export const reoccurrenceSchema = z.object({

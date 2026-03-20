@@ -95,6 +95,12 @@ export class DataLoaderService implements IDataLoaderService {
         isArchived: true,
         typeId: true,
         plaidId: true,
+        depreciationRate: true,
+        depreciationMethod: true,
+        assetOriginalValue: true,
+        assetResidualValue: true,
+        assetUsefulLifeYears: true,
+        assetStartAt: true,
       },
     });
 
@@ -117,6 +123,20 @@ export class DataLoaderService implements IDataLoaderService {
           ? Number(reg.accountSavingsGoal)
           : null,
         statementAt: dateTimeService.createUTC(reg.statementAt).toDate(),
+        depreciationRate: reg.depreciationRate
+          ? Number(reg.depreciationRate)
+          : null,
+        depreciationMethod: reg.depreciationMethod ?? null,
+        assetOriginalValue: reg.assetOriginalValue
+          ? Number(reg.assetOriginalValue)
+          : null,
+        assetResidualValue: reg.assetResidualValue
+          ? Number(reg.assetResidualValue)
+          : null,
+        assetUsefulLifeYears: reg.assetUsefulLifeYears ?? null,
+        assetStartAt: reg.assetStartAt
+          ? dateTimeService.createUTC(reg.assetStartAt).toDate()
+          : null,
       }),
     );
 
