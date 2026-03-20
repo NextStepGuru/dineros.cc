@@ -2,10 +2,14 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { z } from "zod";
 import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
-import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { dateTimeService } from "~/server/services/forecast";
-import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 import { paginateFutureRegisterWindow } from "~/server/lib/registerFuturePagination";
+import {
+  buildFutureLedgerSorted,
+  futureRegisterEntryOr,
+  resolveLoanTransferPeerIds,
+  stripRegisterEntryPlaidJson,
+} from "~/server/lib/registerLedgerFuture";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -47,21 +51,15 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    /** Transfers to/from loans: peer register id on the other leg (payer or loan). Description matching is unreliable (encryption / wording). */
-    const loanTransferPeerIds = new Set<number>();
-    if (direction === "future" && accountId) {
-      const paidFromHere = await PrismaDb.accountRegister.findMany({
-        where: {
-          accountId,
-          targetAccountRegisterId: accountRegisterId,
-        },
-        select: { id: true },
-      });
-      for (const r of paidFromHere) loanTransferPeerIds.add(r.id);
-      if (accountRegister.targetAccountRegisterId != null) {
-        loanTransferPeerIds.add(accountRegister.targetAccountRegisterId);
-      }
-    }
+    const loanTransferPeerIds =
+      direction === "future" && accountId
+        ? await resolveLoanTransferPeerIds(
+            PrismaDb,
+            accountId,
+            accountRegisterId,
+            accountRegister.targetAccountRegisterId,
+          )
+        : new Set<number>();
 
     // For quick mode, limit records and use simpler query
     const isQuickMode = loadMode === "quick";
@@ -86,14 +84,7 @@ export default defineEventHandler(async (event) => {
               ],
             }
           : {
-              OR: [
-                { isCleared: false, isProjected: true },
-                { isProjected: false, isCleared: false, isPending: true },
-                // Include balance row even when cleared — otherwise the Future anchor is missing
-                // and pagination slices from 0 (only pending), hiding projected loan payments.
-                { isBalanceEntry: true },
-                { isProjected: false, isManualEntry: true, isCleared: false },
-              ],
+              OR: [...futureRegisterEntryOr],
             }),
         accountRegisterId,
         register: {
@@ -167,12 +158,7 @@ export default defineEventHandler(async (event) => {
               ],
             }
           : {
-              OR: [
-                { isCleared: false, isProjected: true },
-                { isProjected: false, isCleared: false, isPending: true },
-                { isBalanceEntry: true },
-                { isProjected: false, isManualEntry: true, isCleared: false },
-              ],
+              OR: [...futureRegisterEntryOr],
             }),
         accountRegisterId,
         register: {
@@ -192,8 +178,8 @@ export default defineEventHandler(async (event) => {
       take: fetchLimit,
     });
 
-    const registerEntriesWithoutPlaidJson = allRegisterEntries.map(
-      ({ plaidJson: _plaidJson, ...rest }) => rest,
+    const registerEntriesWithoutPlaidJson = stripRegisterEntryPlaidJson(
+      allRegisterEntries,
     );
 
     const pocketBalances = await PrismaDb.accountRegister.findMany({
@@ -205,53 +191,14 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    const balance = calculateAdjustedBalance(
-      accountRegister.latestBalance,
-      pocketBalances,
-    );
-
-    // Legacy: credit account Interest Charge entries were stored as positive; correct at read time so running balance and sums are correct
-    const toAmount = (entry: {
-      amount: unknown;
-      typeId?: number | null;
-      description?: string;
-    }) => {
-      const n = Number(entry.amount);
-      const isLegacyInterest =
-        accountRegister.type.isCredit &&
-        n > 0 &&
-        (entry.typeId === 2 || entry.description === "Interest Charge");
-      if (isLegacyInterest) return -n;
-      return n;
-    };
-
     // For quick mode, skip expensive sorting and return basic data
     if (isQuickMode) {
-      // Convert Decimal values to numbers for the sort function
-      const convertedEntries = registerEntriesWithoutPlaidJson.map(
-        (entry) => ({
-          ...entry,
-          amount: toAmount(entry),
-          balance: Number(entry.balance),
-        }),
-      );
-
-      // Full mode: expensive but complete processing
-      let balanceUpdated = recalculateRunningBalanceAndSort({
-        registerEntries: convertedEntries,
-        balance,
-        type: accountRegister.type.isCredit ? "credit" : "debit",
+      const balanceUpdated = buildFutureLedgerSorted({
+        registerEntriesWithoutPlaidJson,
+        latestBalance: accountRegister.latestBalance,
+        pocketBalances,
+        isCredit: accountRegister.type.isCredit,
       });
-
-      // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
-      if (accountRegister.type.isCredit) {
-        balanceUpdated = balanceUpdated.map(
-          (entry: { balance: number; [k: string]: unknown }) => ({
-            ...entry,
-            balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-          }),
-        ) as typeof balanceUpdated;
-      }
 
       const { paginated: paginatedEntries, hasMore } = paginateSortedEntries(
         balanceUpdated,
@@ -303,31 +250,12 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    // Convert Decimal values to numbers for the sort function (toAmount corrects legacy interest sign for credit)
-    const convertedEntries = registerEntriesWithoutPlaidJson.map(
-      (entry) => ({
-        ...entry,
-        amount: toAmount(entry),
-        balance: Number(entry.balance),
-      }),
-    );
-
-    // Full mode: expensive but complete processing
-    let balanceUpdated = recalculateRunningBalanceAndSort({
-      registerEntries: convertedEntries,
-      balance,
-      type: accountRegister.type.isCredit ? "credit" : "debit",
+    const balanceUpdated = buildFutureLedgerSorted({
+      registerEntriesWithoutPlaidJson,
+      latestBalance: accountRegister.latestBalance,
+      pocketBalances,
+      isCredit: accountRegister.type.isCredit,
     });
-
-    // Credit: never show running balance above 0 when payments exceed balance (legacy or pre-cap data)
-    if (accountRegister.type.isCredit) {
-      balanceUpdated = balanceUpdated.map(
-        (entry: { balance: number; [k: string]: unknown }) => ({
-          ...entry,
-          balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-        }),
-      ) as typeof balanceUpdated;
-    }
 
     const { paginated: paginatedEntries, hasMore } = paginateSortedEntries(
       balanceUpdated,
