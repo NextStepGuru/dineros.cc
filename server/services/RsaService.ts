@@ -1,5 +1,5 @@
 import { prisma } from "~/server/clients/prismaClient";
-import { generateKeyPairSync } from "crypto";
+import { generateKeyPairSync } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { createId } from "@paralleldrive/cuid2";
 

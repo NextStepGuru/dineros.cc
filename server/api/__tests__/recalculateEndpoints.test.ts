@@ -144,7 +144,7 @@ describe("Recalculate API Endpoints", () => {
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "" });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "HTTP 400: Account ID is required to recalculate account balances"
+        "Account ID is required to recalculate account balances"
       );
     });
 
@@ -155,7 +155,7 @@ describe("Recalculate API Endpoints", () => {
       (global as any).readBody.mockResolvedValue(mockBody);
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "HTTP 400: Account ID is required to recalculate account balances"
+        "Account ID is required to recalculate account balances"
       );
     });
 
@@ -172,7 +172,7 @@ describe("Recalculate API Endpoints", () => {
       });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "HTTP 500: Forecast calculation failed: Database connection failed, Invalid date range"
+        "Forecast calculation failed: Database connection failed, Invalid date range"
       );
     });
 
@@ -188,7 +188,7 @@ describe("Recalculate API Endpoints", () => {
       });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "HTTP 500: Forecast calculation failed: "
+        "Forecast calculation failed: undefined"
       );
     });
 

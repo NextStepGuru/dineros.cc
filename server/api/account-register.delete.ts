@@ -6,18 +6,17 @@ import type { H3Event } from "h3";
 import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 
+const accountRegisterIdQuerySchema = z.object({
+  accountRegisterId: z.coerce.number().min(1),
+});
+
 export default defineEventHandler(async (event: H3Event) => {
   try {
     const query = getQuery(event);
     const user = getUser(event);
 
-    const deleteAccountRegisterSchema = z.object({
-      accountRegisterId: z.coerce.number().min(1),
-    });
+    const { accountRegisterId } = accountRegisterIdQuerySchema.parse(query);
 
-    const { accountRegisterId } = deleteAccountRegisterSchema.parse(query);
-
-    // Can the user delete this account register?
     const lookup = await PrismaDb.accountRegister.findFirstOrThrow({
       where: {
         id: accountRegisterId,
@@ -31,11 +30,59 @@ export default defineEventHandler(async (event: H3Event) => {
       },
     });
 
-    const deletedData = await PrismaDb.$transaction(
+    const archived = await PrismaDb.$transaction(
       async (prisma) => {
-        await prisma.reoccurrence.deleteMany({
+        const userAccountScope = {
+          userAccounts: { some: { userId: user.userId } },
+        };
+
+        await prisma.savingsGoal.updateMany({
           where: {
-            accountRegisterId,
+            OR: [
+              { sourceAccountRegisterId: accountRegisterId },
+              { targetAccountRegisterId: accountRegisterId },
+            ],
+            account: userAccountScope,
+          },
+          data: { isArchived: true },
+        });
+
+        await prisma.accountRegister.updateMany({
+          where: {
+            account: userAccountScope,
+            targetAccountRegisterId: accountRegisterId,
+          },
+          data: { targetAccountRegisterId: null },
+        });
+        await prisma.accountRegister.updateMany({
+          where: {
+            account: userAccountScope,
+            collateralAssetRegisterId: accountRegisterId,
+          },
+          data: { collateralAssetRegisterId: null },
+        });
+        await prisma.accountRegister.updateMany({
+          where: {
+            account: userAccountScope,
+            subAccountRegisterId: accountRegisterId,
+          },
+          data: { subAccountRegisterId: null },
+        });
+
+        await prisma.reoccurrence.updateMany({
+          where: {
+            transferAccountRegisterId: accountRegisterId,
+            account: userAccountScope,
+          },
+          data: { transferAccountRegisterId: null },
+        });
+
+        await prisma.reoccurrenceSplit.deleteMany({
+          where: {
+            transferAccountRegisterId: accountRegisterId,
+            reoccurrence: {
+              account: userAccountScope,
+            },
           },
         });
 
@@ -43,18 +90,35 @@ export default defineEventHandler(async (event: H3Event) => {
           where: { accountRegisterId },
         });
 
-        return await prisma.accountRegister.delete({
+        await prisma.reoccurrenceSplit.deleteMany({
           where: {
-            id: accountRegisterId,
+            reoccurrence: { accountRegisterId },
           },
         });
+
+        await prisma.reoccurrenceSkip.deleteMany({
+          where: { accountRegisterId },
+        });
+
+        await prisma.reoccurrencePlaidNameAlias.deleteMany({
+          where: { accountRegisterId },
+        });
+
+        await prisma.reoccurrence.deleteMany({
+          where: { accountRegisterId },
+        });
+
+        return prisma.accountRegister.update({
+          where: { id: accountRegisterId },
+          data: { isArchived: true },
+        });
       },
-      { maxWait: 20000, timeout: 60000 }
+      { maxWait: 20000, timeout: 60000 },
     );
 
     addRecalculateJob({ accountId: lookup.accountId });
 
-    return accountRegisterSchema.parse(deletedData);
+    return accountRegisterSchema.parse(archived);
   } catch (error) {
     handleApiError(error);
 

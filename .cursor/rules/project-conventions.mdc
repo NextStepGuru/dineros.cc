@@ -9,6 +9,6 @@ alwaysApply: false
 Quick checklist; full wording is in the files under `.cursor/rules/`.
 
 - **Build / dev server / typecheck**: Never run unless the user asks — `00-global-safety.mdc`.
-- **Tests**: Do not add, modify, or run tests unless the user asks — `05-workflow-execution.mdc`.
+- **Tests**: Do not add, modify, or run tests unless the user asks — `05-workflow-execution.mdc`. Vitest + Nuxt project layout and config files — `testing-vitest-nuxt.mdc`.
 - **Prisma / migrations**: Shared client and migration policy — `backend-best-practices.mdc` (sections **Data Access** and **Prisma schema and migrations**).
 - **Code style / TS / Zod**: `10-code-style-and-ts.mdc`.

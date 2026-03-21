@@ -8,7 +8,10 @@ import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { holidayService } from "./HolidayService";
 import {
+  applyReoccurrenceAmountAdjustment,
   calculateNextOccurrenceDate,
+  computeFirstNextOccurrenceDate,
+  countCompletedAdjustmentSteps,
   isTwiceMonthlyInterval,
 } from "./reoccurrenceIntervals";
 
@@ -56,6 +59,9 @@ export class ReoccurrenceService implements IReoccurrenceService {
     if (!firstNextDate) {
       return;
     }
+    const anchorScheduleLastAt = reoccurrence.lastAt
+      ? dateTimeService.toDate(reoccurrence.lastAt)
+      : null;
     let nextAt: any = dateTimeService.createUTC(firstNextDate);
     let occurrenceCount = 0;
 
@@ -96,8 +102,16 @@ export class ReoccurrenceService implements IReoccurrenceService {
         lastAt: dateTimeService.toDate(adjustedLastAt),
       };
 
+      const storedBaseAmount = Number(reoccurrence.amount);
+      let effectiveAmount = this.applyStoredAmountAdjustments(
+        reoccurrence,
+        dateTimeService.toDate(adjustedLastAt),
+        anchorScheduleLastAt,
+      );
+      const splitRatio =
+        storedBaseAmount === 0 ? 1 : effectiveAmount / storedBaseAmount;
+
       // For debt accounts, cap payment to current balance so payments never exceed balance
-      let effectiveAmount = Number(reoccurrence.amount);
       let skipBecauseDebtPaidOff = false;
       const targetAccountForCap = this.cache.accountRegister?.findOne?.({
         id: reoccurrence.accountRegisterId,
@@ -194,7 +208,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: splitEntry.transferAccountRegisterId,
           sourceAccountRegisterId: reoccurrence.accountRegisterId,
-          amount: Number(splitEntry.amount),
+          amount: Number(splitEntry.amount) * splitRatio,
           description: splitDescription,
           reoccurrence: reoccurrenceForEntry,
           categoryId:
@@ -242,6 +256,75 @@ export class ReoccurrenceService implements IReoccurrenceService {
     forecastLogger.serviceDebug(
       "ReoccurrenceService",
       `Processed ${occurrenceCount} occurrences for reoccurrence ${reoccurrence.id}`,
+    );
+  }
+
+  private applyStoredAmountAdjustments(
+    reoccurrence: Reoccurrence,
+    occurrenceDate: Date,
+    scheduleLastAtForAnchor: Date | null,
+  ): number {
+    const cached = this.cache.reoccurrence.findOne({ id: reoccurrence.id });
+    const mode =
+      (reoccurrence as { amountAdjustmentMode?: string }).amountAdjustmentMode ??
+      cached?.amountAdjustmentMode ??
+      "NONE";
+    if (mode === "NONE") {
+      return Number(reoccurrence.amount);
+    }
+    const direction =
+      (reoccurrence as { amountAdjustmentDirection?: string | null })
+        .amountAdjustmentDirection ?? cached?.amountAdjustmentDirection;
+    const rawVal =
+      (reoccurrence as { amountAdjustmentValue?: unknown }).amountAdjustmentValue;
+    const value =
+      rawVal != null
+        ? Number(rawVal)
+        : cached?.amountAdjustmentValue ?? null;
+    const adjIntervalId =
+      (reoccurrence as { amountAdjustmentIntervalId?: number | null })
+        .amountAdjustmentIntervalId ?? cached?.amountAdjustmentIntervalId;
+    const adjIntervalCount =
+      (reoccurrence as { amountAdjustmentIntervalCount?: number | null })
+        .amountAdjustmentIntervalCount ??
+      cached?.amountAdjustmentIntervalCount ??
+      1;
+    const anchorAt =
+      (reoccurrence as { amountAdjustmentAnchorAt?: Date | null })
+        .amountAdjustmentAnchorAt ?? cached?.amountAdjustmentAnchorAt;
+    const intervalName = cached?.intervalName;
+    const adjIntervalName = cached?.amountAdjustmentIntervalName;
+
+    const anchorResolved = anchorAt
+      ? dateTimeService.toDate(anchorAt)
+      : computeFirstNextOccurrenceDate({
+          lastAt: scheduleLastAtForAnchor,
+          intervalId: reoccurrence.intervalId,
+          intervalCount: reoccurrence.intervalCount,
+          intervalName,
+        });
+
+    if (!anchorResolved || adjIntervalId == null) {
+      return Number(reoccurrence.amount);
+    }
+    if (dateTimeService.isBefore(occurrenceDate, anchorResolved)) {
+      return Number(reoccurrence.amount);
+    }
+
+    const m = countCompletedAdjustmentSteps({
+      anchor: anchorResolved,
+      occurrenceDate,
+      adjustmentIntervalId: adjIntervalId,
+      adjustmentIntervalCount: adjIntervalCount,
+      adjustmentIntervalName: adjIntervalName,
+    });
+
+    return applyReoccurrenceAmountAdjustment(
+      Number(reoccurrence.amount),
+      mode as "NONE" | "PERCENT" | "FIXED",
+      direction as "INCREASE" | "DECREASE" | null | undefined,
+      value,
+      m,
     );
   }
 

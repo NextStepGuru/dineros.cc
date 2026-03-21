@@ -49,6 +49,7 @@ function minimalAccountRegister(
     assetStartAt: null,
     paymentCategoryId: null,
     interestCategoryId: null,
+    accruesBalanceGrowth: false,
     ...overrides,
   };
 }

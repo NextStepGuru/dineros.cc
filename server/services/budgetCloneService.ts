@@ -144,6 +144,12 @@ export async function cloneBudget(
         amount: ro.amount,
         description: ro.description,
         categoryId: ro.categoryId,
+        amountAdjustmentMode: ro.amountAdjustmentMode,
+        amountAdjustmentDirection: ro.amountAdjustmentDirection,
+        amountAdjustmentValue: ro.amountAdjustmentValue,
+        amountAdjustmentIntervalId: ro.amountAdjustmentIntervalId,
+        amountAdjustmentIntervalCount: ro.amountAdjustmentIntervalCount,
+        amountAdjustmentAnchorAt: ro.amountAdjustmentAnchorAt,
       },
       select: { id: true },
     });

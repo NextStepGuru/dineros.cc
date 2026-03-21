@@ -1,6 +1,6 @@
 import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister } from "./ModernCacheService";
-import prismaPkg from "@prisma/client";
+import prismaPkg, { AmountAdjustmentMode } from "@prisma/client";
 import { ModernCacheService } from "./ModernCacheService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
@@ -11,8 +11,8 @@ const { Prisma } = prismaPkg;
 
 export class TransferService implements ITransferService {
   private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
-  private cache: ModernCacheService;
-  private entryService: RegisterEntryService;
+  private readonly cache: ModernCacheService;
+  private readonly entryService: RegisterEntryService;
 
   constructor(cache: ModernCacheService, entryService: RegisterEntryService) {
     this.cache = cache;
@@ -291,15 +291,28 @@ export class TransferService implements ITransferService {
     );
   }
 
-  private async processExtraDebtPayment({
-    minBalance,
-    sourceAccountId,
-    lastAt,
-  }: {
-    minBalance: number;
-    sourceAccountId: number;
-    lastAt: Date;
-  }): Promise<boolean> {
+  private static sortDebtAccountsByPaymentPriority(
+    accounts: CacheAccountRegister[],
+  ): CacheAccountRegister[] {
+    return [...accounts].sort((a, b) => {
+      if (a.loanPaymentSortOrder !== b.loanPaymentSortOrder) {
+        return a.loanPaymentSortOrder - b.loanPaymentSortOrder;
+      }
+      return a.balance - b.balance;
+    });
+  }
+
+  private tryResolveExtraDebtAvailability(
+    minBalance: number,
+    sourceAccountId: number,
+    lastAt: Date,
+  ): {
+    sourceAccountRegister: CacheAccountRegister;
+    projectedBalance: number;
+    balanceBeforeExtraDebt: number;
+    todayCushion: number;
+    remainingAvailableAmount: number;
+  } | null {
     const sourceAccountRegister = this.cache.accountRegister.findOne({
       id: sourceAccountId,
     });
@@ -309,21 +322,17 @@ export class TransferService implements ITransferService {
         "TransferService",
         `Extra debt payment: Source account ${sourceAccountId} not found`,
       );
-      return false;
+      return null;
     }
 
-    // Projected balance at the forecast date (today) - for 7-day lookahead
     const projectedBalance = this.calculateProjectedBalanceAtDate(
       sourceAccountId,
       lastAt,
     );
     const cacheBalanceNow = sourceAccountRegister.balance;
-
-    // Use the lower of projected (sum of entries) and cache (running) so we never assume more than we have (e.g. if some same-day outflows aren't on this register in the sum)
     const balanceBeforeExtraDebt = Math.min(projectedBalance, cacheBalanceNow);
     const todayCushion = Math.max(0, balanceBeforeExtraDebt - minBalance);
 
-    // 90-day lookahead and 7-day lookback: ensure balance never drops below min in [today-7, today+90].
     const minBalanceInWindow = this.getMinProjectedBalanceInWindow(
       sourceAccountId,
       lastAt,
@@ -335,16 +344,239 @@ export class TransferService implements ITransferService {
       0,
       minBalanceInWindow - minBalance,
     );
-    // Hard cap: never allow more than today's cushion so running balance never goes below min
     remainingAvailableAmount = Math.min(remainingAvailableAmount, todayCushion);
 
-    // Skip entire day if we're already at or below min - don't apply extra debt until balance is above min again
     if (
       balanceBeforeExtraDebt < minBalance ||
       remainingAvailableAmount <= TransferService.MONEY_EPSILON
     ) {
+      return null;
+    }
+
+    return {
+      sourceAccountRegister,
+      projectedBalance,
+      balanceBeforeExtraDebt,
+      todayCushion,
+      remainingAvailableAmount,
+    };
+  }
+
+  private shouldAbortExtraDebtForLowFunds(
+    remainingAvailableAmount: number,
+    projectedBalance: number,
+  ): boolean {
+    if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`,
+      );
+      return true;
+    }
+    if (projectedBalance <= 0) {
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /** Resolves payment slice for one debt account, or signals to skip / stop the outer loop. */
+  private resolveExtraDebtPaymentForAccount(params: {
+    debtAccountRegister: CacheAccountRegister;
+    remainingAvailableAmount: number;
+    balanceBeforeExtraDebt: number;
+    totalPaymentsMade: number;
+    minBalance: number;
+    todayCushion: number;
+  }):
+    | { kind: "pay"; paymentAmount: number; debtBalance: number }
+    | { kind: "skip" }
+    | { kind: "break" } {
+    const {
+      debtAccountRegister,
+      remainingAvailableAmount,
+      balanceBeforeExtraDebt,
+      totalPaymentsMade,
+      minBalance,
+      todayCushion,
+    } = params;
+
+    const currentBalance = balanceBeforeExtraDebt - totalPaymentsMade;
+    const maxFromCurrentBalance = Math.max(0, currentBalance - minBalance);
+    if (maxFromCurrentBalance <= TransferService.MONEY_EPSILON) {
+      return { kind: "break" };
+    }
+
+    const freshDebt = this.cache.accountRegister.findById(
+      debtAccountRegister.id,
+    );
+    const debtBalance = freshDebt
+      ? +freshDebt.balance
+      : +debtAccountRegister.balance;
+    if (debtBalance >= 0) {
+      return { kind: "skip" };
+    }
+
+    const amountOwed = Math.abs(debtBalance);
+    let paymentAmount = remainingAvailableAmount;
+    if (paymentAmount > amountOwed) {
+      paymentAmount = amountOwed;
+    }
+    if (paymentAmount > maxFromCurrentBalance) {
+      paymentAmount = maxFromCurrentBalance;
+    }
+    const remainingTodayCushion = Math.max(
+      0,
+      todayCushion - totalPaymentsMade,
+    );
+    if (paymentAmount > remainingTodayCushion) {
+      paymentAmount = remainingTodayCushion;
+    }
+    if (paymentAmount <= TransferService.MONEY_EPSILON) {
+      return { kind: "skip" };
+    }
+
+    return { kind: "pay", paymentAmount, debtBalance };
+  }
+
+  private runExtraDebtPaymentLoop(params: {
+    sortedDebtAccounts: CacheAccountRegister[];
+    sourceAccountRegister: CacheAccountRegister;
+    balanceBeforeExtraDebt: number;
+    minBalance: number;
+    todayCushion: number;
+    remainingAvailableAmount: number;
+    lastAt: Date;
+    projectedBalance: number;
+  }): number {
+    const {
+      sortedDebtAccounts,
+      sourceAccountRegister,
+      balanceBeforeExtraDebt,
+      minBalance,
+      todayCushion,
+      lastAt,
+      projectedBalance,
+    } = params;
+    let remainingAvailableAmount = params.remainingAvailableAmount;
+
+    let totalPaymentsMade = 0;
+    let paymentsProcessed = 0;
+
+    for (const debtAccountRegister of sortedDebtAccounts) {
+      if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
+        break;
+      }
+
+      const resolved = this.resolveExtraDebtPaymentForAccount({
+        debtAccountRegister,
+        remainingAvailableAmount,
+        balanceBeforeExtraDebt,
+        totalPaymentsMade,
+        minBalance,
+        todayCushion,
+      });
+
+      if (resolved.kind === "break") {
+        break;
+      }
+      if (resolved.kind === "skip") {
+        continue;
+      }
+
+      const { paymentAmount, debtBalance } = resolved;
+
+      forecastLogger.serviceDebug(
+        "TransferService",
+        `Extra debt payment to ${debtAccountRegister.name}:`,
+        {
+          debtAccountId: debtAccountRegister.id,
+          debtAccountName: debtAccountRegister.name,
+          debtBalance,
+          paymentAmount,
+          remainingAvailableAmount,
+        },
+      );
+
+      this.transferBetweenAccountsWithDate({
+        targetAccountRegisterId: debtAccountRegister.id,
+        sourceAccountRegisterId: sourceAccountRegister.id,
+        amount: paymentAmount,
+        description: `Extra debt payment from ${sourceAccountRegister.name}`,
+        fromDescription: `Debt Payment to ${debtAccountRegister.name}`,
+        forecastDate: lastAt,
+        categoryId: debtAccountRegister.paymentCategoryId ?? null,
+        reoccurrence: {
+          accountId: "",
+          accountRegisterId: debtAccountRegister.id,
+          description: `Extra debt payment from ${sourceAccountRegister.name}`,
+          lastAt: dateTimeService.nowDate(),
+          amount: new Prisma.Decimal(Number(paymentAmount)),
+          transferAccountRegisterId:
+            debtAccountRegister.targetAccountRegisterId,
+          intervalId: 3,
+          intervalCount: 1,
+          id: 0,
+          endAt: null,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          updatedAt: dateTimeService.nowDate(),
+          adjustBeforeIfOnWeekend: false,
+          categoryId: null,
+          amountAdjustmentMode: AmountAdjustmentMode.NONE,
+          amountAdjustmentDirection: null,
+          amountAdjustmentValue: null,
+          amountAdjustmentIntervalId: null,
+          amountAdjustmentIntervalCount: 1,
+          amountAdjustmentAnchorAt: null,
+        },
+      });
+      remainingAvailableAmount -= paymentAmount;
+      totalPaymentsMade += paymentAmount;
+      paymentsProcessed++;
+    }
+
+    forecastLogger.serviceDebug(
+      "TransferService",
+      `Extra debt payment summary:`,
+      {
+        totalPaymentsMade,
+        paymentsProcessed,
+        remainingAvailableAmount,
+        originalAvailableAmount: projectedBalance - minBalance,
+      },
+    );
+    return paymentsProcessed;
+  }
+
+  private async processExtraDebtPayment({
+    minBalance,
+    sourceAccountId,
+    lastAt,
+  }: {
+    minBalance: number;
+    sourceAccountId: number;
+    lastAt: Date;
+  }): Promise<boolean> {
+    const avail = this.tryResolveExtraDebtAvailability(
+      minBalance,
+      sourceAccountId,
+      lastAt,
+    );
+    if (!avail) {
       return false;
     }
+
+    const {
+      sourceAccountRegister,
+      projectedBalance,
+      balanceBeforeExtraDebt,
+      todayCushion,
+      remainingAvailableAmount,
+    } = avail;
 
     forecastLogger.serviceDebug(
       "TransferService",
@@ -359,10 +591,9 @@ export class TransferService implements ITransferService {
       },
     );
 
-    // Find the highest priority debt account (lowest balance, highest sort order)
     const debtAccounts = this.cache.accountRegister.find(
       (account) => account.balance < 0,
-    ); // Must be negative (debt)
+    );
 
     forecastLogger.serviceDebug(
       "TransferService",
@@ -382,15 +613,8 @@ export class TransferService implements ITransferService {
       return false;
     }
 
-    // Sort by loan payment sort order (lower values first) then by balance (most negative first)
-    const sortedDebtAccounts = debtAccounts.sort((a, b) => {
-      // First sort by loanPaymentSortOrder (lower values first)
-      if (a.loanPaymentSortOrder !== b.loanPaymentSortOrder) {
-        return a.loanPaymentSortOrder - b.loanPaymentSortOrder;
-      }
-      // Then by balance (most negative first)
-      return a.balance - b.balance;
-    });
+    const sortedDebtAccounts =
+      TransferService.sortDebtAccountsByPaymentPriority(debtAccounts);
 
     forecastLogger.serviceDebug(
       "TransferService",
@@ -407,133 +631,26 @@ export class TransferService implements ITransferService {
       },
     );
 
-    // Ensure we don't transfer if it would bring the source account below minimum
-    if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
-      forecastLogger.serviceDebug(
-        "TransferService",
-        `Extra debt payment: Available amount (${remainingAvailableAmount}) <= 0, skipping`,
-      );
-      return false;
-    }
-
-    // Additional safety check: ensure projected balance is positive
-    if (projectedBalance <= 0) {
-      forecastLogger.serviceDebug(
-        "TransferService",
-        `Extra debt payment: Projected balance (${projectedBalance}) <= 0, skipping`,
-      );
-      return false;
-    }
-
-    let totalPaymentsMade = 0;
-    let paymentsProcessed = 0;
-
-    // Pay debts in priority order until all available funds are used
-    for (const debtAccountRegister of sortedDebtAccounts) {
-      if (remainingAvailableAmount <= TransferService.MONEY_EPSILON) {
-        break; // No more funds available
-      }
-
-      // Use only calculated balance (start balance minus what we've already sent) so we never rely on stale cache
-      const currentBalance = balanceBeforeExtraDebt - totalPaymentsMade;
-      const maxFromCurrentBalance = Math.max(0, currentBalance - minBalance);
-      if (maxFromCurrentBalance <= TransferService.MONEY_EPSILON) {
-        break; // Already at or below min, stop making payments today
-      }
-
-      // O(1) Map lookup — reflects running balance (updated by createEntry; DB-loaded entries don't update it)
-      const freshDebt = this.cache.accountRegister.findById(
-        debtAccountRegister.id,
-      );
-      const debtBalance = freshDebt
-        ? +freshDebt.balance
-        : +debtAccountRegister.balance;
-      if (debtBalance >= 0) {
-        continue;
-      }
-      const amountOwed = Math.abs(debtBalance);
-
-      let paymentAmount = remainingAvailableAmount;
-
-      if (paymentAmount > amountOwed) {
-        paymentAmount = amountOwed;
-      }
-
-      // Never send more than (current balance - minBalance) so running balance stays >= min
-      if (paymentAmount > maxFromCurrentBalance) {
-        paymentAmount = maxFromCurrentBalance;
-      }
-
-      // Never exceed today's cushion in total (keeps today's balance >= minBalance)
-      const remainingTodayCushion = Math.max(
-        0,
-        todayCushion - totalPaymentsMade,
-      );
-      if (paymentAmount > remainingTodayCushion) {
-        paymentAmount = remainingTodayCushion;
-      }
-
-      // Skip if no payment needed (debt is already paid off)
-      if (paymentAmount <= TransferService.MONEY_EPSILON) {
-        continue;
-      }
-
-      forecastLogger.serviceDebug(
-        "TransferService",
-        `Extra debt payment to ${debtAccountRegister.name}:`,
-        {
-          debtAccountId: debtAccountRegister.id,
-          debtAccountName: debtAccountRegister.name,
-          debtBalance,
-          paymentAmount,
-          remainingAvailableAmount,
-        },
-      );
-
-      // Execute the transfer with the correct forecast date
-      this.transferBetweenAccountsWithDate({
-        targetAccountRegisterId: debtAccountRegister.id,
-        sourceAccountRegisterId: sourceAccountRegister.id,
-        amount: paymentAmount,
-        description: `Extra debt payment from ${sourceAccountRegister.name}`,
-        fromDescription: `Debt Payment to ${debtAccountRegister.name}`,
-        forecastDate: lastAt, // Use the actual forecast date being processed
-        categoryId: debtAccountRegister.paymentCategoryId ?? null,
-        reoccurrence: {
-          accountId: "",
-          accountRegisterId: debtAccountRegister.id,
-          description: `Extra debt payment from ${sourceAccountRegister.name}`,
-          lastAt: dateTimeService.nowDate(), // Use current date for reoccurrence persistence
-          amount: new Prisma.Decimal(Number(paymentAmount)),
-          transferAccountRegisterId:
-            debtAccountRegister.targetAccountRegisterId,
-          intervalId: 3,
-          intervalCount: 1,
-          id: 0,
-          endAt: null,
-          totalIntervals: null,
-          elapsedIntervals: null,
-          updatedAt: dateTimeService.nowDate(),
-          adjustBeforeIfOnWeekend: false,
-          categoryId: null,
-        },
-      });
-      // Update remaining available amount
-      remainingAvailableAmount -= paymentAmount;
-      totalPaymentsMade += paymentAmount;
-      paymentsProcessed++;
-    }
-
-    forecastLogger.serviceDebug(
-      "TransferService",
-      `Extra debt payment summary:`,
-      {
-        totalPaymentsMade,
-        paymentsProcessed,
+    if (
+      this.shouldAbortExtraDebtForLowFunds(
         remainingAvailableAmount,
-        originalAvailableAmount: projectedBalance - minBalance,
-      },
-    );
+        projectedBalance,
+      )
+    ) {
+      return false;
+    }
+
+    const paymentsProcessed = this.runExtraDebtPaymentLoop({
+      sortedDebtAccounts,
+      sourceAccountRegister,
+      balanceBeforeExtraDebt,
+      minBalance,
+      todayCushion,
+      remainingAvailableAmount,
+      lastAt,
+      projectedBalance,
+    });
+
     return paymentsProcessed > 0;
   }
 

@@ -10,8 +10,8 @@ export const getDbDecryptionKeyValues = (): string[] => {
       (key) =>
         key.startsWith("DB_DECRYPTION_KEY") && key !== "DB_DECRYPTION_KEYS",
     )
-    .map((key) => process.env[key]!)
-    .filter((value) => value !== undefined); // Ensure no undefined values
+    .map((key) => process.env[key])
+    .filter((value): value is string => value !== undefined);
 };
 
 const dbDecryptionKeyValues = getDbDecryptionKeyValues();

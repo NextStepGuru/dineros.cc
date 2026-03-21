@@ -299,7 +299,8 @@ describe("Balance Arithmetic Regression Tests", () => {
     // Set up mock data for credit account
     const creditAccountRegister = {
       id: 2,
-      typeId: 2, // Credit account type
+      typeId: 4, // Credit card
+      accruesBalanceGrowth: false,
       budgetId: 1,
       accountId: "test-credit-account",
       name: "Test Credit Account",

@@ -40,7 +40,7 @@ class JwtService {
 
   async verify(token: string): Promise<string | jwt.JwtPayload> {
     const rsaService = new RsaService();
-    const data = jwt.decode(token, { complete: true }) as jwt.Jwt | null;
+    const data = jwt.decode(token, { complete: true });
     const kid = data?.header?.kid;
     const jwtKey: string | null =
       data && typeof data.payload === "object" && "jwtKey" in data.payload

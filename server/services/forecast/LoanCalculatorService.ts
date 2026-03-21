@@ -86,12 +86,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
 
       forecastLogger.debug("DEBUG: interest before sign adjustment =", interest);
 
-      // Apply correct sign for savings vs credit accounts
-      if (accountRegister.typeId === 2) {
-        // Savings account - positive interest (earned)
+      // Positive accrual for savings / investment growth; negative for credit/loans
+      if (accountRegister.accruesBalanceGrowth) {
         interest = absoluteMoney(interest);
       } else {
-        // Credit account - negative interest (charged)
         interest = -absoluteMoney(interest);
       }
 

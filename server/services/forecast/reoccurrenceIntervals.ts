@@ -115,3 +115,83 @@ export function calculateNextOccurrenceDate(
     dateTimeService.add(intervalCount, unitFromId, lastAt),
   );
 }
+
+/** First projected occurrence after `lastAt` (same semantics as forecast `calculateNextOccurrence`). */
+export function computeFirstNextOccurrenceDate(params: {
+  lastAt: Date | null;
+  intervalId: number;
+  intervalCount: number;
+  intervalName?: string | null;
+}): Date | null {
+  if (!params.lastAt) return null;
+  return calculateNextOccurrenceDate({
+    lastAt: params.lastAt,
+    intervalId: params.intervalId,
+    intervalCount: params.intervalCount,
+    intervalName: params.intervalName ?? undefined,
+  });
+}
+
+export type AmountAdjustmentModeName = "NONE" | "PERCENT" | "FIXED";
+export type AmountAdjustmentDirectionName = "INCREASE" | "DECREASE";
+
+/** Number of completed adjustment periods strictly before `occurrenceDate` is after the anchor boundary. */
+export function countCompletedAdjustmentSteps(params: {
+  anchor: Date;
+  occurrenceDate: Date;
+  adjustmentIntervalId: number;
+  adjustmentIntervalCount: number;
+  adjustmentIntervalName?: string | null;
+}): number {
+  const {
+    anchor,
+    occurrenceDate,
+    adjustmentIntervalId,
+    adjustmentIntervalCount,
+    adjustmentIntervalName,
+  } = params;
+  let cursor = dateTimeService.toDate(anchor);
+  const end = dateTimeService.toDate(occurrenceDate);
+  let m = 0;
+  const maxIter = 100000;
+  for (let i = 0; i < maxIter; i++) {
+    const next = calculateNextOccurrenceDate({
+      lastAt: cursor,
+      intervalId: adjustmentIntervalId,
+      intervalCount: adjustmentIntervalCount,
+      intervalName: adjustmentIntervalName ?? undefined,
+    });
+    if (!next) break;
+    if (dateTimeService.isAfter(next, end)) break;
+    m++;
+    cursor = next;
+  }
+  return m;
+}
+
+function roundCents(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function applyReoccurrenceAmountAdjustment(
+  baseAmount: number,
+  mode: AmountAdjustmentModeName,
+  direction: AmountAdjustmentDirectionName | null | undefined,
+  value: number | null | undefined,
+  completedSteps: number,
+): number {
+  if (mode === "NONE" || completedSteps <= 0) {
+    return roundCents(baseAmount);
+  }
+  const v = value ?? 0;
+  const dir = direction ?? "INCREASE";
+  if (mode === "PERCENT") {
+    const factor = dir === "INCREASE" ? 1 + v / 100 : 1 - v / 100;
+    return roundCents(baseAmount * Math.pow(factor, completedSteps));
+  }
+  const sign = baseAmount >= 0 ? 1 : -1;
+  const mag = Math.abs(baseAmount);
+  const deltaPer = dir === "INCREASE" ? v : -v;
+  const newMag = Math.max(0, mag + completedSteps * deltaPer);
+  return roundCents(sign * newMag);
+}

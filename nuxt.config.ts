@@ -126,6 +126,7 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "@nuxt/image",
     "@nuxt/eslint",
+    "@nuxt/test-utils/module",
     "./modules/handle-nuxt-path",
     // Only include nuxt-cron if not in test mode
     ...(process.env.NODE_ENV !== "test" ? ["nuxt-cron"] : []),
@@ -137,6 +138,8 @@ export default defineNuxtConfig({
     shim: false,
     tsConfig: {
       exclude: ["microservice"],
+      // tests/nuxt: Nuxt Vitest project — paths relative to generated .nuxt/tsconfig.json
+      include: ["../tests/nuxt/**/*"],
     },
     sharedTsConfig: {
       exclude: ["microservice"],

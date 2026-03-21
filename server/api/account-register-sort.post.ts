@@ -12,7 +12,7 @@ export default defineEventHandler(async (event: H3Event) => {
     const { accountRegisters, sortMode } = body;
 
     if (!Array.isArray(accountRegisters)) {
-      throw new Error("accountRegisters must be an array");
+      throw new TypeError("accountRegisters must be an array");
     }
 
     if (!sortMode || !["visual", "loan", "savings"].includes(sortMode)) {

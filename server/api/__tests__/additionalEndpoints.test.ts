@@ -33,9 +33,13 @@ vi.mock('~/server/logger', () => ({
   log: vi.fn(),
 }));
 
-vi.mock('../env', () => ({
+// Mock `~/server/env` (not `../env` from __tests__ — wrong module for handlers importing `../env`).
+vi.mock('~/server/env', () => ({
   default: {
     NODE_ENV: 'test',
+    DEPLOY_ENV: 'staging',
+    PLAID_CLIENT_ID: 'test-plaid-id',
+    PLAID_SECRET: 'test-plaid-secret',
   },
 }));
 

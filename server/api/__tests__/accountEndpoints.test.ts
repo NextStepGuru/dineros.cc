@@ -770,6 +770,96 @@ describe("Account Register API Endpoints", () => {
       );
       expect(handleApiError).toHaveBeenCalled();
     });
+
+    it("should update loanPaymentSortOrder when sortMode is loan", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisters: [
+          {
+            id: 1,
+            accountId: "account-123",
+            loanPaymentSortOrder: 2,
+            name: "A",
+            typeId: 1,
+            budgetId: 1,
+          },
+          {
+            id: 2,
+            accountId: "account-123",
+            loanPaymentSortOrder: 0,
+            name: "B",
+            typeId: 1,
+            budgetId: 1,
+          },
+        ],
+        sortMode: "loan",
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-123",
+        userAccounts: [{ userId: 123 }],
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (global as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountRegister.update as any).mockResolvedValue({});
+
+      await accountRegisterSortHandler(mockEvent);
+
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { loanPaymentSortOrder: 2 },
+      });
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { loanPaymentSortOrder: 0 },
+      });
+    });
+
+    it("should update savingsGoalSortOrder when sortMode is savings", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisters: [
+          {
+            id: 10,
+            accountId: "account-xyz",
+            savingsGoalSortOrder: 1,
+            name: "S1",
+            typeId: 1,
+            budgetId: 1,
+          },
+        ],
+        sortMode: "savings",
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-xyz",
+        userAccounts: [{ userId: 123 }],
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (global as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountRegister.update as any).mockResolvedValue({});
+
+      await accountRegisterSortHandler(mockEvent);
+
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { savingsGoalSortOrder: 1 },
+      });
+    });
   });
 
   describe("DELETE /api/account-register", () => {
@@ -783,7 +873,7 @@ describe("Account Register API Endpoints", () => {
       accountRegisterDeleteHandler = module.default;
     });
 
-    it("should delete account register successfully", async () => {
+    it("should archive account register successfully", async () => {
       const mockEvent = {};
       const mockQuery = { accountRegisterId: "1" };
       const mockUser = { userId: 123 };
@@ -793,10 +883,11 @@ describe("Account Register API Endpoints", () => {
         name: "Test Account Register",
         account: { userAccounts: [{ userId: 123 }] },
       };
-      const mockDeletedData = {
+      const mockArchivedData = {
         id: 1,
         accountId: "account-123",
         name: "Test Account Register",
+        isArchived: true,
       };
 
       const { getQuery } = await import("h3");
@@ -812,24 +903,28 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
       );
+      const noop = vi.fn().mockResolvedValue({ count: 0 });
       (prisma.$transaction as any).mockImplementation(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           return await callback({
-            reoccurrence: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
-            registerEntry: {
-              deleteMany: vi.fn().mockResolvedValue({ count: 10 }),
-            },
+            savingsGoal: { updateMany: noop },
             accountRegister: {
-              delete: vi.fn().mockResolvedValue(mockDeletedData),
+              updateMany: noop,
+              update: vi.fn().mockResolvedValue(mockArchivedData),
             },
+            reoccurrence: { updateMany: noop, deleteMany: noop },
+            reoccurrenceSplit: { deleteMany: noop },
+            registerEntry: { deleteMany: noop },
+            reoccurrenceSkip: { deleteMany: noop },
+            reoccurrencePlaidNameAlias: { deleteMany: noop },
           });
         },
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockDeletedData);
+      (accountRegisterSchema.parse as any).mockReturnValue(mockArchivedData);
 
       const result = await accountRegisterDeleteHandler(mockEvent);
 
-      expect(result).toEqual(mockDeletedData);
+      expect(result).toEqual(mockArchivedData);
       expect(prisma.accountRegister.findFirstOrThrow).toHaveBeenCalledWith({
         where: {
           id: 1,
@@ -932,7 +1027,7 @@ describe("Account Register API Endpoints", () => {
       expect(handleApiError).toHaveBeenCalledWith(transactionError);
     });
 
-    it("should clean up related data in correct order", async () => {
+    it("should clean up related data then archive the register", async () => {
       const mockEvent = {};
       const mockQuery = { accountRegisterId: "1" };
       const mockUser = { userId: 123 };
@@ -955,12 +1050,20 @@ describe("Account Register API Endpoints", () => {
         mockAccountRegister,
       );
 
+      const noop = vi.fn().mockResolvedValue({ count: 0 });
       const mockTxn = {
-        reoccurrence: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
-        registerEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 10 }) },
+        savingsGoal: { updateMany: noop },
         accountRegister: {
-          delete: vi.fn().mockResolvedValue(mockAccountRegister),
+          updateMany: noop,
+          update: vi
+            .fn()
+            .mockResolvedValue({ ...mockAccountRegister, isArchived: true }),
         },
+        reoccurrence: { updateMany: noop, deleteMany: noop },
+        reoccurrenceSplit: { deleteMany: noop },
+        registerEntry: { deleteMany: noop },
+        reoccurrenceSkip: { deleteMany: noop },
+        reoccurrencePlaidNameAlias: { deleteMany: noop },
       };
 
       (prisma.$transaction as any).mockImplementation(
@@ -968,19 +1071,22 @@ describe("Account Register API Endpoints", () => {
           return await callback(mockTxn);
         },
       );
-      (accountRegisterSchema.parse as any).mockReturnValue(mockAccountRegister);
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockAccountRegister,
+        isArchived: true,
+      });
 
       await accountRegisterDeleteHandler(mockEvent);
 
-      // Verify the order: reoccurrences first, then register entries, then account register
-      expect(mockTxn.reoccurrence.deleteMany).toHaveBeenCalledWith({
-        where: { accountRegisterId: 1 },
-      });
       expect(mockTxn.registerEntry.deleteMany).toHaveBeenCalledWith({
         where: { accountRegisterId: 1 },
       });
-      expect(mockTxn.accountRegister.delete).toHaveBeenCalledWith({
+      expect(mockTxn.reoccurrence.deleteMany).toHaveBeenCalledWith({
+        where: { accountRegisterId: 1 },
+      });
+      expect(mockTxn.accountRegister.update).toHaveBeenCalledWith({
         where: { id: 1 },
+        data: { isArchived: true },
       });
     });
 
@@ -1006,6 +1112,7 @@ describe("Account Register API Endpoints", () => {
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
       );
+      const noop = vi.fn().mockResolvedValue({ count: 0 });
       (prisma.$transaction as any).mockImplementation(
         async (
           callback: (tx: unknown) => Promise<unknown>,
@@ -1016,15 +1123,18 @@ describe("Account Register API Endpoints", () => {
             timeout: 60000,
           });
           return await callback({
-            reoccurrence: {
-              deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-            },
-            registerEntry: {
-              deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-            },
+            savingsGoal: { updateMany: noop },
             accountRegister: {
-              delete: vi.fn().mockResolvedValue(mockAccountRegister),
+              updateMany: noop,
+              update: vi
+                .fn()
+                .mockResolvedValue({ ...mockAccountRegister, isArchived: true }),
             },
+            reoccurrence: { updateMany: noop, deleteMany: noop },
+            reoccurrenceSplit: { deleteMany: noop },
+            registerEntry: { deleteMany: noop },
+            reoccurrenceSkip: { deleteMany: noop },
+            reoccurrencePlaidNameAlias: { deleteMany: noop },
           });
         },
       );

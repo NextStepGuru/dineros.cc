@@ -11,7 +11,7 @@ export const futureRegisterEntryWhere = {
     { isBalanceEntry: true, isCleared: false },
     { isProjected: false, isManualEntry: true, isCleared: false },
   ],
-} as const;
+};
 
 export async function assertUserOwnsAccount(
   userId: number,

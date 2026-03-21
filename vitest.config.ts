@@ -1,65 +1,56 @@
-import { defineVitestConfig } from "@nuxt/test-utils/config";
+// Vitest + Nuxt 4: https://nuxt.com/docs/4.x/getting-started/testing
+// Explicit projects: node (fast) vs nuxt runtime — avoids duplicate runs from defineVitestConfig auto-split.
+// @nuxt/test-utils v3.x aligns with Vitest 3; v4+ peers vitest ^4 — upgrade both when moving to Vitest 4.
+import { mergeConfig } from "vite";
+import { defineConfig } from "vitest/config";
+import { defineVitestProject } from "@nuxt/test-utils/config";
+import {
+  vitestNodeTestIncludes,
+  vitestNodeProjectExcludes,
+} from "./vitest.test-globs";
+import { vitestResolveAliases, vitestAliasLayer } from "./vitest.resolve-aliases";
 
-export default defineVitestConfig({
+const nuxtProject = await defineVitestProject({
   test: {
-    // Suppress console output during tests
-    silent: true,
-    // Alternative: you can also use reporter: 'verbose' and silent: false if you want test info but not console logs
-    // reporter: 'default',
+    name: "nuxt",
+    include: ["tests/nuxt/**/*.test.ts", "**/*.nuxt.{test,spec}.ts"],
+  },
+});
 
-    // Set up global test configuration
+export default defineConfig({
+  resolve: {
+    alias: { ...vitestResolveAliases },
+  },
+  test: {
+    globals: true,
     setupFiles: ["./vitest.setup.ts"],
-
-    // Parallel execution for faster tests
     pool: "forks",
     poolOptions: {
       forks: {
         singleFork: false,
-        maxForks: 4, // Adjust based on your CPU cores
+        maxForks: 4,
         minForks: 2,
-        // Memory optimization
         isolate: true,
       },
     },
-
-    // Optimize timeouts for faster feedback
-    testTimeout: 10000, // 10 seconds default
-    hookTimeout: 5000, // 5 seconds for setup/teardown
-
-    // Enable test caching for faster re-runs
-    // Note: cache configuration is handled by Vite automatically
-
-    // Optimize for speed
-    globals: true,
-
-    // Environment variables for tests
+    testTimeout: 30000,
+    hookTimeout: 5000,
     env: {
       NODE_ENV: "test",
-      LOG_LEVEL: "error", // Suppress debug/info logs
+      LOG_LEVEL: "error",
     },
-
-    // Test patterns to include
-    include: [
-      "server/api/__tests__/**/*.test.ts",
-      "server/services/__tests__/**/*.test.ts",
-      "server/services/forecast/__tests__/**/*.test.ts",
-      "server/services/reports/__tests__/**/*.test.ts",
-      "server/lib/__tests__/**/*.test.ts",
-      "lib/__tests__/**/*.test.ts",
-      "pages/__tests__/**/*.test.ts",
-      "tests/**/*.test.ts",
-      "schema/__tests__/**/*.test.ts",
-      "prisma/reencrypt/__tests__/**/*.test.ts",
+    silent: true,
+    projects: [
+      mergeConfig(vitestAliasLayer, {
+        test: {
+          name: "node",
+          environment: "node",
+          include: [...vitestNodeTestIncludes],
+          exclude: [...vitestNodeProjectExcludes],
+        },
+      }),
+      mergeConfig(vitestAliasLayer, nuxtProject),
     ],
-
-    // Exclude slow and problematic tests from default runs
-    exclude: [
-      "server/services/__tests__/HashService.test.ts",
-      "server/services/__tests__/JwtService.test.ts",
-      "server/services/__tests__/RsaService.test.ts",
-    ],
-
-    // Coverage configuration
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],
@@ -94,10 +85,9 @@ export default defineVitestConfig({
         "stores/**/*.{js,ts}",
         "types/**/*.{js,ts}",
         "schema/**/*.{js,ts}",
-        "pages/**/*.{js,ts,vue}", // Include page components
-        "components/**/*.{js,ts,vue}", // Include UI components
+        "pages/**/*.{js,ts,vue}",
+        "components/**/*.{js,ts,vue}",
       ],
-      // Coverage thresholds (optional - will fail if below these percentages)
       thresholds: {
         global: {
           branches: 70,

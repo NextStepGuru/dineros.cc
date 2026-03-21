@@ -145,6 +145,7 @@ describe("DataLoaderService", () => {
         isArchived: false,
         typeId: 1,
         plaidId: null,
+        accruesBalanceGrowth: false,
       });
 
       mockDb.accountRegister.findMany.mockResolvedValue([]);
@@ -386,6 +387,7 @@ describe("DataLoaderService", () => {
         isArchived: false,
         typeId: 1,
         plaidId: "plaid-123",
+        type: { accruesBalanceGrowth: false },
       };
 
       mockDb.accountRegister.findMany.mockResolvedValue([mockAccountRegister]);
@@ -407,6 +409,7 @@ describe("DataLoaderService", () => {
       expect(loadedAccount.targetAccountRegisterId).toBe(2);
       expect(loadedAccount.loanPaymentsPerYear).toBe(12);
       expect(loadedAccount.allowExtraPayment).toBe(true);
+      expect(loadedAccount.accruesBalanceGrowth).toBe(false);
     });
   });
 

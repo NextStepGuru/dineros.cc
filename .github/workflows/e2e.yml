@@ -15,7 +15,7 @@ jobs:
       NODE_ENV: development
       DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
-      DB_ENCRYPTION_KEY: "ci-e2e-encryption-key-placeholder-32bytes!!"
+      DB_ENCRYPTION_KEY: "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c="
       PLAID_CLIENT_ID: "ci-plaid-client-id"
       PLAID_SECRET: "ci-plaid-secret"
       REDIS_HOST: "127.0.0.1"

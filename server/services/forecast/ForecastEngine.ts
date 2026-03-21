@@ -335,6 +335,10 @@ export class ForecastEngine implements IForecastEngine {
         dueReoccurrences.map((reoccurrence) => ({
           ...reoccurrence,
           amount: new Prisma.Decimal(reoccurrence.amount),
+          amountAdjustmentValue:
+            reoccurrence.amountAdjustmentValue != null
+              ? new Prisma.Decimal(reoccurrence.amountAdjustmentValue)
+              : null,
           lastAt: reoccurrence.lastAt || dateTimeService.nowDate(),
           updatedAt: reoccurrence.updatedAt || dateTimeService.nowDate(),
         })),

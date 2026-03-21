@@ -24,7 +24,9 @@ type CanonicalDurationUnit =
   | "second"
   | "millisecond";
 
-type DateTimeInput = DateTime | Date | string | number;
+/** Comparison / diff operand (excludes numeric epoch; use {@link DateTimeInput} for full set). */
+type DateTimeComparable = DateTime | Date | string;
+type DateTimeInput = DateTimeComparable | number;
 type DurationObjectInput = Partial<Record<CanonicalDurationUnit, number>>;
 
 export type DurationInputArg2 =
@@ -113,7 +115,7 @@ function daysInMonthUTC(year: number, monthZeroBased: number): number {
 
 function toDate(input?: DateTimeInput): Date {
   if (input instanceof DateTime) return new Date(input.valueOf());
-  if (input instanceof Date) return new Date(input.getTime());
+  if (input instanceof Date) return new Date(input);
   if (typeof input === "number") return new Date(input);
   if (typeof input === "string") return new Date(input);
   return new Date();
@@ -140,7 +142,7 @@ function formatDateUTC(date: Date, formatString: string): string {
     s: String(date.getUTCSeconds()),
   };
 
-  return formatString.replace(
+  return formatString.replaceAll(
     /YYYY|dddd|SSS|MM|DD|HH|mm|ss|M|D|H|m|s/g,
     (token) => replacements[token] ?? token,
   );
@@ -151,7 +153,7 @@ function formatDateUTC(date: Date, formatString: string): string {
  * Use DateTimeService for all server-side datetime to respect run context and UTC boundaries.
  */
 export class DateTime {
-  private _date: Date;
+  private readonly _date: Date;
 
   constructor(input?: DateTimeInput) {
     this._date = toDate(input);
@@ -193,7 +195,7 @@ export class DateTime {
 
   static parseUTC(input: string | Date): DateTime {
     if (input instanceof Date) {
-      return new DateTime(new Date(input.getTime()));
+      return new DateTime(input);
     }
     const parsed = new Date(input);
     if (!Number.isNaN(parsed.getTime())) return new DateTime(parsed);
@@ -209,7 +211,7 @@ export class DateTime {
   }
 
   toDate(): Date {
-    return new Date(this._date.getTime());
+    return new Date(this._date);
   }
 
   clone(): DateTime {
@@ -307,27 +309,27 @@ export class DateTime {
     return this.add(-amount, unit);
   }
 
-  private resolveOther(other: DateTime | Date | string): Date {
+  private resolveOther(other: DateTimeComparable): Date {
     return toDate(other);
   }
 
-  isAfter(other: DateTime | Date | string): boolean {
+  isAfter(other: DateTimeComparable): boolean {
     return this.valueOf() > this.resolveOther(other).getTime();
   }
 
-  isBefore(other: DateTime | Date | string): boolean {
+  isBefore(other: DateTimeComparable): boolean {
     return this.valueOf() < this.resolveOther(other).getTime();
   }
 
-  isSame(other: DateTime | Date | string): boolean {
+  isSame(other: DateTimeComparable): boolean {
     return this.valueOf() === this.resolveOther(other).getTime();
   }
 
-  isSameOrBefore(other: DateTime | Date | string): boolean {
+  isSameOrBefore(other: DateTimeComparable): boolean {
     return this.valueOf() <= this.resolveOther(other).getTime();
   }
 
-  isSameOrAfter(other: DateTime | Date | string): boolean {
+  isSameOrAfter(other: DateTimeComparable): boolean {
     return this.valueOf() >= this.resolveOther(other).getTime();
   }
 
@@ -413,7 +415,7 @@ export class DateTime {
   }
 
   diff(
-    other: DateTime | Date | string,
+    other: DateTimeComparable,
     unit: DurationInputArg2 = "milliseconds",
   ): number {
     const lhs = this.valueOf();

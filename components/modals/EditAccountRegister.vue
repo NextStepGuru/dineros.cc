@@ -115,7 +115,9 @@ const isSelectedAccountTypeSavings = computed(() => {
 
 const isSelectedAccountTypeWithInterest = computed(() => {
   return (
-    isSelectedAccountTypeCredit.value || isSelectedAccountTypeSavings.value
+    isSelectedAccountTypeCredit.value ||
+    isSelectedAccountTypeSavings.value ||
+    selectedAccountType.value?.accruesBalanceGrowth === true
   );
 });
 
@@ -158,20 +160,35 @@ const assetStartAtString = computed({
   },
 });
 
+const isSelectedAccountTypeGrowthAsset = computed(
+  () =>
+    !isSelectedAccountTypeCredit.value &&
+    !isSelectedAccountTypeSavings.value &&
+    selectedAccountType.value?.accruesBalanceGrowth === true,
+);
+
 const interestRateLabel = computed(() => {
+  if (isSelectedAccountTypeCredit.value) {
+    return "APR (%)";
+  }
   if (isSelectedAccountTypeSavings.value) {
     return "Interest Rate (%)";
-  } else if (isSelectedAccountTypeCredit.value) {
-    return "APR (%)";
+  }
+  if (isSelectedAccountTypeGrowthAsset.value) {
+    return "Annual Growth Rate (%)";
   }
   return "Interest Rate (%)";
 });
 
 const interestRateHint = computed(() => {
+  if (isSelectedAccountTypeCredit.value) {
+    return "Annual Percentage Rate (0-100%)";
+  }
   if (isSelectedAccountTypeSavings.value) {
     return "Annual Interest Rate earned (0-100%)";
-  } else if (isSelectedAccountTypeCredit.value) {
-    return "Annual Percentage Rate (0-100%)";
+  }
+  if (isSelectedAccountTypeGrowthAsset.value) {
+    return "Expected annual return / appreciation (0-100%)";
   }
   return "Annual Interest Rate (0-100%)";
 });
@@ -329,7 +346,7 @@ async function handleSubmit({
   isSaving.value = false;
 }
 
-async function deleteAccountRegister() {
+async function archiveAccountRegister() {
   isDeleting.value = true;
   const result = await $api("/api/account-register", {
     method: "DELETE",
@@ -343,14 +360,14 @@ async function deleteAccountRegister() {
     isSaving.value = false;
     toast.add({
       color: "error",
-      description: "Failed to delete account register.",
+      description: "Failed to archive account register.",
     });
 
     return;
   } else {
     toast.add({
       color: "success",
-      description: "Deleted account register successfully.",
+      description: "Account archived. It will no longer appear in lists or dropdowns.",
     });
 
     await listStore.fetchLists();
@@ -359,13 +376,13 @@ async function deleteAccountRegister() {
   }
 }
 
-function confirmDelete() {
+function confirmArchive() {
   if (
     confirm(
-      "Are you sure you want to delete this account register? This action cannot be undone.",
+      "Archive this account? It will be hidden from your account list and from dropdowns.",
     )
   ) {
-    deleteAccountRegister();
+    archiveAccountRegister();
   }
 }
 
@@ -573,10 +590,10 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
       UButton(
         color="error"
         v-if="formState.id"
-        @click="confirmDelete"
+        @click="confirmArchive"
         :loading="isDeleting"
         :disabled="isSaving || isDeleting"
-      ) Delete
+      ) Archive
 
       UButton(@click="cancel" color="neutral" :disabled="isSaving || isDeleting") Close
 </template>

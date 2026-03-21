@@ -3,9 +3,9 @@
  */
 export class DatabaseRateLimiter {
   private semaphore: number;
-  private queue: Array<() => void> = [];
+  private readonly queue: Array<() => void> = [];
 
-  constructor(private maxConcurrent: number = 3) {
+  constructor(private readonly maxConcurrent: number = 3) {
     this.semaphore = maxConcurrent;
   }
 
@@ -70,8 +70,8 @@ export class DatabaseRateLimiter {
    */
   private release(): void {
     if (this.queue.length > 0) {
-      const next = this.queue.shift()!;
-      next();
+      const next = this.queue.shift();
+      next?.();
     } else {
       this.semaphore++;
     }

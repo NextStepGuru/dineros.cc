@@ -17,11 +17,11 @@ import { defineStore } from "pinia";
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
 
-// Required environment variables for server/env.ts validation
-process.env.DB_ENCRYPTION_KEY =
-  "test-encryption-key-12345678901234567890123456789012";
-process.env.DB_DECRYPTION_KEY_1 =
-  "test-decryption-key-12345678901234567890123456789012";
+// server/env + prisma-field-encryption require Cloak-serialized keys (see build-test.sh)
+const ciCloakKey =
+  "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c=";
+process.env.DB_ENCRYPTION_KEY = ciCloakKey;
+process.env.DB_DECRYPTION_KEY_1 = ciCloakKey;
 process.env.PLAID_CLIENT_ID = "test-plaid-client-id";
 process.env.PLAID_SECRET = "test-plaid-secret";
 process.env.POSTMARK_SERVER_TOKEN = "test-postmark-token";

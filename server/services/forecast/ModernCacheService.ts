@@ -23,6 +23,13 @@ export type CacheReoccurrence = {
   updatedAt: Date;
   adjustBeforeIfOnWeekend: boolean;
   categoryId?: string | null;
+  amountAdjustmentMode?: "NONE" | "PERCENT" | "FIXED";
+  amountAdjustmentDirection?: "INCREASE" | "DECREASE" | null;
+  amountAdjustmentValue?: number | null;
+  amountAdjustmentIntervalId?: number | null;
+  amountAdjustmentIntervalCount?: number;
+  amountAdjustmentAnchorAt?: Date | null;
+  amountAdjustmentIntervalName?: string | null;
 };
 
 export type CacheAccountRegister = {
@@ -62,6 +69,8 @@ export type CacheAccountRegister = {
   assetStartAt: Date | null;
   paymentCategoryId: string | null;
   interestCategoryId: string | null;
+  /** From account_type.accrues_balance_growth — savings/investment growth accrual */
+  accruesBalanceGrowth: boolean;
 };
 
 export type CacheRegisterEntry = {

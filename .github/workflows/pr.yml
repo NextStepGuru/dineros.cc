@@ -29,6 +29,11 @@ jobs:
       NODE_ENV: test
       CI: true
       TZ: UTC
+      # Minimal values so server/env.ts + Zod validate (required for Prisma + Plaid modules in tests)
+      DEPLOY_ENV: local
+      DB_ENCRYPTION_KEY: "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c="
+      PLAID_CLIENT_ID: "ci-test"
+      PLAID_SECRET: "ci-test-secret"
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5

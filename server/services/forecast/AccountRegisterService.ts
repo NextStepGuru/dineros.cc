@@ -60,7 +60,7 @@ export class AccountRegisterService implements IAccountRegisterService {
       if (!ar.statementAt || ar.isArchived) continue;
       const interestEligible =
         absoluteMoney(ar.balance) > 0.005 &&
-        (ar.targetAccountRegisterId !== null || ar.typeId === 2);
+        (ar.targetAccountRegisterId !== null || ar.accruesBalanceGrowth === true);
       if (!interestEligible) continue;
 
       let st = dateTimeService.toDate(
@@ -498,7 +498,8 @@ export class AccountRegisterService implements IAccountRegisterService {
     this._cachedInterestAccounts = this.cache.accountRegister.find(
       (account) =>
         absoluteMoney(account.balance) > 0.005 &&
-        (account.targetAccountRegisterId !== null || account.typeId === 2),
+        (account.targetAccountRegisterId !== null ||
+          account.accruesBalanceGrowth === true),
     );
     this._cachedExtraPaymentAccounts = this.cache.accountRegister.find({
       allowExtraPayment: true,
@@ -518,7 +519,8 @@ export class AccountRegisterService implements IAccountRegisterService {
     return this.cache.accountRegister.find(
       (account) =>
         absoluteMoney(account.balance) > 0.005 &&
-        (account.targetAccountRegisterId !== null || account.typeId === 2),
+        (account.targetAccountRegisterId !== null ||
+          account.accruesBalanceGrowth === true),
     );
   }
 

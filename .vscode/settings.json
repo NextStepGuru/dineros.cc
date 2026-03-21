@@ -38,5 +38,9 @@
     "**/coverage": true,
     "**/*.log": true,
     "**/output.txt": true
+  },
+  "sonarlint.connectedMode.project": {
+    "connectionId": "nextstepguru",
+    "projectKey": "NextStepGuru_dineros.cc"
   }
 }

@@ -111,6 +111,7 @@ describe("AccountRegisterService", () => {
       assetStartAt: null,
       paymentCategoryId: null,
       interestCategoryId: null,
+      accruesBalanceGrowth: false,
       ...overrides,
     } as CacheAccountRegister;
   }
@@ -741,6 +742,7 @@ describe("AccountRegisterService", () => {
       const savingsAccount = createMockAccount({
         id: 1,
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         targetAccountRegisterId: null,
         balance: 1000,
       });

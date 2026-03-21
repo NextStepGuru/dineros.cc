@@ -27,6 +27,15 @@ function pendingTransactionIdIfPosted(tx: Transaction): string | null {
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
+/** Prefer `merchant_name` / `original_description` over deprecated `name`. */
+function transactionDisplayLabel(tx: Transaction): string {
+  const merchant = tx.merchant_name?.trim();
+  if (merchant) return merchant;
+  const original = tx.original_description?.trim();
+  if (original) return original;
+  return "";
+}
+
 interface SyncResult {
   newTransactions: number;
   matchedTransactions: number;
@@ -62,12 +71,12 @@ class PlaidSyncService {
       formattedAmount = transaction.amount * -1;
     }
 
-    const formattedName = transaction.name;
+    const formattedName = transactionDisplayLabel(transaction);
 
     return {
       id: cuid(),
       plaidId: transaction.transaction_id,
-      plaidJson: JSON.parse(JSON.stringify(transaction)),
+      plaidJson: structuredClone(transaction),
       accountRegisterId: accountRegister.id,
       amount: formattedAmount,
       balance: 0,
@@ -193,7 +202,7 @@ class PlaidSyncService {
         if (matchResult.matchType === "skip") {
           // Transaction already exists, skip it
           log({
-            message: `Skipping existing Plaid transaction: ${transaction.name}`,
+            message: `Skipping existing Plaid transaction: ${transactionDisplayLabel(transaction)}`,
             data: {
               transactionId: transaction.transaction_id,
               accountRegisterId: accountRegister.id,
@@ -215,7 +224,7 @@ class PlaidSyncService {
           matchedCount++;
 
           log({
-            message: `Matched existing transaction: ${transaction.name}`,
+            message: `Matched existing transaction: ${transactionDisplayLabel(transaction)}`,
             data: {
               transactionId: transaction.transaction_id,
               matchType: matchResult.matchType,

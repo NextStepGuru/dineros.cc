@@ -510,6 +510,55 @@ describe("Two-Factor Authentication API Endpoints", () => {
 
       await expect(verifyTwoFactorAuthHandler(mockEvent)).rejects.toThrow();
     });
+
+    it("should verify using a backup code and remove it from settings", async () => {
+      const mockEvent = {};
+      const mockBody = { token: "BACKUP-AAA" };
+      const mockUser = {
+        id: 123,
+        email: "test@example.com",
+        settings: {
+          mfa: {
+            totp: {
+              isEnabled: true,
+              isVerified: false,
+              base32secret: "secret-base32",
+              backupCodes: ["BACKUP-AAA", "BACKUP-BBB"],
+            },
+          },
+          speakeasy: {
+            isEnabled: true,
+            isVerified: false,
+            base32secret: "secret-base32",
+          },
+        },
+      };
+      const mockUpdatedUser = dbUserForSession();
+
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { privateUserSchema } = await import("~/schema/zod");
+      const { sessionUserFromDb } = await import(
+        "~/server/lib/sessionUserProfile"
+      );
+      const otplib = await import("otplib");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      (prisma.user.update as any)
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(mockUpdatedUser);
+
+      const result = await verifyTwoFactorAuthHandler(mockEvent);
+
+      expect(otplib.verify).not.toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalled();
+      expect(result).toEqual(sessionUserFromDb(mockUpdatedUser));
+    });
   });
 
   describe("Cross-endpoint Integration", () => {
