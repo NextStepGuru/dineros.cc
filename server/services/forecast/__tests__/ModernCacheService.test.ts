@@ -58,6 +58,7 @@ describe("ModernCacheService", () => {
       assetStartAt: null,
       paymentCategoryId: null,
       interestCategoryId: null,
+      accruesBalanceGrowth: false,
       ...overrides,
     } as CacheAccountRegister;
   }
@@ -303,7 +304,12 @@ describe("ModernCacheService", () => {
         cache.accountRegister.insertMany([
           createMockAccountRegister({ id: 1, typeId: 1, balance: 1000 }),
           createMockAccountRegister({ id: 2, typeId: 1, balance: 2000 }),
-          createMockAccountRegister({ id: 3, typeId: 2, balance: 3000 }),
+          createMockAccountRegister({
+            id: 3,
+            typeId: 2,
+            balance: 3000,
+            accruesBalanceGrowth: true,
+          }),
         ]);
 
         const updatedCount = cache.accountRegister.updateMany(
@@ -323,7 +329,11 @@ describe("ModernCacheService", () => {
         cache.accountRegister.insertMany([
           createMockAccountRegister({ id: 1, typeId: 1 }),
           createMockAccountRegister({ id: 2, typeId: 1 }),
-          createMockAccountRegister({ id: 3, typeId: 2 }),
+          createMockAccountRegister({
+            id: 3,
+            typeId: 2,
+            accruesBalanceGrowth: true,
+          }),
         ]);
 
         const removedCount = cache.accountRegister.remove({ typeId: 1 });

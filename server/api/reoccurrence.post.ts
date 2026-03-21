@@ -5,6 +5,7 @@ import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { dateTimeService } from "~/server/services/forecast/DateTimeService";
+import { computeFirstNextOccurrenceDate } from "~/server/services/forecast/reoccurrenceIntervals";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -25,6 +26,12 @@ export default defineEventHandler(async (event: H3Event) => {
       endAt,
       splits,
       categoryId,
+      amountAdjustmentMode,
+      amountAdjustmentDirection,
+      amountAdjustmentValue,
+      amountAdjustmentIntervalId,
+      amountAdjustmentIntervalCount,
+      amountAdjustmentAnchorAt,
     } = reoccurrenceWithSplitsSchema.parse(body);
 
     // Can the user create or update a reoccurrence for this account register?
@@ -127,6 +134,41 @@ export default defineEventHandler(async (event: H3Event) => {
           dateTimeService.parseInput(toDateString(endAt)),
         )
       : null;
+    let parsedAdjustmentAnchorAt =
+      amountAdjustmentAnchorAt != null && amountAdjustmentAnchorAt !== ""
+        ? dateTimeService.toDate(
+            dateTimeService.parseInput(toDateString(amountAdjustmentAnchorAt)),
+          )
+        : null;
+
+    const mode = amountAdjustmentMode ?? "NONE";
+    if (mode !== "NONE") {
+      if (amountAdjustmentIntervalId != null) {
+        await PrismaDb.interval.findFirstOrThrow({
+          where: { id: amountAdjustmentIntervalId },
+        });
+      }
+      if (!parsedAdjustmentAnchorAt && parsedLastAt) {
+        const scheduleInterval = await PrismaDb.interval.findUnique({
+          where: { id: intervalId },
+        });
+        const firstNext = computeFirstNextOccurrenceDate({
+          lastAt: parsedLastAt,
+          intervalId,
+          intervalCount,
+          intervalName: scheduleInterval?.name,
+        });
+        parsedAdjustmentAnchorAt = firstNext ?? null;
+      }
+      if (!parsedAdjustmentAnchorAt) {
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            "Amount adjustment requires a last run date or an explicit adjustment anchor date.",
+        });
+      }
+    }
+
     const normalizedSplits = (splits ?? []).map((split, index) => ({
       transferAccountRegisterId: split.transferAccountRegisterId,
       amount: split.amount,
@@ -136,6 +178,25 @@ export default defineEventHandler(async (event: H3Event) => {
     }));
 
     const reoccurrence = await PrismaDb.$transaction(async (prisma) => {
+      const adjustmentFields =
+        mode === "NONE"
+          ? {
+              amountAdjustmentMode: "NONE" as const,
+              amountAdjustmentDirection: null,
+              amountAdjustmentValue: null,
+              amountAdjustmentIntervalId: null,
+              amountAdjustmentIntervalCount: 1,
+              amountAdjustmentAnchorAt: null,
+            }
+          : {
+              amountAdjustmentMode: mode,
+              amountAdjustmentDirection: amountAdjustmentDirection!,
+              amountAdjustmentValue: amountAdjustmentValue!,
+              amountAdjustmentIntervalId: amountAdjustmentIntervalId!,
+              amountAdjustmentIntervalCount: amountAdjustmentIntervalCount ?? 1,
+              amountAdjustmentAnchorAt: parsedAdjustmentAnchorAt,
+            };
+
       const upserted = await prisma.reoccurrence.upsert({
         create: {
           accountId,
@@ -149,6 +210,7 @@ export default defineEventHandler(async (event: H3Event) => {
           lastAt: parsedLastAt,
           endAt: parsedEndAt,
           categoryId: categoryId ?? null,
+          ...adjustmentFields,
         },
         update: {
           accountId,
@@ -162,6 +224,7 @@ export default defineEventHandler(async (event: H3Event) => {
           lastAt: parsedLastAt,
           endAt: parsedEndAt,
           categoryId: categoryId ?? null,
+          ...adjustmentFields,
         },
         where: {
           id,

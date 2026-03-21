@@ -1,14 +1,26 @@
-import { defineVitestConfig } from "@nuxt/test-utils/config";
+import { mergeConfig } from "vite";
+import { defineConfig } from "vitest/config";
+import { defineVitestProject } from "@nuxt/test-utils/config";
+import {
+  vitestNodeTestIncludes,
+  vitestNodeProjectExcludes,
+} from "./vitest.test-globs";
+import { vitestResolveAliases, vitestAliasLayer } from "./vitest.resolve-aliases";
 
-export default defineVitestConfig({
+const nuxtProject = await defineVitestProject({
   test: {
-    // Suppress console output during tests
-    silent: true,
+    name: "nuxt",
+    include: ["tests/nuxt/**/*.test.ts", "**/*.nuxt.{test,spec}.ts"],
+  },
+});
 
-    // Set up global test configuration
+export default defineConfig({
+  resolve: {
+    alias: { ...vitestResolveAliases },
+  },
+  test: {
+    globals: true,
     setupFiles: ["./vitest.setup.ts"],
-
-    // Parallel execution for faster tests
     pool: "forks",
     poolOptions: {
       forks: {
@@ -18,39 +30,24 @@ export default defineVitestConfig({
         isolate: true,
       },
     },
-
-    // Optimize timeouts for faster feedback
-    testTimeout: 10000,
+    testTimeout: 30000,
     hookTimeout: 5000,
-
-    // Optimize for speed
-    globals: true,
-
-    // Environment variables for tests
     env: {
       NODE_ENV: "test",
       LOG_LEVEL: "error",
     },
-
-    // Test patterns to include
-    include: [
-      "server/api/__tests__/**/*.test.ts",
-      "server/services/__tests__/**/*.test.ts",
-      "server/services/forecast/__tests__/**/*.test.ts",
-      "server/lib/__tests__/**/*.test.ts",
-      "lib/__tests__/**/*.test.ts",
-      "pages/__tests__/**/*.test.ts",
-      "tests/**/*.test.ts",
+    silent: true,
+    projects: [
+      mergeConfig(vitestAliasLayer, {
+        test: {
+          name: "node",
+          environment: "node",
+          include: [...vitestNodeTestIncludes],
+          exclude: [...vitestNodeProjectExcludes],
+        },
+      }),
+      mergeConfig(vitestAliasLayer, nuxtProject),
     ],
-
-    // Exclude slow tests from coverage runs
-    exclude: [
-      "server/services/__tests__/HashService.test.ts",
-      "server/services/__tests__/JwtService.test.ts",
-      "server/services/__tests__/RsaService.test.ts",
-    ],
-
-    // Enhanced coverage configuration
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary", "json", "html", "lcov", "cobertura"],
@@ -75,7 +72,6 @@ export default defineVitestConfig({
         "nuxt.config.ts",
         "app.config.ts",
         "eslint.config.mjs",
-        // Exclude all Plaid-related files
         "**/plaid*.{js,ts}",
         "**/*plaid*.{js,ts}",
         "server/api/plaid-*.{js,ts}",
@@ -98,7 +94,6 @@ export default defineVitestConfig({
         "pages/**/*.{js,ts,vue}",
         "components/**/*.{js,ts,vue}",
       ],
-      // Coverage thresholds
       thresholds: {
         global: {
           branches: 70,
@@ -107,7 +102,6 @@ export default defineVitestConfig({
           statements: 80,
         },
       },
-      // Additional coverage options
       all: true,
       clean: true,
       cleanOnRerun: true,

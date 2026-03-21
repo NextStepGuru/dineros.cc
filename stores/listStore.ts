@@ -37,7 +37,10 @@ export const useListStore = defineStore("listStore", {
       const authStore = useAuthStore();
       const registerIds = new Set(
         state.accountRegisters
-          .filter((ar) => ar.budgetId === authStore.getBudgetId)
+          .filter(
+            (ar) =>
+              ar.budgetId === authStore.getBudgetId && ar.isArchived !== true,
+          )
           .map((ar) => ar.id),
       );
       return state.reoccurrences
@@ -56,7 +59,10 @@ export const useListStore = defineStore("listStore", {
       const authStore = useAuthStore();
 
       return state.accountRegisters
-        .filter((item) => item.budgetId === authStore.getBudgetId)
+        .filter(
+          (item) =>
+            item.budgetId === authStore.getBudgetId && item.isArchived !== true,
+        )
         .sort(
           (a, b) =>
             (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0)

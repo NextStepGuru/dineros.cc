@@ -54,6 +54,7 @@ describe("ModernCacheService", () => {
         assetStartAt: null,
         paymentCategoryId: null,
         interestCategoryId: null,
+        accruesBalanceGrowth: false,
       };
 
       cache.accountRegister.insert(account);
@@ -101,6 +102,7 @@ describe("ModernCacheService", () => {
         assetStartAt: null,
         paymentCategoryId: null,
         interestCategoryId: null,
+        accruesBalanceGrowth: false,
       };
 
       cache.accountRegister.insert(account);
@@ -150,6 +152,7 @@ describe("ModernCacheService", () => {
         assetStartAt: null,
         paymentCategoryId: null,
         interestCategoryId: null,
+        accruesBalanceGrowth: false,
       };
 
       cache.accountRegister.insert(account);
@@ -416,6 +419,7 @@ describe("ModernCacheService", () => {
         assetStartAt: null,
         paymentCategoryId: null,
         interestCategoryId: null,
+        accruesBalanceGrowth: false,
       };
 
       const entry: CacheRegisterEntry = {
@@ -490,6 +494,7 @@ describe("ModernCacheService", () => {
         assetStartAt: null,
         paymentCategoryId: null,
         interestCategoryId: null,
+        accruesBalanceGrowth: false,
       };
 
       const entry: CacheRegisterEntry = {

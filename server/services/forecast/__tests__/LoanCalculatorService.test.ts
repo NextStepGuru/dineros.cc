@@ -62,6 +62,7 @@ describe("LoanCalculatorService", () => {
       assetStartAt: null,
       paymentCategoryId: null,
       interestCategoryId: null,
+      accruesBalanceGrowth: false,
       ...overrides,
     } as CacheAccountRegister;
   }
@@ -310,6 +311,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
@@ -329,6 +331,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,
@@ -352,6 +355,7 @@ describe("LoanCalculatorService", () => {
         apr2: null,
         apr3: null,
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         statementAt: dt("2024-01-15").toDate(),
         apr2StartAt: null,
         apr3StartAt: null,

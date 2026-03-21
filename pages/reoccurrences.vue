@@ -55,6 +55,9 @@ function handleTableClick(data: Reoccurrence) {
       endAt: data.endAt
         ? new Date(data.endAt).toISOString().substring(0, 10)
         : undefined,
+      amountAdjustmentAnchorAt: data.amountAdjustmentAnchorAt
+        ? new Date(data.amountAdjustmentAnchorAt).toISOString().substring(0, 10)
+        : undefined,
     },
     callback: (data: Reoccurrence) => {
       listStore.patchReoccurrence(data);
@@ -96,6 +99,12 @@ function handleAddReoccurrence() {
       adjustBeforeIfOnWeekend: false,
       categoryId: null,
       splits: [],
+      amountAdjustmentMode: "NONE",
+      amountAdjustmentDirection: null,
+      amountAdjustmentValue: null,
+      amountAdjustmentIntervalId: null,
+      amountAdjustmentIntervalCount: 1,
+      amountAdjustmentAnchorAt: undefined,
     },
   };
   const modal = overlay.create(ModalsEditReoccurrence);

@@ -779,7 +779,7 @@ function handleAddAccountRegister() {
       latestBalance: 0,
       minPayment: null,
       statementAt: today.value,
-      statementIntervalId: 0,
+      statementIntervalId: 3,
       apr1: null,
       apr1StartAt: null,
       apr2: null,

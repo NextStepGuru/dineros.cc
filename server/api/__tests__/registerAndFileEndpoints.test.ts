@@ -8,8 +8,8 @@ vi.hoisted(() => {
 });
 
 // Make H3 functions globally available
-(global as any).getQuery = vi.fn();
-(global as any).readMultipartFormData = vi.fn();
+(globalThis as any).getQuery = vi.fn();
+(globalThis as any).readMultipartFormData = vi.fn();
 
 // Mock H3/Nuxt utilities before any imports
 vi.mock("h3", () => ({
@@ -78,8 +78,8 @@ describe("Register and File Upload API Endpoints", () => {
     vi.clearAllMocks();
 
     // Properly set up the global mock functions
-    (global as any).getQuery = vi.fn();
-    (global as any).readMultipartFormData = vi.fn();
+    (globalThis as any).getQuery = vi.fn();
+    (globalThis as any).readMultipartFormData = vi.fn();
   });
 
   describe("GET /api/register", () => {
@@ -409,13 +409,14 @@ describe("Register and File Upload API Endpoints", () => {
       expect(result.entries.length).toBeGreaterThan(500);
       expect(
         result.entries.some(
-          (e: { id?: string }) => e.id === "loan" || e.description?.includes("RV"),
+          (e: { id?: string; description?: string | null }) =>
+            e.id === "loan" || e.description?.includes("RV"),
         ),
       ).toBe(true);
       expect(result.hasMore).toBe(false);
     });
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should successfully return register entries in quick mode",
       async () => {
         const mockEvent = {};
@@ -457,7 +458,7 @@ describe("Register and File Upload API Endpoints", () => {
         const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
 
         (getQuery as any).mockReturnValue(mockQuery);
-        (global as any).getQuery.mockReturnValue(mockQuery);
+        (globalThis as any).getQuery.mockReturnValue(mockQuery);
         (getUser as any).mockReturnValue({ userId: 123 });
         (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
           mockAccountRegister,
@@ -533,7 +534,7 @@ describe("Register and File Upload API Endpoints", () => {
       }
     );
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should handle past direction with correct filter conditions",
       async () => {
         const mockEvent = {};
@@ -560,7 +561,7 @@ describe("Register and File Upload API Endpoints", () => {
         const { prisma } = await import("~/server/clients/prismaClient");
 
         (getQuery as any).mockReturnValue(mockQuery);
-        (global as any).getQuery.mockReturnValue(mockQuery);
+        (globalThis as any).getQuery.mockReturnValue(mockQuery);
         (getUser as any).mockReturnValue({ userId: 123 });
         (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
           mockAccountRegister,
@@ -580,9 +581,10 @@ describe("Register and File Upload API Endpoints", () => {
         await registerHandler(mockEvent);
 
         const peerLoanCalls = (prisma.accountRegister.findMany as any).mock.calls.filter(
-          (call: unknown[]) =>
-            call[0]?.where &&
-            "targetAccountRegisterId" in (call[0].where as object),
+          (call: unknown[]) => {
+            const arg = call[0] as { where?: Record<string, unknown> } | undefined;
+            return arg?.where && "targetAccountRegisterId" in arg.where;
+          },
         );
         expect(peerLoanCalls.length).toBe(0);
 
@@ -672,7 +674,7 @@ describe("Register and File Upload API Endpoints", () => {
       uploadFileHandler = module.default;
     });
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should successfully process CSV file upload",
       async () => {
         const mockEvent = {};
@@ -760,7 +762,7 @@ describe("Register and File Upload API Endpoints", () => {
       }
     );
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should handle missing form data",
       async () => {
         const mockEvent = {};
@@ -777,7 +779,7 @@ describe("Register and File Upload API Endpoints", () => {
       }
     );
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should handle invalid CSV data",
       async () => {
         const mockEvent = {};
@@ -815,7 +817,7 @@ describe("Register and File Upload API Endpoints", () => {
       }
     );
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should handle unauthorized account register access",
       async () => {
         const mockEvent = {};
@@ -856,7 +858,7 @@ describe("Register and File Upload API Endpoints", () => {
       }
     );
 
-    it.runIf(process.env.RUN_EDGE_CASE_TESTS === "true")(
+    it(
       "should handle schema validation errors",
       async () => {
         const mockEvent = {};

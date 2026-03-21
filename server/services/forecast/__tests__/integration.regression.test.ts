@@ -1,4 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
+import type { Prisma } from "@prisma/client";
 import { dateTimeService } from "../DateTimeService";
 import { Decimal } from "~/types/test-types";
 import { ForecastEngineFactory } from "../index";
@@ -181,10 +182,8 @@ describe("Integration Regression Tests", () => {
       }
 
       // Bug #2: Interest should be calculated exactly once per month
-      const interestEntries = gmEntries.filter(
-        (entry: any) =>
-          entry.description &&
-          entry.description.toLowerCase().includes("interest")
+      const interestEntries = gmEntries.filter((entry: any) =>
+        entry.description?.toLowerCase().includes("interest")
       );
       expect(interestEntries.length).toBeGreaterThanOrEqual(3);
       expect(interestEntries.length).toBeLessThanOrEqual(4);
@@ -193,7 +192,7 @@ describe("Integration Regression Tests", () => {
         .map((entry: any) =>
           dateTimeService.format("YYYY-MM-DD", new Date(entry.createdAt))
         )
-        .sort();
+        .sort((a: string, b: string) => a.localeCompare(b));
       for (let i = 1; i < interestDates.length; i++) {
         const current = dateTimeService.create(interestDates[i]);
         const previous = dateTimeService.create(interestDates[i - 1]);
@@ -390,10 +389,13 @@ describe("Integration Regression Tests", () => {
       mockPrisma.registerEntry.deleteMany.mockResolvedValue({});
 
       const allCreatedEntries: any[] = [];
-      mockPrisma.registerEntry.createMany.mockImplementation((data) => {
-        allCreatedEntries.push(...data.data);
-        return Promise.resolve({});
-      });
+      mockPrisma.registerEntry.createMany.mockImplementation(
+        (data: Prisma.RegisterEntryCreateManyArgs) => {
+          const rows = Array.isArray(data.data) ? data.data : [data.data];
+          allCreatedEntries.push(...rows);
+          return Promise.resolve({});
+        }
+      );
 
       // Act: Run comprehensive 6-month forecast
       const result = await engine.recalculate({
@@ -411,8 +413,8 @@ describe("Integration Regression Tests", () => {
       for (const entry of allCreatedEntries) {
         expect(typeof entry.balance).toBe("number");
         expect(typeof entry.amount).toBe("number");
-        expect(isFinite(entry.balance)).toBe(true);
-        expect(isFinite(entry.amount)).toBe(true);
+        expect(Number.isFinite(entry.balance)).toBe(true);
+        expect(Number.isFinite(entry.amount)).toBe(true);
         // No string concatenation artifacts
         expect(entry.balance.toString()).not.toMatch(/\d+\.\d+\d+\.\d+/);
       }
@@ -422,16 +424,15 @@ describe("Integration Regression Tests", () => {
         const accountEntries = allCreatedEntries.filter(
           (e) => e.accountRegisterId === account.id
         );
-        const interestEntries = accountEntries.filter(
-          (e) =>
-            e.description && e.description.toLowerCase().includes("interest")
+        const interestEntries = accountEntries.filter((e) =>
+          e.description?.toLowerCase().includes("interest")
         );
 
         if (interestEntries.length > 1) {
           // Check no consecutive day interest processing
           const dates = interestEntries
             .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
-            .sort();
+            .sort((a: string, b: string) => a.localeCompare(b));
           for (let i = 1; i < dates.length; i++) {
             const daysDiff = dt(dates[i]).diff(
               dt(dates[i - 1]),
@@ -459,14 +460,17 @@ describe("Integration Regression Tests", () => {
       if (monthlyRecurrenceEntries.length >= 7) {
         const monthlyDates = monthlyRecurrenceEntries
           .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
-          .sort();
+          .sort((a: string, b: string) => a.localeCompare(b));
         expect(monthlyDates).toEqual([
           "2025-01-01", "2025-02-01", "2025-03-01", "2025-04-01",
           "2025-05-01", "2025-06-01", "2025-07-01",
         ]);
       }
 
-      const resultEntries = result.registerEntries || [];
+      const resultEntries = (result.registerEntries || []) as Array<{
+        accountRegisterId: number;
+        createdAt: Date | string | number;
+      }>;
 
       // Each account should have entries throughout the timeline
       for (const account of accounts) {
@@ -565,10 +569,13 @@ describe("Integration Regression Tests", () => {
       mockPrisma.registerEntry.deleteMany.mockResolvedValue({});
 
       const allCreatedEntries: any[] = [];
-      mockPrisma.registerEntry.createMany.mockImplementation((data) => {
-        allCreatedEntries.push(...data.data);
-        return Promise.resolve({});
-      });
+      mockPrisma.registerEntry.createMany.mockImplementation(
+        (data: Prisma.RegisterEntryCreateManyArgs) => {
+          const rows = Array.isArray(data.data) ? data.data : [data.data];
+          allCreatedEntries.push(...rows);
+          return Promise.resolve({});
+        }
+      );
 
       // Act: Process through month-end and leap year boundary
       const result = await engine.recalculate({
@@ -586,16 +593,25 @@ describe("Integration Regression Tests", () => {
       for (const entry of allCreatedEntries) {
         expect(typeof entry.balance).toBe("number");
         expect(typeof entry.amount).toBe("number");
-        expect(isFinite(entry.balance)).toBe(true);
-        expect(isFinite(entry.amount)).toBe(true);
+        expect(Number.isFinite(entry.balance)).toBe(true);
+        expect(Number.isFinite(entry.amount)).toBe(true);
       }
 
-      // Daily interest should not create consecutive duplicates
+      // Daily interest should not create consecutive duplicates (monthly cadence)
       const interestEntries = allCreatedEntries.filter(
         (entry) =>
-          entry.description &&
-          entry.description.toLowerCase().includes("interest")
+          entry.accountRegisterId === edgeCaseAccount.id &&
+          entry.description?.toLowerCase().includes("interest")
       );
+      if (interestEntries.length > 1) {
+        const dates = interestEntries
+          .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
+          .sort((a: string, b: string) => a.localeCompare(b));
+        for (let i = 1; i < dates.length; i++) {
+          const daysDiff = dt(dates[i]).diff(dt(dates[i - 1]), "days");
+          expect(daysDiff).toBeGreaterThan(25);
+        }
+      }
 
       // Basic validation that the test ran successfully
       expect(allCreatedEntries.length).toBeGreaterThan(0);
@@ -638,6 +654,7 @@ describe("Integration Regression Tests", () => {
         allowExtraPayment: false,
         isArchived: false,
         plaidId: null,
+        type: { accruesBalanceGrowth: true },
       };
 
       mockPrisma.accountRegister.findMany.mockResolvedValue([longTermAccount]);
@@ -662,10 +679,8 @@ describe("Integration Regression Tests", () => {
       const allEntries = (result.registerEntries || []).filter(
         (e: any) => e.accountRegisterId === accountId
       );
-      const interestEntries = allEntries.filter(
-        (entry: any) =>
-          entry.description &&
-          entry.description.toLowerCase().includes("interest")
+      const interestEntries = allEntries.filter((entry: any) =>
+        entry.description?.toLowerCase().includes("interest")
       );
       expect(interestEntries.length).toBeGreaterThanOrEqual(48);
       expect(interestEntries.length).toBeLessThanOrEqual(65);

@@ -25,17 +25,25 @@ class HashService {
 
     // Optional: set LOGIN_DEBUG=1 to log hash shape (no secrets) for debugging verify failures.
     if (process.env.LOGIN_DEBUG === "1") {
-      const rawCharCodes = [...hashedString.slice(0, 30)].map((c) =>
-        c.charCodeAt(0),
+      const rawCharCodes = Array.from(hashedString.slice(0, 30), (c) =>
+        c.codePointAt(0) ?? 0,
       );
       const decodedHex =
-        typeof Buffer !== "undefined"
-          ? Buffer.from(decoded, "latin1").toString("hex").slice(0, 60)
-          : "[no Buffer]";
+        typeof Buffer === "undefined"
+          ? "[no Buffer]"
+          : Buffer.from(decoded, "latin1").toString("hex").slice(0, 60);
       const looksLikePlaintext =
         hashedString.length < 50 &&
         /^[\x20-\x7e]+$/.test(hashedString) &&
         !decoded.startsWith("$argon2");
+      let hint: string | undefined;
+      if (looksLikePlaintext) {
+        hint =
+          "DB has plaintext password, not a hash. Re-set password via app (forgot-password or change-password) so it is hashed.";
+      } else if (hashedString.length < 50) {
+        hint =
+          "Decrypted password from DB is very short → likely wrong DB_ENCRYPTION_KEY in this process";
+      }
       log({
         message: "[LOGIN][DEBUG] HashService.verify",
         level: "info",
@@ -49,11 +57,7 @@ class HashService {
           inputLen: inputString.length,
           looksLikeArgon2: decoded.startsWith("$argon2"),
           looksLikePlaintext,
-          hint: looksLikePlaintext
-            ? "DB has plaintext password, not a hash. Re-set password via app (forgot-password or change-password) so it is hashed."
-            : hashedString.length < 50
-              ? "Decrypted password from DB is very short → likely wrong DB_ENCRYPTION_KEY in this process"
-              : undefined,
+          hint,
         },
       });
     }

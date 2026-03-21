@@ -32,6 +32,9 @@ const isSaving = ref(false);
 const isDeleting = ref(false);
 const formState = reactive<Partial<Schema>>({
   ...props.reoccurrence,
+  amountAdjustmentMode: props.reoccurrence.amountAdjustmentMode ?? "NONE",
+  amountAdjustmentIntervalCount:
+    props.reoccurrence.amountAdjustmentIntervalCount ?? 1,
 });
 const splitsRef = ref<NonNullable<Schema["splits"]>>(
   (props.reoccurrence.splits ?? []).map((s) => ({
@@ -91,6 +94,20 @@ function syncFormStateFromProps() {
     categoryId:
       split.categoryId === undefined ? null : split.categoryId,
   }));
+
+  formState.amountAdjustmentMode =
+    props.reoccurrence.amountAdjustmentMode ?? "NONE";
+  formState.amountAdjustmentDirection =
+    props.reoccurrence.amountAdjustmentDirection ?? null;
+  formState.amountAdjustmentValue =
+    props.reoccurrence.amountAdjustmentValue ?? null;
+  formState.amountAdjustmentIntervalId =
+    props.reoccurrence.amountAdjustmentIntervalId ?? null;
+  formState.amountAdjustmentIntervalCount =
+    props.reoccurrence.amountAdjustmentIntervalCount ?? 1;
+  formState.amountAdjustmentAnchorAt = formatDate(
+    props.reoccurrence.amountAdjustmentAnchorAt,
+  );
 
   isExternal.value = !props.reoccurrence.transferAccountRegisterId;
 }
@@ -299,6 +316,45 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
           label-key="label"
           :filter-fields="['label', 'name']"
           placeholder="None")
+
+      .space-y-3.border.border-gray-700.rounded-lg.p-3
+        UFormField(label="Amount adjustment" hint="independent of payment frequency" name="amountAdjustmentMode")
+          USelect(
+            v-model="formState.amountAdjustmentMode"
+            class="w-full"
+            :items="[{ id: 'NONE', name: 'None' }, { id: 'PERCENT', name: 'Percent' }, { id: 'FIXED', name: 'Fixed amount' }]"
+            valueKey="id"
+            labelKey="name")
+        template(v-if="formState.amountAdjustmentMode && formState.amountAdjustmentMode !== 'NONE'")
+          .flex.flex-wrap.gap-4
+            UFormField(label="Direction" name="amountAdjustmentDirection")
+              USelect(
+                v-model="formState.amountAdjustmentDirection"
+                class="w-full min-w-40"
+                :items="[{ id: 'INCREASE', name: 'Increase' }, { id: 'DECREASE', name: 'Decrease' }]"
+                valueKey="id"
+                labelKey="name")
+            UFormField(
+              label="Value"
+              name="amountAdjustmentValue"
+              :hint="formState.amountAdjustmentMode === 'PERCENT' ? 'Percent per adjustment period (compounded)' : 'Dollars added per adjustment period'")
+                UInputNumber(
+                  v-model="formState.amountAdjustmentValue"
+                  :step="formState.amountAdjustmentMode === 'PERCENT' ? 0.1 : 0.01"
+                  class="w-full min-w-32")
+          .flex.space-x-4
+            UFormField(label="Count" name="amountAdjustmentIntervalCount")
+              UInput(v-model="formState.amountAdjustmentIntervalCount" class="w-24")
+            UFormField(label="Adjustment interval" name="amountAdjustmentIntervalId" class="flex-1")
+              USelect(
+                v-model="formState.amountAdjustmentIntervalId"
+                placeholder="Select an Interval"
+                class="w-full"
+                :items="listStore.getIntervals.map(i => ({ id: i.id, name: i.name }))"
+                valueKey="id"
+                labelKey="name")
+          UFormField(label="Adjustment anchor" hint="optional; leave empty to use first projected occurrence. Update if you change Last run at." name="amountAdjustmentAnchorAt")
+            UInput(v-model="formState.amountAdjustmentAnchorAt" type="date" class="w-full")
 
       .flex(class="md:flex-row flex-col md:space-x-4 max-sm:space-y-4")
         UFormField(label="Amount to Debit" name="amount")

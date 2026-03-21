@@ -80,6 +80,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "Interval",
  *       "isList": false
  *     },
+ *     "amountAdjustmentInterval": {
+ *       "modelName": "Interval",
+ *       "isList": false
+ *     },
  *     "category": {
  *       "modelName": "Category",
  *       "isList": false

@@ -73,6 +73,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -103,6 +104,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 50,
         name: "Pending",
+        merchant_name: "Pending",
         date: "2024-01-01",
         pending: true,
       } as Transaction;
@@ -130,6 +132,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -162,6 +165,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -197,6 +201,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -239,6 +244,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -287,6 +293,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 
@@ -335,6 +342,7 @@ describe("PlaidSyncService", () => {
         transaction_id: "test-id",
         amount: 100,
         name: "Test Transaction",
+        merchant_name: "Test Transaction",
         date: "2024-01-01",
       } as Transaction;
 

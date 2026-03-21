@@ -20,7 +20,7 @@ export async function loggedChatCompletion(params: {
 
   try {
     const response = await client.chat.completions.create(body);
-    const durationMs = dateTimeService.now() - start;
+    const durationMs = dateTimeService.now().valueOf() - start.valueOf();
     const usage = response.usage;
     let cachedPromptTokens: number | null = null;
     if (
@@ -73,7 +73,7 @@ export async function loggedChatCompletion(params: {
 
     return response;
   } catch (err: unknown) {
-    const durationMs = dateTimeService.now() - start;
+    const durationMs = dateTimeService.now().valueOf() - start.valueOf();
     const message =
       err instanceof Error
         ? err.message

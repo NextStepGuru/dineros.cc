@@ -8,12 +8,21 @@ import { loggedChatCompletion } from "~/server/services/OpenAiCompletionLogger";
 
 const enrichmentResponseSchema = z.object({
   displayName: z.string(),
-  categoryId: z.string().uuid().nullable(),
+  categoryId: z.uuid().nullable(),
 });
 
 const MAX_DESC = 1500;
 
-function buildCategoryPaths(categories: Category[]): Map<string, string> {
+/** Prefer `merchant_name` / `original_description` over deprecated `name`. */
+export function transactionDisplayLabel(tx: Transaction): string {
+  const merchant = tx.merchant_name?.trim();
+  if (merchant) return merchant;
+  const original = tx.original_description?.trim();
+  if (original) return original;
+  return "";
+}
+
+export function buildCategoryPaths(categories: Category[]): Map<string, string> {
   const byId = new Map(categories.map((c) => [c.id, c]));
   function pathFor(id: string): string {
     const parts: string[] = [];
@@ -54,7 +63,7 @@ class PlaidTransactionEnrichmentService {
     context: PlaidEnrichmentMetadata;
   }): Promise<{ description: string; categoryId: string | null }> {
     const { transaction, accountId, context } = params;
-    const fallbackName = transaction.name ?? "Transaction";
+    const fallbackName = transactionDisplayLabel(transaction) || "Transaction";
 
     const client = getOpenAIClient();
     if (!client || !env?.OPENAI_API_KEY?.trim()) {
@@ -84,12 +93,18 @@ class PlaidTransactionEnrichmentService {
     const allowedIds = new Set(categories.map((c) => c.id));
 
     const payload: Record<string, unknown> = {
-      name: transaction.name,
       amount: transaction.amount,
       date: transaction.date,
     };
+    const label = transactionDisplayLabel(transaction);
+    if (label) {
+      payload.display_label = label;
+    }
     if (transaction.merchant_name) {
       payload.merchant_name = transaction.merchant_name;
+    }
+    if (transaction.original_description) {
+      payload.original_description = transaction.original_description;
     }
     if (transaction.personal_finance_category) {
       payload.personal_finance_category = transaction.personal_finance_category;

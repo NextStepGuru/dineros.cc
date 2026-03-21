@@ -18,6 +18,7 @@ export type AccountType = {
   name: string;
   type: string;
   isCredit: boolean;
+  accruesBalanceGrowth: boolean;
 };
 
 export type ReoccurrenceBase = z.infer<typeof reoccurrenceSchema>;

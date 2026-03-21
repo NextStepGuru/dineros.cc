@@ -329,6 +329,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         statementAt: dt("2025-01-15").toDate(),
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         name: "Interest Timeline Test",
         budgetId: 1,
         accountId: "test",
@@ -405,6 +406,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         statementAt: dt("2027-05-21").toDate(), // From screenshot
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         name: "Slides & Solar savings fund",
         budgetId: 1,
         accountId: "test",
@@ -462,6 +464,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         statementAt: dt("2025-02-01").toDate(),
         statementIntervalId: 3, // Monthly
         typeId: 2, // Savings account
+        accruesBalanceGrowth: true,
         name: "Integration Test Account",
         budgetId: 1,
         accountId: "test-integration",
@@ -542,6 +545,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         statementAt: dt("2025-03-09 12:00:00").toDate(), // DST transition weekend
         statementIntervalId: 3,
         typeId: 2,
+        accruesBalanceGrowth: true,
         name: "DST Test Account",
         budgetId: 1,
         accountId: "test",
@@ -609,6 +613,7 @@ describe("Double Interest Calculation Regression Tests", () => {
         statementAt: dt("2025-01-31").toDate(), // End of month
         statementIntervalId: 3,
         typeId: 2,
+        accruesBalanceGrowth: true,
         name: "Month End Test",
         budgetId: 1,
         accountId: "test",

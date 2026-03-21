@@ -208,6 +208,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
         balance: "5432.10" as any, // String balance
         name: "String Balance Account",
         typeId: 2,
+        accruesBalanceGrowth: true,
         budgetId: 1,
         accountId: "string-balance",
         latestBalance: 0,
@@ -401,6 +402,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
         latestBalance: "7890.12" as any,
         name: "String Decimal Mix",
         typeId: 2,
+        accruesBalanceGrowth: true,
         budgetId: 1,
         accountId: "string-decimal-mix",
         minPayment: null,

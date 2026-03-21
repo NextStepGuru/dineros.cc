@@ -255,7 +255,16 @@ export const accountRegisterSchema = z.object({
   latestBalance: z.coerce.number().default(0),
   minPayment: z.coerce.number().nullable().default(null),
   statementAt: z.coerce.date().default(() => new Date()),
-  statementIntervalId: z.coerce.number().nullable().default(null),
+  // Must reference interval.id (1+); 0/null from forms would violate FK — default matches Prisma @default(3)
+  statementIntervalId: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") return 3;
+      const n = typeof val === "number" ? val : Number(val);
+      if (!Number.isFinite(n) || n < 1) return 3;
+      return n;
+    },
+    z.number().int().min(1),
+  ),
   apr1: z.coerce.number().nullable().default(null),
   apr1StartAt: z.coerce.date().nullable().default(null),
   apr2: z.coerce.number().nullable().default(null),
@@ -285,27 +294,72 @@ export const accountRegisterSchema = z.object({
   interestCategoryId: z.string().uuid().nullable().optional(),
 });
 
-export const reoccurrenceSchema = z.object({
-  id: z.number().default(0),
-  accountId: z.string().min(1),
-  accountRegisterId: z.coerce.number().min(1).default(0),
-  intervalId: z.coerce.number().min(1).default(0),
-  transferAccountRegisterId: z.coerce.number().optional(),
-  intervalCount: z.coerce.number().min(1).default(0),
-  adjustBeforeIfOnWeekend: z.boolean().default(false),
-  categoryId: z.string().uuid().nullable().optional(),
-  endAt: z.union([
-    z.string(),
-    z.date().transform((d) => d.toISOString()),
-    z.undefined().transform(() => undefined),
-    z.null().transform(() => undefined),
-  ]),
-  lastAt: z.union([z.string(), z.date().transform((d) => d.toISOString())]),
-  amount: z.coerce.number(),
-  description: z
-    .string()
-    .min(3, "Description must be at least 3 characters long"),
-});
+const amountAdjustmentModeSchema = z.enum(["NONE", "PERCENT", "FIXED"]);
+const amountAdjustmentDirectionSchema = z.enum(["INCREASE", "DECREASE"]);
+
+export const reoccurrenceSchema = z
+  .object({
+    id: z.number().default(0),
+    accountId: z.string().min(1),
+    accountRegisterId: z.coerce.number().min(1).default(0),
+    intervalId: z.coerce.number().min(1).default(0),
+    transferAccountRegisterId: z.coerce.number().optional(),
+    intervalCount: z.coerce.number().min(1).default(0),
+    adjustBeforeIfOnWeekend: z.boolean().default(false),
+    categoryId: z.string().uuid().nullable().optional(),
+    endAt: z.union([
+      z.string(),
+      z.date().transform((d) => d.toISOString()),
+      z.undefined().transform(() => undefined),
+      z.null().transform(() => undefined),
+    ]),
+    lastAt: z.union([z.string(), z.date().transform((d) => d.toISOString())]),
+    amount: z.coerce.number(),
+    description: z
+      .string()
+      .min(3, "Description must be at least 3 characters long"),
+    amountAdjustmentMode: amountAdjustmentModeSchema.default("NONE"),
+    amountAdjustmentDirection: amountAdjustmentDirectionSchema
+      .optional()
+      .nullable(),
+    amountAdjustmentValue: z.coerce.number().nullable().optional(),
+    amountAdjustmentIntervalId: z.coerce.number().nullable().optional(),
+    amountAdjustmentIntervalCount: z.coerce.number().min(1).default(1),
+    amountAdjustmentAnchorAt: z
+      .union([
+        z.string(),
+        z.date().transform((d) => d.toISOString()),
+        z.undefined().transform(() => undefined),
+        z.null().transform(() => undefined),
+      ])
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.amountAdjustmentMode === "NONE") {
+      return;
+    }
+    if (data.amountAdjustmentDirection == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Adjustment direction is required when an adjustment is enabled.",
+        path: ["amountAdjustmentDirection"],
+      });
+    }
+    if (data.amountAdjustmentValue == null || data.amountAdjustmentValue <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Adjustment value must be greater than zero.",
+        path: ["amountAdjustmentValue"],
+      });
+    }
+    if (data.amountAdjustmentIntervalId == null || data.amountAdjustmentIntervalId < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Adjustment interval is required when an adjustment is enabled.",
+        path: ["amountAdjustmentIntervalId"],
+      });
+    }
+  });
 
 export const reoccurrenceSplitSchema = z.object({
   id: z.coerce.number().optional(),

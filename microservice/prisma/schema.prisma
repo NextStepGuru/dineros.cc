@@ -7,6 +7,17 @@ datasource db {
   provider = "mysql"
 }
 
+enum AmountAdjustmentMode {
+  NONE
+  PERCENT
+  FIXED
+}
+
+enum AmountAdjustmentDirection {
+  INCREASE
+  DECREASE
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -352,11 +363,18 @@ model Reoccurrence {
   amount                    Decimal   @db.Decimal(19, 2)
   description               String    @db.VarChar(1500) /// @encrypted
   categoryId                String?   @map("category_id")
+  amountAdjustmentMode               AmountAdjustmentMode   @default(NONE) @map("amount_adjustment_mode")
+  amountAdjustmentDirection          AmountAdjustmentDirection? @map("amount_adjustment_direction")
+  amountAdjustmentValue              Decimal?                 @map("amount_adjustment_value") @db.Decimal(19, 6)
+  amountAdjustmentIntervalId         Int?                     @map("amount_adjustment_interval_id") @db.UnsignedInt
+  amountAdjustmentIntervalCount      Int                      @default(1) @map("amount_adjustment_interval_count") @db.UnsignedInt
+  amountAdjustmentAnchorAt           DateTime?                @map("amount_adjustment_anchor_at")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   account          Account                      @relation(fields: [accountId], references: [id])
   register         AccountRegister              @relation(fields: [accountRegisterId], references: [id])
-  interval         Interval                     @relation(fields: [intervalId], references: [id])
+  interval         Interval                     @relation("ReoccurrenceScheduleInterval", fields: [intervalId], references: [id])
+  amountAdjustmentInterval Interval?            @relation("ReoccurrenceAmountAdjustmentInterval", fields: [amountAdjustmentIntervalId], references: [id])
   category         Category?                    @relation(fields: [categoryId], references: [id])
   entries          RegisterEntry[]
   skips            ReoccurrenceSkip[]
@@ -415,11 +433,12 @@ model ReoccurrenceSkip {
 }
 
 model AccountType {
-  id        Int      @id @default(autoincrement()) @db.UnsignedInt
-  type      String
-  name      String
-  isCredit  Boolean  @default(false) @map("is_credit")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  id                   Int      @id @default(autoincrement()) @db.UnsignedInt
+  type                 String
+  name                 String
+  isCredit             Boolean  @default(false) @map("is_credit")
+  accruesBalanceGrowth Boolean  @default(false) @map("accrues_balance_growth")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
 
   registers AccountRegister[]
 
@@ -432,7 +451,8 @@ model Interval {
   name      String
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  reoccurrences   Reoccurrence[]
+  reoccurrenceSchedules          Reoccurrence[]    @relation("ReoccurrenceScheduleInterval")
+  reoccurrenceAmountAdjustments  Reoccurrence[]    @relation("ReoccurrenceAmountAdjustmentInterval")
   AccountRegister AccountRegister[]
 
   @@map("interval")

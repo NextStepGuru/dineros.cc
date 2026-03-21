@@ -103,12 +103,20 @@ export class DataLoaderService implements IDataLoaderService {
         assetStartAt: true,
         paymentCategoryId: true,
         interestCategoryId: true,
+        type: {
+          select: {
+            accruesBalanceGrowth: true,
+          },
+        },
       },
     });
 
     const lokiAccountRegisters: CacheAccountRegister[] = accountRegisters.map(
-      (reg) => ({
-        ...reg,
+      (reg) => {
+        const { type, ...regFields } = reg;
+        return {
+        ...regFields,
+        accruesBalanceGrowth: type?.accruesBalanceGrowth ?? false,
         balance: Number(reg.latestBalance),
         latestBalance: Number(reg.latestBalance),
         minPayment: reg.minPayment ? Number(reg.minPayment) : null,
@@ -141,7 +149,8 @@ export class DataLoaderService implements IDataLoaderService {
           : null,
         paymentCategoryId: reg.paymentCategoryId ?? null,
         interestCategoryId: reg.interestCategoryId ?? null,
-      }),
+      };
+      },
     );
 
     // Load into cache
@@ -185,18 +194,27 @@ export class DataLoaderService implements IDataLoaderService {
   private async loadReoccurrences(accountId?: string) {
     const reoccurrences = await this.db.reoccurrence.findMany({
       where: { accountId },
-      include: { interval: { select: { name: true } } },
+      include: {
+        interval: { select: { name: true } },
+        amountAdjustmentInterval: { select: { name: true } },
+      },
     });
 
     // Load into cache
     reoccurrences.forEach((item) => {
-      const { interval, ...rest } = item;
+      const { interval, amountAdjustmentInterval, ...rest } = item;
       this.cache.reoccurrence.insert({
         ...rest,
         amount: Number(item.amount),
+        amountAdjustmentValue:
+          item.amountAdjustmentValue != null
+            ? Number(item.amountAdjustmentValue)
+            : null,
         lastAt: item.lastAt,
         endAt: item.endAt ? item.endAt : null,
         intervalName: interval?.name ?? undefined,
+        amountAdjustmentIntervalName:
+          amountAdjustmentInterval?.name ?? undefined,
       });
     });
 

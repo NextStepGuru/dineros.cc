@@ -115,6 +115,7 @@ describe("ForecastEngine Integration Tests", () => {
           isArchived: false,
           typeId: 1,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
         {
           id: 2,
@@ -140,8 +141,9 @@ describe("ForecastEngine Integration Tests", () => {
           minAccountBalance: null,
           allowExtraPayment: false,
           isArchived: false,
-          typeId: 2,
+          typeId: 4,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
       ]);
     });
@@ -549,6 +551,7 @@ describe("ForecastEngine Integration Tests", () => {
           isArchived: false,
           typeId: 1,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
         {
           id: 2,
@@ -579,6 +582,7 @@ describe("ForecastEngine Integration Tests", () => {
           isArchived: false,
           typeId: 5,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
       ]);
     });
@@ -658,6 +662,7 @@ describe("ForecastEngine Integration Tests", () => {
           loanPaymentSortOrder: 1,
           isArchived: false,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
         {
           id: 2,
@@ -665,7 +670,7 @@ describe("ForecastEngine Integration Tests", () => {
           balance: -2000, // Debt to pay down
           minPayment: 50,
           targetAccountRegisterId: null,
-          typeId: 2,
+          typeId: 4,
           accountId: "test-account-123",
           budgetId: 1,
           latestBalance: -2000,
@@ -685,6 +690,7 @@ describe("ForecastEngine Integration Tests", () => {
           allowExtraPayment: false,
           isArchived: false,
           plaidId: null,
+          type: { accruesBalanceGrowth: false },
         },
       ]);
 
