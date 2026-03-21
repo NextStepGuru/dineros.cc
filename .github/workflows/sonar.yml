@@ -11,6 +11,10 @@ jobs:
             NODE_ENV: test
             CI: true
             TZ: UTC
+            DEPLOY_ENV: local
+            DB_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+            PLAID_CLIENT_ID: "ci-test"
+            PLAID_SECRET: "ci-test-secret"
         steps:
             - uses: actions/checkout@v6
               with:
