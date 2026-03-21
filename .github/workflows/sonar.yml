@@ -12,7 +12,7 @@ jobs:
             CI: true
             TZ: UTC
             DEPLOY_ENV: local
-            DB_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+            DB_ENCRYPTION_KEY: "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c="
             PLAID_CLIENT_ID: "ci-test"
             PLAID_SECRET: "ci-test-secret"
         steps:
