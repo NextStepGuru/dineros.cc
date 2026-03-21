@@ -541,7 +541,14 @@ describe("budgetCloneService", () => {
           description: "Split",
           categoryId: null,
           splits: [
-            { reoccurrenceId: 1, transferAccountRegisterId: 11, amount: 50, description: "To savings", sortOrder: 0 },
+            {
+              reoccurrenceId: 1,
+              transferAccountRegisterId: 11,
+              amount: 50,
+              description: "To savings",
+              categoryId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              sortOrder: 0,
+            },
           ],
           skips: [],
           plaidNameAliases: [],
@@ -559,6 +566,7 @@ describe("budgetCloneService", () => {
             transferAccountRegisterId: 101,
             amount: 50,
             description: "To savings",
+            categoryId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
             sortOrder: 0,
           },
         ],

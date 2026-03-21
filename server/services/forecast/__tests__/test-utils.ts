@@ -45,6 +45,8 @@ export async function createTestDatabase(): Promise<PrismaClient> {
           assetResidualValue: d.assetResidualValue ?? null,
           assetUsefulLifeYears: d.assetUsefulLifeYears ?? null,
           assetStartAt: d.assetStartAt ?? null,
+          paymentCategoryId: d.paymentCategoryId ?? null,
+          interestCategoryId: d.interestCategoryId ?? null,
         };
         accountRegisters.push(accountRegister);
         return accountRegister;
@@ -66,6 +68,8 @@ export async function createTestDatabase(): Promise<PrismaClient> {
           assetResidualValue: ar.assetResidualValue ?? null,
           assetUsefulLifeYears: ar.assetUsefulLifeYears ?? null,
           assetStartAt: ar.assetStartAt ?? null,
+          paymentCategoryId: ar.paymentCategoryId ?? null,
+          interestCategoryId: ar.interestCategoryId ?? null,
         }));
       }),
       update: vi.fn(),

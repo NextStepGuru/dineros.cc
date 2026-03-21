@@ -204,6 +204,7 @@ export async function cloneBudget(
     transferAccountRegisterId: number;
     amount: unknown;
     description: string | null;
+    categoryId: string | null;
     sortOrder: number;
   }> = [];
   for (const ro of sourceReoccurrences) {
@@ -218,6 +219,7 @@ export async function cloneBudget(
           transferAccountRegisterId: newTransferId,
           amount: split.amount,
           description: split.description,
+          categoryId: split.categoryId,
           sortOrder: split.sortOrder,
         });
       }

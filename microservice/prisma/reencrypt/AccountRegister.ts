@@ -141,6 +141,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "children": {
  *       "modelName": "AccountRegister",
  *       "isList": true
+ *     },
+ *     "snapshotRows": {
+ *       "modelName": "AccountRegisterSnapshot",
+ *       "isList": true
  *     }
  *   }
  * }

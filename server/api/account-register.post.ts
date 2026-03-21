@@ -43,6 +43,14 @@ export default defineEventHandler(async (event: H3Event) => {
       allowExtraPayment,
       isArchived,
       subAccountRegisterId,
+      depreciationRate,
+      depreciationMethod,
+      assetOriginalValue,
+      assetResidualValue,
+      assetUsefulLifeYears,
+      assetStartAt,
+      paymentCategoryId,
+      interestCategoryId,
     } = parsed;
 
     if (
@@ -68,7 +76,28 @@ export default defineEventHandler(async (event: H3Event) => {
     if (!isCreditType) {
       collateralAssetRegisterId = null;
       targetAccountRegisterId = null;
-    } else {
+    }
+
+    let paymentCategoryIdResolved = paymentCategoryId ?? null;
+    let interestCategoryIdResolved = interestCategoryId ?? null;
+    if (!isCreditType) {
+      paymentCategoryIdResolved = null;
+    }
+
+    for (const cid of [paymentCategoryIdResolved, interestCategoryIdResolved]) {
+      if (cid == null) continue;
+      const cat = await PrismaDb.category.findFirst({
+        where: { id: cid, accountId, isArchived: false },
+      });
+      if (!cat) {
+        throw createError({
+          statusCode: 400,
+          message: "Category not found for this account.",
+        });
+      }
+    }
+
+    if (isCreditType) {
       if (targetAccountRegisterId != null) {
         const payer = await PrismaDb.accountRegister.findFirst({
           where: {
@@ -200,6 +229,14 @@ export default defineEventHandler(async (event: H3Event) => {
         allowExtraPayment,
         isArchived,
         subAccountRegisterId,
+        depreciationRate,
+        depreciationMethod,
+        assetOriginalValue,
+        assetResidualValue,
+        assetUsefulLifeYears,
+        assetStartAt,
+        paymentCategoryId: paymentCategoryIdResolved,
+        interestCategoryId: interestCategoryIdResolved,
       },
       update: {
         id,
@@ -231,6 +268,14 @@ export default defineEventHandler(async (event: H3Event) => {
         allowExtraPayment,
         isArchived,
         subAccountRegisterId,
+        depreciationRate,
+        depreciationMethod,
+        assetOriginalValue,
+        assetResidualValue,
+        assetUsefulLifeYears,
+        assetStartAt,
+        paymentCategoryId: paymentCategoryIdResolved,
+        interestCategoryId: interestCategoryIdResolved,
       },
       where: {
         id,

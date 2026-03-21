@@ -9,6 +9,10 @@ description: >-
 
 # Create branch from default
 
+## Scope
+
+Run only when the user explicitly asks to create or switch to a new branch, invokes this skill, or clearly requests this workflow. Do not branch, commit, or push without a direct user request (see `.cursor/rules/00-global-safety.mdc`).
+
 ## Resolve default branch
 
 Detect the repo default branch (user can override, e.g. "branch from main"):

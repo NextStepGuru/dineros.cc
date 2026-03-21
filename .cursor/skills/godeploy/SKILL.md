@@ -8,6 +8,8 @@ description: >-
 
 # /godeploy — branch, commit all, push, PR
 
+Run only when the user says `/godeploy`, `godeploy`, or explicitly asks for the full branch + commit + push + PR flow. This skill is the exception that chains git operations with user consent for that workflow.
+
 Run these steps in order. Stop and tell the user if any step fails.
 
 ## 0. Preconditions

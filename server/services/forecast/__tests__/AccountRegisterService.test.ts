@@ -103,6 +103,14 @@ describe("AccountRegisterService", () => {
       allowExtraPayment: false,
       isArchived: false,
       plaidId: null,
+      depreciationRate: null,
+      depreciationMethod: null,
+      assetOriginalValue: null,
+      assetResidualValue: null,
+      assetUsefulLifeYears: null,
+      assetStartAt: null,
+      paymentCategoryId: null,
+      interestCategoryId: null,
       ...overrides,
     } as CacheAccountRegister;
   }
@@ -404,6 +412,123 @@ describe("AccountRegisterService", () => {
       ).toHaveBeenCalledWith(
         account,
         1500, // 1000 (latestBalance) + 500 (entry amount) = 1500 projected balance
+      );
+    });
+
+    const INTEREST_CAT = "11111111-1111-1111-1111-111111111111";
+    const PAYMENT_CAT = "22222222-2222-2222-2222-222222222222";
+
+    it("passes interestCategoryId on interest charge and paymentCategoryId on transfer when set", async () => {
+      const account = createMockAccount({
+        id: 1,
+        name: "Credit Card",
+        targetAccountRegisterId: 2,
+        interestCategoryId: INTEREST_CAT,
+        paymentCategoryId: PAYMENT_CAT,
+      });
+
+      mockLoanCalculator.isCreditAccount.mockReturnValue(true);
+      mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-75);
+      mockLoanCalculator.calculatePaymentAmount.mockReturnValue(150);
+      mockDb.accountRegister.update.mockResolvedValue({});
+
+      await (service as any).processAccountInterestCharge(
+        account,
+        dateTimeService.create("2024-01-01"),
+      );
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Interest Charge",
+          categoryId: INTEREST_CAT,
+        }),
+      );
+      expect(
+        mockTransferService.transferBetweenAccountsWithDate,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoryId: PAYMENT_CAT,
+        }),
+      );
+    });
+
+    it("passes interestCategoryId on interest earned for savings", async () => {
+      const account = createMockAccount({
+        id: 1,
+        interestCategoryId: INTEREST_CAT,
+      });
+
+      mockLoanCalculator.isCreditAccount.mockReturnValue(false);
+      mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(25);
+      mockLoanCalculator.calculatePaymentAmount.mockReturnValue(0);
+      mockDb.accountRegister.update.mockResolvedValue({});
+
+      await (service as any).processAccountInterestCharge(account);
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Interest Earned",
+          categoryId: INTEREST_CAT,
+        }),
+      );
+    });
+
+    it("passes paymentCategoryId on direct payment entry when no target account", async () => {
+      const account = createMockAccount({
+        id: 1,
+        name: "Loan Account",
+        targetAccountRegisterId: null,
+        paymentCategoryId: PAYMENT_CAT,
+      });
+
+      mockLoanCalculator.isCreditAccount.mockReturnValue(true);
+      mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-30);
+      mockLoanCalculator.calculatePaymentAmount.mockReturnValue(100);
+      mockDb.accountRegister.update.mockResolvedValue({});
+
+      await (service as any).processAccountInterestCharge(account);
+
+      const paymentCalls = (mockEntryService.createEntry as any).mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as { description?: string }).description?.startsWith(
+            "Payment for ",
+          ),
+      );
+      expect(paymentCalls).toHaveLength(1);
+      expect(paymentCalls[0]![0]).toMatchObject({
+        categoryId: PAYMENT_CAT,
+        typeId: 4,
+      });
+    });
+
+    it("uses null categoryId on interest and payment when register has none", async () => {
+      const account = createMockAccount({
+        id: 1,
+        name: "Credit Card",
+        targetAccountRegisterId: 2,
+        interestCategoryId: null,
+        paymentCategoryId: null,
+      });
+
+      mockLoanCalculator.isCreditAccount.mockReturnValue(true);
+      mockLoanCalculator.calculateInterestForAccount.mockResolvedValue(-10);
+      mockLoanCalculator.calculatePaymentAmount.mockReturnValue(20);
+      mockDb.accountRegister.update.mockResolvedValue({});
+
+      await (service as any).processAccountInterestCharge(account);
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Interest Charge",
+          categoryId: null,
+        }),
+      );
+      expect(
+        mockTransferService.transferBetweenAccountsWithDate,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoryId: null,
+        }),
       );
     });
   });

@@ -281,6 +281,8 @@ export const accountRegisterSchema = z.object({
   assetResidualValue: z.coerce.number().nullable().default(null),
   assetUsefulLifeYears: z.coerce.number().nullable().default(null),
   assetStartAt: z.coerce.date().nullable().default(null),
+  paymentCategoryId: z.string().uuid().nullable().optional(),
+  interestCategoryId: z.string().uuid().nullable().optional(),
 });
 
 export const reoccurrenceSchema = z.object({
@@ -311,6 +313,7 @@ export const reoccurrenceSplitSchema = z.object({
   transferAccountRegisterId: z.coerce.number().min(1),
   amount: z.coerce.number(),
   description: z.string().max(500).optional(),
+  categoryId: z.string().uuid().nullable().optional(),
   sortOrder: z.coerce.number().min(0).default(0),
 });
 

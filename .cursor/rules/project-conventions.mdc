@@ -1,0 +1,14 @@
+---
+description: Pointers to project-wide agent policies (details live in other rule files)
+globs: **/*.{ts,js,vue,json,pug,md}
+alwaysApply: false
+---
+
+# Project conventions (index)
+
+Quick checklist; full wording is in the files under `.cursor/rules/`.
+
+- **Build / dev server / typecheck**: Never run unless the user asks — `00-global-safety.mdc`.
+- **Tests**: Do not add, modify, or run tests unless the user asks — `05-workflow-execution.mdc`.
+- **Prisma / migrations**: Shared client and migration policy — `backend-best-practices.mdc` (sections **Data Access** and **Prisma schema and migrations**).
+- **Code style / TS / Zod**: `10-code-style-and-ts.mdc`.

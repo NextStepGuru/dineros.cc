@@ -8,6 +8,10 @@ description: >-
 
 # Safe push
 
+## Scope
+
+Run only when the user explicitly asks to push or sync to the remote, or invokes this skill. Do not push without a direct user request (see `.cursor/rules/00-global-safety.mdc`).
+
 ## Current branch
 
 Resolve with: `git branch --show-current` → use as `<branch>`.

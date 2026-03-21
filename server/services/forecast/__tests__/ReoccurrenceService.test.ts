@@ -15,7 +15,10 @@ type ServiceReoccurrence = Parameters<
 describe("ReoccurrenceService", () => {
   let service: ReoccurrenceService;
   let mockDb: PrismaClient;
-  let mockCache: { reoccurrence: any };
+  let mockCache: {
+    reoccurrence: any;
+    reoccurrenceSplit: { find: ReturnType<typeof vi.fn> };
+  };
   let mockEntryService: { createEntry: any };
   let mockTransferService: { transferBetweenAccounts: any };
 
@@ -28,6 +31,9 @@ describe("ReoccurrenceService", () => {
         findOne: vi.fn(),
         find: vi.fn(),
         update: vi.fn(),
+      },
+      reoccurrenceSplit: {
+        find: vi.fn().mockReturnValue([]),
       },
     };
 
@@ -145,6 +151,82 @@ describe("ReoccurrenceService", () => {
           adjustBeforeIfOnWeekend: false,
         }),
       });
+    });
+
+    it("uses split categoryId on split transfer when set", async () => {
+      const SPLIT_CAT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+      const REC_CAT = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-01-01T00:00:00.000Z"),
+        transferAccountRegisterId: 2,
+        intervalId: 3,
+        categoryId: REC_CAT,
+      });
+
+      mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+      mockCache.reoccurrenceSplit.find.mockReturnValue([
+        {
+          id: 1,
+          reoccurrenceId: 1,
+          transferAccountRegisterId: 3,
+          amount: 25,
+          description: null,
+          categoryId: SPLIT_CAT,
+          sortOrder: 0,
+        },
+      ]);
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
+
+      expect(mockTransferService.transferBetweenAccounts).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(mockTransferService.transferBetweenAccounts).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          targetAccountRegisterId: 3,
+          categoryId: SPLIT_CAT,
+        }),
+      );
+    });
+
+    it("falls back to recurrence categoryId for split when split categoryId is null", async () => {
+      const REC_CAT = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+      const reoccurrence = createMockReoccurrence({
+        lastAt: new Date("2024-01-01T00:00:00.000Z"),
+        transferAccountRegisterId: 2,
+        intervalId: 3,
+        categoryId: REC_CAT,
+      });
+
+      mockCache.reoccurrence.findOne.mockReturnValue(reoccurrence);
+      mockCache.reoccurrenceSplit.find.mockReturnValue([
+        {
+          id: 1,
+          reoccurrenceId: 1,
+          transferAccountRegisterId: 3,
+          amount: 25,
+          description: null,
+          categoryId: null,
+          sortOrder: 0,
+        },
+      ]);
+
+      await service.processReoccurrences(
+        [reoccurrence],
+        new Date("2024-02-01T00:00:00.000Z"),
+      );
+
+      expect(mockTransferService.transferBetweenAccounts).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          targetAccountRegisterId: 3,
+          categoryId: REC_CAT,
+        }),
+      );
     });
 
     it("should create entry for reoccurrence without transfer account", async () => {

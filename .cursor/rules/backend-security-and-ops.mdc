@@ -19,7 +19,7 @@ alwaysApply: false
 ## Environment and Runtime
 
 - **Env**: Validate environment with Zod in `server/envSchema.ts`. In `server/env.ts`, ensure `safeParse` result is checked before exporting; do not export `parsedEnv.data` when `parsedEnv.success` is false. Microservice should use the same pattern.
-- **Node version**: Align Node version across `package.json` engines, Dockerfiles, and CI to avoid runtime drift (main app uses Node 24; microservice uses Node 22; document or unify as needed).
+- **Node version**: Both the main app and `microservice/` use the same `engines.node` range (e.g. `>=24.14.0 <25.0.0` in root and `microservice/package.json`). Align Dockerfiles and CI with that range to avoid runtime drift.
 
 ## Deployment and Observability
 
