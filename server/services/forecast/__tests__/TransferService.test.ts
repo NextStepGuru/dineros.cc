@@ -648,6 +648,53 @@ describe("TransferService", () => {
       expect(mockEntryService.createEntry).toHaveBeenCalled();
     });
 
+    it("passes debt account paymentCategoryId on extra debt transfer source entry", async () => {
+      const PAYMENT_CAT = "22222222-2222-2222-2222-222222222222";
+      const sourceAccount = createMockAccount({
+        id: 1,
+        balance: 2000,
+        latestBalance: 2000,
+        allowExtraPayment: true,
+        minAccountBalance: 500,
+      });
+
+      const debtAccount = createMockAccount({
+        id: 2,
+        balance: -500,
+        loanPaymentSortOrder: 1,
+        paymentCategoryId: PAYMENT_CAT,
+      });
+
+      mockCache.accountRegister.insert(sourceAccount);
+      mockCache.accountRegister.insert(debtAccount);
+      mockCache.registerEntry.insert(
+        createMockEntry({
+          accountRegisterId: 1,
+          amount: 2000,
+          isBalanceEntry: false,
+          createdAt: dateTimeService.create("2024-01-01").toDate(),
+        }),
+      );
+
+      vi.spyOn(service as any, "calculateProjectedBalanceAtDate").mockReturnValue(
+        2000,
+      );
+
+      await (service as any).processExtraDebtPayment({
+        minBalance: 500,
+        sourceAccountId: 1,
+        lastAt: dateTimeService.create("2024-01-01").toDate(),
+      });
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 1,
+          amount: expect.any(Number),
+          categoryId: PAYMENT_CAT,
+        }),
+      );
+    });
+
     it("should return false when source account not found", async () => {
       const result = await (service as any).processExtraDebtPayment({
         minBalance: 500,

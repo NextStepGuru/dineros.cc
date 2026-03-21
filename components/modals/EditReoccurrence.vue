@@ -88,6 +88,8 @@ function syncFormStateFromProps() {
   splitsRef.value = (props.reoccurrence.splits ?? []).map((split) => ({
     ...split,
     amount: Number(split.amount),
+    categoryId:
+      split.categoryId === undefined ? null : split.categoryId,
   }));
 
   isExternal.value = !props.reoccurrence.transferAccountRegisterId;
@@ -107,6 +109,7 @@ function addSplit() {
     transferAccountRegisterId: undefined as unknown as number,
     amount: 0,
     description: "",
+    categoryId: null,
     sortOrder: current.length,
   });
   splitsRef.value = current;
@@ -141,6 +144,10 @@ async function handleSubmit({ data: formData }: FormSubmitEvent<Schema>) {
         transferAccountRegisterId: split.transferAccountRegisterId,
         amount: Number(split.amount),
         description: split.description?.trim() || undefined,
+        categoryId:
+          split.categoryId === undefined || split.categoryId === null
+            ? undefined
+            : split.categoryId,
         sortOrder,
       })),
     };
@@ -315,14 +322,24 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         p.text-xs.text-gray-400 {{ splitCountLabel }}
         .space-y-3(v-if="splitsRef.length > 0")
           .grid.grid-cols-1.gap-3.border.border-gray-700.rounded-lg.p-3(v-for="(split, index) in splitsRef" :key="split.id || 'new-split-' + index")
-            .flex.gap-3.items-start(class="max-sm:flex-col")
-              UFormField(label="Amount" class="flex-1")
+            .flex.gap-3.items-start.flex-wrap(class="max-sm:flex-col")
+              UFormField(label="Amount" class="flex-1 min-w-32")
                 UInputNumber(v-model="split.amount" :format-options="formatCurrencyOptions" :step="0.01" class="w-full")
-              UFormField(label="Transfer into Account" class="flex-1")
+              UFormField(label="Transfer into Account" class="flex-1 min-w-40")
                 USelect(v-model="split.transferAccountRegisterId" :items="splitTargetOptions" valueKey="id" labelKey="name" class="w-full" placeholder="Select account")
-              UFormField(label="Label" class="flex-1")
+              UFormField(label="Category" class="flex-1 min-w-40")
+                USelectMenu(
+                  v-model="split.categoryId"
+                  class="w-full"
+                  :items="categorySelectItems"
+                  value-key="value"
+                  label-key="label"
+                  :filter-fields="['label', 'name']"
+                  placeholder="Same as reoccurrence")
+              UFormField(label="Label" class="flex-1 min-w-32")
                 UInput(v-model="split.description" class="w-full" placeholder="Optional")
-              UButton(color="error" variant="soft" size="xs" class="mt-6" @click="removeSplit(index)") Remove
+              UTooltip(text="Remove split" :delay-duration="150")
+                UButton(color="error" variant="soft" size="xs" square icon="i-lucide-trash-2" class="mt-6 shrink-0" aria-label="Remove split" @click="removeSplit(index)")
         p.text-xs.text-gray-500(v-else) No split transfers configured.
 
   template(#footer)

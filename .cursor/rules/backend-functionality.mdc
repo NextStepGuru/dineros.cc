@@ -9,7 +9,7 @@ alwaysApply: false
 ## API Routes
 
 - **Location**: `server/api/`. Use Nitro file-based routing. Method-specific files: `*.get.ts`, `*.post.ts`, `*.patch.ts`, `*.delete.ts`. Sub-routes: `server/api/tasks/`, `server/api/webhook/`, `server/api/_ah/`.
-- **Handlers**: Prefer wrapping handlers with `withErrorHandler(handler)` from `server/lib/withErrorHandler.ts` so errors are logged and passed to `handleApiError`. When not using `withErrorHandler`, use try/catch and call `handleApiError(error)`; ensure unknown errors still result in a thrown response (handleApiError may return without throwing for non-Error types—avoid relying on that for flow control).
+- **Handlers**: Prefer wrapping handlers with `withErrorHandler(handler)` from `server/lib/withErrorHandler.ts`. For `handleApiError` behavior, try/catch patterns, and edge cases, see **Error Handling** in `backend-best-practices.mdc`.
 - **Thin routes**: Keep route handlers thin. Put business logic in `server/services/` and data access via `server/clients/` (Prisma, Redis, etc.). Use `getUser(event)` from `server/lib/getUser` to get `userId` for authenticated routes.
 
 ## Services and Clients

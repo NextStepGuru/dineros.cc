@@ -49,6 +49,9 @@ vi.mock("~/server/clients/prismaClient", () => ({
     registerEntry: {
       deleteMany: vi.fn(),
     },
+    category: {
+      findFirst: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -490,6 +493,158 @@ describe("Account Register API Endpoints", () => {
           }),
           where: expect.objectContaining({
             id: 1,
+          }),
+        }),
+      );
+    });
+
+    it("clears paymentCategoryId when account type is not credit", async () => {
+      const mockEvent = {};
+      const PAY = "22222222-2222-2222-2222-222222222222";
+      const INT = "11111111-1111-1111-1111-111111111111";
+      const mockBody = {
+        id: 1,
+        accountId: "account-123",
+        typeId: 1,
+        budgetId: 1,
+        name: "Checking",
+        balance: 1000,
+        latestBalance: 1000,
+        sortOrder: 1,
+        paymentCategoryId: PAY,
+        interestCategoryId: INT,
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-123",
+        userAccounts: [{ userId: 123 }],
+      };
+      const mockParsed = {
+        ...mockBody,
+        collateralAssetRegisterId: null,
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { accountRegisterSchema } = await import("~/schema/zod");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountType.findUnique as any).mockResolvedValue({
+        id: 1,
+        isCredit: false,
+      });
+      (prisma.accountRegister.upsert as any).mockResolvedValue(mockParsed);
+      (accountRegisterSchema.parse as any).mockReturnValue(mockParsed);
+      (prisma.category.findFirst as any).mockResolvedValue({ id: INT });
+
+      await accountRegisterPostHandler(mockEvent);
+
+      expect(prisma.accountRegister.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            paymentCategoryId: null,
+            interestCategoryId: INT,
+          }),
+          update: expect.objectContaining({
+            paymentCategoryId: null,
+            interestCategoryId: INT,
+          }),
+        }),
+      );
+    });
+
+    it("rejects when category is not found for account", async () => {
+      const mockEvent = {};
+      const CAT = "33333333-3333-3333-3333-333333333333";
+      const mockBody = {
+        id: 1,
+        accountId: "account-123",
+        typeId: 1,
+        budgetId: 1,
+        name: "Test",
+        balance: 1000,
+        latestBalance: 1000,
+        sortOrder: 1,
+        interestCategoryId: CAT,
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-123",
+        userAccounts: [{ userId: 123 }],
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { accountRegisterSchema } = await import("~/schema/zod");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountType.findUnique as any).mockResolvedValue({
+        id: 1,
+        isCredit: false,
+      });
+      (accountRegisterSchema.parse as any).mockReturnValue({
+        ...mockBody,
+        collateralAssetRegisterId: null,
+      });
+      (prisma.category.findFirst as any).mockResolvedValue(null);
+
+      await expect(accountRegisterPostHandler(mockEvent)).rejects.toThrow(
+        /Category not found for this account/,
+      );
+    });
+
+    it("persists payment and interest category IDs for credit types when valid", async () => {
+      const mockEvent = {};
+      const PAY = "22222222-2222-2222-2222-222222222222";
+      const INT = "11111111-1111-1111-1111-111111111111";
+      const mockBody = {
+        id: 1,
+        accountId: "account-123",
+        typeId: 4,
+        budgetId: 1,
+        name: "Card",
+        balance: -500,
+        latestBalance: -500,
+        sortOrder: 1,
+        paymentCategoryId: PAY,
+        interestCategoryId: INT,
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-123",
+        userAccounts: [{ userId: 123 }],
+      };
+      const mockParsed = { ...mockBody, collateralAssetRegisterId: null };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { accountRegisterSchema } = await import("~/schema/zod");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountType.findUnique as any).mockResolvedValue({
+        id: 4,
+        isCredit: true,
+      });
+      (prisma.accountRegister.upsert as any).mockResolvedValue(mockParsed);
+      (accountRegisterSchema.parse as any).mockReturnValue(mockParsed);
+      (prisma.category.findFirst as any).mockResolvedValue({ id: "ok" });
+
+      await accountRegisterPostHandler(mockEvent);
+
+      expect(prisma.accountRegister.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            paymentCategoryId: PAY,
+            interestCategoryId: INT,
           }),
         }),
       );

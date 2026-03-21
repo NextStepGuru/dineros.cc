@@ -197,7 +197,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
           amount: Number(splitEntry.amount),
           description: splitDescription,
           reoccurrence: reoccurrenceForEntry,
-          categoryId: recurrenceCategoryId,
+          categoryId:
+            splitEntry.categoryId ?? recurrenceCategoryId,
         });
       }
 

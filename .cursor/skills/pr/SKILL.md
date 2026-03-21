@@ -8,11 +8,15 @@ description: >-
 
 # Create pull request
 
+## Scope
+
+Run only when the user explicitly asks to open a PR or invokes this skill. Do not open PRs without a direct user request (see `.cursor/rules/00-global-safety.mdc`).
+
 ## Resolve repo and branches
 
-- **Owner/repo**: From `git remote get-url origin` — parse to owner and repo name (e.g. `https://github.com/NextStepGuru/dineros.cc.git` → owner `NextStepGuru`, repo `dineros.cc`). Strip `.git` from repo if present.
+- **Owner/repo**: From `git remote get-url origin` — parse to owner and repo name (e.g. `https://github.com/<owner>/<repo>.git`). Strip `.git` from repo if present.
 - **Head**: Current branch — `git branch --show-current`
-- **Base**: User-specified or default. Default = `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||'` (fallback: `master`, then `main`).
+- **Base**: User-specified or default. Default = `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||'` (fallback: `main`, then `master`).
 
 ## Title and body
 

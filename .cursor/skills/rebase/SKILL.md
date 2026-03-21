@@ -8,6 +8,10 @@ description: >-
 
 # Rebase onto default branch
 
+## Scope
+
+Run only when the user explicitly asks to rebase or invokes this skill. Do not rebase without a direct user request (see `.cursor/rules/00-global-safety.mdc`).
+
 ## Guard
 
 If current branch is `main` or `master`, abort with: "Do not rebase the default branch." Do not run rebase.
@@ -19,7 +23,7 @@ Detect the repo default (user can override, e.g. "rebase onto main"):
 ```bash
 git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||'
 # Or: git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
-# Fallback: master, then main
+# Fallback: main, then master
 ```
 
 Use result as `DEFAULT`; upstream ref is `origin/<DEFAULT>`.

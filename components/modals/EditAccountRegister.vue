@@ -5,6 +5,7 @@ import {
   formatAccountRegisters,
   formatCurrencyOptions,
 } from "~/lib/utils";
+import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import { accountRegisterSchema } from "~/schema/zod";
 import type { AccountRegister } from "~/types/types";
 
@@ -73,6 +74,18 @@ function normalizeAccountRegisterState(
       toNullableNumber(accountRegister.savingsGoalSortOrder) ?? 0,
     accountSavingsGoal: toNullableNumber(accountRegister.accountSavingsGoal),
     minAccountBalance: toNullableNumber(accountRegister.minAccountBalance) ?? 0,
+    depreciationRate: toNullableNumber(accountRegister.depreciationRate),
+    depreciationMethod:
+      (accountRegister.depreciationMethod as string | null) ?? null,
+    assetOriginalValue: toNullableNumber(accountRegister.assetOriginalValue),
+    assetResidualValue: toNullableNumber(accountRegister.assetResidualValue),
+    assetUsefulLifeYears: toNullableNumber(accountRegister.assetUsefulLifeYears),
+    assetStartAt:
+      accountRegister.assetStartAt != null
+        ? new Date(accountRegister.assetStartAt)
+        : null,
+    paymentCategoryId: accountRegister.paymentCategoryId ?? null,
+    interestCategoryId: accountRegister.interestCategoryId ?? null,
   };
 }
 
@@ -104,6 +117,45 @@ const isSelectedAccountTypeWithInterest = computed(() => {
   return (
     isSelectedAccountTypeCredit.value || isSelectedAccountTypeSavings.value
   );
+});
+
+const isSelectedAccountTypeVehicleAsset = computed(
+  () => selectedAccountType.value?.id === 20,
+);
+const isSelectedAccountTypeCollectableVehicle = computed(
+  () => selectedAccountType.value?.id === 21,
+);
+const isSelectedAccountTypeDepreciatingOrAppreciatingAsset = computed(
+  () =>
+    isSelectedAccountTypeVehicleAsset.value ||
+    isSelectedAccountTypeCollectableVehicle.value,
+);
+
+const assetSectionLabel = computed(() =>
+  isSelectedAccountTypeVehicleAsset.value ? "Depreciation" : "Appreciation",
+);
+
+const depreciationRatePercent = computed({
+  get: () =>
+    formState.value.depreciationRate != null
+      ? formState.value.depreciationRate * 100
+      : null,
+  set: (v: number | null) => {
+    formState.value.depreciationRate =
+      v != null && Number.isFinite(v) ? v / 100 : null;
+  },
+});
+
+const assetStartAtString = computed({
+  get: () => {
+    const d = formState.value.assetStartAt;
+    if (!d) return "";
+    const date = d instanceof Date ? d : new Date(d);
+    return date.toISOString().split("T")[0];
+  },
+  set: (value: string) => {
+    formState.value.assetStartAt = value ? new Date(value) : null;
+  },
 });
 
 const interestRateLabel = computed(() => {
@@ -150,9 +202,26 @@ watch(
     if (!isSelectedAccountTypeCredit.value) {
       formState.value.collateralAssetRegisterId = null;
       formState.value.targetAccountRegisterId = null;
+      formState.value.paymentCategoryId = null;
     }
   },
 );
+
+const categorySelectItemsForRegister = computed(() => {
+  const base = [{ id: null, name: "None", value: null, label: "None" }] as {
+    id: string | null;
+    name: string;
+    value: string | null;
+    label: string;
+  }[];
+  return [
+    ...base,
+    ...buildSortedCategorySelectItems(
+      listStore.getCategories,
+      formState.value.accountId,
+    ),
+  ];
+});
 
 /** Checking/savings/etc. registers that can fund loan or card payments (same account, top-level, non-credit). */
 const loanPaymentSourceSelectItems = computed(() => {
@@ -408,6 +477,26 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
             :max="100"
             class="w-full")
 
+      UFormField(label="Interest category" name="interestCategoryId" v-if="isSelectedAccountTypeWithInterest")
+        USelectMenu(
+          v-model="formState.interestCategoryId"
+          class="w-full"
+          :items="categorySelectItemsForRegister"
+          value-key="value"
+          label-key="label"
+          :filter-fields="['label', 'name']"
+          placeholder="None")
+
+      UFormField(label="Payment category" name="paymentCategoryId" v-if="isSelectedAccountTypeCredit")
+        USelectMenu(
+          v-model="formState.paymentCategoryId"
+          class="w-full"
+          :items="categorySelectItemsForRegister"
+          value-key="value"
+          label-key="label"
+          :filter-fields="['label', 'name']"
+          placeholder="None")
+
       UFormField(label="Min Account Balance" name="minAccountBalance" v-if="isSelectedAccountTypeChecking" hint="before paying down extra debt")
         UInputNumber(
           v-model="formState.minAccountBalance"
@@ -424,6 +513,49 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
             v-model="formState.accountSavingsGoal"
             :format-options="formatCurrencyOptions"
             :step="0.01"
+            class="w-full")
+
+      // Depreciation/Appreciation (Vehicle Asset, Collectable Vehicle)
+      div(v-if="isSelectedAccountTypeDepreciatingOrAppreciatingAsset" class="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800")
+        h3(class="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2") {{ assetSectionLabel }} Settings
+
+        UFormField(:label="assetSectionLabel + ' Rate (%)'" name="depreciationRate" :hint="assetSectionLabel === 'Depreciation' ? 'Annual depreciation rate (0–100%)' : 'Annual appreciation rate (0–100%)'")
+          UInputNumber(
+            v-model="depreciationRatePercent"
+            :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 2 }"
+            :step="0.1"
+            :min="0"
+            :max="100"
+            class="w-full")
+
+        UFormField(label="Method" name="depreciationMethod" v-if="isSelectedAccountTypeVehicleAsset" hint="declining-balance, straight-line, or compound")
+          USelect(
+            v-model="formState.depreciationMethod"
+            class="w-full"
+            placeholder="Default (declining-balance)"
+            :items="[{ id: null, name: 'Default (declining-balance)' }, { id: 'declining-balance', name: 'Declining balance' }, { id: 'straight-line', name: 'Straight-line' }, { id: 'compound', name: 'Compound' }]"
+            valueKey="id"
+            labelKey="name")
+
+        UFormField(label="Residual value (floor)" name="assetResidualValue" hint="Optional minimum value")
+          UInputNumber(
+            v-model="formState.assetResidualValue"
+            :format-options="formatCurrencyOptions"
+            :step="0.01"
+            class="w-full")
+
+        UFormField(label="Useful life (years)" name="assetUsefulLifeYears" v-if="isSelectedAccountTypeVehicleAsset" hint="For straight-line method")
+          UInputNumber(
+            v-model="formState.assetUsefulLifeYears"
+            :step="1"
+            :min="1"
+            :max="100"
+            class="w-full")
+
+        UFormField(label="Start date" name="assetStartAt" hint="When depreciation/appreciation begins (default: statement date)")
+          UInput(
+            v-model="assetStartAtString"
+            type="date"
             class="w-full")
 
       UFormField(label="Import Transactions" hint="optional, CSV File Import")

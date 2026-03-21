@@ -171,6 +171,7 @@ export class AccountRegisterService implements IAccountRegisterService {
       amount: Number(interest),
       forecastDate: accrualDate,
       typeId: isCreditAccount ? 2 : 3, // Interest Charge (2) or Interest Earned (3)
+      categoryId: accountRegister.interestCategoryId ?? null,
       reoccurrence: {
         accountId: "",
         accountRegisterId: accountRegister.id,
@@ -207,6 +208,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           amount: Number(paymentAmount),
           description: `Payment to ${accountRegister.name}`,
           forecastDate: accrualDate,
+          categoryId: accountRegister.paymentCategoryId ?? null,
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,
@@ -240,6 +242,7 @@ export class AccountRegisterService implements IAccountRegisterService {
           amount: Number(paymentAmount),
           forecastDate: accrualDate,
           typeId: 4, // Loan Payment
+          categoryId: accountRegister.paymentCategoryId ?? null,
           reoccurrence: {
             accountId: "",
             accountRegisterId: accountRegister.id,

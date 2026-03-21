@@ -9,7 +9,7 @@ alwaysApply: false
 ## Forms
 
 - Use Nuxt UI form primitives (e.g. `UForm`) with schema-based validation (Zod). Use `handleError` from `lib/utils.ts` to map validation/errors to toast and focus.
-- For submit flows: use a single `isLoading` or `isSaving` flag, guard double-submit, and show success/error via toast. Avoid native `alert`, `confirm`, or `prompt`; use Nuxt UI modals or `useOverlay()` for confirmations.
+- For submit flows: use a single `isLoading` or `isSaving` flag, guard double-submit, and show success/error via toast. For toasts vs native dialogs and confirmations, see `frontend-ux-and-state.mdc`.
 
 ## State and Watchers
 

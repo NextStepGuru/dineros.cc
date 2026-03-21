@@ -60,6 +60,8 @@ export type CacheAccountRegister = {
   assetResidualValue: number | null | undefined | Decimal;
   assetUsefulLifeYears: number | null;
   assetStartAt: Date | null;
+  paymentCategoryId: string | null;
+  interestCategoryId: string | null;
 };
 
 export type CacheRegisterEntry = {
@@ -96,6 +98,7 @@ export type CacheReoccurrenceSplit = {
   transferAccountRegisterId: number;
   amount: number;
   description: string | null;
+  categoryId: string | null;
   sortOrder: number;
 };
 

@@ -43,10 +43,13 @@ export default defineVitestConfig({
       "server/api/__tests__/**/*.test.ts",
       "server/services/__tests__/**/*.test.ts",
       "server/services/forecast/__tests__/**/*.test.ts",
+      "server/services/reports/__tests__/**/*.test.ts",
       "server/lib/__tests__/**/*.test.ts",
       "lib/__tests__/**/*.test.ts",
       "pages/__tests__/**/*.test.ts",
       "tests/**/*.test.ts",
+      "schema/__tests__/**/*.test.ts",
+      "prisma/reencrypt/__tests__/**/*.test.ts",
     ],
 
     // Exclude slow and problematic tests from default runs

@@ -1,5 +1,5 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
-import type { H3Event } from "h3";
+import { createError, type H3Event } from "h3";
 import { reoccurrenceWithSplitsSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
@@ -49,6 +49,26 @@ export default defineEventHandler(async (event: H3Event) => {
           accountId,
         },
       });
+    }
+
+    const splitCategoryIds = Array.from(
+      new Set(
+        (splits ?? [])
+          .map((s) => s.categoryId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+    if (splitCategoryIds.length > 0) {
+      const found = await PrismaDb.category.findMany({
+        where: { id: { in: splitCategoryIds }, accountId },
+        select: { id: true },
+      });
+      if (found.length !== splitCategoryIds.length) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: "Invalid category on a split.",
+        });
+      }
     }
 
     const splitTargets = (splits ?? []).map((item) => item.transferAccountRegisterId);
@@ -111,6 +131,7 @@ export default defineEventHandler(async (event: H3Event) => {
       transferAccountRegisterId: split.transferAccountRegisterId,
       amount: split.amount,
       description: split.description?.trim() || null,
+      categoryId: split.categoryId ?? null,
       sortOrder: split.sortOrder ?? index,
     }));
 

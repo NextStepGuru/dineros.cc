@@ -101,6 +101,8 @@ export class DataLoaderService implements IDataLoaderService {
         assetResidualValue: true,
         assetUsefulLifeYears: true,
         assetStartAt: true,
+        paymentCategoryId: true,
+        interestCategoryId: true,
       },
     });
 
@@ -137,6 +139,8 @@ export class DataLoaderService implements IDataLoaderService {
         assetStartAt: reg.assetStartAt
           ? dateTimeService.createUTC(reg.assetStartAt).toDate()
           : null,
+        paymentCategoryId: reg.paymentCategoryId ?? null,
+        interestCategoryId: reg.interestCategoryId ?? null,
       }),
     );
 

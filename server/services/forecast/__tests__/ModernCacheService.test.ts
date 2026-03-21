@@ -50,6 +50,14 @@ describe("ModernCacheService", () => {
       allowExtraPayment: false,
       isArchived: false,
       plaidId: null,
+      depreciationRate: null,
+      depreciationMethod: null,
+      assetOriginalValue: null,
+      assetResidualValue: null,
+      assetUsefulLifeYears: null,
+      assetStartAt: null,
+      paymentCategoryId: null,
+      interestCategoryId: null,
       ...overrides,
     } as CacheAccountRegister;
   }

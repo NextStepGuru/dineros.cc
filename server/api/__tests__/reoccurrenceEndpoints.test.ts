@@ -41,6 +41,10 @@ vi.mock('~/server/clients/prismaClient', () => ({
       deleteMany: vi.fn(),
       createMany: vi.fn(),
     },
+    category: {
+      findFirstOrThrow: vi.fn(),
+      findMany: vi.fn(),
+    },
     registerEntry: {
       deleteMany: vi.fn(),
     },
@@ -305,6 +309,121 @@ describe('Reoccurrence API Endpoints', () => {
 
       await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow('Database constraint violation');
       expect(handleApiError).toHaveBeenCalledWith(dbError);
+    });
+
+    it('validates split category IDs and succeeds when all exist for account', async () => {
+      const mockEvent = {};
+      const SPLIT_CAT = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const mockBody = {
+        id: null,
+        accountId: 'account-123',
+        accountRegisterId: 1,
+        transferAccountRegisterId: 2,
+        intervalId: 1,
+        intervalCount: 1,
+        adjustBeforeIfOnWeekend: false,
+        description: 'With splits',
+        amount: 100,
+        lastAt: '2024-01-01',
+        endAt: null,
+        splits: [
+          {
+            transferAccountRegisterId: 2,
+            amount: 50,
+            categoryId: SPLIT_CAT,
+            sortOrder: 0,
+          },
+        ],
+        categoryId: null,
+      };
+
+      const mockAccountRegister = { id: 1, accountId: 'account-123' };
+      const mockCreated = {
+        ...mockBody,
+        lastAt: new Date('2024-01-01'),
+        id: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
+      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.category.findMany as any).mockResolvedValue([{ id: SPLIT_CAT }]);
+      (prisma.accountRegister.findMany as any).mockResolvedValue([{ id: 2 }]);
+      (prisma.reoccurrence.upsert as any).mockResolvedValue(mockCreated);
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockCreated);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockCreated);
+
+      await reoccurrencePostHandler(mockEvent);
+
+      expect(prisma.category.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: [SPLIT_CAT] },
+          accountId: 'account-123',
+        },
+        select: { id: true },
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+    });
+
+    it('rejects when split category IDs are not all valid for account', async () => {
+      const mockEvent = {};
+      const CAT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const CAT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+      const mockBody = {
+        id: null,
+        accountId: 'account-123',
+        accountRegisterId: 1,
+        transferAccountRegisterId: 2,
+        intervalId: 1,
+        intervalCount: 1,
+        adjustBeforeIfOnWeekend: false,
+        description: 'Bad splits',
+        amount: 100,
+        lastAt: '2024-01-01',
+        endAt: null,
+        splits: [
+          {
+            transferAccountRegisterId: 2,
+            amount: 50,
+            categoryId: CAT_A,
+            sortOrder: 0,
+          },
+          {
+            transferAccountRegisterId: 3,
+            amount: 50,
+            categoryId: CAT_B,
+            sortOrder: 1,
+          },
+        ],
+        categoryId: null,
+      };
+
+      const mockAccountRegister = { id: 1, accountId: 'account-123' };
+
+      const { readBody } = await import('h3');
+      const { getUser } = await import('~/server/lib/getUser');
+      const { prisma } = await import('~/server/clients/prismaClient');
+      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue({ userId: 123 });
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.category.findMany as any).mockResolvedValue([{ id: CAT_A }]);
+
+      await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow(
+        /Invalid category on a split/,
+      );
     });
   });
 

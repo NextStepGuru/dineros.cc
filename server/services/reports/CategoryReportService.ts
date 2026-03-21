@@ -19,6 +19,24 @@ function utcDayEnd(isoDate: string): Date {
   return dateTimeService.createUTC(`${isoDate}T23:59:59.999Z`).toDate();
 }
 
+/** Normalizes `dateTo` when inverted or still out of range (exported for unit tests). */
+export function resolveCategoryReportDateRange(
+  dateFrom: string,
+  dateTo: string,
+): { dateTo: string } {
+  let resolvedDateTo = dateTo;
+  if (resolvedDateTo < dateFrom) {
+    resolvedDateTo = dateTimeService
+      .createUTC(`${resolvedDateTo}T00:00:00.000Z`)
+      .add(1, "day")
+      .format("YYYY-MM-DD");
+  }
+  if (utcDayStart(dateFrom).getTime() > utcDayEnd(resolvedDateTo).getTime()) {
+    resolvedDateTo = dateFrom;
+  }
+  return { dateTo: resolvedDateTo };
+}
+
 /** Match legacy interest sign correction from `server/api/register.ts` */
 function toAmount(
   entry: {
@@ -85,14 +103,13 @@ export async function getCategoryReport(params: {
     showSubcategories,
   } = params.query;
 
+  const { dateTo: resolvedDateTo } = resolveCategoryReportDateRange(
+    dateFrom,
+    dateTo,
+  );
+
   const start = utcDayStart(dateFrom);
-  const end = utcDayEnd(dateTo);
-  if (start.getTime() > end.getTime()) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: "dateFrom must be on or before dateTo",
-    });
-  }
+  const end = utcDayEnd(resolvedDateTo);
 
   const budget = await PrismaDb.budget.findFirst({
     where: {
@@ -402,7 +419,7 @@ export async function getCategoryReport(params: {
   return {
     mode,
     dateFrom,
-    dateTo,
+    dateTo: resolvedDateTo,
     budgetId,
     accountRegisterId: scopedRegisterId,
     includeTransfers,

@@ -122,6 +122,14 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "AccountRegister",
  *       "isList": true
  *     },
+ *     "paymentCategory": {
+ *       "modelName": "Category",
+ *       "isList": false
+ *     },
+ *     "interestCategory": {
+ *       "modelName": "Category",
+ *       "isList": false
+ *     },
  *     "entries": {
  *       "modelName": "RegisterEntry",
  *       "isList": true

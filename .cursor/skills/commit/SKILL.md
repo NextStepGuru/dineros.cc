@@ -8,6 +8,10 @@ description: >-
 
 # Create commit
 
+## Scope
+
+Run only when the user explicitly asks to commit or invokes this skill. Do not create commits without a direct user request (see `.cursor/rules/00-global-safety.mdc`).
+
 ## Guard
 
 If in detached HEAD (`git branch --show-current` is empty), abort with a clear message. Do not commit.

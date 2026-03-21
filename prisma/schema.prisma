@@ -209,6 +209,8 @@ model AccountRegister {
   assetResidualValue        Decimal?  @map("asset_residual_value") @db.Decimal(19, 2)
   assetUsefulLifeYears      Int?      @map("asset_useful_life_years")
   assetStartAt              DateTime? @map("asset_start_at")
+  paymentCategoryId         String?   @map("payment_category_id")
+  interestCategoryId        String?   @map("interest_category_id")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budget              Budget            @relation(fields: [budgetId], references: [id])
@@ -218,6 +220,8 @@ model AccountRegister {
   parent              AccountRegister?  @relation("ar_children", fields: [subAccountRegisterId], references: [id])
   collateralAsset     AccountRegister?  @relation("RegisterCollateral", fields: [collateralAssetRegisterId], references: [id], onDelete: SetNull)
   loansSecuredByAsset AccountRegister[] @relation("RegisterCollateral")
+  paymentCategory     Category?         @relation("AccountRegisterPaymentCategory", fields: [paymentCategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  interestCategory    Category?         @relation("AccountRegisterInterestCategory", fields: [interestCategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   entries               RegisterEntry[]
   reoccurrences         Reoccurrence[]
@@ -359,8 +363,11 @@ model Category {
   parent            Category?       @relation("cat_children", fields: [subCategoryId], references: [id])
   children          Category[]      @relation("cat_children")
   accountRegisterId Int?            @db.UnsignedInt
-  entries           RegisterEntry[]
-  reoccurrences     Reoccurrence[]
+  entries             RegisterEntry[]
+  reoccurrences       Reoccurrence[]
+  reoccurrenceSplits  ReoccurrenceSplit[]
+  accountRegistersPaymentDefault  AccountRegister[] @relation("AccountRegisterPaymentCategory")
+  accountRegistersInterestDefault AccountRegister[] @relation("AccountRegisterInterestCategory")
 
   @@map("category")
 }
@@ -418,11 +425,13 @@ model ReoccurrenceSplit {
   transferAccountRegisterId Int      @map("transfer_account_register_id") @db.UnsignedInt
   amount                    Decimal  @db.Decimal(19, 2)
   description               String?  @db.VarChar(500)
+  categoryId                String?  @map("category_id")
   sortOrder                 Int      @default(0) @map("sort_order") @db.UnsignedInt
   updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
 
   reoccurrence   Reoccurrence    @relation(fields: [reoccurrenceId], references: [id])
   targetRegister AccountRegister @relation(fields: [transferAccountRegisterId], references: [id])
+  category       Category?       @relation(fields: [categoryId], references: [id])
 
   @@index([reoccurrenceId])
   @@map("reoccurrence_split")

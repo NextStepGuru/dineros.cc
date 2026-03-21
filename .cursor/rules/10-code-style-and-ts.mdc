@@ -17,8 +17,10 @@ alwaysApply: false
 
 - Prefer strict typing. Avoid introducing new `any`; use proper types or `unknown` with narrowing.
 - The project uses `typescript.strict: false` and `typeCheck: false` in Nuxt config; when adding or refactoring code, still use explicit types for API responses, event payloads, and composable return values.
+- Do not run typecheck commands in automation unless the user explicitly asks (see `00-global-safety.mdc`).
 - Use shared schemas from `schema/zod.ts` (and `schema/plaid.ts` where applicable) for request/response validation and type inference instead of ad-hoc types.
 
 ## General
 
 - Keep proposed fixes and edits concise. One logical change per edit when possible.
+- Tests: do not add, modify, or run tests unless the user asks (see `05-workflow-execution.mdc`).

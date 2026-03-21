@@ -498,6 +498,7 @@ export class TransferService implements ITransferService {
         description: `Extra debt payment from ${sourceAccountRegister.name}`,
         fromDescription: `Debt Payment to ${debtAccountRegister.name}`,
         forecastDate: lastAt, // Use the actual forecast date being processed
+        categoryId: debtAccountRegister.paymentCategoryId ?? null,
         reoccurrence: {
           accountId: "",
           accountRegisterId: debtAccountRegister.id,
