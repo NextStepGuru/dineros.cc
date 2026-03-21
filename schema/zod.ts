@@ -85,7 +85,7 @@ function normalizeSettings(value: unknown, includePrivateMfaFields: boolean) {
           ? {
               transports: passkey.transports
                 .filter((transport) => typeof transport === "string")
-                .map((transport) => String(transport)),
+                .map(String),
             }
           : {}),
         ...(typeof passkey.name === "string" ? { name: passkey.name } : {}),
@@ -190,7 +190,7 @@ export const publicProfileSchema = z.object({
   id: z.number(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   password: z.string(),
   countryId: z.number().nullable().optional(),
   timezoneOffset: z.number().nullable().optional(),
@@ -198,14 +198,12 @@ export const publicProfileSchema = z.object({
   settings: publicUserSettingsSchema,
 });
 
-export const privateUserSchema = publicProfileSchema.merge(
-  z.object({
-    settings: privateUserSettingsSchema,
-  })
-);
+export const privateUserSchema = publicProfileSchema.extend({
+  settings: privateUserSettingsSchema,
+});
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
   tokenChallenge: z.string().optional(),
 });
@@ -228,7 +226,7 @@ export const registerSchema = z
   .object({
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
-    email: z.string().email("Invalid email address"),
+    email: z.email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters long"),
     confirmPassword: z
       .string()
@@ -246,7 +244,7 @@ export const accountRegisterSchema = z.object({
     .number()
     .min(1)
     .nullable()
-    .transform((a) => (a ? a : undefined))
+    .transform((a) => a ?? undefined)
     .optional(),
   typeId: z.coerce.number().min(1).default(0),
   budgetId: z.coerce.number().min(1).default(0),
@@ -290,8 +288,8 @@ export const accountRegisterSchema = z.object({
   assetResidualValue: z.coerce.number().nullable().default(null),
   assetUsefulLifeYears: z.coerce.number().nullable().default(null),
   assetStartAt: z.coerce.date().nullable().default(null),
-  paymentCategoryId: z.string().uuid().nullable().optional(),
-  interestCategoryId: z.string().uuid().nullable().optional(),
+  paymentCategoryId: z.uuid().nullable().optional(),
+  interestCategoryId: z.uuid().nullable().optional(),
 });
 
 const amountAdjustmentModeSchema = z.enum(["NONE", "PERCENT", "FIXED"]);
@@ -306,7 +304,7 @@ export const reoccurrenceSchema = z
     transferAccountRegisterId: z.coerce.number().optional(),
     intervalCount: z.coerce.number().min(1).default(0),
     adjustBeforeIfOnWeekend: z.boolean().default(false),
-    categoryId: z.string().uuid().nullable().optional(),
+    categoryId: z.uuid().nullable().optional(),
     endAt: z.union([
       z.string(),
       z.date().transform((d) => d.toISOString()),
@@ -340,21 +338,21 @@ export const reoccurrenceSchema = z
     }
     if (data.amountAdjustmentDirection == null) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Adjustment direction is required when an adjustment is enabled.",
         path: ["amountAdjustmentDirection"],
       });
     }
     if (data.amountAdjustmentValue == null || data.amountAdjustmentValue <= 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Adjustment value must be greater than zero.",
         path: ["amountAdjustmentValue"],
       });
     }
     if (data.amountAdjustmentIntervalId == null || data.amountAdjustmentIntervalId < 1) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Adjustment interval is required when an adjustment is enabled.",
         path: ["amountAdjustmentIntervalId"],
       });
@@ -367,7 +365,7 @@ export const reoccurrenceSplitSchema = z.object({
   transferAccountRegisterId: z.coerce.number().min(1),
   amount: z.coerce.number(),
   description: z.string().max(500).optional(),
-  categoryId: z.string().uuid().nullable().optional(),
+  categoryId: z.uuid().nullable().optional(),
   sortOrder: z.coerce.number().min(0).default(0),
 });
 
@@ -403,6 +401,10 @@ export const budgetSchema = z.object({
 
 export const createBudgetSchema = z.object({
   name: z.string().min(1).max(255),
+  /** When true, create a new financial Account and clone default budget + categories into it. */
+  duplicateFinancialAccount: z.boolean().optional(),
+  /** Optional budget to copy from when duplicating (defaults to default budget). */
+  sourceBudgetId: z.coerce.number().int().positive().optional(),
 });
 
 export const renameBudgetSchema = z.object({

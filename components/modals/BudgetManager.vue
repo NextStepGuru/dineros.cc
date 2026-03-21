@@ -18,6 +18,7 @@ const authStore = useAuthStore();
 const { $api } = useNuxtApp();
 
 const createName = ref("");
+const duplicateFinancialAccount = ref(false);
 const renameName = ref(props.budget?.name ?? "");
 const isSubmitting = ref(false);
 
@@ -36,11 +37,22 @@ async function handleCreate() {
   try {
     const created = await $api<Budget>("/api/budget", {
       method: "POST",
-      body: { name },
+      body: {
+        name,
+        duplicateFinancialAccount: duplicateFinancialAccount.value,
+      },
     }).catch((err) => handleError(err, toast));
     if (created) {
       listStore.addBudget(created);
-      toast.add({ color: "success", description: "Budget created." });
+      if (duplicateFinancialAccount.value) {
+        await listStore.fetchLists();
+      }
+      toast.add({
+        color: "success",
+        description: duplicateFinancialAccount.value
+          ? "New financial account and budget created from your default."
+          : "Budget created.",
+      });
       props.callback();
     }
   } finally {
@@ -121,7 +133,7 @@ const title = computed(() => {
 const description = computed(() => {
   switch (props.mode) {
     case "create":
-      return "Create a new budget by copying all accounts and data from your default budget. You can then change it without affecting the default.";
+      return "Create a new budget by copying registers and data from your default budget. Optionally create a separate financial account (new workspace) with categories and settings migrated.";
     case "rename":
       return "Change the name of this budget.";
     case "reset":
@@ -153,6 +165,13 @@ UModal(
             placeholder="e.g. Vacation plan"
             maxlength="255"
           )
+        UFormField(label="Financial account")
+          UCheckbox(
+            v-model="duplicateFinancialAccount"
+            label="Create new financial account (copy categories and migrate references)"
+          )
+          p.text-sm.text-gray-500.mt-1
+            | Uses a new account workspace; your default budget is unchanged.
       template(v-else-if="mode === 'rename' && budget")
         UFormField(label="Name")
           UInput(

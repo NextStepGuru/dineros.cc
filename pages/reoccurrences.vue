@@ -18,7 +18,6 @@ import {
 } from "~/lib/categoryFilter";
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
-import CombinedGlobalCategoryFilter from "~/components/filters/CombinedGlobalCategoryFilter.vue";
 
 const ModalsEditReoccurrence = defineAsyncComponent(
   () => import("~/components/modals/EditReoccurrence.vue")
@@ -29,6 +28,7 @@ definePageMeta({
 });
 
 const listStore = useListStore();
+const authStore = useAuthStore();
 const toast = useToast();
 
 /** Root `overflow-auto` + table `overflow-clip` break sticky headers when the real scroll is the outer wrapper. */
@@ -116,11 +116,19 @@ async function handleRecalculate() {
 
   isRecalculating.value = true;
   try {
+    const accountId =
+      listStore.budgets.find((b) => b.id === authStore.budgetId)?.accountId ??
+      listStore.getAccounts?.[0]?.id;
+    const body: {
+      accountId?: string;
+      budgetId?: number;
+    } = { accountId };
+    if (authStore.budgetId > 0) {
+      body.budgetId = authStore.budgetId;
+    }
     const data = await (useNuxtApp().$api as typeof $fetch)<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>("/api/recalculate", {
       method: "POST",
-      body: {
-        accountId: listStore.getAccounts?.[0]?.id,
-      },
+      body,
     });
 
     if (data?.success) {
@@ -185,7 +193,7 @@ const columns: TableColumn<Reoccurrence>[] = [
     accessorKey: "amount",
     header: () => h("div", { class: "text-right" }, "Amount"),
     cell: ({ row }) => {
-      const className = `text-right ${parseInt(row.getValue("amount")) < 0
+      const className = `text-right ${Number.parseInt(String(row.getValue("amount")), 10) < 0
         ? "dark:text-red-300 text-red-700"
         : ""
         }`;
@@ -267,7 +275,7 @@ defineShortcuts({
   },
   meta_a: () => handleAddReoccurrence(),
   meta_f: () => {
-    void combinedTableFilterRef.value?.expandAndFocus();
+    combinedTableFilterRef.value?.expandAndFocus()?.catch(() => {});
   },
 });
 
@@ -384,7 +392,7 @@ onBeforeUnmount(() => {
           :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
           @click="showShortcuts = !showShortcuts"
         )
-      CombinedGlobalCategoryFilter(
+      FiltersCombinedGlobalCategoryFilter(
         ref="combinedTableFilterRef"
         v-model:global-filter="globalFilter"
         v-model:category-filter="categoryFilter"

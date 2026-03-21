@@ -108,7 +108,7 @@ function sendMessage({ data }: FormSubmitEvent<ContactSchemaType>) {
   ].join("\n");
   const subjectLine = subject || `[${reasonLabel}] Contact from Dineros`;
   const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
+  globalThis.location.href = mailto;
   toast.add({
     color: "success",
     description: "Opening your email client to send your message.",

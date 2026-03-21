@@ -10,6 +10,7 @@ import { prisma } from "~/server/clients/prismaClient";
 const replaySchema = z.object({
   accountRegisterId: z.coerce.number().optional(),
   accountId: z.string().optional(),
+  budgetId: z.coerce.number().optional(),
   fixedNow: z.string().optional(),
   timezone: z.string().optional(),
   startDate: z.string().optional(),
@@ -19,7 +20,7 @@ const replaySchema = z.object({
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { accountId, fixedNow, timezone, startDate, endDate } =
+    const { accountId, budgetId, fixedNow, timezone, startDate, endDate } =
       replaySchema.parse(body);
 
     if (!accountId) {
@@ -33,6 +34,7 @@ export default defineEventHandler(async (event) => {
 
     const buildContext = () => ({
       accountId,
+      ...(budgetId != null && budgetId > 0 ? { budgetId } : {}),
       startDate: startDate
         ? dateTimeService.toDate(dateTimeService.parseInput(startDate))
         : dateTimeService.now().startOf("month").toDate(),

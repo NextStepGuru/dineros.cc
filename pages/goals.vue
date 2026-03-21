@@ -40,7 +40,6 @@ function handleTableClick(goal: SavingsGoal) {
 }
 
 function handleAddGoal() {
-  const first = listStore.getAccountRegisters[0];
   const props: EditSavingsGoalProps = {
     goal: null,
     callback: () => {

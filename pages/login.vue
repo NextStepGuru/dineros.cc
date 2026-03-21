@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import type {
-  AuthenticationResponseJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-} from "@simplewebauthn/types";
+import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/types";
 import type { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { startAuthentication } from "@simplewebauthn/browser";
@@ -92,6 +89,123 @@ const authTokenCookie = useCookie("authToken", {
   path: "/",
 });
 
+async function completePasswordLoginRedirect(
+  response: LoginResponse,
+): Promise<boolean> {
+  const result = processLoginResponse(response);
+  if (!result.success || !result.token) return false;
+  authTokenCookie.value = result.token;
+  authStore.setToken(result.token);
+  if (result.user) {
+    authStore.setUser(result.user as User);
+  }
+  await listStore.fetchLists();
+  const defaultBudget = listStore.getDefaultBudget;
+  if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
+  const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
+  toast.add({ color: "success", description: "Login successful!" });
+  globalThis.location.assign(redirectPath);
+  return true;
+}
+
+async function runInitialLoginStep(
+  $api: typeof $fetch,
+  formData: LoginSchemaType,
+): Promise<void> {
+  let data: LoginResponse | null = null;
+  const err: { value?: { statusCode?: number; data?: unknown } } = {
+    value: undefined,
+  };
+  try {
+    data = await $api<LoginResponse>("/api/login", {
+      method: "POST",
+      body: formData,
+    });
+  } catch (e: unknown) {
+    err.value = e as { statusCode?: number; data?: unknown };
+  }
+
+  if (err.value) {
+    isSaving.value = false;
+    toast.add({
+      color: "error",
+      description: formatLoginError(err.value),
+    });
+    return;
+  }
+
+  const processed = processLoginResponse(data as LoginResponse);
+  if (processed.requiresTwoFactor) {
+    tokenChallengeRequired.value = true;
+    mfaMethods.value = processed.mfaMethods?.length
+      ? processed.mfaMethods
+      : ["totp"];
+    selectedMfaMethod.value = mfaMethods.value.includes("totp")
+      ? "totp"
+      : mfaMethods.value[0];
+    emailCodeSent.value = false;
+    isSaving.value = false;
+    return;
+  }
+
+  const completed = await completePasswordLoginRedirect(data as LoginResponse);
+  if (!completed) {
+    toast.add({
+      color: "error",
+      description: processed.errorMessage || "Invalid login credentials.",
+    });
+  }
+  isSaving.value = false;
+}
+
+async function runTotpMfaStep(): Promise<void> {
+  if (!String(formState.value.tokenChallenge || "").trim()) {
+    toast.add({
+      color: "error",
+      description: "Enter your authentication code.",
+    });
+    isSaving.value = false;
+    return;
+  }
+
+  const data = await $fetch<LoginResponse>("/api/mfa/totp/verify", {
+    method: "POST",
+    body: { token: String(formState.value.tokenChallenge || "").trim() },
+  });
+  await completePasswordLoginRedirect(data);
+  isSaving.value = false;
+}
+
+async function runEmailMfaStep($api: typeof $fetch): Promise<void> {
+  const code = String(formState.value.tokenChallenge || "").trim();
+  if (!emailCodeSent.value) {
+    await $api("/api/mfa/email/send-code", { method: "POST" });
+    emailCodeSent.value = true;
+    toast.add({
+      color: "success",
+      description: "Verification code sent to your email.",
+    });
+    isSaving.value = false;
+    return;
+  }
+
+  if (!code) {
+    toast.add({
+      color: "error",
+      description: "Enter the email verification code.",
+    });
+    isSaving.value = false;
+    return;
+  }
+
+  const data = await $fetch<LoginResponse>("/api/mfa/email/verify", {
+    method: "POST",
+    body: { code },
+  });
+  await completePasswordLoginRedirect(data);
+  isSaving.value = false;
+}
+
 // Submit handler - use $fetch (not useAPI) when already mounted to avoid Nuxt 4 warning
 const handleSubmit = async ({
   data: formData,
@@ -100,131 +214,23 @@ const handleSubmit = async ({
     isSaving.value = true;
     const $api = useNuxtApp().$api as typeof $fetch;
 
-    const completeAuth = async (response: LoginResponse) => {
-      const result = processLoginResponse(response);
-      if (result.success && result.token) {
-        authTokenCookie.value = result.token;
-        authStore.setToken(result.token);
-        if (result.user) {
-          authStore.setUser(result.user as User);
-        }
-
-        await listStore.fetchLists();
-        const defaultBudget = listStore.getDefaultBudget;
-        if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
-        const redirectPath = getPostLoginRedirect(
-          listStore.getAccountRegisters,
-        );
-        toast.add({ color: "success", description: "Login successful!" });
-        window.location.assign(redirectPath);
-        return true;
-      }
-      return false;
-    };
-
     if (!tokenChallengeRequired.value) {
-      let data: LoginResponse | null = null;
-      const err: { value?: { statusCode?: number; data?: unknown } } = {
-        value: undefined,
-      };
-      try {
-        data = await $api<LoginResponse>("/api/login", {
-          method: "POST",
-          body: formData,
-        });
-      } catch (e: unknown) {
-        err.value = e as { statusCode?: number; data?: unknown };
-      }
-
-      if (err.value) {
-        isSaving.value = false;
-        toast.add({
-          color: "error",
-          description: formatLoginError(err.value),
-        });
-        return;
-      }
-
-      const processed = processLoginResponse(data as LoginResponse);
-      if (processed.requiresTwoFactor) {
-        tokenChallengeRequired.value = true;
-        mfaMethods.value = processed.mfaMethods?.length
-          ? processed.mfaMethods
-          : ["totp"];
-        selectedMfaMethod.value = mfaMethods.value.includes("totp")
-          ? "totp"
-          : mfaMethods.value[0];
-        emailCodeSent.value = false;
-        isSaving.value = false;
-        return;
-      }
-
-      const completed = await completeAuth(data as LoginResponse);
-      if (!completed) {
-        toast.add({
-          color: "error",
-          description: processed.errorMessage || "Invalid login credentials.",
-        });
-      }
-      isSaving.value = false;
+      await runInitialLoginStep($api, formData);
       return;
     }
-
     if (selectedMfaMethod.value === "totp") {
-      if (!String(formState.value.tokenChallenge || "").trim()) {
-        toast.add({
-          color: "error",
-          description: "Enter your authentication code.",
-        });
-        isSaving.value = false;
-        return;
-      }
-
-      const data = await $fetch<LoginResponse>("/api/mfa/totp/verify", {
-        method: "POST",
-        body: { token: String(formState.value.tokenChallenge || "").trim() },
-      });
-      await completeAuth(data);
-      isSaving.value = false;
+      await runTotpMfaStep();
       return;
     }
-
     if (selectedMfaMethod.value === "email") {
-      const code = String(formState.value.tokenChallenge || "").trim();
-      if (!emailCodeSent.value) {
-        await $api("/api/mfa/email/send-code", { method: "POST" });
-        emailCodeSent.value = true;
-        toast.add({
-          color: "success",
-          description: "Verification code sent to your email.",
-        });
-        isSaving.value = false;
-        return;
-      }
-
-      if (!code) {
-        toast.add({
-          color: "error",
-          description: "Enter the email verification code.",
-        });
-        isSaving.value = false;
-        return;
-      }
-
-      const data = await $fetch<LoginResponse>("/api/mfa/email/verify", {
-        method: "POST",
-        body: { code },
-      });
-      await completeAuth(data);
-      isSaving.value = false;
-      return;
+      await runEmailMfaStep($api);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     isSaving.value = false;
-    toast.add({
-      color: "error",
-      description: "An error occurred during login.",
-    });
+    handleError(
+      error instanceof Error ? error : new Error(String(error)),
+      toast,
+    );
   }
 };
 
@@ -255,18 +261,18 @@ async function startPasskeySignIn() {
       }
       const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
       toast.add({ color: "success", description: "Login successful!" });
-      window.location.assign(redirectPath);
+      globalThis.location.assign(redirectPath);
       return;
     }
     toast.add({
       color: "error",
       description: result.errorMessage || "Passkey verification failed.",
     });
-  } catch (_error) {
-    toast.add({
-      color: "error",
-      description: "Unable to complete passkey sign-in.",
-    });
+  } catch (error: unknown) {
+    handleError(
+      error instanceof Error ? error : new Error(String(error)),
+      toast,
+    );
   } finally {
     isSaving.value = false;
   }

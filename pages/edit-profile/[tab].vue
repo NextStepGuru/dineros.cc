@@ -72,16 +72,19 @@ const navigationItems = computed(() => {
   ];
 
   if (authStore.getUser?.isAdmin === true) {
-    baseItems.push({
-      label: "Admin",
-      to: "/edit-profile/admin-settings",
-      active: route.path.startsWith("/edit-profile/admin-settings"),
-    });
-    baseItems.push({
-      label: "OpenAI logs",
-      to: "/edit-profile/openai-logs",
-      active: route.path.startsWith("/edit-profile/openai-logs"),
-    });
+    return [
+      ...baseItems,
+      {
+        label: "Admin",
+        to: "/edit-profile/admin-settings",
+        active: route.path.startsWith("/edit-profile/admin-settings"),
+      },
+      {
+        label: "OpenAI logs",
+        to: "/edit-profile/openai-logs",
+        active: route.path.startsWith("/edit-profile/openai-logs"),
+      },
+    ];
   }
 
   return baseItems;
@@ -89,31 +92,19 @@ const navigationItems = computed(() => {
 
 // Set up page head for SSR
 useHead(() => {
-  try {
-    const currentPath = route.path;
-    const tabLabel =
-      navigationItems.value.find((item) => item.to === currentPath)?.label ||
-      "Profile";
-    return {
-      title: `Edit Profile - ${tabLabel}`,
-      meta: [
-        {
-          name: "description",
-          content: `Edit your profile settings - ${tabLabel}`,
-        },
-      ],
-    };
-  } catch (error) {
-    return {
-      title: "Edit Profile",
-      meta: [
-        {
-          name: "description",
-          content: "Edit your profile settings",
-        },
-      ],
-    };
-  }
+  const currentPath = route.path;
+  const tabLabel =
+    navigationItems.value.find((item) => item.to === currentPath)?.label ||
+    "Profile";
+  return {
+    title: `Edit Profile - ${tabLabel}`,
+    meta: [
+      {
+        name: "description",
+        content: `Edit your profile settings - ${tabLabel}`,
+      },
+    ],
+  };
 });
 
 // Initialize with default tab if no query parameter

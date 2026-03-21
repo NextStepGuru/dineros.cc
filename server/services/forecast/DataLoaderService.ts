@@ -17,6 +17,7 @@ export class DataLoaderService implements IDataLoaderService {
   }
 
   async loadAccountData(context: ForecastContext): Promise<AccountData> {
+    const { accountId, budgetId } = context;
     // Clear existing cache
     this.cache.accountRegister.clear();
     this.cache.registerEntry.clear();
@@ -33,12 +34,12 @@ export class DataLoaderService implements IDataLoaderService {
       ,
       ,
     ] = await Promise.all([
-      this.loadAccountRegisters(context.accountId),
-      this.loadRegisterEntries(context.accountId),
-      this.loadReoccurrences(context.accountId),
-      this.loadReoccurrenceSkips(context.accountId),
-      this.loadReoccurrenceSplits(context.accountId),
-      this.loadSavingsGoals(context.accountId),
+      this.loadAccountRegisters(accountId, budgetId),
+      this.loadRegisterEntries(accountId, budgetId),
+      this.loadReoccurrences(accountId, budgetId),
+      this.loadReoccurrenceSkips(accountId, budgetId),
+      this.loadReoccurrenceSplits(accountId, budgetId),
+      this.loadSavingsGoals(accountId, budgetId),
     ]);
 
     const minReoccurrenceDate = (() => {
@@ -63,9 +64,13 @@ export class DataLoaderService implements IDataLoaderService {
 
   private async loadAccountRegisters(
     accountId?: string,
+    budgetId?: number,
   ): Promise<CacheAccountRegister[]> {
     const accountRegisters = await this.db.accountRegister.findMany({
-      where: { accountId },
+      where: {
+        accountId,
+        ...(budgetId != null ? { budgetId } : {}),
+      },
       select: {
         id: true,
         budgetId: true,
@@ -160,10 +165,16 @@ export class DataLoaderService implements IDataLoaderService {
     return lokiAccountRegisters;
   }
 
-  private async loadRegisterEntries(accountId?: string) {
+  private async loadRegisterEntries(
+    accountId?: string,
+    budgetId?: number,
+  ) {
     const registerEntries = await this.db.registerEntry.findMany({
       where: {
-        register: { accountId },
+        register: {
+          accountId,
+          ...(budgetId != null ? { budgetId } : {}),
+        },
         isCleared: false, // Exclude cleared entries from active calculations
         OR: [
           // Load all non-projected entries (including historical ones)
@@ -190,9 +201,17 @@ export class DataLoaderService implements IDataLoaderService {
     return cacheEntries;
   }
 
-  private async loadReoccurrences(accountId?: string) {
+  private async loadReoccurrences(
+    accountId?: string,
+    budgetId?: number,
+  ) {
     const reoccurrences = await this.db.reoccurrence.findMany({
-      where: { accountId },
+      where: {
+        accountId,
+        ...(budgetId != null
+          ? { register: { budgetId } }
+          : {}),
+      },
       include: {
         interval: { select: { name: true } },
         amountAdjustmentInterval: { select: { name: true } },
@@ -220,9 +239,21 @@ export class DataLoaderService implements IDataLoaderService {
     return reoccurrences;
   }
 
-  private async loadReoccurrenceSkips(accountId?: string) {
+  private async loadReoccurrenceSkips(
+    accountId?: string,
+    budgetId?: number,
+  ) {
     const reoccurrenceSkips = await this.db.reoccurrenceSkip.findMany({
-      where: { accountId },
+      where: {
+        accountId,
+        ...(budgetId != null
+          ? {
+              reoccurrence: {
+                register: { budgetId },
+              },
+            }
+          : {}),
+      },
     });
 
     // Load into cache
@@ -239,10 +270,18 @@ export class DataLoaderService implements IDataLoaderService {
     return reoccurrenceSkips;
   }
 
-  private async loadReoccurrenceSplits(accountId?: string) {
+  private async loadReoccurrenceSplits(
+    accountId?: string,
+    budgetId?: number,
+  ) {
     const reoccurrenceSplits = await this.db.reoccurrenceSplit.findMany({
       where: {
-        reoccurrence: { accountId },
+        reoccurrence: {
+          accountId,
+          ...(budgetId != null
+            ? { register: { budgetId } }
+            : {}),
+        },
       },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     });
@@ -259,9 +298,14 @@ export class DataLoaderService implements IDataLoaderService {
 
   private async loadSavingsGoals(
     accountId?: string,
+    budgetId?: number,
   ): Promise<CacheSavingsGoal[]> {
     const goals = await this.db.savingsGoal.findMany({
-      where: { accountId, isArchived: false },
+      where: {
+        accountId,
+        isArchived: false,
+        ...(budgetId != null ? { budgetId } : {}),
+      },
       orderBy: { sortOrder: "asc" },
     });
 
