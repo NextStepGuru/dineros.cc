@@ -221,7 +221,10 @@ export default defineEventHandler(async (event) => {
         };
       }
 
-      const firstEntry = balanceUpdated[0]!;
+      const firstEntry = balanceUpdated[0];
+      if (firstEntry === undefined) {
+        throw new Error("register quick mode: missing first entry");
+      }
       const entryWithLowestBalance = balanceUpdated.reduce(
         (minEntry, entry) => {
           return entry.balance < minEntry.balance ? entry : minEntry;
@@ -281,7 +284,10 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    const firstEntry = balanceUpdated[0]!;
+    const firstEntry = balanceUpdated[0];
+    if (firstEntry === undefined) {
+      throw new Error("register full mode: missing first entry");
+    }
     const entryWithLowestBalance = balanceUpdated.reduce((minEntry, entry) => {
       return entry.balance < minEntry.balance ? entry : minEntry;
     }, firstEntry);

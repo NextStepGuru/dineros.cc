@@ -1,11 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IAccountRegisterService } from "./types";
-import type { CacheAccountRegister } from "./ModernCacheService";
+import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
 import prismaPkg from "@prisma/client";
-import { ModernCacheService } from "./ModernCacheService";
-import { LoanCalculatorService } from "./LoanCalculatorService";
-import { RegisterEntryService } from "./RegisterEntryService";
-import { TransferService } from "./TransferService";
+import type { LoanCalculatorService } from "./LoanCalculatorService";
+import type { RegisterEntryService } from "./RegisterEntryService";
+import type { TransferService } from "./TransferService";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 import { absoluteMoney } from "../../../lib/bankers-rounding";

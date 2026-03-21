@@ -1,16 +1,9 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  type MockedFunction,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Global H3 function mocks
-(global as any).defineEventHandler = vi.fn((handler) => handler);
-(global as any).readBody = vi.fn();
-(global as any).createError = vi.fn((error) => {
+(globalThis as any).defineEventHandler = vi.fn((handler) => handler);
+(globalThis as any).readBody = vi.fn();
+(globalThis as any).createError = vi.fn((error) => {
   const statusCode = error.statusCode || 500;
   const message = error.statusMessage || error.message || "Unknown error";
   const fullMessage = `HTTP ${statusCode}: ${message}`;
@@ -19,7 +12,7 @@ import {
   err.statusMessage = message;
   throw err;
 });
-(global as any).getQuery = vi.fn();
+(globalThis as any).getQuery = vi.fn();
 
 // Mock services and clients
 const mockEngine = {
@@ -102,7 +95,7 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       mockEngine.recalculate.mockResolvedValue({
@@ -140,11 +133,11 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "" } } as any;
       const mockBody = { accountId: "" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "" });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Account ID is required to recalculate account balances"
+        "Account ID is required to recalculate account balances",
       );
     });
 
@@ -152,10 +145,10 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = {} as any;
       const mockBody = {};
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Account ID is required to recalculate account balances"
+        "Account ID is required to recalculate account balances",
       );
     });
 
@@ -163,7 +156,7 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       mockEngine.recalculate.mockResolvedValue({
@@ -172,7 +165,7 @@ describe("Recalculate API Endpoints", () => {
       });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Forecast calculation failed: Database connection failed, Invalid date range"
+        "Forecast calculation failed: Database connection failed, Invalid date range",
       );
     });
 
@@ -180,7 +173,7 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       mockEngine.recalculate.mockResolvedValue({
@@ -188,14 +181,14 @@ describe("Recalculate API Endpoints", () => {
       });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Forecast calculation failed: undefined"
+        "Forecast calculation failed: undefined",
       );
     });
 
     it("should handle schema validation errors", async () => {
       const mockEvent = {} as any;
 
-      (global as any).readBody.mockResolvedValue(123);
+      (globalThis as any).readBody.mockResolvedValue(123);
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow();
       expect(mockHandleApiError).toHaveBeenCalled();
@@ -205,7 +198,7 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       mockEngineFactory.create.mockImplementation(() => {
@@ -213,7 +206,7 @@ describe("Recalculate API Endpoints", () => {
       });
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Engine creation failed"
+        "Engine creation failed",
       );
       expect(mockHandleApiError).toHaveBeenCalled();
     });
@@ -222,17 +215,17 @@ describe("Recalculate API Endpoints", () => {
       const mockEvent = { body: { accountId: "account-123" } } as any;
       const mockBody = { accountId: "account-123" };
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       // Reset engine factory to return working engine
       mockEngineFactory.create.mockReturnValue(mockEngine);
       mockEngine.recalculate.mockRejectedValue(
-        new Error("Database connection lost")
+        new Error("Database connection lost"),
       );
 
       await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
-        "Database connection lost"
+        "Database connection lost",
       );
       expect(mockHandleApiError).toHaveBeenCalled();
     });
@@ -256,7 +249,7 @@ describe("Recalculate API Endpoints", () => {
 
       mockMoment.mockReturnValue(mockMomentChain);
 
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
 
       // Reset engine factory to return working engine
@@ -291,7 +284,7 @@ describe("Recalculate API Endpoints", () => {
     it("should successfully recalculate single account via query parameter", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({ accountId: "account-123" });
+      (globalThis as any).getQuery.mockReturnValue({ accountId: "account-123" });
       mockPrisma.accountRegister.findFirst.mockResolvedValue({
         id: 1,
         accountId: "account-123",
@@ -337,7 +330,7 @@ describe("Recalculate API Endpoints", () => {
     it("should handle single account not found", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({
+      (globalThis as any).getQuery.mockReturnValue({
         accountId: "nonexistent-account",
       });
       mockPrisma.accountRegister.findFirst.mockResolvedValue(null);
@@ -355,7 +348,7 @@ describe("Recalculate API Endpoints", () => {
     it("should successfully recalculate all accounts when no query parameter", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([
         { accountId: "account-1" },
         { accountId: "account-2" },
@@ -422,7 +415,7 @@ describe("Recalculate API Endpoints", () => {
     it("should handle no accounts found in database", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([]);
 
       const result = await recalculateTaskHandler(mockEvent);
@@ -439,7 +432,7 @@ describe("Recalculate API Endpoints", () => {
     it("should handle mixed success and failure scenarios", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([
         { accountId: "account-success" },
         { accountId: "account-failure" },
@@ -503,7 +496,7 @@ describe("Recalculate API Endpoints", () => {
     it("should handle calculation failure without errors array", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([
         { accountId: "account-failure" },
       ]);
@@ -527,7 +520,7 @@ describe("Recalculate API Endpoints", () => {
     it("should handle non-Error exceptions", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([
         { accountId: "account-error" },
       ]);
@@ -564,7 +557,7 @@ describe("Recalculate API Endpoints", () => {
 
       mockMoment.mockReturnValue(mockMomentChain);
 
-      (global as any).getQuery.mockReturnValue({ accountId: "account-123" });
+      (globalThis as any).getQuery.mockReturnValue({ accountId: "account-123" });
       mockPrisma.accountRegister.findFirst.mockResolvedValue({
         id: 1,
         accountId: "account-123",
@@ -593,7 +586,7 @@ describe("Recalculate API Endpoints", () => {
     it("should create fresh engine instances for each account", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockResolvedValue([
         { accountId: "account-1" },
         { accountId: "account-2" },
@@ -616,26 +609,26 @@ describe("Recalculate API Endpoints", () => {
     it("should handle database query errors for account lookup", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({ accountId: "account-123" });
+      (globalThis as any).getQuery.mockReturnValue({ accountId: "account-123" });
       mockPrisma.accountRegister.findFirst.mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       await expect(recalculateTaskHandler(mockEvent)).rejects.toThrow(
-        "Database connection failed"
+        "Database connection failed",
       );
     });
 
     it("should handle database query errors for finding all accounts", async () => {
       const mockEvent = {} as any;
 
-      (global as any).getQuery.mockReturnValue({});
+      (globalThis as any).getQuery.mockReturnValue({});
       mockPrisma.accountRegister.findMany.mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       await expect(recalculateTaskHandler(mockEvent)).rejects.toThrow(
-        "Database connection failed"
+        "Database connection failed",
       );
     });
   });
@@ -650,7 +643,7 @@ describe("Recalculate API Endpoints", () => {
       mockEngineFactory.create.mockReturnValue(mockEngine);
 
       const mockEvent = { body: { accountId: "account-123" } } as any;
-      (global as any).readBody.mockResolvedValue({ accountId: "account-123" });
+      (globalThis as any).readBody.mockResolvedValue({ accountId: "account-123" });
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
       mockEngine.recalculate.mockResolvedValue({
         isSuccess: true,
@@ -660,8 +653,6 @@ describe("Recalculate API Endpoints", () => {
 
       await postHandler(mockEvent);
 
-      const postCallCount = mockEngineFactory.create.mock.calls.length;
-
       // Test task endpoint
       vi.clearAllMocks();
       mockEngineFactory.create.mockReturnValue(mockEngine);
@@ -669,7 +660,7 @@ describe("Recalculate API Endpoints", () => {
       const taskModule = await import("~/server/api/tasks/recalculate");
       const taskHandler = taskModule.default;
 
-      (global as any).getQuery.mockReturnValue({ accountId: "account-123" });
+      (globalThis as any).getQuery.mockReturnValue({ accountId: "account-123" });
       mockPrisma.accountRegister.findFirst.mockResolvedValue({
         id: 1,
         accountId: "account-123",

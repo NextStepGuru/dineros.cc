@@ -1,8 +1,8 @@
-import { defineEventHandler } from "h3";
+import { defineEventHandler, type EventHandler } from "h3";
 import { log } from "~/server/logger";
 import { handleApiError } from "~/server/lib/handleApiError";
 
-export function withErrorHandler(handler: Function) {
+export function withErrorHandler(handler: EventHandler) {
   return defineEventHandler(async (event) => {
     try {
       return await handler(event);

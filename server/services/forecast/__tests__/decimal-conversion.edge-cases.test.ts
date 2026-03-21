@@ -608,7 +608,7 @@ describe("Decimal/String Conversion Edge Cases", () => {
       expect(entries).toHaveLength(4);
 
       // Calculate expected running balance
-      let expectedBalance = 5000.5;
+      const expectedBalance = 5000.5;
       const expectedBalances = [
         expectedBalance - 100.25, // 4900.25
         4900.25 + 50.75, // 4951.00

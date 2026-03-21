@@ -8,13 +8,23 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import { dateTimeService } from "../DateTimeService";
-import type { RegisterEntry } from "~/types/types";
 
 const ACCOUNT_ID = "asset-depreciation-account";
 
 /** Round for stable snapshots / float compares */
 function r2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function sortByCreatedAt<
+  T extends { createdAt: Date | string | number },
+>(arr: readonly T[]): T[] {
+  const copy = [...arr];
+  copy.sort(
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  return copy;
 }
 
 function baseRegister(overrides: Record<string, unknown>) {
@@ -68,7 +78,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
   it("Vehicle Asset declining-balance depreciation over 12 months", async () => {
     dateTimeService.setNowOverride("2024-01-01T12:00:00.000Z");
 
-    const checking = await db.accountRegister.create({
+    await db.accountRegister.create({
       data: baseRegister({
         name: "Checking",
         typeId: 1,
@@ -136,18 +146,18 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     expect(depreciationEntries.length).toBe(12);
 
     // First month: 30,000 * 0.15 / 12 = 375 (opening from seed entry)
-    expect(r2(Number(depreciationEntries[0]!.amount))).toBe(-375);
+    const firstDep = depreciationEntries.at(0);
+    expect(firstDep).toBeDefined();
+    expect(r2(Number(firstDep?.amount))).toBe(-375);
 
     // Verify balance decreases each month (mock may give balance entry balance 0)
-    const sortedEntries = vehicleEntries.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    const sortedEntries = sortByCreatedAt(vehicleEntries);
     let prevBalance = 30_000;
     for (const entry of sortedEntries) {
       if (entry.isBalanceEntry) {
         const bal = r2(Number(entry.balance));
-        if (bal !== 0) expect(bal).toBe(r2(prevBalance));
-        else prevBalance = 30_000; // mock: treat 0 as opening
+        if (bal === 0) prevBalance = 30_000; // mock: treat 0 as opening
+        else expect(bal).toBe(r2(prevBalance));
         continue;
       }
       const newBalance = r2(Number(entry.balance));
@@ -156,9 +166,10 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     }
 
     // Final balance should be less than starting balance
-    const lastEntry = sortedEntries[sortedEntries.length - 1];
-    expect(Number(lastEntry!.balance)).toBeLessThan(30_000);
-    expect(Number(lastEntry!.balance)).toBeGreaterThan(5_000); // Above residual value
+    const lastEntry = sortedEntries.at(-1);
+    expect(lastEntry).toBeDefined();
+    expect(Number(lastEntry?.balance)).toBeLessThan(30_000);
+    expect(Number(lastEntry?.balance)).toBeGreaterThan(5_000); // Above residual value
   });
 
   it("Vehicle Asset straight-line depreciation over 12 months", async () => {
@@ -217,7 +228,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
         balance: 0,
         latestBalance: 0,
         statementAt: new Date("2024-01-01T00:00:00.000Z"),
-        depreciationRate: 0.50, // High rate to test floor
+        depreciationRate: 0.5, // High rate to test floor
         depreciationMethod: "declining-balance",
         assetOriginalValue: 10_000,
         assetResidualValue: 5_000,
@@ -257,9 +268,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     const vehicleEntries = result.registerEntries.filter(
       (e) => e.accountRegisterId === vehicle.id
     );
-    const sortedEntries = vehicleEntries.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    const sortedEntries = sortByCreatedAt(vehicleEntries);
 
     // Verify no balance goes below residual value (skip balance entry if mock gave 0)
     for (const entry of sortedEntries) {
@@ -268,8 +277,9 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     }
 
     // Final balance should be at or above residual value
-    const lastEntry = sortedEntries[sortedEntries.length - 1];
-    expect(Number(lastEntry!.balance)).toBeGreaterThanOrEqual(5_000);
+    const lastEntry = sortedEntries.at(-1);
+    expect(lastEntry).toBeDefined();
+    expect(Number(lastEntry?.balance)).toBeGreaterThanOrEqual(5_000);
   });
 
   it("Collectable Vehicle appreciation over 12 months", async () => {
@@ -326,20 +336,21 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     expect(appreciationEntries.length).toBe(12);
 
     // First month: 50,000 * 0.05 / 12 = 208.33
-    expect(r2(Number(appreciationEntries[0]!.amount))).toBe(208.33);
+    const firstApp = appreciationEntries.at(0);
+    expect(firstApp).toBeDefined();
+    expect(r2(Number(firstApp?.amount))).toBe(208.33);
 
     // Verify balance increases each month
-    const sortedEntries = result.registerEntries
-      .filter((e) => e.accountRegisterId === collectable.id)
-      .sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+    const collectableEntries = result.registerEntries.filter(
+      (e) => e.accountRegisterId === collectable.id
+    );
+    const sortedEntries = sortByCreatedAt(collectableEntries);
 
     let prevBalance = 50_000;
     for (const entry of sortedEntries) {
       if (entry.isBalanceEntry) {
-        if (Number(entry.balance) !== 0) expect(r2(Number(entry.balance))).toBe(r2(prevBalance));
-        else prevBalance = 50_000;
+        if (Number(entry.balance) === 0) prevBalance = 50_000;
+        else expect(r2(Number(entry.balance))).toBe(r2(prevBalance));
         continue;
       }
       const newBalance = r2(Number(entry.balance));
@@ -350,8 +361,9 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     }
 
     // Final balance should be greater than starting balance
-    const lastEntry = sortedEntries[sortedEntries.length - 1];
-    expect(Number(lastEntry!.balance)).toBeGreaterThan(50_000);
+    const lastEntry = sortedEntries.at(-1);
+    expect(lastEntry).toBeDefined();
+    expect(Number(lastEntry?.balance)).toBeGreaterThan(50_000);
   });
 
   it("Net worth reflects depreciating vehicle", async () => {
@@ -415,17 +427,17 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     const expectedStartNetWorth = 50_000;
 
     // Calculate net worth at end
-    const allEntries = result.registerEntries.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    const allEntries = sortByCreatedAt(result.registerEntries);
+    const endChecking = allEntries.findLast(
+      (e) => e.accountRegisterId === checking.id,
     );
-    const endChecking = allEntries
-      .filter((e) => e.accountRegisterId === checking.id)
-      .slice(-1)[0];
-    const endVehicle = allEntries
-      .filter((e) => e.accountRegisterId === vehicle.id)
-      .slice(-1)[0];
+    const endVehicle = allEntries.findLast(
+      (e) => e.accountRegisterId === vehicle.id,
+    );
+    expect(endChecking).toBeDefined();
+    expect(endVehicle).toBeDefined();
     const endNetWorth =
-      Number(endChecking!.balance) + Number(endVehicle!.balance);
+      Number(endChecking?.balance) + Number(endVehicle?.balance);
 
     // Net worth should decrease as vehicle depreciates
     expect(endNetWorth).toBeLessThan(expectedStartNetWorth);
@@ -470,9 +482,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
 
     expect(result.isSuccess).toBe(true);
 
-    const allEntries = result.registerEntries.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    const allEntries = sortByCreatedAt(result.registerEntries);
 
     const startChecking = allEntries
       .filter((e) => e.accountRegisterId === checking.id)
@@ -480,17 +490,21 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     const startCollectable = allEntries
       .filter((e) => e.accountRegisterId === collectable.id)
       .find((e) => e.isBalanceEntry);
+    expect(startChecking).toBeDefined();
+    expect(startCollectable).toBeDefined();
     const startNetWorth =
-      Number(startChecking!.balance) + Number(startCollectable!.balance);
+      Number(startChecking?.balance) + Number(startCollectable?.balance);
 
-    const endChecking = allEntries
-      .filter((e) => e.accountRegisterId === checking.id)
-      .slice(-1)[0];
-    const endCollectable = allEntries
-      .filter((e) => e.accountRegisterId === collectable.id)
-      .slice(-1)[0];
+    const endChecking = allEntries.findLast(
+      (e) => e.accountRegisterId === checking.id,
+    );
+    const endCollectable = allEntries.findLast(
+      (e) => e.accountRegisterId === collectable.id,
+    );
+    expect(endChecking).toBeDefined();
+    expect(endCollectable).toBeDefined();
     const endNetWorth =
-      Number(endChecking!.balance) + Number(endCollectable!.balance);
+      Number(endChecking?.balance) + Number(endCollectable?.balance);
 
     // Net worth should increase as collectable appreciates
     expect(endNetWorth).toBeGreaterThan(startNetWorth);
@@ -516,7 +530,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
         balance: 0,
         latestBalance: 0,
         statementAt: new Date("2024-01-01T00:00:00.000Z"),
-        depreciationRate: 0.20, // 20% annual
+        depreciationRate: 0.2, // 20% annual
         depreciationMethod: "declining-balance",
         assetOriginalValue: 25_000,
         assetResidualValue: 3_000,
@@ -582,9 +596,7 @@ describe("Asset Depreciation/Appreciation forecast", () => {
 
     expect(result.isSuccess).toBe(true);
 
-    const allEntries = result.registerEntries.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    const allEntries = sortByCreatedAt(result.registerEntries);
 
     // Mock may give balance entry 0; use known start values from setup
     const startBalances = {
@@ -593,22 +605,23 @@ describe("Asset Depreciation/Appreciation forecast", () => {
       collectable: 40_000,
     };
 
+    const endCheckingBal = allEntries.findLast(
+      (e) => e.accountRegisterId === checking.id,
+    );
+    const endVehicleBal = allEntries.findLast(
+      (e) => e.accountRegisterId === vehicle.id,
+    );
+    const endCollectableBal = allEntries.findLast(
+      (e) => e.accountRegisterId === collectable.id,
+    );
+    expect(endCheckingBal).toBeDefined();
+    expect(endVehicleBal).toBeDefined();
+    expect(endCollectableBal).toBeDefined();
+
     const endBalances = {
-      checking: Number(
-        allEntries
-          .filter((e) => e.accountRegisterId === checking.id)
-          .slice(-1)[0]!.balance
-      ),
-      vehicle: Number(
-        allEntries
-          .filter((e) => e.accountRegisterId === vehicle.id)
-          .slice(-1)[0]!.balance
-      ),
-      collectable: Number(
-        allEntries
-          .filter((e) => e.accountRegisterId === collectable.id)
-          .slice(-1)[0]!.balance
-      ),
+      checking: Number(endCheckingBal?.balance),
+      vehicle: Number(endVehicleBal?.balance),
+      collectable: Number(endCollectableBal?.balance),
     };
 
     // Vehicle should depreciate
@@ -684,15 +697,16 @@ describe("Asset Depreciation/Appreciation forecast", () => {
     // Should have 36 monthly depreciation entries (3 years)
     expect(depreciationEntries.length).toBe(36);
 
-    const vehicleEntries = result.registerEntries
-      .filter((e) => e.accountRegisterId === vehicle.id)
-      .sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+    const vehicleEntries = sortByCreatedAt(
+      result.registerEntries.filter(
+        (e) => e.accountRegisterId === vehicle.id,
+      ),
+    );
 
     // Final balance should be close to residual value after 3 years
-    const lastEntry = vehicleEntries[vehicleEntries.length - 1];
-    const finalBalance = Number(lastEntry!.balance);
+    const lastEntry = vehicleEntries.at(-1);
+    expect(lastEntry).toBeDefined();
+    const finalBalance = Number(lastEntry?.balance);
     expect(finalBalance).toBeGreaterThanOrEqual(5_000);
     expect(finalBalance).toBeLessThan(30_000);
   });
@@ -744,19 +758,20 @@ describe("Asset Depreciation/Appreciation forecast", () => {
 
     expect(result.isSuccess).toBe(true);
 
-    const vehicleEntries = result.registerEntries
-      .filter((e) => e.accountRegisterId === vehicle.id)
-      .sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+    const vehicleEntries = sortByCreatedAt(
+      result.registerEntries.filter(
+        (e) => e.accountRegisterId === vehicle.id,
+      ),
+    );
 
     // Verify running balance continuity (mock may give balance entry balance 0)
     let runningBalance = 0;
     for (const row of vehicleEntries) {
       if (row.isBalanceEntry) {
-        if (Number(row.balance) !== 0) {
-          expect(r2(Number(row.balance))).toBe(r2(Number(row.amount)));
-          runningBalance = Number(row.balance);
+        const bal = Number(row.balance);
+        if (bal) {
+          expect(r2(bal)).toBe(r2(Number(row.amount)));
+          runningBalance = bal;
         }
         continue;
       }

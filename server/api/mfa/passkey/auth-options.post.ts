@@ -1,3 +1,4 @@
+import { defineEventHandler, setResponseStatus } from "h3";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { prisma } from "~/server/clients/prismaClient";
 import { privateUserSchema } from "~/schema/zod";

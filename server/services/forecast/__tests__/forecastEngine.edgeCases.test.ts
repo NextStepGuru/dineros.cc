@@ -1,11 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
-import { ModernCacheService } from "../ModernCacheService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { ReoccurrenceService } from "../ReoccurrenceService";
-import { TransferService } from "../TransferService";
-import { AccountRegisterService } from "../AccountRegisterService";
-import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
 
@@ -13,12 +7,6 @@ const dt = (input?: any) => dateTimeService.create(input);
 
 describe("ForecastEngine - Edge Cases and Error Handling", () => {
   let forecastEngine: ForecastEngine;
-  let cache: ModernCacheService;
-  let entryService: RegisterEntryService;
-  let reoccurrenceService: ReoccurrenceService;
-  let transferService: TransferService;
-  let accountRegisterService: AccountRegisterService;
-  let loanCalculator: LoanCalculatorService;
 
   beforeEach(async () => {
     const mockDb = {
@@ -365,7 +353,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
       const result = forecastEngine["convertToFinalFormat"](mockResults);
 
       expect(result).toHaveLength(1);
-      expect(result[0]!.id).toBe("1");
+      expect(result[0]).toMatchObject({ id: "1" });
     });
 
     it("should handle empty results array", () => {
@@ -457,7 +445,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         savingsGoal: {
           findMany: vi.fn().mockResolvedValue([]),
         },
-        $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+        $transaction: vi.fn((cb: (_tx: any) => Promise<any>) => cb(mockDb)),
         $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
 
@@ -500,7 +488,7 @@ describe("ForecastEngine - Edge Cases and Error Handling", () => {
         savingsGoal: {
           findMany: vi.fn().mockResolvedValue([]),
         },
-        $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+        $transaction: vi.fn((cb: (_tx: any) => Promise<any>) => cb(mockDb)),
         $executeRaw: vi.fn().mockResolvedValue(undefined),
       } as any;
 

@@ -62,7 +62,7 @@ export default defineEventHandler(async (event: H3Event) => {
 
     // Update all account registers with new sort order
     const updatePromises = accountRegisters.map((accountRegister) => {
-      let updateData: any = {};
+      const updateData: any = {};
 
       switch (sortMode) {
         case "loan":

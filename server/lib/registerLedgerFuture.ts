@@ -1,4 +1,7 @@
-import { recalculateRunningBalanceAndSort } from "~/lib/sort";
+import {
+  recalculateRunningBalanceAndSort,
+  type PartialRegisterEntry,
+} from "~/lib/sort";
 import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 import { dateTimeService } from "~/server/services/forecast";
 import type { PrismaClient } from "@prisma/client";
@@ -48,13 +51,18 @@ export async function resolveLoanTransferPeerIds(
   return loanTransferPeerIds;
 }
 
-type RawEntry = {
-  amount: unknown;
-  balance: unknown;
+/** Prisma `Decimal` is structurally compatible; avoids coupling to `@prisma/client` paths. */
+type DecimalLike = { toNumber(): number; toString(): string };
+
+/** Register rows for `lib/sort` (amount/balance may be Prisma `Decimal` before conversion). */
+export type LedgerSortableEntry = Omit<
+  PartialRegisterEntry,
+  "amount" | "balance"
+> & {
+  amount: PartialRegisterEntry["amount"] | DecimalLike;
+  balance: PartialRegisterEntry["balance"] | DecimalLike;
   typeId?: number | null;
   description?: string | null;
-  plaidJson?: unknown;
-  [key: string]: unknown;
 };
 
 export function stripRegisterEntryPlaidJson<T extends { plaidJson?: unknown }>(
@@ -77,14 +85,14 @@ export function toAmountForRegisterEntry(
   return n;
 }
 
-export function buildFutureLedgerSorted<T extends RawEntry>(params: {
+export function buildFutureLedgerSorted<T extends LedgerSortableEntry>(params: {
   registerEntriesWithoutPlaidJson: T[];
   latestBalance: unknown;
   pocketBalances: Array<{ balance: unknown }>;
   isCredit: boolean;
-}): Array<
-  T & { amount: number; balance: number; seq: number | null | undefined }
-> {
+}): Array<T & { amount: number; balance: number }> {
+  type RowWithNumbers = T & { amount: number; balance: number };
+
   const balance = calculateAdjustedBalance(
     params.latestBalance,
     params.pocketBalances,
@@ -95,26 +103,22 @@ export function buildFutureLedgerSorted<T extends RawEntry>(params: {
       amount: toAmountForRegisterEntry(entry, params.isCredit),
       balance: Number(entry.balance),
     }),
-  );
+  ) as RowWithNumbers[];
 
-  let balanceUpdated = recalculateRunningBalanceAndSort({
+  let balanceUpdated = recalculateRunningBalanceAndSort<RowWithNumbers>({
     registerEntries: convertedEntries,
     balance,
     type: params.isCredit ? "credit" : "debit",
   });
 
   if (params.isCredit) {
-    balanceUpdated = balanceUpdated.map(
-      (entry: { balance: number; [k: string]: unknown }) => ({
-        ...entry,
-        balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-      }),
-    ) as typeof balanceUpdated;
+    balanceUpdated = balanceUpdated.map((entry: RowWithNumbers) => {
+      const b = Number(entry.balance);
+      return { ...entry, balance: Math.min(b, 0) };
+    });
   }
 
-  return balanceUpdated as Array<
-    T & { amount: number; balance: number; seq: number | null | undefined }
-  >;
+  return balanceUpdated;
 }
 
 /**
@@ -133,11 +137,11 @@ export function futureBalanceAtOrBeforeAsOf(
       last = e.balance;
     }
   }
-  return last !== undefined ? last : fallbackBalance;
+  return last ?? fallbackBalance;
 }
 
 /** Projected register balance at end of day on `asOf` (e.g. month end), same rules as future register API. */
-export function forecastBalanceAtMonthEnd<T extends RawEntry>(params: {
+export function forecastBalanceAtMonthEnd<T extends LedgerSortableEntry>(params: {
   registerEntriesWithoutPlaidJson: T[];
   latestBalance: unknown;
   pocketBalances: Array<{ balance: unknown }>;

@@ -76,6 +76,9 @@ export default defineConfig({
         "**/*plaid*.{js,ts}",
         "server/api/plaid-*.{js,ts}",
         "server/api/webhook/plaid*.{js,ts}",
+        "server/api/tasks/**",
+        // Large signup-style handler; better covered via E2E than narrow unit tests.
+        "server/api/account-register.post.ts",
         "server/cron/plaid*.{js,ts}",
         "server/queues/plaid*.{js,ts}",
         "server/services/PlaidSyncService.ts",

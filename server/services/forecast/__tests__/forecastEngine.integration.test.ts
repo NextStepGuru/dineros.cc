@@ -1,23 +1,41 @@
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ForecastEngine } from "../ForecastEngine";
-import { ModernCacheService } from "../ModernCacheService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { ReoccurrenceService } from "../ReoccurrenceService";
-import { TransferService } from "../TransferService";
-import { AccountRegisterService } from "../AccountRegisterService";
-import { LoanCalculatorService } from "../LoanCalculatorService";
 import type { ForecastContext } from "../types";
 import { dateTimeService } from "../DateTimeService";
 import { forecastLogger } from "../logger";
+import type { CacheAccountRegister } from "../ModernCacheService";
 
 const dt = (input?: any) => dateTimeService.create(input);
+
+const INTEGRATION_REGISTER_DEFAULTS: Pick<
+  CacheAccountRegister,
+  | "depreciationRate"
+  | "depreciationMethod"
+  | "assetOriginalValue"
+  | "assetResidualValue"
+  | "assetUsefulLifeYears"
+  | "assetStartAt"
+  | "paymentCategoryId"
+  | "interestCategoryId"
+  | "accruesBalanceGrowth"
+> = {
+  depreciationRate: null,
+  depreciationMethod: null,
+  assetOriginalValue: null,
+  assetResidualValue: null,
+  assetUsefulLifeYears: null,
+  assetStartAt: null,
+  paymentCategoryId: null,
+  interestCategoryId: null,
+  accruesBalanceGrowth: false,
+};
+
+type RegisterEntryCreateManyCall = readonly [
+  args: { data: Record<string, unknown>[] },
+];
+type RegisterEntryCreateCall = readonly [
+  args: { data: Record<string, unknown> },
+];
 
 // Mock the database
 const mockDb = {
@@ -50,9 +68,176 @@ const mockDb = {
   savingsGoal: {
     findMany: vi.fn().mockResolvedValue([]),
   },
-  $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockDb)),
+  $transaction: vi.fn((cb: (_tx: any) => Promise<any>) => cb(mockDb)),
   $executeRaw: vi.fn().mockResolvedValue(undefined),
 } as any;
+
+function setupMockData() {
+  // Mock account registers
+  mockDb.accountRegister.findMany.mockImplementation((_args: any) => {
+    return Promise.resolve([
+      {
+        id: 1,
+        budgetId: 1,
+        accountId: "test-account-123",
+        name: "Checking Account",
+        balance: 1000,
+        latestBalance: 1000,
+        minPayment: null,
+        statementAt: dateTimeService.add(1, "month").toDate(),
+        apr1: null,
+        apr1StartAt: null,
+        apr2: null,
+        apr2StartAt: null,
+        apr3: null,
+        apr3StartAt: null,
+        targetAccountRegisterId: null,
+        loanStartAt: null,
+        loanPaymentsPerYear: null,
+        loanTotalYears: null,
+        loanOriginalAmount: null,
+        loanPaymentSortOrder: 1,
+        minAccountBalance: 500,
+        allowExtraPayment: true,
+        isArchived: false,
+        typeId: 1,
+        plaidId: null,
+        type: { accruesBalanceGrowth: false },
+      },
+      {
+        id: 2,
+        budgetId: 1,
+        accountId: "test-account-123",
+        name: "Credit Card",
+        balance: -500, // Debt
+        latestBalance: -500,
+        minPayment: 25,
+        statementAt: dateTimeService.add(15, "days").toDate(),
+        apr1: 0.18, // 18% APR
+        apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
+        apr2: null,
+        apr2StartAt: null,
+        apr3: null,
+        apr3StartAt: null,
+        targetAccountRegisterId: 1, // Paid from checking account
+        loanStartAt: null,
+        loanPaymentsPerYear: null,
+        loanTotalYears: null,
+        loanOriginalAmount: null,
+        loanPaymentSortOrder: 1,
+        minAccountBalance: null,
+        allowExtraPayment: false,
+        isArchived: false,
+        typeId: 4,
+        plaidId: null,
+        type: { accruesBalanceGrowth: false },
+      },
+    ]);
+  });
+
+  // Mock register entries
+  mockDb.registerEntry.findMany.mockResolvedValue([
+    {
+      id: "existing-entry-1",
+      accountRegisterId: 1,
+      sourceAccountRegisterId: null,
+      description: "Existing Balance",
+      amount: 0,
+      balance: 1000,
+      createdAt: dateTimeService.subtract(1, "day").toDate(),
+      reoccurrenceId: null,
+      isProjected: false,
+      isPending: false,
+      isCleared: true,
+      isBalanceEntry: true,
+      isManualEntry: false,
+      isReconciled: false,
+    },
+  ]);
+
+  mockDb.savingsGoal.findMany.mockResolvedValue([]);
+
+  // Mock reoccurrences
+  mockDb.reoccurrence.findMany.mockResolvedValue([
+    {
+      id: 1,
+      accountId: "test-account-123",
+      accountRegisterId: 1,
+      intervalId: 3, // Monthly
+      intervalCount: 1,
+      transferAccountRegisterId: null,
+      lastAt: dt().startOf("month").toDate(),
+      endAt: null,
+      amount: 3000, // Salary
+      description: "Monthly Salary",
+      totalIntervals: null,
+      elapsedIntervals: null,
+      updatedAt: new Date(),
+      adjustBeforeIfOnWeekend: false,
+    },
+    {
+      id: 2,
+      accountId: "test-account-123",
+      accountRegisterId: 1,
+      intervalId: 3, // Monthly
+      intervalCount: 1,
+      transferAccountRegisterId: null,
+      lastAt: dt().startOf("month").add(5, "days").toDate(),
+      endAt: null,
+      amount: -1200, // Rent
+      description: "Monthly Rent",
+      totalIntervals: null,
+      elapsedIntervals: null,
+      updatedAt: new Date(),
+      adjustBeforeIfOnWeekend: false,
+    },
+  ]);
+
+  // Mock reoccurrence skips
+  mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
+  mockDb.reoccurrenceSplit.findMany.mockResolvedValue([]);
+
+  // Mock reoccurrence aggregate
+  mockDb.reoccurrence.aggregate.mockResolvedValue({
+    _min: {
+      lastAt: dt().startOf("month").toDate(),
+    },
+  });
+
+  // Mock database operations
+  mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 0 });
+  mockDb.registerEntry.createMany.mockResolvedValue({ count: 0 });
+  mockDb.registerEntry.create.mockResolvedValue({});
+  mockDb.registerEntry.update.mockResolvedValue({});
+  mockDb.registerEntry.updateMany.mockResolvedValue({ count: 0 });
+  mockDb.registerEntry.count.mockResolvedValue(0);
+  mockDb.accountRegister.update.mockResolvedValue({});
+  mockDb.accountRegister.updateMany.mockResolvedValue({ count: 0 });
+  mockDb.reoccurrence.update.mockResolvedValue({});
+
+  // Mock missing queries that DataLoaderService makes
+  mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
+  mockDb.reoccurrence.aggregate.mockResolvedValue({
+    _min: {
+      lastAt: dt().startOf("month").toDate(),
+    },
+  });
+
+  // Mock DataPersisterService operations
+  mockDb.registerEntry.updateMany.mockImplementation((args: any) => {
+    // Handle different updateMany calls with different where clauses
+    if (args?.where?.isProjected === true) {
+      return Promise.resolve({ count: 0 });
+    }
+    if (args?.where?.isManualEntry === true) {
+      return Promise.resolve({ count: 0 });
+    }
+    if (args?.where?.description === "Latest Balance") {
+      return Promise.resolve({ count: 0 });
+    }
+    return Promise.resolve({ count: 0 });
+  });
+}
 
 describe("ForecastEngine Integration Tests", () => {
   let engine: ForecastEngine;
@@ -84,173 +269,6 @@ describe("ForecastEngine Integration Tests", () => {
     // Setup default mock responses
     setupMockData();
   });
-
-  function setupMockData() {
-    // Mock account registers
-    mockDb.accountRegister.findMany.mockImplementation((args: any) => {
-      return Promise.resolve([
-        {
-          id: 1,
-          budgetId: 1,
-          accountId: "test-account-123",
-          name: "Checking Account",
-          balance: 1000,
-          latestBalance: 1000,
-          minPayment: null,
-          statementAt: dateTimeService.add(1, "month").toDate(),
-          apr1: null,
-          apr1StartAt: null,
-          apr2: null,
-          apr2StartAt: null,
-          apr3: null,
-          apr3StartAt: null,
-          targetAccountRegisterId: null,
-          loanStartAt: null,
-          loanPaymentsPerYear: null,
-          loanTotalYears: null,
-          loanOriginalAmount: null,
-          loanPaymentSortOrder: 1,
-          minAccountBalance: 500,
-          allowExtraPayment: true,
-          isArchived: false,
-          typeId: 1,
-          plaidId: null,
-          type: { accruesBalanceGrowth: false },
-        },
-        {
-          id: 2,
-          budgetId: 1,
-          accountId: "test-account-123",
-          name: "Credit Card",
-          balance: -500, // Debt
-          latestBalance: -500,
-          minPayment: 25,
-          statementAt: dateTimeService.add(15, "days").toDate(),
-          apr1: 0.18, // 18% APR
-          apr1StartAt: dateTimeService.subtract(1, "year").toDate(),
-          apr2: null,
-          apr2StartAt: null,
-          apr3: null,
-          apr3StartAt: null,
-          targetAccountRegisterId: 1, // Paid from checking account
-          loanStartAt: null,
-          loanPaymentsPerYear: null,
-          loanTotalYears: null,
-          loanOriginalAmount: null,
-          loanPaymentSortOrder: 1,
-          minAccountBalance: null,
-          allowExtraPayment: false,
-          isArchived: false,
-          typeId: 4,
-          plaidId: null,
-          type: { accruesBalanceGrowth: false },
-        },
-      ]);
-    });
-
-    // Mock register entries
-    mockDb.registerEntry.findMany.mockResolvedValue([
-      {
-        id: "existing-entry-1",
-        accountRegisterId: 1,
-        sourceAccountRegisterId: null,
-        description: "Existing Balance",
-        amount: 0,
-        balance: 1000,
-        createdAt: dateTimeService.subtract(1, "day").toDate(),
-        reoccurrenceId: null,
-        isProjected: false,
-        isPending: false,
-        isCleared: true,
-        isBalanceEntry: true,
-        isManualEntry: false,
-        isReconciled: false,
-      },
-    ]);
-
-    mockDb.savingsGoal.findMany.mockResolvedValue([]);
-
-    // Mock reoccurrences
-    mockDb.reoccurrence.findMany.mockResolvedValue([
-      {
-        id: 1,
-        accountId: "test-account-123",
-        accountRegisterId: 1,
-        intervalId: 3, // Monthly
-        intervalCount: 1,
-        transferAccountRegisterId: null,
-        lastAt: dt().startOf("month").toDate(),
-        endAt: null,
-        amount: 3000, // Salary
-        description: "Monthly Salary",
-        totalIntervals: null,
-        elapsedIntervals: null,
-        updatedAt: new Date(),
-        adjustBeforeIfOnWeekend: false,
-      },
-      {
-        id: 2,
-        accountId: "test-account-123",
-        accountRegisterId: 1,
-        intervalId: 3, // Monthly
-        intervalCount: 1,
-        transferAccountRegisterId: null,
-        lastAt: dt().startOf("month").add(5, "days").toDate(),
-        endAt: null,
-        amount: -1200, // Rent
-        description: "Monthly Rent",
-        totalIntervals: null,
-        elapsedIntervals: null,
-        updatedAt: new Date(),
-        adjustBeforeIfOnWeekend: false,
-      },
-    ]);
-
-    // Mock reoccurrence skips
-    mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
-    mockDb.reoccurrenceSplit.findMany.mockResolvedValue([]);
-
-    // Mock reoccurrence aggregate
-    mockDb.reoccurrence.aggregate.mockResolvedValue({
-      _min: {
-        lastAt: dt().startOf("month").toDate(),
-      },
-    });
-
-    // Mock database operations
-    mockDb.registerEntry.deleteMany.mockResolvedValue({ count: 0 });
-    mockDb.registerEntry.createMany.mockResolvedValue({ count: 0 });
-    mockDb.registerEntry.create.mockResolvedValue({});
-    mockDb.registerEntry.update.mockResolvedValue({});
-    mockDb.registerEntry.updateMany.mockResolvedValue({ count: 0 });
-    mockDb.registerEntry.count.mockResolvedValue(0);
-    mockDb.accountRegister.update.mockResolvedValue({});
-    mockDb.accountRegister.updateMany.mockResolvedValue({ count: 0 });
-    mockDb.reoccurrence.update.mockResolvedValue({});
-
-    // Mock missing queries that DataLoaderService makes
-    mockDb.reoccurrenceSkip.findMany.mockResolvedValue([]);
-    mockDb.reoccurrence.aggregate.mockResolvedValue({
-      _min: {
-        lastAt: dt().startOf("month").toDate(),
-      },
-    });
-
-    // Mock DataPersisterService operations
-    mockDb.registerEntry.updateMany.mockImplementation((args: any) => {
-      // Handle different updateMany calls with different where clauses
-      if (args?.where?.isProjected === true) {
-        return Promise.resolve({ count: 0 });
-      }
-      if (args?.where?.isManualEntry === true) {
-        return Promise.resolve({ count: 0 });
-      }
-      if (args?.where?.description === "Latest Balance") {
-        return Promise.resolve({ count: 0 });
-      }
-      return Promise.resolve({ count: 0 });
-    });
-  }
 
   describe("Basic Forecast Calculation", () => {
     it("should successfully calculate a basic forecast", async () => {
@@ -343,6 +361,7 @@ describe("ForecastEngine Integration Tests", () => {
       // Insert many items
       for (let i = 1; i <= 1000; i++) {
         cache.accountRegister.insert({
+          ...INTEGRATION_REGISTER_DEFAULTS,
           id: i,
           typeId: (i % 5) + 1,
           budgetId: 1,
@@ -401,8 +420,8 @@ describe("ForecastEngine Integration Tests", () => {
 
         expect(result.isSuccess).toBe(false);
         expect(result.errors).toBeDefined();
-        expect(result.errors!.length).toBeGreaterThan(0);
-        expect(result.errors![0]).toContain("Database connection failed");
+        expect((result.errors ?? []).length).toBeGreaterThan(0);
+        expect((result.errors ?? [])[0]).toContain("Database connection failed");
       } finally {
         // Restore forecastLogger.error
         forecastLogger.error = originalError;
@@ -443,7 +462,7 @@ describe("ForecastEngine Integration Tests", () => {
 
       // Verify running balances for each account
       Object.values(entriesByAccount).forEach((accountEntries) => {
-        const sortedEntries = accountEntries.sort(
+        const sortedEntries = [...accountEntries].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         );
@@ -462,10 +481,7 @@ describe("ForecastEngine Integration Tests", () => {
         // Calculate running balances starting from the balance entry
         let runningBalance = balanceEntry.balance;
 
-        for (let i = 0; i < sortedEntries.length; i++) {
-          const current = sortedEntries[i];
-          if (current == null) continue;
-
+        for (const current of sortedEntries) {
           // Skip balance entries as they set the initial balance
           if (current.isBalanceEntry) {
             continue;
@@ -513,12 +529,8 @@ describe("ForecastEngine Integration Tests", () => {
     beforeEach(() => {
       // "Now" before the forecast window so same-calendar-day logic does not mark the year's projected rows as pending (pending rows are excluded from persist).
       dateTimeService.setNowOverride("2023-06-01T12:00:00.000Z");
-      testContext.startDate = dateTimeService
-        .createUTC("2024-01-01")
-        .toDate();
-      testContext.endDate = dateTimeService
-        .createUTC("2025-01-01")
-        .toDate();
+      testContext.startDate = dateTimeService.createUTC("2024-01-01").toDate();
+      testContext.endDate = dateTimeService.createUTC("2025-01-01").toDate();
 
       // Type-5 loan + statement day inside the forecast window so interest → min payment transfer runs (synthetic reoccurrence id 0 in code path).
       mockDb.accountRegister.findMany.mockResolvedValue([
@@ -600,10 +612,10 @@ describe("ForecastEngine Integration Tests", () => {
       const createMock = vi.mocked(mockDb.registerEntry.create);
       const allRows = [
         ...createManyMock.mock.calls.flatMap(
-          (call) => call[0].data as Record<string, unknown>[],
+          (call: RegisterEntryCreateManyCall) => call[0].data,
         ),
         ...createMock.mock.calls.map(
-          (call) => call[0].data as Record<string, unknown>,
+          (call: RegisterEntryCreateCall) => call[0].data,
         ),
       ];
       expect(allRows.length).toBeGreaterThan(0);

@@ -1,26 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DatabaseRateLimiter } from '../lib/rateLimiter';
+import { describe, it, expect, beforeEach } from "vitest";
+import { DatabaseRateLimiter } from "../lib/rateLimiter";
 
-describe('DatabaseRateLimiter', () => {
+describe("DatabaseRateLimiter", () => {
   let rateLimiter: DatabaseRateLimiter;
 
   beforeEach(() => {
     rateLimiter = new DatabaseRateLimiter(2); // Max 2 concurrent operations
   });
 
-  describe('Basic Functionality', () => {
-    it('should initialize with correct max concurrent limit', () => {
+  describe("Basic Functionality", () => {
+    it("should initialize with correct max concurrent limit", () => {
       const status = rateLimiter.getStatus();
       expect(status.maxConcurrent).toBe(2);
       expect(status.available).toBe(2);
       expect(status.queued).toBe(0);
     });
 
-    it('should execute operations within concurrency limit immediately', async () => {
-      const results: string[] = [];
+    it("should execute operations within concurrency limit immediately", async () => {
       const operations = [
-        () => Promise.resolve('op1'),
-        () => Promise.resolve('op2'),
+        () => Promise.resolve("op1"),
+        () => Promise.resolve("op2"),
       ];
 
       const start = Date.now();
@@ -28,64 +27,66 @@ describe('DatabaseRateLimiter', () => {
       const executionResults = await promise;
       const duration = Date.now() - start;
 
-      expect(executionResults).toEqual(['op1', 'op2']);
+      expect(executionResults).toEqual(["op1", "op2"]);
       expect(duration).toBeLessThan(200); // Avoid wall-clock flakes in CI
     });
 
-    it('should queue operations when exceeding concurrency limit', async () => {
+    it("should queue operations when exceeding concurrency limit", async () => {
       const executionOrder: string[] = [];
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
 
       const operations = [
         async () => {
-          executionOrder.push('start-1');
+          executionOrder.push("start-1");
           await delay(100);
-          executionOrder.push('end-1');
-          return 'op1';
+          executionOrder.push("end-1");
+          return "op1";
         },
         async () => {
-          executionOrder.push('start-2');
+          executionOrder.push("start-2");
           await delay(100);
-          executionOrder.push('end-2');
-          return 'op2';
+          executionOrder.push("end-2");
+          return "op2";
         },
         async () => {
-          executionOrder.push('start-3');
+          executionOrder.push("start-3");
           await delay(50);
-          executionOrder.push('end-3');
-          return 'op3';
+          executionOrder.push("end-3");
+          return "op3";
         },
       ];
 
       const results = await rateLimiter.executeWithLimit(operations);
 
-      expect(results).toEqual(['op1', 'op2', 'op3']);
+      expect(results).toEqual(["op1", "op2", "op3"]);
 
       // Should start first 2 operations immediately, queue the 3rd
-      expect(executionOrder.slice(0, 2)).toEqual(['start-1', 'start-2']);
+      expect(executionOrder.slice(0, 2)).toEqual(["start-1", "start-2"]);
 
       // Third operation should start after one of the first two completes
-      expect(executionOrder).toContain('start-3');
-      expect(executionOrder).toContain('end-3');
+      expect(executionOrder).toContain("start-3");
+      expect(executionOrder).toContain("end-3");
     });
   });
 
-  describe('Status Tracking', () => {
-    it('should track available slots correctly during execution', async () => {
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  describe("Status Tracking", () => {
+    it("should track available slots correctly during execution", async () => {
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
 
       const operation1 = async () => {
         const status = rateLimiter.getStatus();
         expect(status.available).toBe(1); // One slot taken
         await delay(50);
-        return 'op1';
+        return "op1";
       };
 
       const operation2 = async () => {
         const status = rateLimiter.getStatus();
         expect(status.available).toBe(0); // Both slots taken
         await delay(50);
-        return 'op2';
+        return "op2";
       };
 
       await rateLimiter.executeWithLimit([operation1, operation2]);
@@ -96,21 +97,20 @@ describe('DatabaseRateLimiter', () => {
       expect(finalStatus.queued).toBe(0);
     });
 
-    it('should track queued operations correctly', async () => {
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    it("should track queued operations correctly", async () => {
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
       let queuedCount = 0;
 
-      const operations = Array.from({ length: 5 }, (_, i) =>
-        async () => {
-          if (i >= 2) {
-            // Operations 3, 4, 5 should be queued initially
-            const status = rateLimiter.getStatus();
-            queuedCount = Math.max(queuedCount, status.queued);
-          }
-          await delay(30);
-          return `op${i + 1}`;
+      const operations = Array.from({ length: 5 }, (_, i) => async () => {
+        if (i >= 2) {
+          // Operations 3, 4, 5 should be queued initially
+          const status = rateLimiter.getStatus();
+          queuedCount = Math.max(queuedCount, status.queued);
         }
-      );
+        await delay(30);
+        return `op${i + 1}`;
+      });
 
       await rateLimiter.executeWithLimit(operations);
 
@@ -119,15 +119,17 @@ describe('DatabaseRateLimiter', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle operation failures without blocking other operations', async () => {
+  describe("Error Handling", () => {
+    it("should handle operation failures without blocking other operations", async () => {
       const operations = [
-        () => Promise.resolve('success1'),
-        () => Promise.reject(new Error('test error')),
-        () => Promise.resolve('success2'),
+        () => Promise.resolve("success1"),
+        () => Promise.reject(new Error("test error")),
+        () => Promise.resolve("success2"),
       ];
 
-      await expect(rateLimiter.executeWithLimit(operations)).rejects.toThrow('test error');
+      await expect(rateLimiter.executeWithLimit(operations)).rejects.toThrow(
+        "test error",
+      );
 
       // Rate limiter should still be functional after error
       const status = rateLimiter.getStatus();
@@ -135,10 +137,8 @@ describe('DatabaseRateLimiter', () => {
       expect(status.queued).toBe(0);
     });
 
-    it('should release semaphore slot even when operation fails', async () => {
-      const operations = [
-        () => Promise.reject(new Error('failure')),
-      ];
+    it("should release semaphore slot even when operation fails", async () => {
+      const operations = [() => Promise.reject(new Error("failure"))];
 
       await expect(rateLimiter.executeWithLimit(operations)).rejects.toThrow();
 
@@ -148,36 +148,39 @@ describe('DatabaseRateLimiter', () => {
     });
   });
 
-  describe('Batch Execution', () => {
-    it('should execute operations in batches with specified batch size', async () => {
+  describe("Batch Execution", () => {
+    it("should execute operations in batches with specified batch size", async () => {
       const executionOrder: number[] = [];
-      const operations = Array.from({ length: 6 }, (_, i) =>
-        async () => {
-          executionOrder.push(i);
-          await new Promise(resolve => setTimeout(resolve, 10));
-          return `result${i}`;
-        }
-      );
+      const operations = Array.from({ length: 6 }, (_, i) => async () => {
+        executionOrder.push(i);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return `result${i}`;
+      });
 
       const results = await rateLimiter.executeBatched(operations, 3);
 
-      expect(results).toEqual(['result0', 'result1', 'result2', 'result3', 'result4', 'result5']);
+      expect(results).toEqual([
+        "result0",
+        "result1",
+        "result2",
+        "result3",
+        "result4",
+        "result5",
+      ]);
       expect(executionOrder).toEqual([0, 1, 2, 3, 4, 5]);
     });
 
-    it('should respect rate limiting within each batch', async () => {
+    it("should respect rate limiting within each batch", async () => {
       const concurrentTracker: number[] = [];
       let currentConcurrent = 0;
 
-      const operations = Array.from({ length: 4 }, () =>
-        async () => {
-          currentConcurrent++;
-          concurrentTracker.push(currentConcurrent);
-          await new Promise(resolve => setTimeout(resolve, 50));
-          currentConcurrent--;
-          return 'done';
-        }
-      );
+      const operations = Array.from({ length: 4 }, () => async () => {
+        currentConcurrent++;
+        concurrentTracker.push(currentConcurrent);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        currentConcurrent--;
+        return "done";
+      });
 
       await rateLimiter.executeBatched(operations, 2);
 
@@ -186,36 +189,37 @@ describe('DatabaseRateLimiter', () => {
     });
   });
 
-  describe('Integration with Different Concurrency Limits', () => {
-    it('should work with concurrency limit of 1', async () => {
+  describe("Integration with Different Concurrency Limits", () => {
+    it("should work with concurrency limit of 1", async () => {
       const singleThreadLimiter = new DatabaseRateLimiter(1);
       const executionOrder: string[] = [];
 
       const operations = [
         async () => {
-          executionOrder.push('start-1');
-          await new Promise(resolve => setTimeout(resolve, 30));
-          executionOrder.push('end-1');
-          return 'op1';
+          executionOrder.push("start-1");
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          executionOrder.push("end-1");
+          return "op1";
         },
         async () => {
-          executionOrder.push('start-2');
-          await new Promise(resolve => setTimeout(resolve, 30));
-          executionOrder.push('end-2');
-          return 'op2';
+          executionOrder.push("start-2");
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          executionOrder.push("end-2");
+          return "op2";
         },
       ];
 
       await singleThreadLimiter.executeWithLimit(operations);
 
       // Operations should be completely sequential
-      expect(executionOrder).toEqual(['start-1', 'end-1', 'start-2', 'end-2']);
+      expect(executionOrder).toEqual(["start-1", "end-1", "start-2", "end-2"]);
     });
 
-    it('should work with high concurrency limit', async () => {
+    it("should work with high concurrency limit", async () => {
       const highConcurrencyLimiter = new DatabaseRateLimiter(10);
-      const operations = Array.from({ length: 8 }, (_, i) =>
-        () => Promise.resolve(`result${i}`)
+      const operations = Array.from(
+        { length: 8 },
+        (_, i) => () => Promise.resolve(`result${i}`),
       );
 
       const start = Date.now();
@@ -227,10 +231,11 @@ describe('DatabaseRateLimiter', () => {
     });
   });
 
-  describe('Performance Characteristics', () => {
-    it('should handle large numbers of operations efficiently', async () => {
-      const operations = Array.from({ length: 100 }, (_, i) =>
-        () => Promise.resolve(i)
+  describe("Performance Characteristics", () => {
+    it("should handle large numbers of operations efficiently", async () => {
+      const operations = Array.from(
+        { length: 100 },
+        (_, i) => () => Promise.resolve(i),
       );
 
       const start = Date.now();

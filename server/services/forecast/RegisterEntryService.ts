@@ -2,9 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import type { IRegisterEntryService, CreateEntryParams } from "./types";
 import type {
   CacheRegisterEntry,
-  CacheAccountRegister,
+  CacheAccountRegister, ModernCacheService
 } from "./ModernCacheService";
-import { ModernCacheService } from "./ModernCacheService";
 import { recalculateRunningBalanceAndSort } from "../../../lib/sort";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";

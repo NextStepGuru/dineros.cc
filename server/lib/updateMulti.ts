@@ -24,7 +24,13 @@ export default function updateMulti<T extends unknown[]>(
 
   let paramIndex = 0;
   const valuesSql = values
-    .map((row) => `(${row.map(() => `'$${++paramIndex}'`)})`)
+    .map((row) => {
+      const placeholders = row.map(() => {
+        const n = ++paramIndex;
+        return "'" + "$" + n + "'";
+      });
+      return "(" + placeholders.join(",") + ")";
+    })
     .join(",");
 
   const sql = `UPDATE "${tableName}" SET ${setSql} FROM (VALUES ${valuesSql}) AS t("id", ${fieldsSql}) WHERE "${tableName}"."id" = "t"."id"`;

@@ -48,16 +48,14 @@ export type DurationInputArg2 =
   | "milliseconds"
   | "ms";
 
-export namespace unitOfTime {
-  export type StartOf =
-    | "year"
-    | "month"
-    | "week"
-    | "day"
-    | "hour"
-    | "minute"
-    | "second";
-}
+export type UnitOfTimeStartOf =
+  | "year"
+  | "month"
+  | "week"
+  | "day"
+  | "hour"
+  | "minute"
+  | "second";
 
 export type MomentSetObject = Partial<{
   year: number;
@@ -333,7 +331,7 @@ export class DateTime {
     return this.valueOf() >= this.resolveOther(other).getTime();
   }
 
-  startOf(unit: unitOfTime.StartOf): DateTime {
+  startOf(unit: UnitOfTimeStartOf): DateTime {
     const d = this.toDate();
     switch (unit) {
       case "year":
@@ -368,7 +366,7 @@ export class DateTime {
     return new DateTime(d);
   }
 
-  endOf(unit: unitOfTime.StartOf): DateTime {
+  endOf(unit: UnitOfTimeStartOf): DateTime {
     const d = this.startOf(unit).toDate();
     switch (unit) {
       case "year":

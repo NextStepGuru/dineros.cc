@@ -6,6 +6,6 @@ export function normalizePlaidDescription(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, " ")
+    .replaceAll(/\s+/g, " ")
     .slice(0, 500);
 }

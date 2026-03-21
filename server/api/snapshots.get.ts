@@ -5,7 +5,7 @@ import { handleApiError } from "~/server/lib/handleApiError";
 import { assertUserOwnsAccount } from "~/server/services/accountSnapshotService";
 
 const querySchema = z.object({
-  accountId: z.string().uuid(),
+  accountId: z.uuid(),
 });
 
 export default defineEventHandler(async (event) => {

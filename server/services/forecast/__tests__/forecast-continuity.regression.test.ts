@@ -1,13 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { dateTimeService } from "../DateTimeService";
-import { ModernCacheService } from "../ModernCacheService";
 import { ForecastEngine } from "../ForecastEngine";
-import { DataLoaderService } from "../DataLoaderService";
-import { DataPersisterService } from "../DataPersisterService";
-import { AccountRegisterService } from "../AccountRegisterService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { TransferService } from "../TransferService";
-import { LoanCalculatorService } from "../LoanCalculatorService";
 
 const dt = (input?: any) => dateTimeService.create(input);
 
@@ -20,7 +13,6 @@ const dt = (input?: any) => dateTimeService.create(input);
 describe("Forecast Continuity Regression Tests", () => {
   let mockPrisma: any;
   let engine: ForecastEngine;
-  let cache: ModernCacheService;
 
   beforeEach(async () => {
     // Mock Prisma client
@@ -56,8 +48,6 @@ describe("Forecast Continuity Regression Tests", () => {
 
     // Create engine with mocked database
     engine = new ForecastEngine(mockPrisma);
-
-    cache = new ModernCacheService();
   });
 
   describe("Multi-month forecast continuity", () => {
@@ -158,11 +148,11 @@ describe("Forecast Continuity Regression Tests", () => {
       const allEntries = result.registerEntries || [];
       expect(allEntries.length).toBeGreaterThan(0);
       const latestEntryDate = Math.max(
-        ...allEntries.map((entry: any) => new Date(entry.createdAt).getTime())
+        ...allEntries.map((entry: any) => new Date(entry.createdAt).getTime()),
       );
       expect(Number.isFinite(latestEntryDate)).toBe(true);
       expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
-        new Date("2025-09-01T00:00:00.000Z").getTime() // Adjusted for shorter period
+        new Date("2025-09-01T00:00:00.000Z").getTime(), // Adjusted for shorter period
       );
     });
 
@@ -572,10 +562,10 @@ describe("Forecast Continuity Regression Tests", () => {
         expect(entry.amount.toString()).not.toMatch(/\d+\.\d+\d+\.\d+/);
 
         // Should be valid numbers
-        expect(isNaN(entry.balance)).toBe(false);
-        expect(isNaN(entry.amount)).toBe(false);
-        expect(isFinite(entry.balance)).toBe(true);
-        expect(isFinite(entry.amount)).toBe(true);
+        expect(Number.isNaN(entry.balance)).toBe(false);
+        expect(Number.isNaN(entry.amount)).toBe(false);
+        expect(Number.isFinite(entry.balance)).toBe(true);
+        expect(Number.isFinite(entry.amount)).toBe(true);
       }
     });
 
@@ -634,13 +624,6 @@ describe("Forecast Continuity Regression Tests", () => {
       // Assert: Should process full 3 months
       expect(result.isSuccess).toBe(true);
 
-      // Find all interest entries (for verification)
-      const interestEntries = allCreatedEntries.filter(
-        (entry) =>
-          entry.description &&
-          entry.description.toLowerCase().includes("interest")
-      );
-
       // Verify that the forecast completed successfully
       expect(allCreatedEntries.length).toBeGreaterThan(0);
 
@@ -648,15 +631,15 @@ describe("Forecast Continuity Regression Tests", () => {
       for (const entry of allCreatedEntries) {
         expect(typeof entry.amount).toBe("number");
         expect(typeof entry.balance).toBe("number");
-        expect(isFinite(entry.amount)).toBe(true);
-        expect(isFinite(entry.balance)).toBe(true);
+        expect(Number.isFinite(entry.amount)).toBe(true);
+        expect(Number.isFinite(entry.balance)).toBe(true);
       }
 
       // Verify balance integrity - all balances should be finite numbers
       const finalEntries = allCreatedEntries.slice(-5); // Last few entries
       if (finalEntries.length > 0) {
         for (const entry of finalEntries) {
-          expect(isFinite(entry.balance)).toBe(true);
+          expect(Number.isFinite(entry.balance)).toBe(true);
           expect(typeof entry.balance).toBe("number");
         }
       }

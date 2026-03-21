@@ -4,7 +4,7 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import type { z } from "zod";
 import type { User } from "../../types/types";
 
-import { publicProfileSchema } from "~/schema/zod";
+import type { publicProfileSchema } from "~/schema/zod";
 
 interface Country {
   id: number;

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -8,11 +8,11 @@ vi.hoisted(() => {
 });
 
 // Mock H3/Nuxt utilities before any imports
-vi.mock('h3', () => ({
+vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
   createError: vi.fn((error) => {
     const statusCode = error.statusCode || 500;
-    const message = error.statusMessage || error.message || 'Unknown error';
+    const message = error.statusMessage || error.message || "Unknown error";
     const fullMessage = `HTTP ${statusCode}: ${message}`;
     const err = new Error(fullMessage) as any;
     err.statusCode = statusCode;
@@ -25,7 +25,7 @@ vi.mock('h3', () => ({
 }));
 
 // Mock server dependencies
-vi.mock('~/server/clients/prismaClient', () => ({
+vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
     accountRegister: {
       findFirstOrThrow: vi.fn(),
@@ -52,78 +52,89 @@ vi.mock('~/server/clients/prismaClient', () => ({
   },
 }));
 
-vi.mock('~/server/clients/queuesClient', () => ({
+vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
 }));
 
-vi.mock('~/server/lib/getUser', () => ({
+vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn(),
 }));
 
-vi.mock('~/server/lib/handleApiError', () => ({
+vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', () => ({
+vi.mock("~/schema/zod", () => ({
   reoccurrenceWithSplitsSchema: {
     parse: vi.fn(),
   },
 }));
 
-describe('Reoccurrence API Endpoints', () => {
+describe("Reoccurrence API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('POST /api/reoccurrence', () => {
+  describe("POST /api/reoccurrence", () => {
     let reoccurrencePostHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../reoccurrence.post');
+      const module = await import("../reoccurrence.post");
       reoccurrencePostHandler = module.default;
     });
 
-    it('should successfully create a new reoccurrence', async () => {
+    it("should successfully create a new reoccurrence", async () => {
       const mockEvent = {};
       const mockBody = {
         id: null,
-        accountId: 'account-123',
+        accountId: "account-123",
         accountRegisterId: 1,
         transferAccountRegisterId: null,
         intervalId: 1,
         adjustBeforeIfOnWeekend: false,
-        description: 'Monthly Salary',
+        description: "Monthly Salary",
         amount: 5000,
-        lastAt: '2024-01-01',
+        lastAt: "2024-01-01",
         endAt: null,
       };
 
       const mockAccountRegister = {
         id: 1,
-        accountId: 'account-123',
+        accountId: "account-123",
       };
 
       const mockCreatedReoccurrence = {
         ...mockBody,
-        lastAt: new Date('2024-01-01'),
+        lastAt: new Date("2024-01-01"),
         id: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
-      (prisma.reoccurrence.upsert as any).mockResolvedValue(mockCreatedReoccurrence);
-      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockCreatedReoccurrence);
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
-      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockCreatedReoccurrence);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
+      (prisma.reoccurrence.upsert as any).mockResolvedValue(
+        mockCreatedReoccurrence,
+      );
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(
+        mockCreatedReoccurrence,
+      );
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback(prisma),
+      );
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(
+        mockCreatedReoccurrence,
+      );
 
       const result = await reoccurrencePostHandler(mockEvent);
 
@@ -133,7 +144,7 @@ describe('Reoccurrence API Endpoints', () => {
         where: {
           id: 1,
           account: {
-            id: 'account-123',
+            id: "account-123",
             userAccounts: {
               some: {
                 userId: 123,
@@ -145,77 +156,89 @@ describe('Reoccurrence API Endpoints', () => {
       expect(prisma.reoccurrence.upsert).toHaveBeenCalledWith({
         where: { id: expect.any(Number) },
         create: expect.objectContaining({
-          accountId: 'account-123',
+          accountId: "account-123",
           accountRegisterId: 1,
-          description: 'Monthly Salary',
+          description: "Monthly Salary",
           amount: 5000,
         }),
         update: expect.objectContaining({
-          accountId: 'account-123',
+          accountId: "account-123",
           accountRegisterId: 1,
-          description: 'Monthly Salary',
+          description: "Monthly Salary",
           amount: 5000,
         }),
       });
-      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "account-123",
+      });
       expect(result).toEqual(mockCreatedReoccurrence);
     });
 
-    it('should successfully update existing reoccurrence', async () => {
+    it("should successfully update existing reoccurrence", async () => {
       const mockEvent = {};
       const mockBody = {
         id: 123,
-        accountId: 'account-123',
+        accountId: "account-123",
         accountRegisterId: 1,
         transferAccountRegisterId: 2,
         intervalId: 2,
         adjustBeforeIfOnWeekend: true,
-        description: 'Updated Salary',
+        description: "Updated Salary",
         amount: 6000,
-        lastAt: '2024-01-15',
-        endAt: '2024-12-31',
+        lastAt: "2024-01-15",
+        endAt: "2024-12-31",
       };
 
       const mockAccountRegister = {
         id: 1,
-        accountId: 'account-123',
+        accountId: "account-123",
       };
 
       const mockUpdatedReoccurrence = {
         ...mockBody,
-        lastAt: new Date('2024-01-15'),
-        endAt: new Date('2024-12-31'),
+        lastAt: new Date("2024-01-15"),
+        endAt: new Date("2024-12-31"),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      await import("~/server/clients/queuesClient");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
       (prisma.accountRegister.findMany as any).mockResolvedValue([{ id: 2 }]);
-      (prisma.reoccurrence.upsert as any).mockResolvedValue(mockUpdatedReoccurrence);
-      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockUpdatedReoccurrence);
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
-      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockUpdatedReoccurrence);
+      (prisma.reoccurrence.upsert as any).mockResolvedValue(
+        mockUpdatedReoccurrence,
+      );
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(
+        mockUpdatedReoccurrence,
+      );
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback(prisma),
+      );
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(
+        mockUpdatedReoccurrence,
+      );
 
       const result = await reoccurrencePostHandler(mockEvent);
 
       expect(prisma.reoccurrence.upsert).toHaveBeenCalledWith({
         where: { id: 123 },
         create: expect.objectContaining({
-          description: 'Updated Salary',
+          description: "Updated Salary",
           amount: 6000,
           transferAccountRegisterId: 2,
         }),
         update: expect.objectContaining({
-          description: 'Updated Salary',
+          description: "Updated Salary",
           amount: 6000,
           transferAccountRegisterId: 2,
         }),
@@ -223,24 +246,26 @@ describe('Reoccurrence API Endpoints', () => {
       expect(result).toEqual(mockUpdatedReoccurrence);
     });
 
-    it('should handle unauthorized access to account register', async () => {
+    it("should handle unauthorized access to account register", async () => {
       const mockEvent = {};
       const mockBody = {
         accountRegisterId: 1,
-        description: 'Unauthorized Reoccurrence',
+        description: "Unauthorized Reoccurrence",
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
       (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
-        new Error('User does not have permission to access this account register')
+        new Error(
+          "User does not have permission to access this account register",
+        ),
       );
       (handleApiError as any).mockImplementation((error: any) => {
         throw error;
@@ -250,22 +275,22 @@ describe('Reoccurrence API Endpoints', () => {
       expect(handleApiError).toHaveBeenCalled();
     });
 
-    it('should handle schema validation errors', async () => {
+    it("should handle schema validation errors", async () => {
       const mockEvent = {};
       const mockBody = {
-        accountRegisterId: 'invalid-id', // Should be number
-        description: '',
+        accountRegisterId: "invalid-id", // Should be number
+        description: "",
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
 
-      const validationError = new Error('Invalid schema');
+      const validationError = new Error("Invalid schema");
       (reoccurrenceWithSplitsSchema.parse as any).mockImplementation(() => {
         throw validationError;
       });
@@ -273,58 +298,66 @@ describe('Reoccurrence API Endpoints', () => {
         throw error;
       });
 
-      await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow('Invalid schema');
+      await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow(
+        "Invalid schema",
+      );
       expect(handleApiError).toHaveBeenCalledWith(validationError);
     });
 
-    it('should handle database upsert errors', async () => {
+    it("should handle database upsert errors", async () => {
       const mockEvent = {};
       const mockBody = {
         accountRegisterId: 1,
-        description: 'Test Reoccurrence',
+        description: "Test Reoccurrence",
       };
 
       const mockAccountRegister = {
         id: 1,
-        accountId: 'account-123',
+        accountId: "account-123",
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      const dbError = new Error('Database constraint violation');
+      const dbError = new Error("Database constraint violation");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
       (prisma.reoccurrence.upsert as any).mockRejectedValue(dbError);
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback(prisma),
+      );
       (handleApiError as any).mockImplementation((error: any) => {
         throw error;
       });
 
-      await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow('Database constraint violation');
+      await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow(
+        "Database constraint violation",
+      );
       expect(handleApiError).toHaveBeenCalledWith(dbError);
     });
 
-    it('validates split category IDs and succeeds when all exist for account', async () => {
+    it("validates split category IDs and succeeds when all exist for account", async () => {
       const mockEvent = {};
-      const SPLIT_CAT = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const SPLIT_CAT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
       const mockBody = {
         id: null,
-        accountId: 'account-123',
+        accountId: "account-123",
         accountRegisterId: 1,
         transferAccountRegisterId: 2,
         intervalId: 1,
         intervalCount: 1,
         adjustBeforeIfOnWeekend: false,
-        description: 'With splits',
+        description: "With splits",
         amount: 100,
-        lastAt: '2024-01-01',
+        lastAt: "2024-01-01",
         endAt: null,
         splits: [
           {
@@ -337,30 +370,37 @@ describe('Reoccurrence API Endpoints', () => {
         categoryId: null,
       };
 
-      const mockAccountRegister = { id: 1, accountId: 'account-123' };
+      const mockAccountRegister = { id: 1, accountId: "account-123" };
       const mockCreated = {
         ...mockBody,
-        lastAt: new Date('2024-01-01'),
+        lastAt: new Date("2024-01-01"),
         id: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
       (prisma.category.findMany as any).mockResolvedValue([{ id: SPLIT_CAT }]);
       (prisma.accountRegister.findMany as any).mockResolvedValue([{ id: 2 }]);
       (prisma.reoccurrence.upsert as any).mockResolvedValue(mockCreated);
-      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(mockCreated);
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => callback(prisma));
+      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(
+        mockCreated,
+      );
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback(prisma),
+      );
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockCreated);
 
       await reoccurrencePostHandler(mockEvent);
@@ -368,28 +408,30 @@ describe('Reoccurrence API Endpoints', () => {
       expect(prisma.category.findMany).toHaveBeenCalledWith({
         where: {
           id: { in: [SPLIT_CAT] },
-          accountId: 'account-123',
+          accountId: "account-123",
         },
         select: { id: true },
       });
-      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "account-123",
+      });
     });
 
-    it('rejects when split category IDs are not all valid for account', async () => {
+    it("rejects when split category IDs are not all valid for account", async () => {
       const mockEvent = {};
-      const CAT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-      const CAT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+      const CAT_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+      const CAT_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
       const mockBody = {
         id: null,
-        accountId: 'account-123',
+        accountId: "account-123",
         accountRegisterId: 1,
         transferAccountRegisterId: 2,
         intervalId: 1,
         intervalCount: 1,
         adjustBeforeIfOnWeekend: false,
-        description: 'Bad splits',
+        description: "Bad splits",
         amount: 100,
-        lastAt: '2024-01-01',
+        lastAt: "2024-01-01",
         endAt: null,
         splits: [
           {
@@ -408,17 +450,19 @@ describe('Reoccurrence API Endpoints', () => {
         categoryId: null,
       };
 
-      const mockAccountRegister = { id: 1, accountId: 'account-123' };
+      const mockAccountRegister = { id: 1, accountId: "account-123" };
 
-      const { readBody } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue({ userId: 123 });
       (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(mockAccountRegister);
+      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+        mockAccountRegister,
+      );
       (prisma.category.findMany as any).mockResolvedValue([{ id: CAT_A }]);
 
       await expect(reoccurrencePostHandler(mockEvent)).rejects.toThrow(
@@ -427,39 +471,42 @@ describe('Reoccurrence API Endpoints', () => {
     });
   });
 
-  describe('DELETE /api/reoccurrence', () => {
+  describe("DELETE /api/reoccurrence", () => {
     let reoccurrenceDeleteHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../reoccurrence.delete');
+      const module = await import("../reoccurrence.delete");
       reoccurrenceDeleteHandler = module.default;
     });
 
-    it('should successfully delete reoccurrence and related entries', async () => {
+    it("should successfully delete reoccurrence and related entries", async () => {
       const mockEvent = {};
-      const mockQuery = { reoccurrenceId: '123' };
+      const mockQuery = { reoccurrenceId: "123" };
 
       const mockReoccurrence = {
         id: 123,
-        accountId: 'account-123',
-        description: 'Monthly Salary',
+        accountId: "account-123",
+        description: "Monthly Salary",
         amount: 5000,
       };
 
       const mockDeletedReoccurrence = {
         id: 123,
-        description: 'Monthly Salary',
+        description: "Monthly Salary",
         amount: 5000,
       };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
-      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(mockReoccurrence);
+      (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(
+        mockReoccurrence,
+      );
       (prisma.$transaction as any).mockImplementation(async (callback: any) => {
         const mockPrisma = {
           registerEntry: {
@@ -474,7 +521,9 @@ describe('Reoccurrence API Endpoints', () => {
         };
         return await callback(mockPrisma);
       });
-      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(mockDeletedReoccurrence);
+      (reoccurrenceWithSplitsSchema.parse as any).mockReturnValue(
+        mockDeletedReoccurrence,
+      );
 
       const result = await reoccurrenceDeleteHandler(mockEvent);
 
@@ -495,23 +544,25 @@ describe('Reoccurrence API Endpoints', () => {
         },
       });
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: 'account-123' });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "account-123",
+      });
       expect(result).toEqual(mockDeletedReoccurrence);
     });
 
-    it('should handle unauthorized access', async () => {
+    it("should handle unauthorized access", async () => {
       const mockEvent = {};
-      const mockQuery = { reoccurrenceId: '123' };
+      const mockQuery = { reoccurrenceId: "123" };
 
-      const { getQuery } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getQuery as any).mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.reoccurrence.findFirstOrThrow as any).mockRejectedValue(
-        new Error('Reoccurrence not found or unauthorized')
+        new Error("Reoccurrence not found or unauthorized"),
       );
       (handleApiError as any).mockImplementation((error: any) => {
         throw error;
@@ -521,13 +572,13 @@ describe('Reoccurrence API Endpoints', () => {
       expect(handleApiError).toHaveBeenCalled();
     });
 
-    it('should handle invalid reoccurrence ID format', async () => {
+    it("should handle invalid reoccurrence ID format", async () => {
       const mockEvent = {};
-      const mockQuery = { reoccurrenceId: 'invalid-id' };
+      const mockQuery = { reoccurrenceId: "invalid-id" };
 
-      const { getQuery } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getQuery as any).mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -539,41 +590,45 @@ describe('Reoccurrence API Endpoints', () => {
       expect(handleApiError).toHaveBeenCalled();
     });
 
-    it('should handle transaction failures', async () => {
+    it("should handle transaction failures", async () => {
       const mockEvent = {};
-      const mockQuery = { reoccurrenceId: '123' };
+      const mockQuery = { reoccurrenceId: "123" };
 
       const mockReoccurrence = {
         id: 123,
-        accountId: 'account-123',
+        accountId: "account-123",
       };
 
-      const { getQuery } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      const transactionError = new Error('Transaction failed');
+      const transactionError = new Error("Transaction failed");
 
       (getQuery as any).mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(mockReoccurrence);
+      (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(
+        mockReoccurrence,
+      );
       (prisma.$transaction as any).mockRejectedValue(transactionError);
       (handleApiError as any).mockImplementation((error: any) => {
         throw error;
       });
 
-      await expect(reoccurrenceDeleteHandler(mockEvent)).rejects.toThrow('Transaction failed');
+      await expect(reoccurrenceDeleteHandler(mockEvent)).rejects.toThrow(
+        "Transaction failed",
+      );
       expect(handleApiError).toHaveBeenCalledWith(transactionError);
     });
 
-    it('should handle missing reoccurrence ID in query', async () => {
+    it("should handle missing reoccurrence ID in query", async () => {
       const mockEvent = {};
       const mockQuery = {}; // Missing reoccurrenceId
 
-      const { getQuery } = await import('h3');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getQuery as any).mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue({ userId: 123 });
@@ -586,33 +641,34 @@ describe('Reoccurrence API Endpoints', () => {
     });
   });
 
-  describe('Cross-endpoint Integration', () => {
-    it('should use consistent error handling across reoccurrence endpoints', async () => {
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+  describe("Cross-endpoint Integration", () => {
+    it("should use consistent error handling across reoccurrence endpoints", async () => {
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       expect(handleApiError).toBeDefined();
-      expect(typeof handleApiError).toBe('function');
+      expect(typeof handleApiError).toBe("function");
     });
 
-    it('should use consistent user authentication', async () => {
-      const { getUser } = await import('~/server/lib/getUser');
+    it("should use consistent user authentication", async () => {
+      const { getUser } = await import("~/server/lib/getUser");
 
       expect(getUser).toBeDefined();
-      expect(typeof getUser).toBe('function');
+      expect(typeof getUser).toBe("function");
     });
 
-    it('should trigger recalculation consistently', async () => {
-      const { addRecalculateJob } = await import('~/server/clients/queuesClient');
+    it("should trigger recalculation consistently", async () => {
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       expect(addRecalculateJob).toBeDefined();
-      expect(typeof addRecalculateJob).toBe('function');
+      expect(typeof addRecalculateJob).toBe("function");
     });
 
-    it('should use consistent schema validation', async () => {
-      const { reoccurrenceWithSplitsSchema } = await import('~/schema/zod');
+    it("should use consistent schema validation", async () => {
+      const { reoccurrenceWithSplitsSchema } = await import("~/schema/zod");
 
       expect(reoccurrenceWithSplitsSchema).toBeDefined();
-      expect(typeof reoccurrenceWithSplitsSchema.parse).toBe('function');
+      expect(typeof reoccurrenceWithSplitsSchema.parse).toBe("function");
     });
   });
 });

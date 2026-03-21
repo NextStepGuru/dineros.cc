@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { verify } from "otplib";
 import { getUser } from "../lib/getUser";
 import { prisma } from "../clients/prismaClient";
@@ -36,13 +37,11 @@ export default defineEventHandler(async (event) => {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          settings: JSON.parse(
-            JSON.stringify({
-              ...withUpdatedTotp(user.settings, {
-                backupCodes: updatedBackupCodes,
-              }),
-            })
-          ),
+          settings: structuredClone(
+            withUpdatedTotp(user.settings, {
+              backupCodes: updatedBackupCodes,
+            }),
+          ) as Prisma.InputJsonValue,
         },
       });
 
@@ -60,13 +59,11 @@ export default defineEventHandler(async (event) => {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        settings: JSON.parse(
-          JSON.stringify({
-            ...withUpdatedTotp(user.settings, {
-              isVerified: verificationResult,
-            }),
-          })
-        ),
+        settings: structuredClone(
+          withUpdatedTotp(user.settings, {
+            isVerified: verificationResult,
+          }),
+        ) as Prisma.InputJsonValue,
       },
     });
 

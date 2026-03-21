@@ -33,31 +33,34 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    const result = await PrismaDb.$transaction(async (tx) => {
-      const newBudget = await tx.budget.create({
-        data: {
-          name,
-          accountId: defaultBudget.accountId,
-          userId: user.userId,
-          isDefault: false,
-        },
-        select: {
-          id: true,
-          name: true,
-          accountId: true,
-          isArchived: true,
-          isDefault: true,
-          userId: true,
-        },
-      });
-      await cloneBudget(
-        tx as Parameters<typeof cloneBudget>[0],
-        defaultBudget.id,
-        newBudget.id,
-        defaultBudget.accountId,
-      );
-      return newBudget;
-    });
+    const result = await PrismaDb.$transaction(
+      async (tx) => {
+        const newBudget = await tx.budget.create({
+          data: {
+            name,
+            accountId: defaultBudget.accountId,
+            userId: user.userId,
+            isDefault: false,
+          },
+          select: {
+            id: true,
+            name: true,
+            accountId: true,
+            isArchived: true,
+            isDefault: true,
+            userId: true,
+          },
+        });
+        await cloneBudget(
+          tx as Parameters<typeof cloneBudget>[0],
+          defaultBudget.id,
+          newBudget.id,
+          defaultBudget.accountId,
+        );
+        return newBudget;
+      },
+      { maxWait: 20000, timeout: 60000 },
+    );
 
     setResponseStatus(event, 201);
     return budgetSchema.parse(result);

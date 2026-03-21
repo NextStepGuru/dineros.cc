@@ -3,8 +3,6 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 // Import modules after mocks
 import RsaService from "../RsaService";
 import { prisma } from "~/server/clients/prismaClient";
-import { createId } from "@paralleldrive/cuid2";
-import { generateKeyPairSync } from "crypto";
 
 // Mock createId to return predictable IDs
 vi.mock("@paralleldrive/cuid2", () => ({
@@ -43,8 +41,6 @@ vi.mock("~/server/clients/prismaClient", () => ({
 
 // Get typed references to the mocked functions
 const mockRsaDb = prisma.rsa as any;
-const mockCreateId = createId as any;
-const mockGenerateKeyPairSync = generateKeyPairSync as any;
 
 describe("RsaService", () => {
   let rsaService: RsaService;
@@ -59,7 +55,7 @@ describe("RsaService", () => {
     };
 
     // Pass the mocked client to RsaService constructor
-    rsaService = new RsaService(mockPrismaClient as any);
+    rsaService = new RsaService(mockPrismaClient);
   });
 
   describe("getKey", () => {

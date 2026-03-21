@@ -49,11 +49,14 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    ignore: ["**/__tests__/**"],
     typescript: {
-      // customize tsconfig.server.json
       tsConfig: {
         exclude: ["microservice"],
       },
+    },
+    esbuild: {
+      options: { target: "es2022" },
     },
 
     compressPublicAssets: true,
@@ -128,8 +131,7 @@ export default defineNuxtConfig({
     "@nuxt/eslint",
     "@nuxt/test-utils/module",
     "./modules/handle-nuxt-path",
-    // Only include nuxt-cron if not in test mode
-    ...(process.env.NODE_ENV !== "test" ? ["nuxt-cron"] : []),
+    ...(process.env.NODE_ENV === "test" ? [] : ["nuxt-cron"]),
   ],
   css: ["~/assets/css/main.css"],
   typescript: {

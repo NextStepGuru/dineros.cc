@@ -5,7 +5,7 @@ const mockGetCookie = vi.fn();
 const mockSetResponseStatus = vi.fn();
 
 vi.mock("h3", () => ({
-  defineEventHandler: (handler: (e: any) => any) => handler,
+  defineEventHandler: (handler: (_e: any) => any) => handler,
   getHeader: (event: any, name: string) => mockGetHeader(event, name),
   getCookie: (event: any, name: string) => mockGetCookie(event, name),
   setResponseStatus: (event: any, code: number) =>
@@ -19,22 +19,21 @@ vi.mock("~/server/services/JwtService", () => ({
   })),
 }));
 
+function createEvent(url: string, method: string) {
+  return {
+    node: { req: { url, method } },
+    context: {} as any,
+  };
+}
+
 describe("auth middleware", () => {
-  let authHandler: (event: any) => Promise<any>;
+  let authHandler: (_event: any) => Promise<any>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import("../auth");
+    const module = await import("~/server/middleware/auth");
     authHandler = module.default;
   });
-
-  function createEvent(url: string, method: string) {
-    const event = {
-      node: { req: { url, method } },
-      context: {} as any,
-    };
-    return event;
-  }
 
   it("should not run auth for non-API URLs", async () => {
     const event = createEvent("/", "GET");

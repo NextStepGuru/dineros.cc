@@ -10,8 +10,6 @@ export function getOpenAIClient(): OpenAI | null {
     client = null;
     return null;
   }
-  if (client === undefined) {
-    client = new OpenAI({ apiKey: key });
-  }
+  client ??= new OpenAI({ apiKey: key });
   return client;
 }

@@ -23,6 +23,18 @@ export const queueManager = new QueueManager(
   sharedRedisConnection,
 );
 
+if (!queueManager.isDisabled()) {
+  try {
+    await queueManager.start();
+  } catch (error) {
+    log({
+      message: "Failed to initialize queues",
+      data: error,
+      level: "error",
+    });
+  }
+}
+
 export const addBackupJob = (data: BackupJob) =>
   queueManager.addJob(backup.queueName, data);
 

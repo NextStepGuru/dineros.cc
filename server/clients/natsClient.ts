@@ -17,10 +17,19 @@ export async function getNatsConnection() {
     return natsConnection; // Return existing active connection
   }
 
+  const natsUrl = env?.NATS_URL;
+  if (natsUrl === undefined) {
+    log({
+      level: "error",
+      message: "NATS_URL is unavailable (environment was not validated).",
+    });
+    return null;
+  }
+
   let attempts = 0;
   while (attempts < MAX_RETRIES) {
     try {
-      natsConnection = await connect({ servers: env.NATS_URL });
+      natsConnection = await connect({ servers: natsUrl });
       log({ message: "Connected to NATS" });
 
       // Start monitoring connection status

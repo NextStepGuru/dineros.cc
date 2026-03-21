@@ -1,22 +1,82 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TransferService } from "../TransferService";
 import { ModernCacheService } from "../ModernCacheService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { AccountRegisterService } from "../AccountRegisterService";
+import type { RegisterEntryService } from "../RegisterEntryService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
-import type { PrismaClient, Reoccurrence } from "~/types/test-types";
+import type { PrismaClient } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
-import prismaPkg from "@prisma/client";
+import prismaPkg, { AmountAdjustmentMode } from "@prisma/client";
 
 const { Prisma } = prismaPkg;
+
+/** Fields required on Prisma `Reoccurrence` for `TransferParams` / `transferBetweenAccountsWithDate`. */
+const MOCK_REOCCURRENCE_ADJUSTMENT_DEFAULTS = {
+  amountAdjustmentMode: AmountAdjustmentMode.NONE,
+  amountAdjustmentDirection: null,
+  amountAdjustmentValue: null,
+  amountAdjustmentIntervalId: null,
+  amountAdjustmentIntervalCount: 1,
+  amountAdjustmentAnchorAt: null,
+};
+
+function createMockAccount(overrides: any = {}) {
+  return {
+    id: 1,
+    typeId: 1,
+    budgetId: 1,
+    accountId: "test-account",
+    name: "Test Account",
+    balance: 1000,
+    latestBalance: 1000,
+    minPayment: null,
+    statementAt: dateTimeService.create("2024-01-15"),
+    apr1: 0.15,
+    apr1StartAt: null,
+    apr2: null,
+    apr2StartAt: null,
+    apr3: null,
+    apr3StartAt: null,
+    targetAccountRegisterId: null,
+    loanStartAt: null,
+    loanPaymentsPerYear: null,
+    loanTotalYears: null,
+    loanOriginalAmount: null,
+    loanPaymentSortOrder: 0,
+    savingsGoalSortOrder: 0,
+    accountSavingsGoal: null,
+    minAccountBalance: 500,
+    allowExtraPayment: false,
+    isArchived: false,
+    plaidId: null,
+    ...overrides,
+  };
+}
+
+function createMockEntry(overrides: any = {}) {
+  return {
+    id: `test-entry-${Math.random()}`,
+    accountRegisterId: 1,
+    sourceAccountRegisterId: null,
+    description: "Test Entry",
+    amount: 100,
+    balance: 1100,
+    isBalanceEntry: false,
+    isPending: false,
+    isProjected: false,
+    isManualEntry: false,
+    isCleared: false,
+    isReconciled: false,
+    createdAt: dateTimeService.create("2024-01-01"),
+    ...overrides,
+  };
+}
 
 describe("TransferService", () => {
   let service: TransferService;
   let mockDb: PrismaClient;
   let mockCache: ModernCacheService;
   let mockEntryService: RegisterEntryService;
-  let mockAccountService: AccountRegisterService;
 
   beforeEach(async () => {
     mockDb = await createTestDatabase();
@@ -27,10 +87,6 @@ describe("TransferService", () => {
     // Create mock services
     mockEntryService = {
       createEntry: vi.fn(),
-    } as any;
-
-    mockAccountService = {
-      getAccount: vi.fn(),
     } as any;
 
     service = new TransferService(mockCache, mockEntryService);
@@ -47,78 +103,10 @@ describe("TransferService", () => {
     // mockCache.clearAll(); // Temporarily disabled for debugging
   });
 
-  function createMockAccount(overrides: any = {}) {
-    return {
-      id: 1,
-      typeId: 1,
-      budgetId: 1,
-      accountId: "test-account",
-      name: "Test Account",
-      balance: 1000,
-      latestBalance: 1000,
-      minPayment: null,
-      statementAt: dateTimeService.create("2024-01-15"),
-      apr1: 0.15,
-      apr1StartAt: null,
-      apr2: null,
-      apr2StartAt: null,
-      apr3: null,
-      apr3StartAt: null,
-      targetAccountRegisterId: null,
-      loanStartAt: null,
-      loanPaymentsPerYear: null,
-      loanTotalYears: null,
-      loanOriginalAmount: null,
-      loanPaymentSortOrder: 0,
-      savingsGoalSortOrder: 0,
-      accountSavingsGoal: null,
-      minAccountBalance: 500,
-      allowExtraPayment: false,
-      isArchived: false,
-      plaidId: null,
-      ...overrides,
-    };
-  }
-
-  function createMockEntry(overrides: any = {}) {
-    return {
-      id: `test-entry-${Math.random()}`, // Make ID unique
-      accountRegisterId: 1,
-      sourceAccountRegisterId: null,
-      description: "Test Entry",
-      amount: 100,
-      balance: 1100,
-      isBalanceEntry: false,
-      isPending: false,
-      isProjected: false,
-      isManualEntry: false,
-      isCleared: false,
-      isReconciled: false,
-      createdAt: dateTimeService.create("2024-01-01"),
-      ...overrides,
-    };
-  }
-
-  const mockReoccurrence = {
-    accountId: "test-account",
-    accountRegisterId: 1,
-    description: "Test Transfer",
-    lastAt: dateTimeService.create("2024-01-01"),
-    amount: 100,
-    transferAccountRegisterId: 2,
-    intervalId: 3,
-    intervalCount: 1,
-    id: 1,
-    endAt: null,
-    totalIntervals: null,
-    elapsedIntervals: null,
-    updatedAt: dateTimeService.create("2024-01-01"),
-    adjustBeforeIfOnWeekend: false,
-  };
-
   describe("transferBetweenAccounts", () => {
     it("should create entries for both accounts", () => {
       const reoccurrence = {
+        ...MOCK_REOCCURRENCE_ADJUSTMENT_DEFAULTS,
         id: 1,
         accountId: "test-account",
         accountRegisterId: 1,
@@ -149,6 +137,7 @@ describe("TransferService", () => {
 
     it("should use fromDescription when provided", () => {
       const reoccurrence = {
+        ...MOCK_REOCCURRENCE_ADJUSTMENT_DEFAULTS,
         id: 1,
         accountId: "test-account",
         accountRegisterId: 1,
@@ -186,6 +175,7 @@ describe("TransferService", () => {
   describe("transferBetweenAccountsWithDate", () => {
     it("should create entries with forecast date", () => {
       const reoccurrence = {
+        ...MOCK_REOCCURRENCE_ADJUSTMENT_DEFAULTS,
         id: 1,
         accountId: "test-account",
         accountRegisterId: 1,
@@ -491,18 +481,7 @@ describe("TransferService", () => {
       mockCache.registerEntry.insert(entry2);
       mockCache.registerEntry.insert(entry3);
 
-      // Debug: Check if entries are in cache
-      const allEntries = mockCache.registerEntry.find({});
-      const accountEntries = mockCache.registerEntry.find({
-        accountRegisterId: 1,
-      });
-
       const targetDate = dateTimeService.create("2024-01-20").toDate();
-
-      // Test the date comparison directly
-      const filteredEntries = accountEntries.filter((entry) =>
-        dateTimeService.isSameOrBefore(entry.createdAt, targetDate),
-      );
 
       const result = (service as any).calculateProjectedBalanceAtDate(
         1,
@@ -676,9 +655,10 @@ describe("TransferService", () => {
         }),
       );
 
-      vi.spyOn(service as any, "calculateProjectedBalanceAtDate").mockReturnValue(
-        2000,
-      );
+      vi.spyOn(
+        service as any,
+        "calculateProjectedBalanceAtDate",
+      ).mockReturnValue(2000);
 
       await (service as any).processExtraDebtPayment({
         minBalance: 500,
@@ -783,14 +763,12 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(debtAccount1);
       mockCache.accountRegister.insert(debtAccount2);
 
-      // Debug: Check what accounts are in cache
-      const allAccounts = mockCache.accountRegister.find({});
+      mockCache.accountRegister.find({});
       const debtAccounts = mockCache.accountRegister.find(
         (account) => account.balance < 0,
       );
 
-      // Test the sorting logic directly
-      const sortedDebtAccounts = debtAccounts.sort((a, b) => {
+      debtAccounts.sort((a, b) => {
         if (a.loanPaymentSortOrder !== b.loanPaymentSortOrder) {
           return a.loanPaymentSortOrder - b.loanPaymentSortOrder;
         }
@@ -1101,7 +1079,7 @@ describe("TransferService", () => {
       const result = service.findExtraPaymentAccounts();
 
       expect(result).toHaveLength(1);
-      expect(result[0]!.allowExtraPayment).toBe(true);
+      expect(result[0]?.allowExtraPayment).toBe(true);
     });
 
     it("getAccountBalance should return account balance or 0", () => {
@@ -1155,7 +1133,7 @@ describe("TransferService", () => {
       const found = mockCache.registerEntry.find({ accountRegisterId: 1 });
 
       expect(found.length).toBe(1);
-      expect(found[0]!.amount).toBe(500);
+      expect(found[0]?.amount).toBe(500);
     });
   });
 

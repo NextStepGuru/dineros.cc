@@ -3,10 +3,8 @@ import { createPinia, setActivePinia, defineStore } from "pinia";
 import type {
   Reoccurrence,
   Interval,
-  AccountType,
   AccountRegister,
   Budget,
-  Account,
 } from "~/types/types";
 
 (globalThis as any).defineStore = defineStore;

@@ -1,4 +1,6 @@
 {
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.preferences.includePackageJsonAutoImports": "off",
   "typescript.suggest.autoImports": false,
   "typescript.validate.enable": true,

@@ -18,7 +18,7 @@ describe("Direct Debug Test", () => {
 
   it("should test forecast engine step by step", async () => {
     // Create a simple account register
-    const accountRegister = await db.accountRegister.create({
+    await db.accountRegister.create({
       data: {
         id: 1,
         typeId: 1,
@@ -52,7 +52,7 @@ describe("Direct Debug Test", () => {
     });
 
     // Create a simple register entry
-    const registerEntry = await db.registerEntry.create({
+    await db.registerEntry.create({
       data: {
         id: "entry-1",
         accountRegisterId: 1,
@@ -73,11 +73,11 @@ describe("Direct Debug Test", () => {
     const engine = ForecastEngineFactory.create(db as any);
 
     // Test the data loader directly
-    const dataLoader = engine.getCache();
+    engine.getCache();
 
     // Test loading account data
     try {
-      const accountData = await engine.getCache().accountRegister.find({});
+      engine.getCache().accountRegister.find({});
 
       // Wait a bit to ensure async operations complete
       await new Promise((resolve) => setTimeout(resolve, 100));

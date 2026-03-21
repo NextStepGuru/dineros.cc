@@ -1,6 +1,10 @@
 import { Configuration, PlaidEnvironments } from "plaid";
 import env from "~/server/env";
 
+if (!env) {
+  throw new Error("Server env validation failed; cannot configure Plaid.");
+}
+
 export const configuration = new Configuration({
   basePath:
     env.DEPLOY_ENV === "production"

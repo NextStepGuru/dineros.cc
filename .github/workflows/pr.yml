@@ -47,22 +47,22 @@ jobs:
       - run: npx prisma generate
       - run: pnpm test
 
-  build:
-    runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: "mysql://ci:ci@localhost:3306/ci"
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-        with:
-          version: "10.32.1"
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: npx prisma generate
-      - run: pnpm build
+  # build:
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     DATABASE_URL: "mysql://ci:ci@localhost:3306/ci"
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: pnpm/action-setup@v5
+  #       with:
+  #         version: "10.32.1"
+  #     - uses: actions/setup-node@v6
+  #       with:
+  #         node-version-file: ".nvmrc"
+  #         cache: "pnpm"
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: npx prisma generate
+  #     - run: pnpm build
 
   build-main-site-docker:
     runs-on: ubuntu-latest

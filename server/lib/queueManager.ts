@@ -18,18 +18,21 @@ class QueueManager {
   connection: Redis | null;
   isTestMode: boolean;
   queueConfigs: QueueRegistryConfig[];
+  private initialized = false;
 
   constructor(queueConfigs: QueueRegistryConfig[], connection: Redis) {
     this.queueConfigs = queueConfigs;
     this.connection = connection;
     this.isTestMode = process.env.NODE_ENV === "test";
+  }
 
-    if (!this.isTestMode) {
-      // Initialize queues asynchronously
-      this.initializeQueues().catch((error) => {
-        console.error("Failed to initialize queues:", error);
-      });
+  /** Call after construction (e.g. from module scope); no-op in test mode. */
+  public async start(): Promise<void> {
+    if (this.isTestMode || this.initialized) {
+      return;
     }
+    await this.initializeQueues();
+    this.initialized = true;
   }
 
   private async initializeQueues() {
@@ -64,7 +67,7 @@ class QueueManager {
     if (!queue) {
       throw new Error(`Queue ${queueName} not found`);
     }
-    return (queue as import("bullmq").Queue).add(queueName, data, opts);
+    return queue.add(queueName, data, opts);
   }
 
   // Method to check if queues are disabled (for testing)

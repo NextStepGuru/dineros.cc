@@ -8,4 +8,5 @@
 # dist/
 # coverage/
 # .env.local
+# Nuxt regenerates .nuxt/tsconfig.json; root tsconfig only extends it
 tsconfig.json

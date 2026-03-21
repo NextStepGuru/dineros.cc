@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   const results = [];
   let totalEntries = 0;
   let totalAccountRegisters = 0;
-  let failedAccounts = [];
+  const failedAccounts = [];
 
   const fixedNow = (query.fixedNow as string) ?? undefined;
   const timezone = (query.timezone as string) ?? "UTC";

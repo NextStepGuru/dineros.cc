@@ -145,7 +145,7 @@ export class ForecastEngine implements IForecastEngine {
       }
 
       // 8. Calculate running balances and sort entries
-      let processedResults = await this.processAccountEntries(
+      const processedResults = await this.processAccountEntries(
         activeAccountRegisters
       );
 

@@ -36,7 +36,7 @@ export const handleApiError = (error: unknown) => {
     }
 
     // Handle other Prisma errors
-    if (errorObj.name && errorObj.name.startsWith("Prisma")) {
+    if (errorObj.name?.startsWith("Prisma")) {
       log({
         message: "Database operation error",
         data: {
@@ -94,5 +94,4 @@ export const handleApiError = (error: unknown) => {
 
   // For other unknown error types, don't throw (as expected by tests)
   log({ message: "Unknown error", data: error, level: "error" });
-  return;
 };

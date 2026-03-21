@@ -1,6 +1,5 @@
-import type { CacheAccountRegister } from "./ModernCacheService";
+import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
 import type { IRegisterEntryService } from "./types";
-import { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 import {

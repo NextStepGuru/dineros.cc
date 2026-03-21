@@ -4,7 +4,7 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import type { z } from "zod";
 import type { User } from "../../types/types";
 
-import { passwordSchema } from "~/schema/zod";
+import type { passwordSchema } from "~/schema/zod";
 
 type PasswordSchemaType = z.infer<typeof passwordSchema>;
 
