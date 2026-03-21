@@ -770,6 +770,96 @@ describe("Account Register API Endpoints", () => {
       );
       expect(handleApiError).toHaveBeenCalled();
     });
+
+    it("should update loanPaymentSortOrder when sortMode is loan", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisters: [
+          {
+            id: 1,
+            accountId: "account-123",
+            loanPaymentSortOrder: 2,
+            name: "A",
+            typeId: 1,
+            budgetId: 1,
+          },
+          {
+            id: 2,
+            accountId: "account-123",
+            loanPaymentSortOrder: 0,
+            name: "B",
+            typeId: 1,
+            budgetId: 1,
+          },
+        ],
+        sortMode: "loan",
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-123",
+        userAccounts: [{ userId: 123 }],
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (global as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountRegister.update as any).mockResolvedValue({});
+
+      await accountRegisterSortHandler(mockEvent);
+
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { loanPaymentSortOrder: 2 },
+      });
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { loanPaymentSortOrder: 0 },
+      });
+    });
+
+    it("should update savingsGoalSortOrder when sortMode is savings", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisters: [
+          {
+            id: 10,
+            accountId: "account-xyz",
+            savingsGoalSortOrder: 1,
+            name: "S1",
+            typeId: 1,
+            budgetId: 1,
+          },
+        ],
+        sortMode: "savings",
+      };
+      const mockUser = { userId: 123 };
+      const mockAccount = {
+        id: "account-xyz",
+        userAccounts: [{ userId: 123 }],
+      };
+
+      const { readBody } = await import("h3");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { getUser } = await import("~/server/lib/getUser");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (global as any).readBody.mockResolvedValue(mockBody);
+      (getUser as any).mockReturnValue(mockUser);
+      (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
+      (prisma.accountRegister.update as any).mockResolvedValue({});
+
+      await accountRegisterSortHandler(mockEvent);
+
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { savingsGoalSortOrder: 1 },
+      });
+    });
   });
 
   describe("DELETE /api/account-register", () => {

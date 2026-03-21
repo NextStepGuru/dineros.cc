@@ -48,6 +48,13 @@ vi.mock("~/server/services/forecast", () => ({
     create: vi.fn(),
   },
   dateTimeService: {
+    withRunContext: vi.fn(async (_ctx: unknown, fn: () => Promise<unknown>) =>
+      fn(),
+    ),
+    parseInput: vi.fn((s: string) => s),
+    toDate: vi.fn((d: unknown) =>
+      d instanceof Date ? d : new Date(String(d)),
+    ),
     now: vi.fn(() => ({
       startOf: vi.fn(() => ({
         toDate: vi.fn(() => new Date("2024-01-01T00:00:00.000Z")),
@@ -266,5 +273,40 @@ describe("Recalculate POST API Endpoint", () => {
       entriesBalance: 2,
       accountRegisters: 2,
     });
+  });
+
+  it("should run recalculate inside withRunContext when fixedNow is set", async () => {
+    const mockEvent = {};
+    const mockBody = {
+      accountId: "account123",
+      fixedNow: "2024-06-15T12:00:00.000Z",
+      timezone: "America/New_York",
+    };
+    const mockResult = {
+      isSuccess: true,
+      registerEntries: [{ id: 1, isBalanceEntry: false }],
+      accountRegisters: [{ id: 1, accountId: "account123" }],
+      errors: null,
+    };
+
+    const { ForecastEngineFactory } = await import(
+      "~/server/services/forecast"
+    );
+    const { dateTimeService } = await import("~/server/services/forecast");
+
+    (global as any).readBody.mockResolvedValue(mockBody);
+    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
+    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+
+    const result = await recalculatePostHandler(mockEvent);
+
+    expect(dateTimeService.withRunContext).toHaveBeenCalledWith(
+      {
+        fixedNow: "2024-06-15T12:00:00.000Z",
+        timezone: "America/New_York",
+      },
+      expect.any(Function),
+    );
+    expect(result.success).toBe(true);
   });
 });

@@ -1,18 +1,31 @@
 name: SonarQube Scan
 on:
-    push:
-        branches:
-            - master
-    pull_request:
-        types: [opened, synchronize, reopened]
+    workflow_dispatch:
+
 jobs:
     sonarqube:
         name: SonarQube
         runs-on: ubuntu-latest
+        env:
+            DATABASE_URL: "mysql://ci:ci@localhost:3306/ci"
+            NODE_ENV: test
+            CI: true
+            TZ: UTC
         steps:
             - uses: actions/checkout@v6
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: "10.32.1"
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: "pnpm"
+            - run: pnpm install --frozen-lockfile
+            - run: npx prisma generate
+            - name: Test coverage (LCOV for Sonar)
+              run: pnpm test:coverage
             - name: SonarQube Scan
               uses: SonarSource/sonarqube-scan-action@v6
               env:
