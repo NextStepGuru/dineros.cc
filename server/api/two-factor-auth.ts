@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { randomInt } from "node:crypto";
 import { generateSecret, generateURI } from "otplib";
 import qrcode from "qrcode";
 import { getUser } from "../lib/getUser";
@@ -32,9 +34,9 @@ export default defineEventHandler(async (event) => {
     });
     const otpauthWithLogo = `${uri}&image=${encodeURIComponent(LOGO_URL)}`;
 
-    // Generate backup codes for emergency access
+    // Generate backup codes for emergency access (CSPRNG; upper bound exclusive)
     const backupCodes = Array.from({ length: 8 }, () =>
-      Math.floor(100000 + Math.random() * 900000).toString()
+      randomInt(100_000, 1_000_000).toString(),
     );
 
     const imageUrl = await qrcode.toDataURL(otpauthWithLogo);
@@ -42,17 +44,15 @@ export default defineEventHandler(async (event) => {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        settings: JSON.parse(
-          JSON.stringify({
-            ...(user.settings || {}),
-            ...withUpdatedTotp(user.settings, {
-              base32secret: secret,
-              isEnabled: true,
-              isVerified: false,
-              backupCodes,
-            }),
-          })
-        ),
+        settings: structuredClone({
+          ...user.settings,
+          ...withUpdatedTotp(user.settings, {
+            base32secret: secret,
+            isEnabled: true,
+            isVerified: false,
+            backupCodes,
+          }),
+        }) as Prisma.InputJsonValue,
       },
     });
 

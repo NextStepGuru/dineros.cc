@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   try {
     const user = getUser(event);
     const id = getRouterParam(event, "id");
-    const budgetId = id ? parseInt(id, 10) : NaN;
+    const budgetId = id ? Number.parseInt(id, 10) : Number.NaN;
     if (!Number.isInteger(budgetId) || budgetId < 1) {
       throw createError({
         statusCode: 400,
@@ -45,49 +45,52 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    await PrismaDb.$transaction(async (tx) => {
-      const registerIds = await tx.accountRegister
-        .findMany({
-          where: { budgetId },
-          select: { id: true },
-        })
-        .then((rows) => rows.map((r) => r.id));
-
-      if (registerIds.length > 0) {
-        const reoccurrenceIds = await tx.reoccurrence
+    await PrismaDb.$transaction(
+      async (tx) => {
+        const registerIds = await tx.accountRegister
           .findMany({
-            where: { accountRegisterId: { in: registerIds } },
+            where: { budgetId },
             select: { id: true },
           })
           .then((rows) => rows.map((r) => r.id));
 
-        await tx.reoccurrencePlaidNameAlias.deleteMany({
-          where: { reoccurrenceId: { in: reoccurrenceIds } },
-        });
-        await tx.reoccurrenceSplit.deleteMany({
-          where: { reoccurrenceId: { in: reoccurrenceIds } },
-        });
-        await tx.reoccurrenceSkip.deleteMany({
-          where: { reoccurrenceId: { in: reoccurrenceIds } },
-        });
-        await tx.registerEntry.deleteMany({
-          where: { accountRegisterId: { in: registerIds } },
-        });
-        await tx.reoccurrence.deleteMany({
-          where: { accountRegisterId: { in: registerIds } },
-        });
-        await tx.accountRegister.deleteMany({
-          where: { budgetId },
-        });
-      }
+        if (registerIds.length > 0) {
+          const reoccurrenceIds = await tx.reoccurrence
+            .findMany({
+              where: { accountRegisterId: { in: registerIds } },
+              select: { id: true },
+            })
+            .then((rows) => rows.map((r) => r.id));
 
-      await cloneBudget(
-        tx as Parameters<typeof cloneBudget>[0],
-        defaultBudget.id,
-        budgetId,
-        budget.accountId,
-      );
-    });
+          await tx.reoccurrencePlaidNameAlias.deleteMany({
+            where: { reoccurrenceId: { in: reoccurrenceIds } },
+          });
+          await tx.reoccurrenceSplit.deleteMany({
+            where: { reoccurrenceId: { in: reoccurrenceIds } },
+          });
+          await tx.reoccurrenceSkip.deleteMany({
+            where: { reoccurrenceId: { in: reoccurrenceIds } },
+          });
+          await tx.registerEntry.deleteMany({
+            where: { accountRegisterId: { in: registerIds } },
+          });
+          await tx.reoccurrence.deleteMany({
+            where: { accountRegisterId: { in: registerIds } },
+          });
+          await tx.accountRegister.deleteMany({
+            where: { budgetId },
+          });
+        }
+
+        await cloneBudget(
+          tx as Parameters<typeof cloneBudget>[0],
+          defaultBudget.id,
+          budgetId,
+          budget.accountId,
+        );
+      },
+      { maxWait: 20000, timeout: 60000 },
+    );
 
     addRecalculateJob({ accountId: budget.accountId });
 

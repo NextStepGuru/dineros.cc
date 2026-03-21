@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
     // Set the token as a cookie
     setCookie(event, "authToken", token, {
-      secure: env.NODE_ENV === "production",
+      secure: env?.NODE_ENV === "production",
       maxAge: 86400, // 24 hours - match client-side configuration
       path: "/",
       sameSite: "lax",

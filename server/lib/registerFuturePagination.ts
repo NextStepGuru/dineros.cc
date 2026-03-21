@@ -40,13 +40,18 @@ export function paginateFutureRegisterWindow<T extends FutureRegisterPaginationR
 ): { paginated: T[]; hasMore: boolean } {
   const balanceIdx = entries.findIndex((e) => e.isBalanceEntry);
   const projectedIdx = entries.findIndex((e) => e.isProjected);
-  const anchorStart =
-    balanceIdx >= 0 ? balanceIdx : projectedIdx >= 0 ? projectedIdx : 0;
+  let anchorStart = 0;
+  if (balanceIdx >= 0) {
+    anchorStart = balanceIdx;
+  } else if (projectedIdx >= 0) {
+    anchorStart = projectedIdx;
+  }
   const sliceStart = anchorStart + pageSkip;
 
   let transferAnchorIdx = -1;
   for (let i = anchorStart; i < entries.length; i++) {
-    if (isLoanOrDebtPaymentType6(entries[i]!, loanTransferPeerIds)) {
+    const entry = entries[i];
+    if (entry !== undefined && isLoanOrDebtPaymentType6(entry, loanTransferPeerIds)) {
       transferAnchorIdx = i;
       break;
     }

@@ -49,11 +49,14 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    ignore: ["**/__tests__/**"],
     typescript: {
-      // customize tsconfig.server.json
       tsConfig: {
         exclude: ["microservice"],
       },
+    },
+    esbuild: {
+      options: { target: "es2022" },
     },
 
     compressPublicAssets: true,

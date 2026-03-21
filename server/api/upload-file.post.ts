@@ -16,7 +16,6 @@ export default defineEventHandler(async (event: H3Event) => {
       const structuredData: Record<string, any> = {};
       for (const part of multiPartFormData) {
         if (part.name) {
-          // structuredData[part.name] = part.data;
           structuredData[part.name] = part.data.toString("utf-8");
         }
       }
@@ -56,7 +55,7 @@ export default defineEventHandler(async (event: H3Event) => {
             milliseconds: 0,
           })
           .toDate();
-        const amount = parseFloat(
+        const amount = Number.parseFloat(
           item.Amount.replace("$", "").replace(",", ""),
         );
         const description = item.Description;

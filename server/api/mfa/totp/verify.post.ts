@@ -1,3 +1,4 @@
+import { defineEventHandler, readBody, setResponseStatus } from "h3";
 import { verify } from "otplib";
 import { z } from "zod";
 import { prisma } from "~/server/clients/prismaClient";

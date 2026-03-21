@@ -1,3 +1,4 @@
+import { defineEventHandler, readBody, setResponseStatus } from "h3";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { z } from "zod";

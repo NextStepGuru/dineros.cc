@@ -24,7 +24,7 @@ describe("auth middleware", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import("../auth");
+    const module = await import("~/server/middleware/auth");
     authHandler = module.default;
   });
 

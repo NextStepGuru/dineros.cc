@@ -7,7 +7,7 @@ import {
 } from "~/server/services/accountSnapshotService";
 
 const bodySchema = z.object({
-  accountId: z.string().uuid(),
+  accountId: z.uuid(),
 });
 
 export default defineEventHandler(async (event) => {
