@@ -1,6 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
-import { generateKeyPairSync } from "crypto";
 
 // Import modules after mocks
 import JwtService from "../JwtService";
@@ -43,54 +43,26 @@ describe("JwtService", () => {
   let mockUserFindUniqueOrThrow: any;
   let mockRsaService: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    const { generateKeyPairSync } = await vi.importActual<
+      typeof import("node:crypto")
+    >("node:crypto");
 
     // Get references to the mocked functions
     mockUserFindUnique = (prisma.user as any).findUnique;
     mockUserUpdate = (prisma.user as any).update;
     mockUserFindUniqueOrThrow = (prisma.user as any).findUniqueOrThrow;
 
-    // Generate REAL test key pair to override global crypto mock
-    // Use vi.importActual to get the real crypto module
+    const pair = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: "spki", format: "pem" },
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    });
     testKeyPair = {
-      publicKey: `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy+j9XF968AxNDz2ai5Co
-IXg0tDl/gpTVGEmR7KAGP/7kdBaeusfeUyqUyTXeWjJJNdwc74bSNHzWkacLv/Mx
-sm7YrzCoEidBL5itDpzLFKla7lo/UUrIKeSD9ItDaCS3Fdl2yEMI3i02R6N8qevW
-BksBg93ogZLlt/bzfgriT36aVp2XsH/gsmtgbpr4ZGneoZQaIv6i7BPq2yTWS1Xv
-GWHjWxiypQDKE+ObURw3UTvL40DcEl2H0djJVFntlHJwgMen2rC096a410GhGE2K
-2mlg41dzJsSczy5KcMWjM22d58QHc+sAM81add7oW/0CFWGRAEzVOZrh2vxiXPtl
-2QIDAQAB
------END PUBLIC KEY-----`,
-      privateKey: `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDL6P1cX3rwDE0P
-PZqLkKgheDS0OX+ClNUYSZHsoAY//uR0Fp66x95TKpTJNd5aMkk13BzvhtI0fNaR
-pwu/8zGybtivMKgSJ0EvmK0OnMsUqVruWj9RSsgp5IP0i0NoJLcV2XbIQwjeLTZH
-o3yp69YGSwGD3eiBkuW39vN+CuJPfppWnZewf+Cya2Bumvhkad6hlBoi/qLsE+rb
-JNZLVe8ZYeNbGLKlAMoT45tRHDdRO8vjQNwSXYfR2MlUWe2UcnCAx6fasLT3prjX
-QaEYTYraaWDjV3MmxJzPLkpwxaMzbZ3nxAdz6wAzzVp13uhb/QIVYZEATNU5muHa
-/GJc+2XZAgMBAAECggEAKBuiODjsospcnu6QVzrjI0A0Z622m74AI0iXTBqW2CAg
-Ggh3/MfC/otN3Dz9CTNCbLZot6GGd74Fa31WxZEFmbINa3ov2PBBNWY7xffHxz7f
-jKoSMcB6mijhXqjE37d3DrRpVY8/74mnl1Q8OWUSwkafG+u6Z8A38KVBtC1aYeWr
-9XCs9fAW78earBT/iXOAvTg0h/PPKOATr0S49TMxxFxUhNHL8IakS3mxq+H0cvd8
-uIIh+wEDrUgV/YoiE741LcHAhzL9ox2fBsSOEarPbN2CbQXrSptOtVC5ICMDNOyF
-VNFHQ2SAGi+j9usk2vti36/e68kfbvX/chgkCZT+fQKBgQD+2u4DT5PSzcONl77S
-WK45FNmuOOCdgTGjBE8CQXSkZVQMobUCKdh5oeL8m8JL1r1b1uAxrHJox+ZPZjAn
-PSjIYzT484jg92VP/iKeELaKWZtWx62Jk2VZIJsE15lgZVQdbMBmfv3whVY7wjkW
-XocKGKsxDtWKjc0VUjp21+Uy3QKBgQDM03nK/TkSHGO8vgNBBUXjRIf7727KkOof
-smfIsMsqEtXLJK6yiPpVdRsLb549JB4Y06rnjUO8AAb5u1I4fn56kG4XiX6G10af
-706lugl/lCTffpmyMqGLDa/0Ztyg8F9Ak6rNSLd4p05kA5+g8f4G5mQJUHTmNjBr
-7qiHA1N5LQKBgEPunXT6eD+/ozmR0kaFZuNGQIPlG1JAhreaRWkng2zyqYW4cORD
-vTUmxrdo2VCXy9+4FgiHm/N8HVLavUkoTz+i2hLl731v1GyPJDEX6WBVZEescAB0
-7pXkUA3pXjPIrrQtMdfgT9YV5JeHPOpOhhZV3wPznU4SYDEnuvfEso5tAoGAVKZt
-plvC015SRfXNiHiyanuvK4rHogYEDHeB9upB/LBuFRei73w24UyVkcNehWxA2Afa
-kPnL7Y2hVGJ7V4fHo8W/ChEz7mxX7s9LFKjvNf+2wXsj8AaGxt4wQvSj6AuPgjPF
-GjQcR0v11NW+ihiY4Kck3siWl3H7zw+CLNJOFD0CgYEA8quM2lE1wuuP0Ct/CTzn
-ppg0ylAdgE9PdUkn5Pt+R/o9PLCxMK6U2qAKZeU4okpE152TjH+VeX07UVdp6Rre
-6Te/ym6KK5F5T9iKDFobk736G9oDzgJwr+hsFsZN1U0Iot3hg4L6ca0hnxOwBWm3
-FOy00NAwJms6hDR9DFTAN/I=
------END PRIVATE KEY-----`,
+      publicKey: pair.publicKey,
+      privateKey: pair.privateKey,
     };
 
     mockRsaKey = {
@@ -126,7 +98,10 @@ FOy00NAwJms6hDR9DFTAN/I=
       expect(token).toBeDefined();
       expect(typeof token).toBe("string");
 
-      const decoded = jwt.decode(token, { complete: true }) as jwt.Jwt;
+      const decoded = jwt.decode(token, { complete: true });
+      if (decoded === null) {
+        throw new Error("expected decoded JWT");
+      }
       expect(decoded.payload).toMatchObject({
         userId: userId,
         jwtKey: "existing-jwt-key",
@@ -155,7 +130,10 @@ FOy00NAwJms6hDR9DFTAN/I=
 
       expect(token).toBeDefined();
 
-      const decoded = jwt.decode(token, { complete: true }) as jwt.Jwt;
+      const decoded = jwt.decode(token, { complete: true });
+      if (decoded === null) {
+        throw new Error("expected decoded JWT");
+      }
       expect(decoded.payload).toMatchObject({
         userId: userId,
         jwtKey: "new-jwt-key",
@@ -181,21 +159,22 @@ FOy00NAwJms6hDR9DFTAN/I=
         mockRsaService.getLatestKey.mockRejectedValue(rsaError);
 
         await expect(jwtService.sign({ userId })).rejects.toThrow(
-          "RSA key not found"
+          "RSA key not found",
         );
-      }
+      },
     );
   });
 
   describe("verify", () => {
     it("should reject token with invalid signature", async () => {
+      const invalidHmacSecret = randomBytes(32).toString("base64url");
       const invalidToken = jwt.sign(
         { userId: 555, jwtKey: "test-key" },
-        "wrong-private-key",
+        invalidHmacSecret,
         {
           keyid: "test-key-id",
           algorithm: "HS256", // Different algorithm
-        }
+        },
       );
 
       mockUserFindUniqueOrThrow.mockResolvedValue({
@@ -215,7 +194,7 @@ FOy00NAwJms6hDR9DFTAN/I=
           keyid: "test-key-id",
           algorithm: "PS512",
           expiresIn: "-1h", // Already expired
-        }
+        },
       );
 
       mockUserFindUniqueOrThrow.mockResolvedValue({
@@ -233,11 +212,11 @@ FOy00NAwJms6hDR9DFTAN/I=
         {
           algorithm: "PS512",
           // No keyid provided
-        }
+        },
       );
 
       await expect(jwtService.verify(tokenWithoutKid)).rejects.toThrow(
-        "Invalid token header"
+        "Invalid token header",
       );
     });
 
@@ -248,13 +227,13 @@ FOy00NAwJms6hDR9DFTAN/I=
         {
           keyid: "non-existent-key",
           algorithm: "PS512",
-        }
+        },
       );
 
       mockRsaService.getKey.mockRejectedValue(new Error("RSA key not found"));
 
       await expect(jwtService.verify(validToken)).rejects.toThrow(
-        "RSA key not found"
+        "RSA key not found",
       );
     });
 
@@ -276,11 +255,11 @@ FOy00NAwJms6hDR9DFTAN/I=
           keyid: "test-key-id",
           algorithm: "PS512",
           // Note: expiresIn not allowed with string payload
-        }
+        },
       );
 
       await expect(jwtService.verify(tokenWithStringPayload)).rejects.toThrow(
-        "Invalid token header"
+        "Invalid token header",
       );
     });
 

@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { handleError } from "~/lib/utils";
-import { passwordAndCodeSchema } from "~/schema/zod";
+import type { passwordAndCodeSchema } from "~/schema/zod";
 const toast = useToast(); // Initialize the toast composable
 const runtimeConfig = useRuntimeConfig();
 const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";

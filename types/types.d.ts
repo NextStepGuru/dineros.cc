@@ -1,9 +1,9 @@
 
-import { z } from "zod";
+import type { z } from "zod";
 
-import { plaidAccountSchema } from "~/schema/plaid";
+import type { plaidAccountSchema } from "~/schema/plaid";
 
-import {
+import type {
   accountRegisterSchema,
   intervalSchema,
   publicProfileSchema,

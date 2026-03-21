@@ -17,7 +17,7 @@ describe("Debug Forecast Engine Test", () => {
 
   it("should create forecast engine and run basic test", async () => {
     // Create a simple account register
-    const accountRegister = await db.accountRegister.create({
+    await db.accountRegister.create({
       data: {
         id: 1,
         typeId: 1,
@@ -51,7 +51,7 @@ describe("Debug Forecast Engine Test", () => {
     });
 
     // Create a simple register entry
-    const registerEntry = await db.registerEntry.create({
+    await db.registerEntry.create({
       data: {
         id: "entry-1",
         accountRegisterId: 1,
@@ -69,7 +69,7 @@ describe("Debug Forecast Engine Test", () => {
     });
 
     // Verify the data was created
-    const allEntries = await db.registerEntry.findMany();
+    await db.registerEntry.findMany();
 
     // Create forecast engine
     const engine = ForecastEngineFactory.create(db as any);

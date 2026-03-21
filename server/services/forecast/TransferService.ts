@@ -1,8 +1,7 @@
 import type { ITransferService, TransferParams } from "./types";
-import type { CacheAccountRegister } from "./ModernCacheService";
+import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
 import prismaPkg, { AmountAdjustmentMode } from "@prisma/client";
-import { ModernCacheService } from "./ModernCacheService";
-import { RegisterEntryService } from "./RegisterEntryService";
+import type { RegisterEntryService } from "./RegisterEntryService";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";

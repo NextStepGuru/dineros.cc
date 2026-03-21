@@ -1,15 +1,5 @@
 import { vi } from "vitest";
 
-// Optimize test isolation - these will be called automatically by Vitest
-// beforeEach(() => {
-//   vi.clearAllMocks();
-//   vi.clearAllTimers();
-// });
-
-// afterEach(() => {
-//   vi.restoreAllMocks();
-// });
-
 // Mock Nuxt utilities (defineStore so store modules can load in tests)
 import { defineStore } from "pinia";
 
@@ -18,8 +8,7 @@ process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
 
 // server/env + prisma-field-encryption require Cloak-serialized keys (see build-test.sh)
-const ciCloakKey =
-  "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c=";
+const ciCloakKey = "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c=";
 process.env.DB_ENCRYPTION_KEY = ciCloakKey;
 process.env.DB_DECRYPTION_KEY_1 = ciCloakKey;
 process.env.PLAID_CLIENT_ID = "test-plaid-client-id";
@@ -111,7 +100,7 @@ export const captureStderr = (fn: () => void | Promise<void>): string => {
 
   // Intercept process.stderr.write
   process.stderr.write = (chunk: any, ...args: any[]) => {
-    if (typeof chunk === 'string') {
+    if (typeof chunk === "string") {
       chunks.push(Buffer.from(chunk));
     } else if (Buffer.isBuffer(chunk)) {
       chunks.push(chunk);
@@ -121,9 +110,10 @@ export const captureStderr = (fn: () => void | Promise<void>): string => {
 
   // Intercept console.error
   console.error = (...args: any[]) => {
-    const message = args.map(arg =>
-      typeof arg === 'string' ? arg : JSON.stringify(arg)
-    ).join(' ') + '\n';
+    const message =
+      args
+        .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+        .join(" ") + "\n";
     chunks.push(Buffer.from(message));
     return originalConsoleError.apply(console, args);
   };
@@ -135,18 +125,20 @@ export const captureStderr = (fn: () => void | Promise<void>): string => {
     console.error = originalConsoleError;
   }
 
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks).toString("utf8");
 };
 
 // Async version for async functions
-export const captureStderrAsync = async (fn: () => Promise<void>): Promise<string> => {
+export const captureStderrAsync = async (
+  fn: () => Promise<void>,
+): Promise<string> => {
   const originalStderr = process.stderr.write;
   const originalConsoleError = console.error;
   const chunks: Buffer[] = [];
 
   // Intercept process.stderr.write
   process.stderr.write = (chunk: any, ...args: any[]) => {
-    if (typeof chunk === 'string') {
+    if (typeof chunk === "string") {
       chunks.push(Buffer.from(chunk));
     } else if (Buffer.isBuffer(chunk)) {
       chunks.push(chunk);
@@ -156,9 +148,10 @@ export const captureStderrAsync = async (fn: () => Promise<void>): Promise<strin
 
   // Intercept console.error
   console.error = (...args: any[]) => {
-    const message = args.map(arg =>
-      typeof arg === 'string' ? arg : JSON.stringify(arg)
-    ).join(' ') + '\n';
+    const message =
+      args
+        .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+        .join(" ") + "\n";
     chunks.push(Buffer.from(message));
     return originalConsoleError.apply(console, args);
   };
@@ -170,5 +163,5 @@ export const captureStderrAsync = async (fn: () => Promise<void>): Promise<strin
     console.error = originalConsoleError;
   }
 
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks).toString("utf8");
 };

@@ -6,15 +6,24 @@ vi.hoisted(() => {
 
 vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
-  createError: vi.fn((error: { statusCode?: number; statusMessage?: string; message?: string }) => {
-    const statusCode = error.statusCode || 500;
-    const message = error.statusMessage || error.message || "Unknown error";
-    const fullMessage = `HTTP ${statusCode}: ${message}`;
-    const err = new Error(fullMessage) as Error & { statusCode?: number; statusMessage?: string };
-    err.statusCode = statusCode;
-    err.statusMessage = message;
-    throw err;
-  }),
+  createError: vi.fn(
+    (error: {
+      statusCode?: number;
+      statusMessage?: string;
+      message?: string;
+    }) => {
+      const statusCode = error.statusCode || 500;
+      const message = error.statusMessage || error.message || "Unknown error";
+      const fullMessage = `HTTP ${statusCode}: ${message}`;
+      const err = new Error(fullMessage) as Error & {
+        statusCode?: number;
+        statusMessage?: string;
+      };
+      err.statusCode = statusCode;
+      err.statusMessage = message;
+      throw err;
+    },
+  ),
   readBody: vi.fn(),
   getQuery: vi.fn(),
   setResponseStatus: vi.fn(),
@@ -105,17 +114,21 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     await resetH3Mocks();
-    prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        reoccurrencePlaidNameAlias: { upsert: prismaMock.reoccurrencePlaidNameAlias.upsert },
-        registerEntry: { update: prismaMock.registerEntry.update },
-      };
-      return fn(tx);
-    });
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (_tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          reoccurrencePlaidNameAlias: {
+            upsert: prismaMock.reoccurrencePlaidNameAlias.upsert,
+          },
+          registerEntry: { update: prismaMock.registerEntry.update },
+        };
+        return fn(tx);
+      },
+    );
   });
 
   describe("GET /api/categories", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../categories.get");
@@ -165,7 +178,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("POST /api/category", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../category.post");
@@ -198,7 +211,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("PATCH /api/category", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../category.patch");
@@ -227,7 +240,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("DELETE /api/category", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../category.delete");
@@ -284,7 +297,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("POST /api/snapshot", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../snapshot.post");
@@ -294,7 +307,8 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     it("creates snapshot", async () => {
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
-      const { createAccountSnapshot } = await import("~/server/services/accountSnapshotService");
+      const { createAccountSnapshot } =
+        await import("~/server/services/accountSnapshotService");
       (readBody as any).mockResolvedValue({ accountId: ACCOUNT_ID });
       (getUser as any).mockReturnValue({ userId: 1 });
 
@@ -308,7 +322,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("GET /api/snapshots", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../snapshots.get");
@@ -332,7 +346,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("POST /api/savings-goal", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../savings-goal.post");
@@ -362,7 +376,9 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
       prismaMock.accountRegister.findFirst
         .mockResolvedValueOnce(source as any)
         .mockResolvedValueOnce(target as any);
-      prismaMock.savingsGoal.aggregate.mockResolvedValue({ _max: { sortOrder: 0 } });
+      prismaMock.savingsGoal.aggregate.mockResolvedValue({
+        _max: { sortOrder: 0 },
+      });
       prismaMock.savingsGoal.create.mockResolvedValue({
         id: 5,
         accountId: ACCOUNT_ID,
@@ -411,13 +427,14 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   });
 
   describe("POST /api/register-entry-match-reoccurrence", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
-      const { normalizePlaidDescription } = await import(
-        "~/server/lib/normalizePlaidDescription",
+      const { normalizePlaidDescription } =
+        await import("~/server/lib/normalizePlaidDescription");
+      (normalizePlaidDescription as any).mockImplementation((s: string) =>
+        s.trim(),
       );
-      (normalizePlaidDescription as any).mockImplementation((s: string) => s.trim());
 
       const mod = await import("../register-entry-match-reoccurrence.post");
       handler = mod.default;
@@ -479,7 +496,8 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
       });
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } = await import("~/server/clients/queuesClient");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
       (readBody as any).mockResolvedValue({
         registerEntryId: "entry-1",
         accountRegisterId: 5,

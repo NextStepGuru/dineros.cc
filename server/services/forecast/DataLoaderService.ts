@@ -3,13 +3,13 @@ import type { IDataLoaderService, ForecastContext, AccountData } from "./types";
 import type {
   CacheAccountRegister,
   CacheSavingsGoal,
+  ModernCacheService,
 } from "./ModernCacheService";
-import { ModernCacheService } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
 export class DataLoaderService implements IDataLoaderService {
-  private db: PrismaClient;
-  private cache: ModernCacheService;
+  private readonly db: PrismaClient;
+  private readonly cache: ModernCacheService;
 
   constructor(db: PrismaClient, cache: ModernCacheService) {
     this.db = db;
@@ -115,41 +115,40 @@ export class DataLoaderService implements IDataLoaderService {
       (reg) => {
         const { type, ...regFields } = reg;
         return {
-        ...regFields,
-        accruesBalanceGrowth: type?.accruesBalanceGrowth ?? false,
-        balance: Number(reg.latestBalance),
-        latestBalance: Number(reg.latestBalance),
-        minPayment: reg.minPayment ? Number(reg.minPayment) : null,
-        apr1: reg.apr1 ? Number(reg.apr1) : null,
-        apr2: reg.apr2 ? Number(reg.apr2) : null,
-        apr3: reg.apr3 ? Number(reg.apr3) : null,
-        loanOriginalAmount: reg.loanOriginalAmount
-          ? Number(reg.loanOriginalAmount)
-          : null,
-        minAccountBalance: reg.minAccountBalance != null
-          ? Number(reg.minAccountBalance)
-          : 0,
-        accountSavingsGoal: reg.accountSavingsGoal
-          ? Number(reg.accountSavingsGoal)
-          : null,
-        statementAt: dateTimeService.createUTC(reg.statementAt).toDate(),
-        depreciationRate: reg.depreciationRate
-          ? Number(reg.depreciationRate)
-          : null,
-        depreciationMethod: reg.depreciationMethod ?? null,
-        assetOriginalValue: reg.assetOriginalValue
-          ? Number(reg.assetOriginalValue)
-          : null,
-        assetResidualValue: reg.assetResidualValue
-          ? Number(reg.assetResidualValue)
-          : null,
-        assetUsefulLifeYears: reg.assetUsefulLifeYears ?? null,
-        assetStartAt: reg.assetStartAt
-          ? dateTimeService.createUTC(reg.assetStartAt).toDate()
-          : null,
-        paymentCategoryId: reg.paymentCategoryId ?? null,
-        interestCategoryId: reg.interestCategoryId ?? null,
-      };
+          ...regFields,
+          accruesBalanceGrowth: type?.accruesBalanceGrowth ?? false,
+          balance: Number(reg.latestBalance),
+          latestBalance: Number(reg.latestBalance),
+          minPayment: reg.minPayment ? Number(reg.minPayment) : null,
+          apr1: reg.apr1 ? Number(reg.apr1) : null,
+          apr2: reg.apr2 ? Number(reg.apr2) : null,
+          apr3: reg.apr3 ? Number(reg.apr3) : null,
+          loanOriginalAmount: reg.loanOriginalAmount
+            ? Number(reg.loanOriginalAmount)
+            : null,
+          minAccountBalance:
+            reg.minAccountBalance == null ? 0 : Number(reg.minAccountBalance),
+          accountSavingsGoal: reg.accountSavingsGoal
+            ? Number(reg.accountSavingsGoal)
+            : null,
+          statementAt: dateTimeService.createUTC(reg.statementAt).toDate(),
+          depreciationRate: reg.depreciationRate
+            ? Number(reg.depreciationRate)
+            : null,
+          depreciationMethod: reg.depreciationMethod ?? null,
+          assetOriginalValue: reg.assetOriginalValue
+            ? Number(reg.assetOriginalValue)
+            : null,
+          assetResidualValue: reg.assetResidualValue
+            ? Number(reg.assetResidualValue)
+            : null,
+          assetUsefulLifeYears: reg.assetUsefulLifeYears ?? null,
+          assetStartAt: reg.assetStartAt
+            ? dateTimeService.createUTC(reg.assetStartAt).toDate()
+            : null,
+          paymentCategoryId: reg.paymentCategoryId ?? null,
+          interestCategoryId: reg.interestCategoryId ?? null,
+        };
       },
     );
 
@@ -207,9 +206,9 @@ export class DataLoaderService implements IDataLoaderService {
         ...rest,
         amount: Number(item.amount),
         amountAdjustmentValue:
-          item.amountAdjustmentValue != null
-            ? Number(item.amountAdjustmentValue)
-            : null,
+          item.amountAdjustmentValue == null
+            ? null
+            : Number(item.amountAdjustmentValue),
         lastAt: item.lastAt,
         endAt: item.endAt ? item.endAt : null,
         intervalName: interval?.name ?? undefined,
@@ -231,9 +230,9 @@ export class DataLoaderService implements IDataLoaderService {
       this.cache.reoccurrenceSkip.insert({
         ...item,
         skippedAt:
-          item.skippedAt != null
-            ? dateTimeService.format("YYYY-MM-DD", item.skippedAt)
-            : "",
+          item.skippedAt == null
+            ? ""
+            : dateTimeService.format("YYYY-MM-DD", item.skippedAt),
       });
     });
 
@@ -258,7 +257,9 @@ export class DataLoaderService implements IDataLoaderService {
     return reoccurrenceSplits;
   }
 
-  private async loadSavingsGoals(accountId?: string): Promise<CacheSavingsGoal[]> {
+  private async loadSavingsGoals(
+    accountId?: string,
+  ): Promise<CacheSavingsGoal[]> {
     const goals = await this.db.savingsGoal.findMany({
       where: { accountId, isArchived: false },
       orderBy: { sortOrder: "asc" },

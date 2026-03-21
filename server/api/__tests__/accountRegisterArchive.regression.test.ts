@@ -9,7 +9,7 @@ vi.mock("h3", () => ({
   getQuery: vi.fn(),
 }));
 
-(global as any).getQuery = vi.fn();
+(globalThis as any).getQuery = vi.fn();
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
@@ -48,7 +48,9 @@ const prismaMock = vi.hoisted(() => {
   const reoccurrenceSplitDeleteMany = vi.fn().mockResolvedValue(resolved);
   const registerEntryDeleteMany = vi.fn().mockResolvedValue(resolved);
   const reoccurrenceSkipDeleteMany = vi.fn().mockResolvedValue(resolved);
-  const reoccurrencePlaidNameAliasDeleteMany = vi.fn().mockResolvedValue(resolved);
+  const reoccurrencePlaidNameAliasDeleteMany = vi
+    .fn()
+    .mockResolvedValue(resolved);
 
   return {
     savingsGoalUpdateMany,
@@ -106,7 +108,7 @@ const accountId = "account-xyz";
 const userId = 123;
 
 describe("account register archive regression (DELETE → soft archive)", () => {
-  let handler: (event: unknown) => Promise<unknown>;
+  let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -122,7 +124,7 @@ describe("account register archive regression (DELETE → soft archive)", () => 
       isArchived: true,
     });
     prismaMock.$transaction.mockImplementation(
-      async (fn: (tx: unknown) => Promise<unknown>) => {
+      async (fn: (_tx: unknown) => Promise<unknown>) => {
         const tx = {
           savingsGoal: {
             updateMany: prismaMock.savingsGoalUpdateMany,
@@ -160,7 +162,7 @@ describe("account register archive regression (DELETE → soft archive)", () => 
     (getQuery as any).mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
-    (global as any).getQuery.mockReturnValue({
+    (globalThis as any).getQuery.mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
 
@@ -178,7 +180,7 @@ describe("account register archive regression (DELETE → soft archive)", () => 
     (getQuery as any).mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
-    (global as any).getQuery.mockReturnValue({
+    (globalThis as any).getQuery.mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
 
@@ -251,7 +253,9 @@ describe("account register archive regression (DELETE → soft archive)", () => 
     expect(prismaMock.reoccurrenceSkipDeleteMany).toHaveBeenCalledWith({
       where: { accountRegisterId },
     });
-    expect(prismaMock.reoccurrencePlaidNameAliasDeleteMany).toHaveBeenCalledWith({
+    expect(
+      prismaMock.reoccurrencePlaidNameAliasDeleteMany,
+    ).toHaveBeenCalledWith({
       where: { accountRegisterId },
     });
     expect(prismaMock.reoccurrenceDeleteMany).toHaveBeenCalledWith({
@@ -265,7 +269,7 @@ describe("account register archive regression (DELETE → soft archive)", () => 
     (getQuery as any).mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
-    (global as any).getQuery.mockReturnValue({
+    (globalThis as any).getQuery.mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
 
@@ -279,16 +283,16 @@ describe("account register archive regression (DELETE → soft archive)", () => 
     (getQuery as any).mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
-    (global as any).getQuery.mockReturnValue({
+    (globalThis as any).getQuery.mockReturnValue({
       accountRegisterId: String(accountRegisterId),
     });
 
     await handler({});
 
-    expect(
-      prismaMock.registerEntryDeleteMany.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      prismaMock.reoccurrenceDeleteMany.mock.invocationCallOrder[0],
-    );
+    const registerEntryOrder =
+      prismaMock.registerEntryDeleteMany.mock.invocationCallOrder[0] as number;
+    const reoccurrenceOrder =
+      prismaMock.reoccurrenceDeleteMany.mock.invocationCallOrder[0] as number;
+    expect(registerEntryOrder).toBeLessThan(reoccurrenceOrder);
   });
 });

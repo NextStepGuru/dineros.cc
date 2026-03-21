@@ -1,22 +1,48 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DataPersisterService } from "../DataPersisterService";
-import { ModernCacheService } from "../ModernCacheService";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import type { PrismaClient } from "~/types/test-types";
 import { forecastLogger } from "../logger";
 import { dateTimeService } from "../DateTimeService";
 
+function createMockEntry(overrides: any = {}) {
+  return {
+    id: "test-entry",
+    accountRegisterId: 1,
+    sourceAccountRegisterId: null,
+    description: "Test Entry",
+    amount: 100,
+    balance: 1100,
+    isBalanceEntry: false,
+    isPending: false,
+    isProjected: false,
+    isManualEntry: false,
+    isCleared: false,
+    isReconciled: false,
+    createdAt: dateTimeService.create("2024-01-01"),
+    ...overrides,
+  };
+}
+
+function captureLastAtFromExecuteRaw(mock: {
+  mock: { calls: unknown[][] };
+}): Date | undefined {
+  const call = mock.mock.calls[0]?.[0] as { values?: unknown[] } | undefined;
+  if (!call?.values) return undefined;
+  return call.values[1] instanceof Date ? call.values[1] : undefined;
+}
+
 describe("DataPersisterService", () => {
   let service: DataPersisterService;
   let mockDb: PrismaClient;
-  let mockCache: ModernCacheService;
 
   beforeEach(async () => {
     mockDb = await createTestDatabase();
-    mockCache = new ModernCacheService();
 
     service = new DataPersisterService(
-      mockDb as unknown as ConstructorParameters<typeof DataPersisterService>[0],
+      mockDb as unknown as ConstructorParameters<
+        typeof DataPersisterService
+      >[0],
     );
 
     // Mock forecastLogger to avoid test output
@@ -28,25 +54,6 @@ describe("DataPersisterService", () => {
     await cleanupTestDatabase(mockDb);
     vi.restoreAllMocks();
   });
-
-  function createMockEntry(overrides: any = {}) {
-    return {
-      id: "test-entry",
-      accountRegisterId: 1,
-      sourceAccountRegisterId: null,
-      description: "Test Entry",
-      amount: 100,
-      balance: 1100,
-      isBalanceEntry: false,
-      isPending: false,
-      isProjected: false,
-      isManualEntry: false,
-      isCleared: false,
-      isReconciled: false,
-      createdAt: dateTimeService.create("2024-01-01"),
-      ...overrides,
-    };
-  }
 
   describe("persistForecastResults", () => {
     it("should successfully persist results using createMany", async () => {
@@ -87,7 +94,7 @@ describe("DataPersisterService", () => {
 
       await service.persistForecastResults(entries);
 
-      const createManyArgs = (mockDb.registerEntry.createMany as any).mock
+      const createManyArgs = vi.mocked(mockDb.registerEntry.createMany).mock
         .calls[0][0];
       const createdAt = createManyArgs.data[0].createdAt;
 
@@ -137,7 +144,7 @@ describe("DataPersisterService", () => {
 
       await service.persistForecastResults(entries);
 
-      const createManyArgs = (mockDb.registerEntry.createMany as any).mock
+      const createManyArgs = vi.mocked(mockDb.registerEntry.createMany).mock
         .calls[0][0];
       expect(createManyArgs.data[0].reoccurrenceId).toBeNull();
     });
@@ -188,7 +195,7 @@ describe("DataPersisterService", () => {
       await service.persistForecastResults(entries);
 
       expect(mockDb.registerEntry.create).toHaveBeenCalledTimes(1);
-      const createData = (mockDb.registerEntry.create as any).mock.calls[0][0]
+      const createData = vi.mocked(mockDb.registerEntry.create).mock.calls[0][0]
         .data;
       expect(createData.reoccurrenceId).toBeNull();
       expect(createData.typeId).toBe(6);
@@ -326,7 +333,7 @@ describe("DataPersisterService", () => {
         .mockResolvedValueOnce(2) // manual
         .mockResolvedValueOnce(1); // balance
 
-      const result = await service.getResultsCount(undefined);
+      const result = await service.getResultsCount();
 
       expect(result).toEqual({
         projected: 8,
@@ -372,13 +379,6 @@ describe("DataPersisterService", () => {
 
   // Persistence regression: never future, never regress, latest past from existing or cache lastRunAt (past only).
   describe("persistReoccurrenceLastAt", () => {
-    function captureLastAtFromExecuteRaw(mock: any): Date | undefined {
-      const call = mock.mock.calls[0]?.[0];
-      if (!call?.values) return undefined;
-      // Prisma.sql: last_at CASE id WHEN id THEN lastAt ... so values[1] is first row's lastAt
-      return call.values[1] instanceof Date ? call.values[1] : undefined;
-    }
-
     beforeEach(() => {
       (mockDb as any).$executeRaw =
         (mockDb as any).$executeRaw ?? vi.fn().mockResolvedValue(undefined);
@@ -415,7 +415,7 @@ describe("DataPersisterService", () => {
         expect((mockDb as any).$executeRaw).toHaveBeenCalledTimes(1);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-02-02");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-02-02");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -450,7 +450,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-02");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-03-02");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -485,7 +485,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-01");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-03-01");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -521,7 +521,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-04-15");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-04-15");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -557,7 +557,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-04-01");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-04-01");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -592,7 +592,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2024-03-15");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2024-03-15");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -627,7 +627,7 @@ describe("DataPersisterService", () => {
         await service.persistReoccurrenceLastAt(reoccurrences);
         const lastAt = captureLastAtFromExecuteRaw((mockDb as any).$executeRaw);
         expect(lastAt).toBeDefined();
-        expect(lastAt!.toISOString().slice(0, 10)).toBe("2026-03-02");
+        expect(lastAt?.toISOString().slice(0, 10)).toBe("2026-03-02");
       } finally {
         dateTimeService.clearNowOverride();
       }
@@ -751,7 +751,7 @@ describe("DataPersisterService - Error Handling and Edge Cases", () => {
 
       // Mock database update to throw error for specific entry
       vi.spyOn(mockDb.registerEntry, "update").mockImplementation(
-        async ({ where, data }: any) => {
+        async ({ where, data: _data }: any) => {
           if (where.id === "1") {
             throw new Error("Database connection failed");
           }

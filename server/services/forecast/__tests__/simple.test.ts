@@ -17,7 +17,7 @@ describe("Simple Forecast Engine Test", () => {
 
   it("should create forecast engine and return success", async () => {
     // Create a simple account register
-    const accountRegister = await db.accountRegister.create({
+    await db.accountRegister.create({
       data: {
         id: 1,
         typeId: 1,

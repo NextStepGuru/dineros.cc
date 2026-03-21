@@ -24,8 +24,8 @@ vi.mock("h3", () => ({
 }));
 
 // Make H3 functions globally available
-(global as any).readBody = vi.fn();
-(global as any).getQuery = vi.fn();
+(globalThis as any).readBody = vi.fn();
+(globalThis as any).getQuery = vi.fn();
 
 // Mock server dependencies
 vi.mock("~/server/clients/prismaClient", () => ({
@@ -84,7 +84,7 @@ describe("Account Register API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock functions
-      (global as any).readBody = vi.fn();
+      (globalThis as any).readBody = vi.fn();
 
       const module = await import("../account-register.post");
       accountRegisterPostHandler = module.default;
@@ -399,8 +399,7 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } =
-        await import("~/server/clients/queuesClient");
+      await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
@@ -458,8 +457,7 @@ describe("Account Register API Endpoints", () => {
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { getUser } = await import("~/server/lib/getUser");
-      const { addRecalculateJob } =
-        await import("~/server/clients/queuesClient");
+      await import("~/server/clients/queuesClient");
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
@@ -656,7 +654,7 @@ describe("Account Register API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock functions
-      (global as any).readBody = vi.fn();
+      (globalThis as any).readBody = vi.fn();
 
       const module = await import("../account-register-sort.post");
       accountRegisterSortHandler = module.default;
@@ -706,7 +704,7 @@ describe("Account Register API Endpoints", () => {
         await import("~/server/clients/queuesClient");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.update as any).mockResolvedValue({});
@@ -733,7 +731,7 @@ describe("Account Register API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
 
       await expect(accountRegisterSortHandler(mockEvent)).rejects.toThrow();
@@ -762,7 +760,7 @@ describe("Account Register API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
 
       await expect(accountRegisterSortHandler(mockEvent)).rejects.toThrow(
@@ -805,7 +803,7 @@ describe("Account Register API Endpoints", () => {
       const { getUser } = await import("~/server/lib/getUser");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.update as any).mockResolvedValue({});
@@ -848,7 +846,7 @@ describe("Account Register API Endpoints", () => {
       const { getUser } = await import("~/server/lib/getUser");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.account.findFirstOrThrow as any).mockResolvedValue(mockAccount);
       (prisma.accountRegister.update as any).mockResolvedValue({});
@@ -867,7 +865,7 @@ describe("Account Register API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock functions
-      (global as any).getQuery = vi.fn();
+      (globalThis as any).getQuery = vi.fn();
 
       const module = await import("../account-register.delete");
       accountRegisterDeleteHandler = module.default;
@@ -898,14 +896,14 @@ describe("Account Register API Endpoints", () => {
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (getQuery as any).mockReturnValue(mockQuery);
-      (global as any).getQuery.mockReturnValue(mockQuery);
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
       );
       const noop = vi.fn().mockResolvedValue({ count: 0 });
       (prisma.$transaction as any).mockImplementation(
-        async (callback: (tx: unknown) => Promise<unknown>) => {
+        async (callback: (_tx: unknown) => Promise<unknown>) => {
           return await callback({
             savingsGoal: { updateMany: noop },
             accountRegister: {
@@ -953,7 +951,7 @@ describe("Account Register API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getQuery as any).mockReturnValue(mockQuery);
-      (global as any).getQuery.mockReturnValue(mockQuery);
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
 
       const unauthorizedError = new Error("Account register not found");
@@ -1014,7 +1012,7 @@ describe("Account Register API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getQuery as any).mockReturnValue(mockQuery);
-      (global as any).getQuery.mockReturnValue(mockQuery);
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
@@ -1044,7 +1042,7 @@ describe("Account Register API Endpoints", () => {
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (getQuery as any).mockReturnValue(mockQuery);
-      (global as any).getQuery.mockReturnValue(mockQuery);
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
@@ -1067,7 +1065,7 @@ describe("Account Register API Endpoints", () => {
       };
 
       (prisma.$transaction as any).mockImplementation(
-        async (callback: (tx: unknown) => Promise<unknown>) => {
+        async (callback: (_tx: unknown) => Promise<unknown>) => {
           return await callback(mockTxn);
         },
       );
@@ -1107,7 +1105,7 @@ describe("Account Register API Endpoints", () => {
       const { accountRegisterSchema } = await import("~/schema/zod");
 
       (getQuery as any).mockReturnValue(mockQuery);
-      (global as any).getQuery.mockReturnValue(mockQuery);
+      (globalThis as any).getQuery.mockReturnValue(mockQuery);
       (getUser as any).mockReturnValue(mockUser);
       (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
         mockAccountRegister,
@@ -1115,7 +1113,7 @@ describe("Account Register API Endpoints", () => {
       const noop = vi.fn().mockResolvedValue({ count: 0 });
       (prisma.$transaction as any).mockImplementation(
         async (
-          callback: (tx: unknown) => Promise<unknown>,
+          callback: (_tx: unknown) => Promise<unknown>,
           options: { maxWait?: number; timeout?: number },
         ) => {
           expect(options).toEqual({
@@ -1128,7 +1126,10 @@ describe("Account Register API Endpoints", () => {
               updateMany: noop,
               update: vi
                 .fn()
-                .mockResolvedValue({ ...mockAccountRegister, isArchived: true }),
+                .mockResolvedValue({
+                  ...mockAccountRegister,
+                  isArchived: true,
+                }),
             },
             reoccurrence: { updateMany: noop, deleteMany: noop },
             reoccurrenceSplit: { deleteMany: noop },

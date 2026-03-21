@@ -1,12 +1,50 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AccountRegisterService } from "../AccountRegisterService";
-import { ModernCacheService } from "../ModernCacheService";
-import { LoanCalculatorService } from "../LoanCalculatorService";
-import { RegisterEntryService } from "../RegisterEntryService";
-import { TransferService } from "../TransferService";
 import type { CacheAccountRegister } from "../ModernCacheService";
 import { dateTimeService } from "../DateTimeService";
 import { forecastLogger } from "../logger";
+
+function createMockAccount(
+  overrides: Partial<CacheAccountRegister> = {},
+): CacheAccountRegister {
+  return {
+    id: 1,
+    typeId: 1,
+    budgetId: 1,
+    accountId: "test-account",
+    name: "Test Account",
+    balance: 1000,
+    latestBalance: 1000,
+    minPayment: null,
+    statementAt: dateTimeService.create("2024-01-15").toDate(),
+    apr1: 0.15,
+    apr1StartAt: null,
+    apr2: null,
+    apr2StartAt: null,
+    apr3: null,
+    apr3StartAt: null,
+    targetAccountRegisterId: null,
+    loanStartAt: null,
+    loanPaymentsPerYear: null,
+    loanTotalYears: null,
+    loanOriginalAmount: null,
+    loanPaymentSortOrder: 0,
+    minAccountBalance: 500,
+    allowExtraPayment: false,
+    isArchived: false,
+    plaidId: null,
+    depreciationRate: null,
+    depreciationMethod: null,
+    assetOriginalValue: null,
+    assetResidualValue: null,
+    assetUsefulLifeYears: null,
+    assetStartAt: null,
+    paymentCategoryId: null,
+    interestCategoryId: null,
+    accruesBalanceGrowth: false,
+    ...overrides,
+  } as CacheAccountRegister;
+}
 
 describe("AccountRegisterService", () => {
   let service: AccountRegisterService;
@@ -73,48 +111,6 @@ describe("AccountRegisterService", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  function createMockAccount(
-    overrides: Partial<CacheAccountRegister> = {},
-  ): CacheAccountRegister {
-    return {
-      id: 1,
-      typeId: 1,
-      budgetId: 1,
-      accountId: "test-account",
-      name: "Test Account",
-      balance: 1000,
-      latestBalance: 1000,
-      minPayment: null,
-      statementAt: dateTimeService.create("2024-01-15").toDate(),
-      apr1: 0.15,
-      apr1StartAt: null,
-      apr2: null,
-      apr2StartAt: null,
-      apr3: null,
-      apr3StartAt: null,
-      targetAccountRegisterId: null,
-      loanStartAt: null,
-      loanPaymentsPerYear: null,
-      loanTotalYears: null,
-      loanOriginalAmount: null,
-      loanPaymentSortOrder: 0,
-      minAccountBalance: 500,
-      allowExtraPayment: false,
-      isArchived: false,
-      plaidId: null,
-      depreciationRate: null,
-      depreciationMethod: null,
-      assetOriginalValue: null,
-      assetResidualValue: null,
-      assetUsefulLifeYears: null,
-      assetStartAt: null,
-      paymentCategoryId: null,
-      interestCategoryId: null,
-      accruesBalanceGrowth: false,
-      ...overrides,
-    } as CacheAccountRegister;
-  }
 
   describe("updateBalance", () => {
     it("should update account balance when account exists", () => {
@@ -489,7 +485,7 @@ describe("AccountRegisterService", () => {
 
       await (service as any).processAccountInterestCharge(account);
 
-      const paymentCalls = (mockEntryService.createEntry as any).mock.calls.filter(
+      const paymentCalls = vi.mocked(mockEntryService.createEntry).mock.calls.filter(
         (c: unknown[]) =>
           (c[0] as { description?: string }).description?.startsWith(
             "Payment for ",
@@ -666,8 +662,8 @@ describe("AccountRegisterService", () => {
         typeId: 1,
       });
       expect(result).toHaveLength(2);
-      expect(result[0]!.typeId).toBe(1);
-      expect(result[1]!.typeId).toBe(1);
+      expect(result[0]?.typeId).toBe(1);
+      expect(result[1]?.typeId).toBe(1);
     });
 
     it("should return empty array when no accounts match", () => {
@@ -702,7 +698,7 @@ describe("AccountRegisterService", () => {
       // Mock to handle filter function
       mockCache.accountRegister.find.mockImplementation((query: any) => {
         if (typeof query === "function") {
-          return accounts.filter(query);
+          return accounts.filter((item) => query(item));
         }
         return accounts; // For find({}) call
       });
@@ -728,7 +724,7 @@ describe("AccountRegisterService", () => {
       // Mock to handle filter function
       mockCache.accountRegister.find.mockImplementation((query: any) => {
         if (typeof query === "function") {
-          return accounts.filter(query);
+          return accounts.filter((item) => query(item));
         }
         return accounts; // For find({}) call
       });
@@ -764,7 +760,7 @@ describe("AccountRegisterService", () => {
       // Mock to handle filter function
       mockCache.accountRegister.find.mockImplementation((query: any) => {
         if (typeof query === "function") {
-          return accounts.filter(query);
+          return accounts.filter((item) => query(item));
         }
         return accounts; // For find({}) call
       });
@@ -831,8 +827,8 @@ describe("AccountRegisterService", () => {
       const result = service.filterActiveAccounts(accounts);
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.id).toBe(1);
-      expect(result[1]!.id).toBe(3);
+      expect(result[0]?.id).toBe(1);
+      expect(result[1]?.id).toBe(3);
       expect(result.every((acc) => !acc.isArchived)).toBe(true);
     });
 

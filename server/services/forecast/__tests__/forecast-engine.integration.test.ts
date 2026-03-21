@@ -1,5 +1,6 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ForecastEngine, ForecastEngineFactory } from "../index";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { ForecastEngine } from "../index";
+import { ForecastEngineFactory } from "../index";
 import type { ForecastContext } from "../types";
 import { createTestDatabase, cleanupTestDatabase } from "./test-utils";
 import { dateTimeService } from "../DateTimeService";
@@ -56,18 +57,20 @@ describe("ForecastEngine Integration Tests", () => {
       expect(pendingEntries.length).toBeGreaterThanOrEqual(0);
 
       // Verify running balances are calculated correctly
-      const sortedEntries = result.registerEntries.sort(
+      const sortedEntries = [...result.registerEntries].sort(
         (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
 
       // Check that balances make logical sense
       for (let i = 1; i < sortedEntries.length; i++) {
         const current = sortedEntries[i];
         const previous = sortedEntries[i - 1];
+        if (current === undefined || previous === undefined) {
+          continue;
+        }
 
         if (current.accountRegisterId === previous.accountRegisterId) {
-          // Running balance should equal previous balance + current amount
           expect(current.balance).toBe(previous.balance + current.amount);
         }
       }
@@ -75,7 +78,7 @@ describe("ForecastEngine Integration Tests", () => {
 
     it("should handle loan calculations with interest and payments", async () => {
       // Arrange: Create loan scenario
-      await setupLoanScenario(testDb, testAccountId);
+      await setupBasicBudgetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
@@ -115,7 +118,7 @@ describe("ForecastEngine Integration Tests", () => {
 
     it("should process account transfers correctly", async () => {
       // Arrange: Create transfer scenario
-      await setupTransferScenario(testDb, testAccountId);
+      await setupBasicBudgetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
@@ -179,9 +182,14 @@ describe("ForecastEngine Integration Tests", () => {
         (e: any) => e.description === "Monthly 401k"
       );
       expect(monthlyEntries.length).toBeGreaterThanOrEqual(2);
-      const monthlyMonths = [...new Set(
-        monthlyEntries.map((e: any) => dt(e.createdAt).format("YYYY-MM"))
-      )].sort();
+      const monthlyMonths = [
+        ...new Set(
+          monthlyEntries.map((e: any) => dt(e.createdAt).format("YYYY-MM")),
+        ),
+      ];
+      monthlyMonths.sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      );
       expect(monthlyMonths.length).toBeGreaterThanOrEqual(2);
       if (monthlyMonths.length >= 4) {
         expect(monthlyMonths).toContain("2024-02");
@@ -213,7 +221,7 @@ describe("ForecastEngine Integration Tests", () => {
   describe("Performance Tests", () => {
     it("should complete forecast calculation within performance targets", async () => {
       // Arrange: Create large dataset
-      await setupLargeDatasetScenario(testDb, testAccountId);
+      await setupBasicBudgetScenario(testDb, testAccountId);
 
       const context: ForecastContext = {
         accountId: testAccountId,
@@ -250,7 +258,7 @@ describe("ForecastEngine Integration Tests", () => {
       expect(result.isSuccess).toBeDefined();
       if (!result.isSuccess) {
         expect(result.errors).toBeDefined();
-        expect(result.errors!.length).toBeGreaterThan(0);
+        expect((result.errors ?? []).length).toBeGreaterThan(0);
       }
     });
 
@@ -292,7 +300,7 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
       },
     });
 
-    if (!checkingAccount || !checkingAccount.id) {
+    if (!checkingAccount?.id) {
       throw new Error("Failed to create checking account");
     }
 
@@ -330,16 +338,6 @@ async function setupBasicBudgetScenario(db: any, accountId: string) {
   }
 }
 
-async function setupLoanScenario(db: any, accountId: string) {
-  // Implementation for loan test scenario
-  // Create mortgage account with interest and payments
-}
-
-async function setupTransferScenario(db: any, accountId: string) {
-  // Implementation for transfer test scenario
-  // Create multiple accounts with transfer reoccurrences
-}
-
 async function setupReoccurrenceScenario(db: any, accountId: string) {
   const reg = await db.accountRegister.create({
     data: {
@@ -352,7 +350,9 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
       statementAt: new Date("2024-06-01T00:00:00.000Z"),
     },
   });
-  if (!reg?.id) return reg;
+  if (!reg?.id) {
+    throw new Error("Failed to create account register for reoccurrence scenario");
+  }
 
   await db.reoccurrence.create({
     data: {
@@ -379,11 +379,6 @@ async function setupReoccurrenceScenario(db: any, accountId: string) {
   return reg;
 }
 
-async function setupLargeDatasetScenario(db: any, accountId: string) {
-  // Implementation for performance test scenario
-  // Create large numbers of accounts, entries, and reoccurrences
-}
-
 // Utility functions
 function groupTransfersByDate(transfers: any[]) {
   return transfers.reduce((groups, transfer) => {
@@ -397,8 +392,9 @@ function groupTransfersByDate(transfers: any[]) {
 function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
   return array.reduce((groups, item) => {
     const groupKey = String(item[key]);
-    if (!groups[groupKey]) groups[groupKey] = [];
-    groups[groupKey].push(item);
+    const bucket = groups[groupKey] ?? [];
+    bucket.push(item);
+    groups[groupKey] = bucket;
     return groups;
   }, {} as Record<string, T[]>);
 }

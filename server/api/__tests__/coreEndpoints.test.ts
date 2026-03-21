@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { z } from 'zod';
-import { dbUserForSession } from './fixtures/dbUserForSession';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { z } from "zod";
+import { dbUserForSession } from "./fixtures/dbUserForSession";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -9,11 +9,11 @@ vi.hoisted(() => {
 });
 
 // Mock H3/Nuxt utilities before any imports
-vi.mock('h3', () => ({
+vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
   createError: vi.fn((error) => {
     const statusCode = error.statusCode || 500;
-    const message = error.statusMessage || error.message || 'Unknown error';
+    const message = error.statusMessage || error.message || "Unknown error";
     const fullMessage = `HTTP ${statusCode}: ${message}`;
     const err = new Error(fullMessage) as any;
     err.statusCode = statusCode;
@@ -35,16 +35,16 @@ vi.mock('h3', () => ({
   assertMethod: vi.fn(),
   getMethod: vi.fn(),
   getRequestURL: vi.fn(),
-  getRequestIP: vi.fn()
+  getRequestIP: vi.fn(),
 }));
 
 // Mock server dependencies
-vi.mock('~/server/logger', () => ({
+vi.mock("~/server/logger", () => ({
   log: vi.fn(),
 }));
 
 // Mock the dependencies
-vi.mock('~/server/clients/prismaClient', () => ({
+vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
     user: {
       findUniqueOrThrow: vi.fn(),
@@ -77,51 +77,50 @@ vi.mock('~/server/clients/prismaClient', () => ({
   },
 }));
 
-vi.mock('~/server/lib/getUser', () => ({
+vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn(),
 }));
 
-vi.mock('~/server/lib/handleApiError', () => ({
+vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
-vi.mock('~/schema/zod', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('~/schema/zod')>();
+vi.mock("~/schema/zod", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/schema/zod")>();
   const mockPublicProfileParse = vi.fn();
   return {
     ...actual,
     publicProfileSchema: new Proxy(actual.publicProfileSchema, {
       get(target, prop, receiver) {
-        if (prop === 'parse') return mockPublicProfileParse;
+        if (prop === "parse") return mockPublicProfileParse;
         return Reflect.get(target, prop, receiver);
       },
     }),
   };
 });
 
-describe('Core API Endpoints', () => {
+describe("Core API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('GET /api/user', () => {
+  describe("GET /api/user", () => {
     let userGetHandler: any;
 
     beforeEach(async () => {
       // Import the handler after mocking dependencies
-      const module = await import('../user.get');
+      const module = await import("../user.get");
       userGetHandler = module.default;
     });
 
-    it('should return user profile for authenticated user', async () => {
+    it("should return user profile for authenticated user", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
       const mockUser = dbUserForSession();
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { sessionUserFromDb } = await import(
-        '~/server/lib/sessionUserProfile'
-      );
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { sessionUserFromDb } =
+        await import("~/server/lib/sessionUserProfile");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
@@ -135,46 +134,48 @@ describe('Core API Endpoints', () => {
       expect(result).toEqual(sessionUserFromDb(mockUser));
     });
 
-    it('should handle user not found error', async () => {
+    it("should handle user not found error", async () => {
       const mockEvent = { context: { user: { userId: 999 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 999 });
-      const notFoundError = new Error('User not found');
+      const notFoundError = new Error("User not found");
       (prisma.user.findUniqueOrThrow as any).mockRejectedValue(notFoundError);
 
-      await expect(userGetHandler(mockEvent)).rejects.toThrow('User not found');
+      await expect(userGetHandler(mockEvent)).rejects.toThrow("User not found");
 
       expect(handleApiError).toHaveBeenCalledWith(notFoundError);
     });
 
-    it('should handle authentication errors', async () => {
+    it("should handle authentication errors", async () => {
       const mockEvent = { context: {} };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      const authError = new Error('User not found in context');
+      const authError = new Error("User not found in context");
       (getUser as any).mockImplementation(() => {
         throw authError;
       });
 
-      await expect(userGetHandler(mockEvent)).rejects.toThrow('User not found in context');
+      await expect(userGetHandler(mockEvent)).rejects.toThrow(
+        "User not found in context",
+      );
 
       expect(handleApiError).toHaveBeenCalledWith(authError);
     });
 
-    it('should handle schema validation errors', async () => {
+    it("should handle schema validation errors", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
       const { password: _omit, ...row } = dbUserForSession();
       const mockUser = row as Record<string, unknown>;
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
@@ -189,49 +190,49 @@ describe('Core API Endpoints', () => {
     });
   });
 
-  describe('GET /api/lists', () => {
+  describe("GET /api/lists", () => {
     let listsHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../lists');
+      const module = await import("../lists");
       listsHandler = module.default;
     });
 
-    it('should return all lists data for authenticated user', async () => {
+    it("should return all lists data for authenticated user", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
       const mockReoccurrences = [
         {
           id: 1,
-          description: 'Monthly Salary',
+          description: "Monthly Salary",
           amount: 5000,
-          lastAt: new Date('2023-01-01'),
+          lastAt: new Date("2023-01-01"),
         },
       ];
 
       const mockBudgets = [
         {
           id: 1,
-          name: 'Personal Budget',
+          name: "Personal Budget",
           userId: 123,
           isArchived: false,
         },
       ];
 
       const mockIntervals = [
-        { id: 1, name: 'Monthly', days: 30 },
-        { id: 2, name: 'Weekly', days: 7 },
+        { id: 1, name: "Monthly", days: 30 },
+        { id: 2, name: "Weekly", days: 7 },
       ];
 
       const mockAccountTypes = [
-        { id: 1, name: 'Checking', creditType: false },
-        { id: 2, name: 'Credit Card', creditType: true },
+        { id: 1, name: "Checking", creditType: false },
+        { id: 2, name: "Credit Card", creditType: true },
       ];
 
       const mockAccountRegisters = [
         {
           id: 1,
-          name: 'Main Checking',
+          name: "Main Checking",
           balance: 1000,
           sortOrder: 1,
           isArchived: false,
@@ -241,22 +242,26 @@ describe('Core API Endpoints', () => {
       const mockAccounts = [
         {
           id: 1,
-          name: 'Primary Account',
+          name: "Primary Account",
           userId: 123,
         },
       ];
 
       const mockCategories: any[] = [];
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.reoccurrence.findMany as any).mockResolvedValue(mockReoccurrences);
+      (prisma.reoccurrence.findMany as any).mockResolvedValue(
+        mockReoccurrences,
+      );
       (prisma.budget.findMany as any).mockResolvedValue(mockBudgets);
       (prisma.interval.findMany as any).mockResolvedValue(mockIntervals);
       (prisma.accountType.findMany as any).mockResolvedValue(mockAccountTypes);
-      (prisma.accountRegister.findMany as any).mockResolvedValue(mockAccountRegisters);
+      (prisma.accountRegister.findMany as any).mockResolvedValue(
+        mockAccountRegisters,
+      );
       (prisma.account.findMany as any).mockResolvedValue(mockAccounts);
       (prisma.category.findMany as any).mockResolvedValue(mockCategories);
       (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
@@ -289,10 +294,7 @@ describe('Core API Endpoints', () => {
             orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
           },
         },
-        orderBy: [
-          { lastAt: "asc" },
-          { id: "asc" },
-        ],
+        orderBy: [{ lastAt: "asc" }, { id: "asc" }],
       });
 
       expect(prisma.budget.findMany).toHaveBeenCalledWith({
@@ -303,11 +305,11 @@ describe('Core API Endpoints', () => {
       });
     });
 
-    it('should filter results by user access permissions', async () => {
+    it("should filter results by user access permissions", async () => {
       const mockEvent = { context: { user: { userId: 456 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 456 });
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
@@ -338,11 +340,11 @@ describe('Core API Endpoints', () => {
       });
     });
 
-    it('should handle empty results gracefully', async () => {
+    it("should handle empty results gracefully", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
@@ -368,16 +370,16 @@ describe('Core API Endpoints', () => {
       });
     });
 
-    it('should handle database errors gracefully', async () => {
+    it("should handle database errors gracefully", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
 
-      const dbError = new Error('Database connection failed');
+      const dbError = new Error("Database connection failed");
       (prisma.reoccurrence.findMany as any).mockRejectedValue(dbError);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);
@@ -388,17 +390,17 @@ describe('Core API Endpoints', () => {
       (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
 
       await expect(listsHandler(mockEvent)).rejects.toThrow(
-        'Database connection failed',
+        "Database connection failed",
       );
 
       expect(handleApiError).toHaveBeenCalledWith(dbError);
     });
 
-    it('should filter out archived budgets and account registers', async () => {
+    it("should filter out archived budgets and account registers", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
@@ -437,11 +439,11 @@ describe('Core API Endpoints', () => {
       });
     });
 
-    it('should sort results correctly', async () => {
+    it("should sort results correctly", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
-      const { getUser } = await import('~/server/lib/getUser');
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
@@ -458,11 +460,8 @@ describe('Core API Endpoints', () => {
       // Should apply correct sorting
       expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          orderBy: [
-            { lastAt: "asc" },
-            { id: "asc" },
-          ],
-        })
+          orderBy: [{ lastAt: "asc" }, { id: "asc" }],
+        }),
       );
 
       expect(prisma.accountRegister.findMany).toHaveBeenCalledWith(
@@ -470,26 +469,26 @@ describe('Core API Endpoints', () => {
           orderBy: {
             sortOrder: "asc",
           },
-        })
+        }),
       );
     });
   });
 
-  describe('GET /api/countries', () => {
+  describe("GET /api/countries", () => {
     let countriesHandler: any;
 
     beforeEach(async () => {
-      const module = await import('../countries.get');
+      const module = await import("../countries.get");
       countriesHandler = module.default;
     });
 
-    it('should return active countries with id, name, code, code3', async () => {
+    it("should return active countries with id, name, code, code3", async () => {
       const mockCountries = [
-        { id: 1, name: 'United States', code: 'US', code3: 'USA' },
-        { id: 2, name: 'Canada', code: 'CA', code3: 'CAN' },
+        { id: 1, name: "United States", code: "US", code3: "USA" },
+        { id: 2, name: "Canada", code: "CA", code3: "CAN" },
       ];
 
-      const { prisma } = await import('~/server/clients/prismaClient');
+      const { prisma } = await import("~/server/clients/prismaClient");
       (prisma.$queryRaw as any).mockResolvedValue(mockCountries);
 
       const result = await countriesHandler({});
@@ -497,14 +496,14 @@ describe('Core API Endpoints', () => {
       expect(prisma.$queryRaw).toHaveBeenCalled();
       expect(result).toEqual(mockCountries);
       expect(result).toHaveLength(2);
-      expect(result[0]).toHaveProperty('id');
-      expect(result[0]).toHaveProperty('name');
-      expect(result[0]).toHaveProperty('code');
-      expect(result[0]).toHaveProperty('code3');
+      expect(result[0]).toHaveProperty("id");
+      expect(result[0]).toHaveProperty("name");
+      expect(result[0]).toHaveProperty("code");
+      expect(result[0]).toHaveProperty("code3");
     });
 
-    it('should return empty array when no active countries', async () => {
-      const { prisma } = await import('~/server/clients/prismaClient');
+    it("should return empty array when no active countries", async () => {
+      const { prisma } = await import("~/server/clients/prismaClient");
       (prisma.$queryRaw as any).mockResolvedValue([]);
 
       const result = await countriesHandler({});
@@ -512,23 +511,27 @@ describe('Core API Endpoints', () => {
       expect(result).toEqual([]);
     });
 
-    it('should throw 500 when database fails', async () => {
-      const { prisma } = await import('~/server/clients/prismaClient');
-      (prisma.$queryRaw as any).mockRejectedValue(new Error('Connection refused'));
+    it("should throw 500 when database fails", async () => {
+      const { prisma } = await import("~/server/clients/prismaClient");
+      (prisma.$queryRaw as any).mockRejectedValue(
+        new Error("Connection refused"),
+      );
 
-      await expect(countriesHandler({})).rejects.toThrow(/Failed to fetch countries|500/);
+      await expect(countriesHandler({})).rejects.toThrow(
+        /Failed to fetch countries|500/,
+      );
     });
   });
 
-  describe('Authentication Integration', () => {
-    it('should handle authentication consistently across endpoints', async () => {
-      const userGetModule = await import('../user.get');
-      const listsModule = await import('../lists');
-      const { getUser } = await import('~/server/lib/getUser');
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+  describe("Authentication Integration", () => {
+    it("should handle authentication consistently across endpoints", async () => {
+      const userGetModule = await import("../user.get");
+      const listsModule = await import("../lists");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       const mockEvent = { context: {} };
-      const authError = new Error('Unauthorized');
+      const authError = new Error("Unauthorized");
 
       (getUser as any).mockImplementation(() => {
         throw authError;
@@ -540,18 +543,22 @@ describe('Core API Endpoints', () => {
       });
 
       // Both endpoints should handle auth errors consistently
-      await expect(userGetModule.default(mockEvent as any)).rejects.toThrow('Unauthorized');
-      await expect(listsModule.default(mockEvent as any)).rejects.toThrow('Unauthorized');
+      await expect(userGetModule.default(mockEvent as any)).rejects.toThrow(
+        "Unauthorized",
+      );
+      await expect(listsModule.default(mockEvent as any)).rejects.toThrow(
+        "Unauthorized",
+      );
     });
   });
 
-  describe('Error Handling Integration', () => {
-    it('should use handleApiError consistently', async () => {
-      const { handleApiError } = await import('~/server/lib/handleApiError');
+  describe("Error Handling Integration", () => {
+    it("should use handleApiError consistently", async () => {
+      const { handleApiError } = await import("~/server/lib/handleApiError");
 
       // handleApiError should be called whenever an error occurs
       expect(handleApiError).toBeDefined();
-      expect(typeof handleApiError).toBe('function');
+      expect(typeof handleApiError).toBe("function");
     });
   });
 });

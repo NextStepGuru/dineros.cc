@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { dbUserForSession } from "./fixtures/dbUserForSession";
 
+/** Test-only credential strings (not real secrets). */
+const FIXTURE_PLAINTEXT_PASSWORD = "password123"; // NOSONAR S2068 — fixture
+const FIXTURE_WRONG_PASSWORD = "wrongpassword"; // NOSONAR S2068 — fixture
+const FIXTURE_HASHED_PASSWORD = "hashedPassword"; // NOSONAR S2068 — fixture
+const FIXTURE_HASHED_NEW_PASSWORD = "hashedNewPassword"; // NOSONAR S2068 — fixture
+const FIXTURE_NEW_PASSWORD = "newpassword123"; // NOSONAR S2068 — fixture
+const FIXTURE_WEAK_PASSWORD = "weak"; // NOSONAR S2068 — fixture
+
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
   // Make defineEventHandler available globally before any imports
@@ -26,8 +34,8 @@ vi.mock("h3", () => ({
 }));
 
 // Make H3 functions globally available
-(global as any).readBody = vi.fn();
-(global as any).setResponseStatus = vi.fn();
+(globalThis as any).readBody = vi.fn();
+(globalThis as any).setResponseStatus = vi.fn();
 
 // Mock external dependencies
 vi.mock("otplib", () => ({
@@ -160,7 +168,7 @@ describe("Authentication API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock function
-      (global as any).readBody = vi.fn();
+      (globalThis as any).readBody = vi.fn();
 
       const module = await import("../login.post");
       loginHandler = module.default;
@@ -170,7 +178,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const mockUser = dbUserForSession();
@@ -178,17 +186,16 @@ describe("Authentication API Endpoints", () => {
       const { readBody, setResponseStatus, setCookie } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const { sessionUserFromDb } = await import(
-        "~/server/lib/sessionUserProfile"
-      );
-      const HashService = await import("~/server/services/HashService");
-      const JwtService = await import("~/server/services/JwtService");
+      const { sessionUserFromDb } =
+        await import("~/server/lib/sessionUserProfile");
+      await import("~/server/services/HashService");
+      await import("~/server/services/JwtService");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
         }),
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
@@ -213,7 +220,7 @@ describe("Authentication API Endpoints", () => {
           secure: false,
           maxAge: 86400,
           path: "/",
-        })
+        }),
       );
     });
 
@@ -222,23 +229,22 @@ describe("Authentication API Endpoints", () => {
       const rawEmail = "\u200B test@example.com \uFEFF";
       const mockBody = {
         email: rawEmail,
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const mockUser = dbUserForSession();
 
-      const { readBody, setResponseStatus, setCookie } = await import("h3");
+      const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const { sessionUserFromDb } = await import(
-        "~/server/lib/sessionUserProfile"
-      );
+      const { sessionUserFromDb } =
+        await import("~/server/lib/sessionUserProfile");
 
       (readBody as any).mockResolvedValue(mockBody);
 
       const parseSpy = vi.fn().mockReturnValue({
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       });
       (loginSchema.extend as any).mockReturnValue({ parse: parseSpy });
 
@@ -255,8 +261,8 @@ describe("Authentication API Endpoints", () => {
       expect(parseSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "test@example.com",
-          password: "password123",
-        })
+          password: FIXTURE_PLAINTEXT_PASSWORD,
+        }),
       );
       expect(result).toEqual({
         token: "jwt-token",
@@ -270,7 +276,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "nonexistent@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const { readBody, setResponseStatus } = await import("h3");
@@ -281,7 +287,7 @@ describe("Authentication API Endpoints", () => {
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "nonexistent@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
         }),
       });
       (prisma.user.findFirst as any).mockResolvedValue(null);
@@ -296,13 +302,13 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "wrongpassword",
+        password: FIXTURE_WRONG_PASSWORD,
       };
 
       const mockUser = {
         id: 123,
         email: "test@example.com",
-        password: "hashedPassword",
+        password: FIXTURE_HASHED_PASSWORD,
         settings: {
           speakeasy: {
             isEnabled: false,
@@ -315,13 +321,13 @@ describe("Authentication API Endpoints", () => {
       const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "wrongpassword",
+          password: FIXTURE_WRONG_PASSWORD,
         }),
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
@@ -338,13 +344,13 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const mockUser = {
         id: 123,
         email: "test@example.com",
-        password: "hashedPassword",
+        password: FIXTURE_HASHED_PASSWORD,
         settings: {
           mfa: {
             totp: {
@@ -367,13 +373,13 @@ describe("Authentication API Endpoints", () => {
       const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
         }),
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
@@ -393,7 +399,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
         tokenChallenge: "123456",
       };
 
@@ -418,21 +424,20 @@ describe("Authentication API Endpoints", () => {
         },
       });
 
-      const { readBody, setResponseStatus, setCookie } = await import("h3");
+      const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const { sessionUserFromDb } = await import(
-        "~/server/lib/sessionUserProfile"
-      );
-      const HashService = await import("~/server/services/HashService");
-      const JwtService = await import("~/server/services/JwtService");
+      const { sessionUserFromDb } =
+        await import("~/server/lib/sessionUserProfile");
+      await import("~/server/services/HashService");
+      await import("~/server/services/JwtService");
       const otplib = await import("otplib");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
           tokenChallenge: "123456",
         }),
       });
@@ -461,7 +466,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const mockUser = {
@@ -485,7 +490,7 @@ describe("Authentication API Endpoints", () => {
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
         }),
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
@@ -503,14 +508,14 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
         tokenChallenge: "invalid",
       };
 
       const mockUser = {
         id: 123,
         email: "test@example.com",
-        password: "hashedPassword",
+        password: FIXTURE_HASHED_PASSWORD,
         settings: {
           mfa: {
             totp: {
@@ -533,14 +538,14 @@ describe("Authentication API Endpoints", () => {
       const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { loginSchema, privateUserSchema } = await import("~/schema/zod");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
       const otplib = await import("otplib");
 
       (readBody as any).mockResolvedValue(mockBody);
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
           tokenChallenge: "invalid",
         }),
       });
@@ -580,7 +585,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         email: "test@example.com",
-        password: "password123",
+        password: FIXTURE_PLAINTEXT_PASSWORD,
       };
 
       const { readBody } = await import("h3");
@@ -592,7 +597,7 @@ describe("Authentication API Endpoints", () => {
       (loginSchema.extend as any).mockReturnValue({
         parse: vi.fn().mockReturnValue({
           email: "test@example.com",
-          password: "password123",
+          password: FIXTURE_PLAINTEXT_PASSWORD,
         }),
       });
 
@@ -609,7 +614,7 @@ describe("Authentication API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock function
-      (global as any).readBody = vi.fn();
+      (globalThis as any).readBody = vi.fn();
 
       const module = await import("../forgot-password.post");
       forgotPasswordHandler = module.default;
@@ -626,15 +631,14 @@ describe("Authentication API Endpoints", () => {
 
       const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { postmarkClient } = await import(
-        "~/server/clients/postmarkClient"
-      );
+      const { postmarkClient } =
+        await import("~/server/clients/postmarkClient");
       const cuid2 = await import("@paralleldrive/cuid2");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (setResponseStatus as any).mockImplementation(() => {});
-      (global as any).setResponseStatus.mockImplementation(() => {});
+      (globalThis as any).setResponseStatus.mockImplementation(() => {});
       (prisma.user.findUnique as any).mockResolvedValue(mockUser);
       (cuid2.createId as any).mockReturnValue("resetcode123");
       (prisma.user.update as any).mockResolvedValue(mockUser);
@@ -667,9 +671,9 @@ describe("Authentication API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (setResponseStatus as any).mockImplementation(() => {});
-      (global as any).setResponseStatus.mockImplementation(() => {});
+      (globalThis as any).setResponseStatus.mockImplementation(() => {});
       (prisma.user.findUnique as any).mockResolvedValue(null);
 
       const result = await forgotPasswordHandler(mockEvent);
@@ -702,14 +706,13 @@ describe("Authentication API Endpoints", () => {
 
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { postmarkClient } = await import(
-        "~/server/clients/postmarkClient"
-      );
+      const { postmarkClient } =
+        await import("~/server/clients/postmarkClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
       const cuid2 = await import("@paralleldrive/cuid2");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (prisma.user.findUnique as any).mockResolvedValue(mockUser);
       (cuid2.createId as any).mockReturnValue("resetcode123");
       (prisma.user.update as any).mockResolvedValue(mockUser);
@@ -736,7 +739,7 @@ describe("Authentication API Endpoints", () => {
       const cuid2 = await import("@paralleldrive/cuid2");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (prisma.user.findUnique as any).mockResolvedValue(mockUser);
       (cuid2.createId as any).mockReturnValue("resetcode123");
 
@@ -753,7 +756,7 @@ describe("Authentication API Endpoints", () => {
 
     beforeEach(async () => {
       // Properly set up the global mock function
-      (global as any).readBody = vi.fn();
+      (globalThis as any).readBody = vi.fn();
 
       const module = await import("../reset-password-with-code.post");
       resetPasswordHandler = module.default;
@@ -763,7 +766,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       };
       const mockUser = {
         id: 123,
@@ -773,22 +776,21 @@ describe("Authentication API Endpoints", () => {
 
       const { readBody, setResponseStatus } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { postmarkClient } = await import(
-        "~/server/clients/postmarkClient"
-      );
+      const { postmarkClient } =
+        await import("~/server/clients/postmarkClient");
       const { passwordAndCodeSchema } = await import("~/schema/zod");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (global as any).readBody.mockResolvedValue(mockBody);
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
       (setResponseStatus as any).mockImplementation(() => {});
-      (global as any).setResponseStatus.mockImplementation(() => {});
+      (globalThis as any).setResponseStatus.mockImplementation(() => {});
       (passwordAndCodeSchema.parse as any).mockReturnValue({
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
-      mockHashService.hash.mockResolvedValue("hashedNewPassword");
+      mockHashService.hash.mockResolvedValue(FIXTURE_HASHED_NEW_PASSWORD);
       (prisma.user.update as any).mockResolvedValue(mockUser);
       (postmarkClient.sendEmail as any).mockResolvedValue({});
 
@@ -801,7 +803,7 @@ describe("Authentication API Endpoints", () => {
         data: {
           resetCode: null,
           resetPasswordAt: null,
-          password: "hashedNewPassword",
+          password: FIXTURE_HASHED_NEW_PASSWORD,
         },
       });
       expect(postmarkClient.sendEmail).toHaveBeenCalledWith({
@@ -816,7 +818,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         resetCode: "invalidcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       };
 
       const { readBody } = await import("h3");
@@ -826,12 +828,12 @@ describe("Authentication API Endpoints", () => {
       (readBody as any).mockResolvedValue(mockBody);
       (passwordAndCodeSchema.parse as any).mockReturnValue({
         resetCode: "invalidcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       });
       (prisma.user.findFirst as any).mockResolvedValue(null);
 
       await expect(resetPasswordHandler(mockEvent)).rejects.toThrow(
-        "HTTP 400: Invalid Reset Code"
+        "HTTP 400: Invalid Reset Code",
       );
     });
 
@@ -839,7 +841,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         resetCode: "",
-        newPassword: "weak",
+        newPassword: FIXTURE_WEAK_PASSWORD,
       };
 
       const { readBody } = await import("h3");
@@ -860,7 +862,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       };
       const mockUser = {
         id: 123,
@@ -872,12 +874,12 @@ describe("Authentication API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { passwordAndCodeSchema } = await import("~/schema/zod");
       const { handleApiError } = await import("~/server/lib/handleApiError");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
 
       (readBody as any).mockResolvedValue(mockBody);
       (passwordAndCodeSchema.parse as any).mockReturnValue({
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
 
@@ -892,7 +894,7 @@ describe("Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockBody = {
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       };
       const mockUser = {
         id: 123,
@@ -902,20 +904,19 @@ describe("Authentication API Endpoints", () => {
 
       const { readBody } = await import("h3");
       const { prisma } = await import("~/server/clients/prismaClient");
-      const { postmarkClient } = await import(
-        "~/server/clients/postmarkClient"
-      );
+      const { postmarkClient } =
+        await import("~/server/clients/postmarkClient");
       const { passwordAndCodeSchema } = await import("~/schema/zod");
       const { handleApiError } = await import("~/server/lib/handleApiError");
-      const HashService = await import("~/server/services/HashService");
+      await import("~/server/services/HashService");
 
       (readBody as any).mockResolvedValue(mockBody);
       (passwordAndCodeSchema.parse as any).mockReturnValue({
         resetCode: "validcode",
-        newPassword: "newpassword123",
+        newPassword: FIXTURE_NEW_PASSWORD,
       });
       (prisma.user.findFirst as any).mockResolvedValue(mockUser);
-      mockHashService.hash.mockResolvedValue("hashedNewPassword");
+      mockHashService.hash.mockResolvedValue(FIXTURE_HASHED_NEW_PASSWORD);
       (prisma.user.update as any).mockResolvedValue(mockUser);
 
       const emailError = new Error("Email service unavailable");
@@ -937,9 +938,8 @@ describe("Authentication API Endpoints", () => {
     it("should handle network timeouts gracefully", async () => {
       const loginModule = await import("../login.post");
       const forgotPasswordModule = await import("../forgot-password.post");
-      const resetPasswordModule = await import(
-        "../reset-password-with-code.post"
-      );
+      const resetPasswordModule =
+        await import("../reset-password-with-code.post");
 
       expect(loginModule.default).toBeDefined();
       expect(forgotPasswordModule.default).toBeDefined();

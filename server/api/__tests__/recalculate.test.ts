@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { $fetch } from "@nuxt/test-utils/e2e";
 
 // Mock the dependencies
 vi.mock("~/server/clients/prismaClient", () => ({

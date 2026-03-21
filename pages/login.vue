@@ -7,7 +7,7 @@ import type { z } from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { handleError } from "~/lib/utils";
-import { loginSchema } from "~/schema/zod";
+import type { loginSchema } from "~/schema/zod";
 import type { User } from "~/types/types";
 import type { LoginResponse } from "~/lib/auth";
 import {
@@ -124,7 +124,7 @@ const handleSubmit = async ({
 
     if (!tokenChallengeRequired.value) {
       let data: LoginResponse | null = null;
-      let err: { value?: { statusCode?: number; data?: unknown } } = {
+      const err: { value?: { statusCode?: number; data?: unknown } } = {
         value: undefined,
       };
       try {

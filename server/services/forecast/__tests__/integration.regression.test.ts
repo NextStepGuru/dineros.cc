@@ -364,7 +364,7 @@ describe("Integration Regression Tests", () => {
       ];
 
       // Existing balance entries with Decimal amounts
-      const existingEntries = accounts.map((account, index) => ({
+      const existingEntries = accounts.map((account) => ({
         id: `balance-${account.id}`,
         seq: null,
         accountRegisterId: account.id,

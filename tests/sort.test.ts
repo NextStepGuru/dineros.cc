@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { expect, describe, it } from "vitest";
 import {
   recalculateRunningBalanceAndSort,
@@ -26,14 +27,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Should have sequence numbers from 1 to length
     expect(result.map((r) => r.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
-    // Should have proper order: cleared entries (chronological), balance entry, pending entries (reverse chronological)
-    const clearedEntries = result.filter(
-      (r) => r.isCleared && !r.isBalanceEntry,
-    );
     const balanceEntries = result.filter((r) => r.isBalanceEntry);
-    const pendingEntries = result.filter(
-      (r) => !r.isCleared && !r.isBalanceEntry,
-    );
 
     expect(balanceEntries.length).toBe(1);
 
@@ -63,14 +57,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     // Should have sequence numbers from 1 to length
     expect(result.map((r) => r.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
-    // Should have proper order: cleared entries (chronological), balance entry, pending entries (reverse chronological)
-    const clearedEntries = result.filter(
-      (r) => r.isCleared && !r.isBalanceEntry,
-    );
     const balanceEntries = result.filter((r) => r.isBalanceEntry);
-    const pendingEntries = result.filter(
-      (r) => !r.isCleared && !r.isBalanceEntry,
-    );
 
     expect(balanceEntries.length).toBe(1);
 
@@ -514,14 +501,14 @@ describe("recalculateRunningBalanceAndSort", () => {
     const manualEntryAfterBalance = entriesAfterBalance.find(
       (r) => r.isManualEntry,
     );
-    expect(manualEntryAfterBalance).toBeDefined();
-    expect(manualEntryAfterBalance!.isMatched).toBe(false);
-    expect(manualEntryAfterBalance!.amount).toBe(-75);
+    assert(manualEntryAfterBalance);
+    expect(manualEntryAfterBalance.isMatched).toBe(false);
+    expect(manualEntryAfterBalance.amount).toBe(-75);
 
     // Regular entry should also be after balance
     const regularEntry = entriesAfterBalance.find((r) => !r.isManualEntry);
-    expect(regularEntry).toBeDefined();
-    expect(regularEntry!.amount).toBe(-100);
+    assert(regularEntry);
+    expect(regularEntry.amount).toBe(-100);
 
     // Verify running balance calculations
     // Entry before balance: 1000 - (-50) = 1050
@@ -733,11 +720,11 @@ describe("recalculateRunningBalanceAndSort", () => {
       (r) => r.isManualEntry && r.isMatched,
     );
 
-    expect(pendingBeforeBalance).toBeDefined();
-    expect(pendingBeforeBalance!.amount).toBe(-30);
+    assert(pendingBeforeBalance);
+    expect(pendingBeforeBalance.amount).toBe(-30);
 
-    expect(manualBeforeBalance).toBeDefined();
-    expect(manualBeforeBalance!.amount).toBe(-40);
+    assert(manualBeforeBalance);
+    expect(manualBeforeBalance.amount).toBe(-40);
 
     // Verify chronological order (older first)
     expect(entriesBeforeBalance[0].amount).toBe(-30); // Jan 16 (pending)
@@ -755,11 +742,11 @@ describe("recalculateRunningBalanceAndSort", () => {
     );
     const projectedEntry = entriesAfterBalance.find((r) => r.isProjected);
 
-    expect(manualAfterBalance).toBeDefined();
-    expect(manualAfterBalance!.amount).toBe(-50);
+    assert(manualAfterBalance);
+    expect(manualAfterBalance.amount).toBe(-50);
 
-    expect(projectedEntry).toBeDefined();
-    expect(projectedEntry!.amount).toBe(-60);
+    assert(projectedEntry);
+    expect(projectedEntry.amount).toBe(-60);
 
     // Verify running balance calculations for entries before balance
     // Working backwards: 800 - (-40) = 840, then 840 - (-30) = 870

@@ -6,13 +6,15 @@ vi.hoisted(() => {
 
 vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
-  createError: vi.fn((error: { statusCode?: number; statusMessage?: string }) => {
-    const err = new Error(error.statusMessage || "err") as Error & {
-      statusCode?: number;
-    };
-    err.statusCode = error.statusCode || 500;
-    throw err;
-  }),
+  createError: vi.fn(
+    (error: { statusCode?: number; statusMessage?: string }) => {
+      const err = new Error(error.statusMessage || "err") as Error & {
+        statusCode?: number;
+      };
+      err.statusCode = error.statusCode || 500;
+      throw err;
+    },
+  ),
   getQuery: vi.fn(),
   getRouterParam: vi.fn(),
 }));
@@ -51,7 +53,13 @@ vi.mock("~/server/lib/handleApiError", () => ({
 
 vi.mock("~/server/services/reports/CategoryReportService", () => ({
   getCategoryReport: vi.fn().mockResolvedValue({
-    summary: { totalIn: 0, totalOut: 0, net: 0, transactionCount: 0, sumAbs: 0 },
+    summary: {
+      totalIn: 0,
+      totalOut: 0,
+      net: 0,
+      transactionCount: 0,
+      sumAbs: 0,
+    },
     donutCategories: [],
     tableGroups: [],
   }),
@@ -70,7 +78,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
   });
 
   describe("GET /api/reports/categories", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../reports/categories.get");
@@ -80,9 +88,8 @@ describe("reports / savings-goal / snapshot nested routes", () => {
     it("returns category report", async () => {
       const { getUser } = await import("~/server/lib/getUser");
       const { getQuery } = await import("h3");
-      const { getCategoryReport } = await import(
-        "~/server/services/reports/CategoryReportService",
-      );
+      const { getCategoryReport } =
+        await import("~/server/services/reports/CategoryReportService");
 
       (getUser as any).mockReturnValue({ userId: 42 });
       (getQuery as any).mockReturnValue({
@@ -107,7 +114,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
   });
 
   describe("DELETE /api/savings-goal/:id", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../savings-goal/[id].delete");
@@ -117,7 +124,8 @@ describe("reports / savings-goal / snapshot nested routes", () => {
     it("archives goal and enqueues recalculate", async () => {
       const { getUser } = await import("~/server/lib/getUser");
       const { getRouterParam } = await import("h3");
-      const { addRecalculateJob } = await import("~/server/clients/queuesClient");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
 
       (getUser as any).mockReturnValue({ userId: 7 });
       (getRouterParam as any).mockReturnValue("12");
@@ -138,7 +146,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
   });
 
   describe("GET /api/snapshot/:id", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../snapshot/[id].get");
@@ -177,7 +185,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
   });
 
   describe("DELETE /api/snapshot/:id", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../snapshot/[id].delete");
@@ -202,7 +210,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
   });
 
   describe("GET /api/snapshot-register/:id", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../snapshot-register/[id].get");

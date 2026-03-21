@@ -90,7 +90,7 @@ describe("MFA email API", () => {
   });
 
   describe("POST /api/mfa/email/send-code", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../mfa/email/send-code.post");
@@ -144,7 +144,7 @@ describe("MFA email API", () => {
   });
 
   describe("POST /api/mfa/email/toggle", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../mfa/email/toggle.post");
@@ -163,7 +163,9 @@ describe("MFA email API", () => {
         id: 5,
         settings: {},
       });
-      (prisma.user.update as any).mockResolvedValue(dbUserForSession({ id: 5 }));
+      (prisma.user.update as any).mockResolvedValue(
+        dbUserForSession({ id: 5 }),
+      );
 
       await handler({});
 
@@ -172,7 +174,7 @@ describe("MFA email API", () => {
   });
 
   describe("POST /api/mfa/email/verify", () => {
-    let handler: (event: unknown) => Promise<unknown>;
+    let handler: any;
 
     beforeEach(async () => {
       const mod = await import("../mfa/email/verify.post");

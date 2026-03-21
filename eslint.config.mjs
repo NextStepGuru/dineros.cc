@@ -17,6 +17,9 @@ export default withNuxt([
     plugins: {
       "@typescript-eslint": /** @type {any} */ (tsPlugin),
     },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
   },
   // Parse all .ts files as TypeScript (otherwise they fall back to JS parser and fail)
   {
@@ -29,9 +32,9 @@ export default withNuxt([
       },
     },
   },
-  // Allow unused args/vars prefixed with _; relax no-unused-vars in test files
+  // Allow unused args/vars prefixed with _ (TS only; see Vue block below)
   {
-    files: ["**/*.ts", "**/*.vue"],
+    files: ["**/*.ts"],
     rules: {
       "no-unused-vars": [
         "error",
@@ -41,6 +44,15 @@ export default withNuxt([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  // Pug templates are not analyzed for script-setup variable usage; base unused-var rules
+  // produce false positives for bindings used only in <template lang="pug">.
+  {
+    files: ["**/*.vue"],
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
   {
@@ -67,7 +79,7 @@ export default withNuxt([
       },
     },
     rules: {
-      "no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {
@@ -85,7 +97,7 @@ export default withNuxt([
       },
     },
     rules: {
-      "no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   // Server: single datetime authority — no direct Date/Date.now outside DateTime service
@@ -105,6 +117,7 @@ export default withNuxt([
       },
     },
     rules: {
+      "@typescript-eslint/no-explicit-any": "off",
       "no-restricted-syntax": [
         "error",
         {

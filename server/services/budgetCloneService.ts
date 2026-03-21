@@ -1,4 +1,4 @@
-import { prisma } from "~/server/clients/prismaClient";
+import type { prisma } from "~/server/clients/prismaClient";
 
 type Tx = typeof prisma;
 

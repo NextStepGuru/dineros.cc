@@ -1,15 +1,39 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { LoanCalculatorService } from "../LoanCalculatorService";
 import { AccountRegisterService } from "../AccountRegisterService";
-import { ForecastEngine } from "../ForecastEngine";
-import { ModernCacheService } from "../ModernCacheService";
+import {
+  ModernCacheService,
+  type CacheAccountRegister,
+} from "../ModernCacheService";
 import { RegisterEntryService } from "../RegisterEntryService";
-import { ReoccurrenceService } from "../ReoccurrenceService";
 import { TransferService } from "../TransferService";
 import { dateTimeService } from "../DateTimeService";
-import type { CacheAccountRegister } from "../ModernCacheService";
 
 const dt = (input?: any) => dateTimeService.create(input);
+
+/** CacheAccountRegister fields not exercised by these tests (savings/credit interest timing). */
+const REGRESSION_REGISTER_DEFAULTS: Pick<
+  CacheAccountRegister,
+  | "depreciationRate"
+  | "depreciationMethod"
+  | "assetOriginalValue"
+  | "assetResidualValue"
+  | "assetUsefulLifeYears"
+  | "assetStartAt"
+  | "paymentCategoryId"
+  | "interestCategoryId"
+  | "accruesBalanceGrowth"
+> = {
+  depreciationRate: null,
+  depreciationMethod: null,
+  assetOriginalValue: null,
+  assetResidualValue: null,
+  assetUsefulLifeYears: null,
+  assetStartAt: null,
+  paymentCategoryId: null,
+  interestCategoryId: null,
+  accruesBalanceGrowth: false,
+};
 
 /**
  * Regression tests for Bug #2: Double Interest Calculation
@@ -53,6 +77,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should return true only on exact statement date", () => {
       // Arrange: Account with statement date of Jan 15
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 1,
         balance: -1000,
         apr1: 0.12,
@@ -127,6 +152,7 @@ describe("Double Interest Calculation Regression Tests", () => {
 
     it("should not process interest if no APR", () => {
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 2,
         balance: -1000,
         apr1: 0, // No APR
@@ -164,6 +190,7 @@ describe("Double Interest Calculation Regression Tests", () => {
 
     it("should not process interest if zero balance", () => {
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 3,
         balance: 0, // Zero balance
         apr1: 0.12,
@@ -204,6 +231,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should advance statement date after processing interest", async () => {
       // Arrange: Account with monthly statements
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 5,
         balance: -2000,
         latestBalance: -2000,
@@ -237,10 +265,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       cache.accountRegister.insert(account);
 
       // Act: Update statement date as if interest was processed
-      await accountService.updateStatementDates(
-        [account],
-        dt("2025-01-15"),
-      );
+      await accountService.updateStatementDates([account], dt("2025-01-15"));
 
       // Assert: Statement date should advance to next month
       const updatedAccount = cache.accountRegister.findOne({ id: 5 });
@@ -264,6 +289,7 @@ describe("Double Interest Calculation Regression Tests", () => {
       for (const testCase of testCases) {
         // Arrange
         const account = {
+          ...REGRESSION_REGISTER_DEFAULTS,
           id: testCase.intervalId + 10,
           balance: -1000,
           latestBalance: -1000,
@@ -320,6 +346,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should process interest exactly once per month over multiple months", () => {
       // Arrange: Savings account that earns interest monthly
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 100,
         balance: 10000,
         latestBalance: 10000,
@@ -369,7 +396,10 @@ describe("Double Interest Calculation Regression Tests", () => {
 
           // Simulate statement date update after processing
           if (currentDate.isSameOrAfter(account.statementAt)) {
-            account.statementAt = dateTimeService.create(account.statementAt).add(1, "month").toDate();
+            account.statementAt = dateTimeService
+              .create(account.statementAt)
+              .add(1, "month")
+              .toDate();
           }
         }
 
@@ -397,6 +427,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should prevent the exact double interest scenario from the bug", () => {
       // Arrange: Recreate the exact scenario from the screenshot
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 200,
         balance: 20000, // Slides & Solar savings fund from screenshot
         latestBalance: 20000,
@@ -455,6 +486,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should process interest once per statement period in a full forecast", async () => {
       // Arrange: Account with interest
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 300,
         balance: 5000,
         latestBalance: 5000,
@@ -537,6 +569,7 @@ describe("Double Interest Calculation Regression Tests", () => {
     it("should handle daylight saving time transitions correctly", () => {
       // DST typically happens in March/November
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 400,
         balance: 1000,
         apr1: 0.05,
@@ -605,6 +638,7 @@ describe("Double Interest Calculation Regression Tests", () => {
 
     it("should handle month-end/month-start boundaries correctly", () => {
       const account = {
+        ...REGRESSION_REGISTER_DEFAULTS,
         id: 500,
         balance: 1000,
         apr1: 0.05,

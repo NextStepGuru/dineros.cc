@@ -1,14 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { DateTimeService, dateTimeService } from "../DateTimeService";
+import { describe, it, expect, afterEach } from "vitest";
+import { dateTimeService } from "../DateTimeService";
 
 describe("DateTimeService", () => {
-  let originalInstance: DateTimeService;
-
-  beforeEach(() => {
-    // Store the original instance
-    originalInstance = DateTimeService.getInstance();
-  });
-
   afterEach(() => {
     // Clear any overrides after each test
     dateTimeService.clearNowOverride();
@@ -54,12 +47,16 @@ describe("DateTimeService", () => {
     // Test with Date object
     const dateObj = new Date("2024-01-15T10:30:00Z");
     dateTimeService.setNowOverride(dateObj);
-    expect(dateTimeService.now().isSame(dateTimeService.create(dateObj))).toBe(true);
+    expect(dateTimeService.now().isSame(dateTimeService.create(dateObj))).toBe(
+      true,
+    );
 
     // Test with string
     const dateString = "2024-01-15T10:30:00Z";
     dateTimeService.setNowOverride(dateString);
-    expect(dateTimeService.now().isSame(dateTimeService.create(dateString))).toBe(true);
+    expect(
+      dateTimeService.now().isSame(dateTimeService.create(dateString)),
+    ).toBe(true);
 
     // Test with DateTime object
     const dateTimeObj = dateTimeService.create("2024-01-15T10:30:00Z");

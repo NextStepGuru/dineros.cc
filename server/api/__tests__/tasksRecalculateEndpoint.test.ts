@@ -9,7 +9,6 @@ vi.mock("h3", () => ({
   getQuery: vi.fn(),
 }));
 
-
 const mockEngine = { recalculate: vi.fn() };
 
 vi.mock("~/server/services/forecast", () => ({
@@ -47,7 +46,7 @@ vi.mock("~/server/clients/prismaClient", () => ({
 }));
 
 describe("GET /api/tasks/recalculate", () => {
-  let handler: (event: unknown) => Promise<unknown>;
+  let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();

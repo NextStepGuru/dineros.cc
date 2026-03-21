@@ -149,7 +149,7 @@ describe("Plaid Link API Endpoint", () => {
       };
 
       const { getUser } = await import("~/server/lib/getUser");
-      const { configuration } = await import("~/server/lib/getPlaidClient");
+      await import("~/server/lib/getPlaidClient");
 
       (getUser as any).mockReturnValue(mockUser);
       mockPlaidClient.linkTokenCreate.mockResolvedValue(mockLinkTokenResponse);
