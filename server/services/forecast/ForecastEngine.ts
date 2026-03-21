@@ -19,6 +19,12 @@ import { DateTime } from "./DateTime";
 
 const { Prisma } = prismaPkg;
 
+/** Prisma default interactive tx timeout is 5s; forecast persist work can exceed that on large accounts. */
+const FORECAST_DB_TRANSACTION_OPTIONS = {
+  timeout: 120_000,
+  maxWait: 30_000,
+} as const;
+
 export class ForecastEngine implements IForecastEngine {
   private cache: ModernCacheService;
   private dataLoader: DataLoaderService;
@@ -66,20 +72,25 @@ export class ForecastEngine implements IForecastEngine {
       // 1. Load data from database into memory cache
       const accountData = await this.dataLoader.loadAccountData(context);
 
-      await this.db.$transaction(async (tx) => {
-        await this.dataPersister.convertOldProjectedToPending(
-          context.accountId,
-          tx
-        );
-        const accountRegisterIds = context.accountId
-          ? accountData.accountRegisters.map((r) => r.id)
-          : undefined;
-        await this.dataPersister.performInitialCleanup(
-          context.accountId,
-          tx,
-          accountRegisterIds
-        );
-      });
+      await this.db.$transaction(
+        async (tx) => {
+          await this.dataPersister.convertOldProjectedToPending(
+            context.accountId,
+            tx,
+            context.budgetId,
+          );
+          const accountRegisterIds = context.accountId
+            ? accountData.accountRegisters.map((r) => r.id)
+            : undefined;
+          await this.dataPersister.performInitialCleanup(
+            context.accountId,
+            tx,
+            accountRegisterIds,
+            context.budgetId,
+          );
+        },
+        FORECAST_DB_TRANSACTION_OPTIONS,
+      );
 
       // Only use non-archived account registers
       const activeAccountRegisters = accountData.accountRegisters.filter(
@@ -165,48 +176,63 @@ export class ForecastEngine implements IForecastEngine {
         `Persisting ${entriesToPersist.length} entries (filtered out ${manualEntriesToPersist.length} manual entries and ${pendingEntriesToPersist.length} pending entries to prevent duplication)`
       );
 
-      await this.db.$transaction(async (tx) => {
-        // 7b. Persist updated reoccurrence lastAt
-        const reoccurrences = this.cache.reoccurrence.find();
-        await this.dataPersister.persistReoccurrenceLastAt(reoccurrences, tx);
+      await this.db.$transaction(
+        async (tx) => {
+          // 7b. Persist updated reoccurrence lastAt
+          const reoccurrences = this.cache.reoccurrence.find();
+          await this.dataPersister.persistReoccurrenceLastAt(reoccurrences, tx);
 
-        // 9. Purge all projected entries before persisting new forecast results
-        await this.dataPersister.cleanupProjectedEntries(context.accountId, tx);
-
-        // 11. Persist results back to database
-        const persistIdMap = await this.dataPersister.persistForecastResults(
-          entriesToPersist,
-          tx
-        );
-        for (const e of processedResults) {
-          const newId = persistIdMap.get(e.id);
-          if (newId !== undefined) e.id = newId;
-        }
-
-        // 12. Update balance columns for ALL entries
-        await this.dataPersister.updateRegisterEntryBalances(
-          processedResults,
-          tx
-        );
-
-        // 13. Do not update account register latest_balance from forecast; user/Plaid are the source of truth.
-
-        const statementAtUpdates =
-          this.accountService.getPendingStatementAtUpdates();
-        if (statementAtUpdates.length > 0) {
-          await this.dataPersister.batchUpdateStatementDates(
-            statementAtUpdates,
-            tx
+          // 9. Purge all projected entries before persisting new forecast results
+          await this.dataPersister.cleanupProjectedEntries(
+            context.accountId,
+            tx,
+            context.budgetId,
           );
-          this.accountService.clearPendingStatementAtUpdates();
-        }
 
-        // 14. Update entry statuses based on current date
-        await this.dataPersister.updateEntryStatuses(context.accountId, tx);
+          // 11. Persist results back to database
+          const persistIdMap = await this.dataPersister.persistForecastResults(
+            entriesToPersist,
+            tx,
+          );
+          for (const e of processedResults) {
+            const newId = persistIdMap.get(e.id);
+            if (newId !== undefined) e.id = newId;
+          }
 
-        // 15. Final cleanup
-        await this.dataPersister.performFinalCleanup(context.accountId, tx);
-      });
+          // 12. Update balance columns for ALL entries
+          await this.dataPersister.updateRegisterEntryBalances(
+            processedResults,
+            tx,
+          );
+
+          // 13. Do not update account register latest_balance from forecast; user/Plaid are the source of truth.
+
+          const statementAtUpdates =
+            this.accountService.getPendingStatementAtUpdates();
+          if (statementAtUpdates.length > 0) {
+            await this.dataPersister.batchUpdateStatementDates(
+              statementAtUpdates,
+              tx,
+            );
+            this.accountService.clearPendingStatementAtUpdates();
+          }
+
+          // 14. Update entry statuses based on current date
+          await this.dataPersister.updateEntryStatuses(
+            context.accountId,
+            tx,
+            context.budgetId,
+          );
+
+          // 15. Final cleanup
+          await this.dataPersister.performFinalCleanup(
+            context.accountId,
+            tx,
+            context.budgetId,
+          );
+        },
+        FORECAST_DB_TRANSACTION_OPTIONS,
+      );
 
       // 14. Convert results to expected format
       forecastLogger.debug(
@@ -469,7 +495,8 @@ export class ForecastEngine implements IForecastEngine {
   public async validateResults(context: ForecastContext): Promise<boolean> {
     try {
       const counts = await this.dataPersister.getResultsCount(
-        context.accountId
+        context.accountId,
+        context.budgetId,
       );
       return counts.projected > 0 || counts.pending > 0 || counts.manual > 0;
     } catch {

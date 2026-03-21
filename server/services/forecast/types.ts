@@ -14,6 +14,8 @@ import type {
 // Core Domain Types
 export interface ForecastContext {
   accountId?: string;
+  /** When set, only registers / entries / reoccurrences for this budget are loaded and persisted. */
+  budgetId?: number;
   startDate: Date;
   endDate: Date;
   logging?: ForecastLoggingConfig;
@@ -109,7 +111,8 @@ export type ForecastTransactionClient = Parameters<
 export interface IDataPersisterService {
   convertOldProjectedToPending(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number
   ): Promise<void>;
   persistForecastResults(
     results: CacheRegisterEntry[],
@@ -121,7 +124,8 @@ export interface IDataPersisterService {
   ): Promise<void>;
   cleanupProjectedEntries(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number
   ): Promise<void>;
   updateAccountRegisterBalances(
     accountRegisters: CacheAccountRegister[],

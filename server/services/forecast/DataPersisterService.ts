@@ -272,7 +272,8 @@ export class DataPersisterService implements IDataPersisterService {
 
   async convertOldProjectedToPending(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
     const now = dateTimeService.toDateFromInput(dateTimeService.now());
@@ -283,10 +284,20 @@ export class DataPersisterService implements IDataPersisterService {
       )}`
     );
 
+    const registerScope =
+      accountId != null
+        ? {
+            register: {
+              accountId,
+              ...(budgetId != null ? { budgetId } : {}),
+            },
+          }
+        : {};
+
     const updateResult = await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
-        ...(accountId && { register: { accountId } }),
+        ...registerScope,
         isProjected: true,
         isCleared: false,
         isManualEntry: false,
@@ -303,7 +314,7 @@ export class DataPersisterService implements IDataPersisterService {
     const manualUpdateResult = await db.registerEntry.updateMany({
       data: { isPending: true },
       where: {
-        ...(accountId && { register: { accountId } }),
+        ...registerScope,
         isManualEntry: true,
         isCleared: false,
         createdAt: { lte: now },
@@ -319,12 +330,20 @@ export class DataPersisterService implements IDataPersisterService {
 
   async cleanupProjectedEntries(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
     await db.registerEntry.deleteMany({
       where: {
-        ...(accountId && { register: { accountId } }),
+        ...(accountId != null
+          ? {
+              register: {
+                accountId,
+                ...(budgetId != null ? { budgetId } : {}),
+              },
+            }
+          : {}),
         isProjected: true,
         isPending: false,
         isManualEntry: false,
@@ -334,12 +353,20 @@ export class DataPersisterService implements IDataPersisterService {
 
   private async cleanupZeroBalanceEntries(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
     await db.registerEntry.deleteMany({
       where: {
-        ...(accountId && { register: { accountId } }),
+        ...(accountId != null
+          ? {
+              register: {
+                accountId,
+                ...(budgetId != null ? { budgetId } : {}),
+              },
+            }
+          : {}),
         isBalanceEntry: true,
         amount: 0,
         isProjected: false,
@@ -349,7 +376,8 @@ export class DataPersisterService implements IDataPersisterService {
 
   async updateEntryStatuses(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
     const now = dateTimeService.toDateFromInput(
@@ -362,9 +390,15 @@ export class DataPersisterService implements IDataPersisterService {
     );
 
     if (accountId) {
-      await (db as PrismaClient).$executeRaw(
-        Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`
-      );
+      if (budgetId != null) {
+        await (db as PrismaClient).$executeRaw(
+          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId} AND ar.budget_id = ${budgetId}`,
+        );
+      } else {
+        await (db as PrismaClient).$executeRaw(
+          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`,
+        );
+      }
     } else {
       const accountRows = await db.accountRegister.findMany({
         select: { accountId: true },
@@ -396,7 +430,8 @@ export class DataPersisterService implements IDataPersisterService {
   async performInitialCleanup(
     accountId?: string,
     tx?: ForecastTransactionClient,
-    accountRegisterIds?: number[]
+    accountRegisterIds?: number[],
+    budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
     forecastLogger.info(
@@ -405,16 +440,21 @@ export class DataPersisterService implements IDataPersisterService {
       }`
     );
 
-    await this.convertOldProjectedToPending(accountId, tx);
-    await this.cleanupProjectedEntries(accountId, tx);
+    await this.convertOldProjectedToPending(accountId, tx, budgetId);
+    await this.cleanupProjectedEntries(accountId, tx, budgetId);
 
     if (accountId) {
       const ids =
         accountRegisterIds ??
-        (await db.accountRegister.findMany({
-          where: { accountId },
-          select: { id: true },
-        })).map((reg) => reg.id);
+        (
+          await db.accountRegister.findMany({
+            where: {
+              accountId,
+              ...(budgetId != null ? { budgetId } : {}),
+            },
+            select: { id: true },
+          })
+        ).map((reg) => reg.id);
 
       if (ids.length > 0) {
         await db.registerEntry.deleteMany({
@@ -425,7 +465,7 @@ export class DataPersisterService implements IDataPersisterService {
         });
       }
     } else {
-      await this.cleanupZeroBalanceEntries(accountId, tx);
+      await this.cleanupZeroBalanceEntries(accountId, tx, budgetId);
     }
 
     forecastLogger.info(
@@ -437,7 +477,8 @@ export class DataPersisterService implements IDataPersisterService {
 
   async performFinalCleanup(
     accountId?: string,
-    tx?: ForecastTransactionClient
+    tx?: ForecastTransactionClient,
+    budgetId?: number,
   ): Promise<void> {
     forecastLogger.info(
       `[DataPersisterService] Performing final cleanup for account: ${
@@ -445,7 +486,7 @@ export class DataPersisterService implements IDataPersisterService {
       }`
     );
 
-    await this.updateEntryStatuses(accountId, tx);
+    await this.updateEntryStatuses(accountId, tx, budgetId);
 
     forecastLogger.info(
       `[DataPersisterService] Final cleanup completed for account: ${
@@ -454,16 +495,28 @@ export class DataPersisterService implements IDataPersisterService {
     );
   }
 
-  async getResultsCount(accountId?: string): Promise<{
+  async getResultsCount(
+    accountId?: string,
+    budgetId?: number,
+  ): Promise<{
     projected: number;
     pending: number;
     manual: number;
     balance: number;
   }> {
+    const registerFilter =
+      accountId != null
+        ? {
+            register: {
+              accountId,
+              ...(budgetId != null ? { budgetId } : {}),
+            },
+          }
+        : {};
     const [projected, pending, manual, balance] = await Promise.all([
       this.db.registerEntry.count({
         where: {
-          ...(accountId && { register: { accountId } }),
+          ...registerFilter,
           isProjected: true,
           isPending: false,
           isManualEntry: false,
@@ -471,19 +524,19 @@ export class DataPersisterService implements IDataPersisterService {
       }),
       this.db.registerEntry.count({
         where: {
-          ...(accountId && { register: { accountId } }),
+          ...registerFilter,
           isPending: true,
         },
       }),
       this.db.registerEntry.count({
         where: {
-          ...(accountId && { register: { accountId } }),
+          ...registerFilter,
           isManualEntry: true,
         },
       }),
       this.db.registerEntry.count({
         where: {
-          ...(accountId && { register: { accountId } }),
+          ...registerFilter,
           isBalanceEntry: true,
         },
       }),

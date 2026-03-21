@@ -25,6 +25,7 @@ vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
     budget: {
       findFirst: vi.fn(),
+      findFirstOrThrow: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
       create: vi.fn(),
@@ -63,6 +64,10 @@ vi.mock("~/server/services/budgetCloneService", () => ({
   cloneBudget: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("~/server/services/accountWorkspaceCloneService", () => ({
+  duplicateAccountWorkspace: vi.fn(),
+}));
+
 vi.mock("~/schema/zod", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/schema/zod")>();
   return { ...actual };
@@ -99,7 +104,8 @@ describe("Budget API Endpoints", () => {
     beforeEach(async () => {
       const mod = await import("../budget.post");
       handler = mod.default;
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue(defaultBudget);
       prisma.budget.count.mockResolvedValue(5);
       prisma.$transaction.mockImplementation(
@@ -110,14 +116,15 @@ describe("Budget API Endpoints", () => {
           return cb(tx);
         },
       );
-      const { readBody } = (await import("h3") as any);
+      const { readBody } = (await import("h3")) as any;
       readBody.mockResolvedValue({ name: "Vacation" });
     });
 
     it("returns 201 and budget when default exists and under limit", async () => {
       const event = {};
-      const { setResponseStatus } = (await import("h3") as any);
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const { setResponseStatus } = (await import("h3")) as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       const { cloneBudget } =
         await import("~/server/services/budgetCloneService");
 
@@ -147,7 +154,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when no default budget", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue(null);
 
       await expect(handler({})).rejects.toMatchObject({
@@ -157,7 +165,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when max budgets reached", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.count.mockResolvedValue(10);
 
       await expect(handler({})).rejects.toMatchObject({
@@ -167,10 +176,54 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws on invalid body (missing name)", async () => {
-      const { readBody } = (await import("h3") as any);
+      const { readBody } = (await import("h3")) as any;
       readBody.mockResolvedValue({});
 
       await expect(handler({})).rejects.toThrow();
+    });
+
+    it("duplicates financial account, recalculates, and returns new budget", async () => {
+      const { readBody } = (await import("h3")) as any;
+      readBody.mockResolvedValue({
+        name: "Vacation",
+        duplicateFinancialAccount: true,
+      });
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
+      const { duplicateAccountWorkspace } =
+        await import("~/server/services/accountWorkspaceCloneService");
+      const { addRecalculateJob } =
+        await import("~/server/clients/queuesClient");
+      const { cloneBudget } =
+        await import("~/server/services/budgetCloneService");
+
+      vi.mocked(duplicateAccountWorkspace).mockResolvedValue({
+        accountId: "acc-new",
+        budgetId: 44,
+      });
+      prisma.$transaction.mockImplementation(
+        async (cb: (_tx: unknown) => Promise<unknown>) => cb({}),
+      );
+      prisma.budget.findFirstOrThrow.mockResolvedValue({
+        id: 44,
+        name: "Vacation",
+        accountId: "acc-new",
+        isArchived: false,
+        isDefault: false,
+        userId: 123,
+      });
+
+      const result = await handler({});
+
+      expect(duplicateAccountWorkspace).toHaveBeenCalled();
+      expect(cloneBudget).not.toHaveBeenCalled();
+      expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: "acc-new" });
+      expect(result).toMatchObject({
+        id: 44,
+        name: "Vacation",
+        accountId: "acc-new",
+        userId: 123,
+      });
     });
   });
 
@@ -180,11 +233,12 @@ describe("Budget API Endpoints", () => {
     beforeEach(async () => {
       const mod = await import("../budget/[id].delete");
       handler = mod.default;
-      const { getRouterParam } = (await import("h3") as any);
+      const { getRouterParam } = (await import("h3")) as any;
       getRouterParam.mockImplementation((_: any, key: string) =>
         key === "id" ? "2" : undefined,
       );
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue({
         id: 2,
         accountId: "acc-1",
@@ -213,7 +267,7 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 for invalid id", async () => {
-      const { getRouterParam } = (await import("h3") as any);
+      const { getRouterParam } = (await import("h3")) as any;
       getRouterParam.mockReturnValue("abc");
 
       await expect(handler({})).rejects.toMatchObject({
@@ -223,7 +277,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 404 when budget not found", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue(null);
 
       await expect(handler({})).rejects.toMatchObject({
@@ -233,7 +288,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when deleting default budget", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue({
         id: 1,
         accountId: "acc-1",
@@ -253,12 +309,13 @@ describe("Budget API Endpoints", () => {
     beforeEach(async () => {
       const mod = await import("../budget/[id].patch");
       handler = mod.default;
-      const { getRouterParam, readBody } = (await import("h3") as any);
+      const { getRouterParam, readBody } = (await import("h3")) as any;
       getRouterParam.mockImplementation((_: any, key: string) =>
         key === "id" ? "2" : undefined,
       );
       readBody.mockResolvedValue({ name: "New Name" });
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue({
         id: 2,
         accountId: "acc-1",
@@ -288,7 +345,7 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 for invalid id", async () => {
-      const { getRouterParam } = (await import("h3") as any);
+      const { getRouterParam } = (await import("h3")) as any;
       getRouterParam.mockReturnValue("0");
 
       await expect(handler({})).rejects.toMatchObject({
@@ -298,7 +355,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 404 when budget not found", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue(null);
 
       await expect(handler({})).rejects.toMatchObject({
@@ -308,7 +366,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when renaming default budget", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockResolvedValue({
         id: 1,
         accountId: "acc-1",
@@ -322,7 +381,7 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws on invalid body (empty name)", async () => {
-      const { readBody } = (await import("h3") as any);
+      const { readBody } = (await import("h3")) as any;
       readBody.mockResolvedValue({ name: "" });
 
       await expect(handler({})).rejects.toThrow();
@@ -335,11 +394,12 @@ describe("Budget API Endpoints", () => {
     beforeEach(async () => {
       const mod = await import("../budget/[id]/reset.post");
       handler = mod.default;
-      const { getRouterParam } = (await import("h3") as any);
+      const { getRouterParam } = (await import("h3")) as any;
       getRouterParam.mockImplementation((_: any, key: string) =>
         key === "id" ? "2" : undefined,
       );
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst
         .mockResolvedValueOnce({
           id: 2,
@@ -394,7 +454,7 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 for invalid id", async () => {
-      const { getRouterParam } = (await import("h3") as any);
+      const { getRouterParam } = (await import("h3")) as any;
       getRouterParam.mockReturnValue("x");
 
       await expect(handler({})).rejects.toMatchObject({
@@ -404,7 +464,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 404 when budget not found", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockReset();
       prisma.budget.findFirst.mockResolvedValue(null);
 
@@ -415,7 +476,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when resetting default budget", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockReset();
       prisma.budget.findFirst.mockResolvedValue({
         id: 1,
@@ -430,7 +492,8 @@ describe("Budget API Endpoints", () => {
     });
 
     it("throws 400 when default budget not found", async () => {
-      const prisma = (await import("~/server/clients/prismaClient")).prisma as any;
+      const prisma = (await import("~/server/clients/prismaClient"))
+        .prisma as any;
       prisma.budget.findFirst.mockReset();
       prisma.budget.findFirst
         .mockResolvedValueOnce({ id: 2, accountId: "acc-1", isDefault: false })

@@ -9,13 +9,14 @@ const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
 function signupPrefillAllowed(): boolean {
   if (import.meta.dev) return true;
   if (runtimeConfig.public.signupTestPrefill) return true;
-  const host = import.meta.server
-    ? useRequestURL().hostname
-    : typeof window !== "undefined"
-      ? window.location.hostname
-      : "";
+  let host = "";
+  if (import.meta.server) {
+    host = useRequestURL().hostname;
+  } else if (globalThis.location !== undefined) {
+    host = globalThis.location.hostname;
+  }
   if (/^(localhost|127\.0\.0\.1)$/i.test(host)) return true;
-  if (/staging|(^|\.)test\.|\.vercel\.app$/i.test(host)) return true;
+  if (/(?:staging|(?:^|\.)test\.|\.vercel\.app$)/i.test(host)) return true;
   return false;
 }
 
@@ -44,15 +45,31 @@ const TEST_LAST = [
   "Fischer",
 ] as const;
 
+function randomUint32(): number {
+  const buf = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(buf);
+  return buf[0]!;
+}
+
 function pick<T extends readonly string[]>(arr: T): T[number] {
-  return arr[Math.floor(Math.random() * arr.length)]!;
+  return arr[randomUint32() % arr.length]!;
+}
+
+function secureRandomId8(): string {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) {
+    return c.randomUUID().replaceAll("-", "").slice(0, 8);
+  }
+  if (c?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    c.getRandomValues(bytes);
+    return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}${Date.now().toString(36)}`.slice(0, 16);
 }
 
 function randomSignupFixture() {
-  const id =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID().slice(0, 8)
-      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const id = secureRandomId8();
   const pass = `Test!${id}Aa1`;
   return {
     firstName: pick(TEST_FIRST),
@@ -109,6 +126,11 @@ const signupSchema = z
     path: ["confirmPassword"],
   });
 const isSaving = ref(false);
+
+function onFormError(event: Parameters<typeof handleError>[0]) {
+  handleError(event, toast);
+}
+
 type RegisterSchemaType = z.infer<typeof signupSchema>;
 const formState = ref({
   firstName: signupPrefill.value?.firstName ?? "",
@@ -155,12 +177,12 @@ const handleSubmit = async ({
     });
     saveLocalLastSignupCredentials(formData.email, formData.password);
     await navigateTo("/login");
-  } catch (error) {
+  } catch (error: unknown) {
     isSaving.value = false;
-    toast.add({
-      color: "error",
-      description: "An error occurred during registration.",
-    });
+    handleError(
+      error instanceof Error ? error : new Error(String(error)),
+      toast,
+    );
   }
 };
 </script>
@@ -172,7 +194,7 @@ const handleSubmit = async ({
       title="Create your account"
       subtitle="Build your first predictive budget in minutes."
     )
-      UForm(:state="formState" :schema="signupSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
+      UForm(:state="formState" :schema="signupSchema" class="auth-form" @submit.prevent="handleSubmit" @error="onFormError" :disabled="isSaving")
         UFormField(label="First Name" for="firstName")
           UInput(
             id="firstName"

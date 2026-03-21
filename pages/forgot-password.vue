@@ -44,6 +44,10 @@ const formState = ref({
 
 const isSaving = ref(false);
 
+function onFormError(event: Parameters<typeof handleError>[0]) {
+  handleError(event, toast);
+}
+
 // Submit handler
 const handleSubmit = async ({
   data: formData,
@@ -75,12 +79,12 @@ const handleSubmit = async ({
       description: "Forgot Password successful, please login.",
     });
     navigateTo("/reset-password-with-code");
-  } catch (error) {
+  } catch (error: unknown) {
     isSaving.value = false;
-    toast.add({
-      color: "error",
-      description: "An error occurred during Forgot Password.",
-    });
+    handleError(
+      error instanceof Error ? error : new Error(String(error)),
+      toast,
+    );
   }
 };
 </script>
@@ -92,7 +96,7 @@ const handleSubmit = async ({
       title="Recover your account"
       subtitle="Enter your email and we will send a secure reset code."
     )
-      UForm(:state="formState" :schema="forgotPasswordSchema" class="auth-form" @submit.prevent="handleSubmit" @error="handleError($event, toast)" :disabled="isSaving")
+      UForm(:state="formState" :schema="forgotPasswordSchema" class="auth-form" @submit.prevent="handleSubmit" @error="onFormError" :disabled="isSaving")
         UFormField(label="Email Address" for="email")
           UInput(
             id="email"

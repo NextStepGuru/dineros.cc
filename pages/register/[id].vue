@@ -21,7 +21,6 @@ import type {
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
-import CombinedGlobalCategoryFilter from "~/components/filters/CombinedGlobalCategoryFilter.vue";
 import { useSnapshotMode } from "~/composables/useSnapshotMode";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
@@ -113,7 +112,7 @@ function dismissRegisterOnboarding() {
 }
 
 function printRegisterPage() {
-  if (import.meta.client) window.print();
+  if (import.meta.client) globalThis.print();
 }
 
 onMounted(() => {
@@ -134,9 +133,9 @@ const showAccountSelector = computed(
 const accountRegisterOptionsWithBalance = computed(() => {
   const formatted = formatAccountRegisters(registersForRegisterPage.value);
   return formatted.map((r) => {
-    const pockets = !r.subAccountRegisterId
-      ? formatted.filter((p) => p.subAccountRegisterId === r.id)
-      : [];
+    const pockets = r.subAccountRegisterId
+      ? []
+      : formatted.filter((p) => p.subAccountRegisterId === r.id);
     const balanceRaw =
       pockets.length > 0
         ? calculateAdjustedBalance(r.latestBalance ?? 0, pockets)
@@ -192,7 +191,7 @@ onBeforeMount(async () => {
 const accountRegisterId = ref<number>(
   route.params.id === "" || Array.isArray(route.params.id)
     ? 0
-    : parseInt(route.params.id),
+    : Number.parseInt(String(route.params.id), 10),
 );
 
 // Watch for changes to accountRegisterId and navigate to the new route
@@ -479,6 +478,8 @@ function openReoccurrenceFromPlaidEntry(entry: RegisterEntry) {
       adjustBeforeIfOnWeekend: false,
       categoryId: entry.categoryId ?? null,
       splits: [],
+      amountAdjustmentMode: "NONE",
+      amountAdjustmentIntervalCount: 1,
     },
     callback: async (created: Reoccurrence) => {
       listStore.patchReoccurrence(created);
@@ -785,7 +786,7 @@ const columns: TableColumn<RegisterEntry>[] = [
     header: () => h("div", { class: "text-right" }, "Amount"),
     cell: ({ row }) => {
       const className = `text-right ${
-        parseInt(row.getValue("amount")) < 0
+        Number(row.getValue("amount")) < 0
           ? "dark:text-red-300 text-red-700"
           : ""
       }`;
@@ -805,7 +806,7 @@ const columns: TableColumn<RegisterEntry>[] = [
     header: () => h("div", { class: "text-right" }, "Balance"),
     cell: ({ row }) => {
       const className = `text-right ${
-        parseInt(row.getValue("balance")) < 0
+        Number(row.getValue("balance")) < 0
           ? "dark:text-red-300 text-red-700"
           : ""
       }`;
@@ -1001,7 +1002,7 @@ defineShortcuts({
   meta_r: () => refreshAccountEntries(),
   meta_a: () => handleAddEntry(),
   meta_f: () => {
-    void combinedTableFilterRef.value?.expandAndFocus();
+    combinedTableFilterRef.value?.expandAndFocus()?.catch(() => {});
   },
   meta_shift_r: () => recalcAccount(),
 });
@@ -1093,6 +1094,7 @@ async function recalcAccount() {
       method: "POST",
       body: {
         accountId: currentAccountRegister.value?.accountId,
+        ...(authStore.budgetId > 0 ? { budgetId: authStore.budgetId } : {}),
       },
     });
 
@@ -1157,7 +1159,7 @@ async function recalcAccount() {
           @refresh="refreshAccountEntries"
         )
           template(#filter)
-            CombinedGlobalCategoryFilter(
+            FiltersCombinedGlobalCategoryFilter(
               ref="combinedTableFilterRef"
               v-model:global-filter="globalFilter"
               v-model:category-filter="categoryFilter"

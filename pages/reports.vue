@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { formatAccountRegisters } from "~/lib/utils";
 import type { AccountRegister } from "~/types/types";
-import CategoryReportsDonut from "~/components/reports/CategoryReportsDonut.vue";
-import CategoryReportsGroupedTable from "~/components/reports/CategoryReportsGroupedTable.vue";
 
 definePageMeta({
   middleware: "auth",
@@ -135,8 +133,8 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
           template(#header)
             h2(class="font-medium") By category
           .space-y-8
-            CategoryReportsDonut(:categories="data.donutCategories" :currencyFmt="currencyFmt")
-            CategoryReportsGroupedTable(
+            ReportsCategoryReportsDonut(:categories="data.donutCategories" :currencyFmt="currencyFmt")
+            ReportsCategoryReportsGroupedTable(
               :groups="data.tableGroups"
               :currencyFmt="currencyFmt")
 </template>

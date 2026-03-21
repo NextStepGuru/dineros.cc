@@ -5,6 +5,8 @@ import { useListStore } from "../stores/listStore";
 import { formatDate, getAccountTypeLabel } from "~/lib/utils";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
 
+type AccountRegisterSortMode = "visual" | "loan" | "savings";
+
 const ModalsEditAccountRegister = defineAsyncComponent(
   () => import("~/components/modals/EditAccountRegister.vue"),
 );
@@ -159,15 +161,13 @@ function handleTouchMove(event: TouchEvent, index: number) {
   );
 
   if (newIndex !== dragOverIndex.value) {
-    const draggedParent = draggableAccountRegisters.value[draggedIndex.value];
-    if (!draggedParent.subAccountRegisterId) {
-      const targetParent = draggableAccountRegisters.value[newIndex];
-      if (!targetParent.subAccountRegisterId) {
-        dragOverIndex.value = newIndex;
-      }
-    } else {
-      dragOverIndex.value = newIndex;
-    }
+    const draggedParent =
+      draggableAccountRegisters.value[draggedIndex.value as number];
+    updateDragOverIndexForParentDrag(
+      newIndex,
+      draggedParent,
+      draggableAccountRegisters.value,
+    );
   }
 }
 
@@ -252,15 +252,6 @@ function handlePocketDragOver(
   }
 }
 
-function handlePocketDragLeave(event: DragEvent) {
-  const target = event.target as HTMLElement;
-  const relatedTarget = event.relatedTarget as HTMLElement;
-
-  if (!target.contains(relatedTarget)) {
-    dragOverIndex.value = null;
-  }
-}
-
 function handlePocketDrop(
   event: DragEvent,
   subRow: AccountRegister,
@@ -274,7 +265,10 @@ function handlePocketDrop(
   }
 
   // Extract the dragged pocket account ID
-  const draggedPocketId = parseInt(String(draggedIndex.value).replace("sub-", ""));
+  const draggedPocketId = Number.parseInt(
+    String(draggedIndex.value).replace("sub-", ""),
+    10,
+  );
 
   // Get all pocket accounts for this parent
   const pocketAccounts = listStore.getAccountRegisters
@@ -424,8 +418,14 @@ function handlePocketTouchEnd(
       dragOverIndex.value !== null &&
       draggedIndex.value !== dragOverIndex.value
     ) {
-      const draggedPocketId = parseInt(String(draggedIndex.value).replace("sub-", ""));
-      const dropPocketId = parseInt(String(dragOverIndex.value).replace("sub-", ""));
+      const draggedPocketId = Number.parseInt(
+        String(draggedIndex.value).replace("sub-", ""),
+        10,
+      );
+      const dropPocketId = Number.parseInt(
+        String(dragOverIndex.value).replace("sub-", ""),
+        10,
+      );
 
       const pocketAccounts = listStore.getAccountRegisters
         .filter((f) => f.subAccountRegisterId === parentId)
@@ -498,26 +498,17 @@ function handleDragOver(event: DragEvent, index: number) {
 
   // Only allow parent-to-parent dropping
   if (draggedIndex.value !== null && draggedIndex.value !== index) {
-    // Check if we're dragging a parent account
-    const draggedParent = draggableAccountRegisters.value[draggedIndex.value];
-
-    // If dragging a parent, only allow dropping on other parent accounts
-    if (!draggedParent.subAccountRegisterId) {
-      const targetParent = draggableAccountRegisters.value[index];
-
-      // Only show drop zone if target is also a parent account
-      if (!targetParent.subAccountRegisterId) {
-        dragOverIndex.value = index;
-      }
-    } else {
-      // If dragging a pocket account, allow normal pocket-to-pocket dropping
-      dragOverIndex.value = index;
-    }
+    const draggedParent =
+      draggableAccountRegisters.value[draggedIndex.value as number];
+    updateDragOverIndexForParentDrag(
+      index,
+      draggedParent,
+      draggableAccountRegisters.value,
+    );
   }
 }
 
 function handleDragLeave(event: DragEvent) {
-  // Only clear if we're leaving the drop zone entirely
   const target = event.target as HTMLElement;
   const relatedTarget = event.relatedTarget as HTMLElement;
 
@@ -695,10 +686,6 @@ async function handleSaveSnapshotClick() {
   }
 }
 
-// const stripedTheme = ref({
-//   tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
-// });
-
 const modal = overlay.create(ModalsEditAccountRegister);
 const categoriesModal = overlay.create(ModalsManageCategories);
 
@@ -746,7 +733,7 @@ const columns: TableColumn<AccountRegister>[] = [
     header: () => h("div", { class: "text-right" }, "Balance"),
     cell: ({ row }) => {
       const className = `text-right ${
-        parseInt(row.getValue("balance")) < 0
+        Number(row.getValue("balance")) < 0
           ? "dark:text-red-300 text-red-700"
           : ""
       }`;
@@ -778,6 +765,7 @@ function handleAddAccountRegister() {
       balance: 0,
       latestBalance: 0,
       minPayment: null,
+      subAccountRegisterId: undefined,
       statementAt: today.value,
       statementIntervalId: 3,
       apr1: null,
@@ -799,6 +787,14 @@ function handleAddAccountRegister() {
       minAccountBalance: 0,
       allowExtraPayment: false,
       isArchived: false,
+      depreciationRate: null,
+      depreciationMethod: null,
+      assetOriginalValue: null,
+      assetResidualValue: null,
+      assetUsefulLifeYears: null,
+      assetStartAt: null,
+      paymentCategoryId: undefined,
+      interestCategoryId: undefined,
     },
     callback: (data: AccountRegister) => {
       listStore.patchAccountRegister(data);
@@ -859,7 +855,7 @@ function effectiveRegisterBalance(reg: AccountRegister): number {
     return +reg.balance;
   }
   const v = forecastBalancesById.value[reg.id];
-  return v !== undefined ? v : +reg.balance;
+  return v ?? +reg.balance;
 }
 
 /** Debit / credit / net for accounts table (linked loan+asset or standalone). */
@@ -926,6 +922,21 @@ const draggedIndex = ref<number | string | null>(null);
 const isDragging = ref(false);
 const dragOverIndex = ref<number | string | null>(null);
 
+function updateDragOverIndexForParentDrag(
+  newIndex: number,
+  draggedParent: AccountRegister,
+  parentRows: AccountRegister[],
+): void {
+  if (draggedParent.subAccountRegisterId != null) {
+    dragOverIndex.value = newIndex;
+    return;
+  }
+  const targetParent = parentRows[newIndex];
+  if (targetParent.subAccountRegisterId == null) {
+    dragOverIndex.value = newIndex;
+  }
+}
+
 // Touch state for mobile
 const LONG_PRESS_MS = 450;
 const TAP_MOVE_THRESHOLD_PX = 10;
@@ -948,7 +959,7 @@ const draggedPocketGroup = ref<{
 const collapsedParents = ref<Set<number>>(new Set());
 
 // Sort mode state
-const activeSortMode = ref<"visual" | "loan" | "savings">("visual");
+const activeSortMode = ref<AccountRegisterSortMode>("visual");
 
 function pocketSubs(parentId: number) {
   const mode = activeSortMode.value;
@@ -983,7 +994,7 @@ const sortMenuItems = computed(() => [
       label: item.label,
       icon: item.icon,
       onSelect: () => {
-        activeSortMode.value = item.key as "visual" | "loan" | "savings";
+        activeSortMode.value = item.key as AccountRegisterSortMode;
       },
     })),
   ],
@@ -1062,11 +1073,11 @@ async function handleDragEnd(event: any) {
   );
 
   try {
-    const response = await $api("/api/account-register-sort", {
+    await $api("/api/account-register-sort", {
       method: "POST",
       body: {
         accountRegisters: newOrder,
-        sortMode: activeSortMode.value as "visual" | "loan" | "savings",
+        sortMode: activeSortMode.value as AccountRegisterSortMode,
       },
     });
 
@@ -1088,11 +1099,11 @@ async function handleDragEnd(event: any) {
 
 async function handlePocketDragEnd(updatedPockets: AccountRegister[]) {
   try {
-    const response = await $api("/api/account-register-sort", {
+    await $api("/api/account-register-sort", {
       method: "POST",
       body: {
         accountRegisters: updatedPockets,
-        sortMode: activeSortMode.value as "visual" | "loan" | "savings",
+        sortMode: activeSortMode.value as AccountRegisterSortMode,
       },
     });
 
@@ -1485,7 +1496,7 @@ onBeforeUnmount(() => {
                 :draggable="!isSnapshotMode"
                 @dragstart="handlePocketDragStart($event, subRow, row.id)"
                 @dragover="handlePocketDragOver($event, subRow, row.id)"
-                @dragleave="handlePocketDragLeave($event)"
+                @dragleave="handleDragLeave($event)"
                 @drop="handlePocketDrop($event, subRow, row.id)"
                 @dragenter.prevent
                 @touchstart="handlePocketTouchStart($event, subRow, row.id)"
