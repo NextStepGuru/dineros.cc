@@ -239,6 +239,19 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
+export const accountInviteCreateSchema = z.object({
+  accountId: z.string().min(1),
+  email: z.email("Invalid email address"),
+});
+
+export const accountInviteAcceptSchema = z.object({
+  token: z.string().min(1),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
+});
+
 export const accountRegisterSchema = z.object({
   id: z.number(),
   accountId: z.string().min(1),

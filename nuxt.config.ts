@@ -91,8 +91,17 @@ export default defineNuxtConfig({
       },
       viewport: "width=device-width, initial-scale=1",
       link: [
-        { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-        { rel: "apple-touch-icon", href: "/favicon.ico" },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "32x32",
+          href: "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_32,h_32,f_png/v1737776329/pepe_solo_t0twqk.png",
+        },
+        {
+          rel: "apple-touch-icon",
+          sizes: "180x180",
+          href: "https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_180,h_180,f_png/v1737776329/pepe_solo_t0twqk.png",
+        },
       ],
       meta: [
         {

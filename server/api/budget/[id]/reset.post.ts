@@ -2,6 +2,10 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { createError, getRouterParam } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
+import {
+  accountWhereUserIsMember,
+  budgetWhereForAccountMember,
+} from "~/server/lib/accountAccess";
 import { cloneBudget } from "~/server/services/budgetCloneService";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 
@@ -18,7 +22,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const budget = await PrismaDb.budget.findFirst({
-      where: { id: budgetId, userId: user.userId },
+      where: budgetWhereForAccountMember(user.userId, budgetId),
       select: { id: true, accountId: true, isDefault: true },
     });
     if (!budget) {
@@ -35,7 +39,11 @@ export default defineEventHandler(async (event) => {
     }
 
     const defaultBudget = await PrismaDb.budget.findFirst({
-      where: { accountId: budget.accountId, userId: user.userId, isDefault: true },
+      where: {
+        accountId: budget.accountId,
+        isDefault: true,
+        account: accountWhereUserIsMember(user.userId),
+      },
       select: { id: true, accountId: true },
     });
     if (!defaultBudget) {

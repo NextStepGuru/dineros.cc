@@ -372,6 +372,8 @@ const linkColumns = computed<TableColumn<PlaidAccount>[]>(() => {
 <template lang="pug">
 div.p-4
   h2(class="text-xl font-bold text-center") Sync Accounts
+  p(class="text-sm text-center frog-text-muted max-w-2xl mx-auto mb-4")
+    | Bank connections are tied to your login. Everyone you invite can see shared account data; only this profile&apos;s Plaid connection is used for bank linking.
 
   // Connect to Plaid section
   .pt-5(v-if="!authStore.hasPlaidConnected")

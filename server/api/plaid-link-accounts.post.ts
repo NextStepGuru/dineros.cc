@@ -5,6 +5,7 @@ import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
 import { mapPlaidTypesToAccountTypes } from "~/lib/utils";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
+import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -60,13 +61,6 @@ export default defineEventHandler(async (event) => {
     const user = privateUserSchema.parse(lookupUser);
 
     for (const linkAccount of linkAccounts) {
-      const lookupBudget = await prisma.budget.findFirstOrThrow({
-        where: {
-          isDefault: true,
-          userId,
-        },
-      });
-
       const lookupAccount = await prisma.account.findFirstOrThrow({
         where: {
           isDefault: true,
@@ -76,6 +70,14 @@ export default defineEventHandler(async (event) => {
               userId,
             },
           },
+        },
+      });
+
+      const lookupBudget = await prisma.budget.findFirstOrThrow({
+        where: {
+          accountId: lookupAccount.id,
+          isDefault: true,
+          account: accountWhereUserIsMember(userId),
         },
       });
 

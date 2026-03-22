@@ -2,6 +2,7 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { createError, getRouterParam } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { budgetWhereForAccountMember } from "~/server/lib/accountAccess";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 
 export default defineEventHandler(async (event) => {
@@ -17,7 +18,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const budget = await PrismaDb.budget.findFirst({
-      where: { id: budgetId, userId: user.userId },
+      where: budgetWhereForAccountMember(user.userId, budgetId),
       select: { id: true, accountId: true, isDefault: true },
     });
     if (!budget) {
