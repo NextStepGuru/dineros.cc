@@ -718,6 +718,7 @@ export class TransferService implements ITransferService {
           sourceAccountRegisterId: sourceAccount.id,
           amount,
           description: `Goal: ${goal.name}`,
+          categoryId: goal.categoryId ?? null,
           forecastDate: targetDate,
         });
 
@@ -827,6 +828,7 @@ export class TransferService implements ITransferService {
       remainingToGoal: number;
       sortOrder: number;
       description: string;
+      categoryId?: string | null;
     };
 
     const targets: FundingTarget[] = [];
@@ -840,6 +842,7 @@ export class TransferService implements ITransferService {
           remainingToGoal: remaining,
           sortOrder: a.savingsGoalSortOrder,
           description: `Savings goal contribution from ${sourceAccountRegister.name}`,
+          categoryId: null,
         });
       }
     }
@@ -856,6 +859,7 @@ export class TransferService implements ITransferService {
           remainingToGoal: remaining,
           sortOrder: g.sortOrder,
           description: `Goal: ${g.name}`,
+          categoryId: g.categoryId ?? null,
         });
       }
     }
@@ -907,6 +911,7 @@ export class TransferService implements ITransferService {
         sourceAccountRegisterId: sourceAccountRegister.id,
         amount,
         description: t.description,
+        categoryId: t.categoryId ?? null,
         forecastDate: targetDate,
       });
 

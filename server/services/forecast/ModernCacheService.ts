@@ -123,6 +123,7 @@ export type CacheSavingsGoal = {
   targetAccountRegisterId: number;
   priorityOverDebt: boolean;
   ignoreMinBalance: boolean;
+  categoryId?: string | null;
   sortOrder: number;
   isArchived: boolean;
 };

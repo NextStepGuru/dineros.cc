@@ -320,6 +320,7 @@ export class DataLoaderService implements IDataLoaderService {
       targetAccountRegisterId: g.targetAccountRegisterId,
       priorityOverDebt: g.priorityOverDebt,
       ignoreMinBalance: g.ignoreMinBalance,
+      categoryId: g.categoryId ?? null,
       sortOrder: g.sortOrder,
       isArchived: g.isArchived,
     }));

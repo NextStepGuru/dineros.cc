@@ -66,6 +66,34 @@ export default defineConfig({
         storageState: authStoragePath,
       },
     },
+    {
+      name: "webkit-public",
+      testDir: "./tests/e2e/specs/public",
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
+      name: "webkit-authed",
+      testDir: "./tests/e2e/specs/authed",
+      dependencies: ["auth-setup"],
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: authStoragePath,
+      },
+    },
+    {
+      name: "mobile-public",
+      testDir: "./tests/e2e/specs/public",
+      use: { ...devices["iPhone 14"] },
+    },
+    {
+      name: "mobile-authed",
+      testDir: "./tests/e2e/specs/authed",
+      dependencies: ["auth-setup"],
+      use: {
+        ...devices["iPhone 14"],
+        storageState: authStoragePath,
+      },
+    },
   ],
   ...(useLocalWebServer
     ? {

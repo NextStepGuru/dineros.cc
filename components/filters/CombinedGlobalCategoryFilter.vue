@@ -58,7 +58,7 @@ defineExpose({
       <UTooltip text="Table filters" :delay-duration="150">
         <UButton
           variant="soft"
-          size="sm"
+          size="md"
           square
           icon="i-lucide-sliders-horizontal"
           title="Table filters"
@@ -98,7 +98,7 @@ defineExpose({
       <UTooltip text="Reset filters" :delay-duration="150">
         <UButton
           variant="soft"
-          size="sm"
+          size="md"
           square
           icon="i-lucide-x"
           title="Reset filters"

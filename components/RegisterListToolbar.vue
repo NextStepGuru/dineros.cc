@@ -40,7 +40,7 @@ const emit = defineEmits<{
     <UTooltip v-if="showAdd" :text="addTooltip" :delay-duration="150">
       <UButton
         color="primary"
-        size="sm"
+        size="md"
         square
         icon="i-lucide-plus"
         :title="addTitle"
@@ -51,7 +51,7 @@ const emit = defineEmits<{
     <UTooltip v-if="showRefresh" text="Refresh register" :delay-duration="150">
       <UButton
         color="success"
-        size="sm"
+        size="md"
         square
         icon="i-lucide-refresh-cw"
         title="Refresh register"
@@ -67,7 +67,7 @@ const emit = defineEmits<{
     >
       <UButton
         variant="soft"
-        size="sm"
+        size="md"
         square
         icon="i-lucide-keyboard"
         :color="showShortcuts ? 'primary' : 'neutral'"

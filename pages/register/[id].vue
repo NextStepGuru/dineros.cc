@@ -1192,7 +1192,7 @@ async function recalcAccount() {
               UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
                 UButton(
                   variant="soft"
-                  size="sm"
+                  size="md"
                   square
                   icon="i-lucide-camera"
                   :color="isSnapshotMode ? 'primary' : 'neutral'"
@@ -1202,7 +1202,7 @@ async function recalcAccount() {
             UTooltip(v-if="!isSnapshotMode" text="Recalculate forecast" :delay-duration="150")
               UButton(
                 color="error"
-                size="sm"
+                size="md"
                 square
                 icon="i-lucide-calculator"
                 title="Recalculate forecast"

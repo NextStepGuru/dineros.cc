@@ -1,5 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+function isLocalBaseUrl(baseURL?: string): boolean {
+  if (!baseURL) return true;
+  try {
+    const url = new URL(baseURL);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return true;
+  }
+}
+
 test.describe("Public navigation", () => {
   test("homepage has title and loads", async ({ page }) => {
     await page.goto("/");
@@ -35,7 +45,11 @@ test.describe("Public navigation", () => {
   }) => {
     await page.goto("/");
     const banner = page.locator("output").filter({ hasText: /local development/i });
-    await expect(banner).toBeVisible();
+    if (isLocalBaseUrl(test.info().project.use.baseURL)) {
+      await expect(banner).toBeVisible();
+      return;
+    }
+    await expect(banner).toHaveCount(0);
   });
 
   test("static pages render with main headings", async ({ page }) => {

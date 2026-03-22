@@ -1350,7 +1350,7 @@ onBeforeUnmount(() => {
           UTooltip(text="Manage categories" :delay-duration="150")
             UButton(
               color="info"
-              size="sm"
+              size="md"
               square
               icon="i-lucide-tags"
               title="Manage categories"
@@ -1361,7 +1361,7 @@ onBeforeUnmount(() => {
           UTooltip(text="Save snapshot" :delay-duration="150")
             UButton(
               color="success"
-              size="sm"
+              size="md"
               square
               icon="i-lucide-save"
               title="Save snapshot"
@@ -1374,7 +1374,7 @@ onBeforeUnmount(() => {
             UTooltip(text="Sort accounts" :delay-duration="150")
               UButton(
                 color="warning"
-                size="sm"
+                size="md"
                 square
                 icon="i-lucide-arrow-up-down"
                 title="Sort accounts"
@@ -1385,7 +1385,7 @@ onBeforeUnmount(() => {
             UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
               UButton(
                 variant="soft"
-                size="sm"
+                size="md"
                 square
                 icon="i-lucide-camera"
                 :color="isSnapshotMode ? 'primary' : 'neutral'"
@@ -1395,7 +1395,7 @@ onBeforeUnmount(() => {
           UTooltip(text="Projected balance (end of month)" :delay-duration="150")
             UButton(
               variant="soft"
-              size="sm"
+              size="md"
               square
               icon="i-lucide-line-chart"
               :color="showProjectedBalanceTimeline ? 'primary' : 'neutral'"
