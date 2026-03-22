@@ -30,6 +30,10 @@ export default defineNuxtConfig({
       testDate: process.env.TEST_DATE || "",
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "https://dineros.cc",
       signupTestPrefill: process.env.NUXT_PUBLIC_SIGNUP_TEST_PREFILL === "1",
+      deployEnv:
+        process.env.NUXT_PUBLIC_DEPLOY_ENV ||
+        process.env.DEPLOY_ENV ||
+        "production",
     },
   },
   devtools: false,
