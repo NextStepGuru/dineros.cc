@@ -301,6 +301,7 @@ function collectReoccurrenceSplits(
         splitsToCreate.push({
           reoccurrenceId: newReoccurrenceId,
           transferAccountRegisterId: newTransferId,
+          amountMode: split.amountMode ?? "FIXED",
           amount: split.amount,
           description: split.description,
           categoryId: mapCategoryId(split.categoryId, categoryIdMap),
@@ -393,6 +394,7 @@ async function cloneSavingsGoals(
   targetBudgetId: number,
   sourceRegisterIds: Set<number>,
   registerIdMap: Map<number, number>,
+  categoryIdMap: Map<string, string> | undefined,
 ): Promise<void> {
   const sourceGoals = await tx.savingsGoal.findMany({
     where: { budgetId: sourceBudgetId, isArchived: false },
@@ -422,6 +424,7 @@ async function cloneSavingsGoals(
         targetAccountRegisterId: newTargetId,
         priorityOverDebt: g.priorityOverDebt,
         ignoreMinBalance: g.ignoreMinBalance,
+        categoryId: mapCategoryId(g.categoryId, categoryIdMap),
         sortOrder: g.sortOrder,
       },
     });
@@ -537,5 +540,6 @@ export async function cloneBudget(
     targetBudgetId,
     sourceRegisterIds,
     registerIdMap,
+    categoryIdMap,
   );
 }

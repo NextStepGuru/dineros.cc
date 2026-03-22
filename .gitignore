@@ -4,6 +4,7 @@
 .nuxt
 .nitro
 .cache
+.dumps
 dist
 
 # Node dependencies
@@ -41,3 +42,4 @@ playwright-report/index.html
 /.pnpm-store
 /node-compile-cache
 /prisma/reencrypt
+dineros-secrets.yml

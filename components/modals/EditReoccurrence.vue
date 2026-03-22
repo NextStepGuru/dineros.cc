@@ -40,6 +40,7 @@ const splitsRef = ref<NonNullable<Schema["splits"]>>(
   (props.reoccurrence.splits ?? []).map((s) => ({
     ...s,
     amount: Number(s.amount),
+    amountMode: s.amountMode ?? "FIXED",
   })),
 );
 const isExternal = ref(true);
@@ -91,6 +92,7 @@ function syncFormStateFromProps() {
   splitsRef.value = (props.reoccurrence.splits ?? []).map((split) => ({
     ...split,
     amount: Number(split.amount),
+    amountMode: split.amountMode ?? "FIXED",
     categoryId:
       split.categoryId === undefined ? null : split.categoryId,
   }));
@@ -124,6 +126,7 @@ function addSplit() {
   const current = [...splitsRef.value];
   current.push({
     transferAccountRegisterId: undefined as unknown as number,
+    amountMode: "FIXED",
     amount: 0,
     description: "",
     categoryId: null,
@@ -159,6 +162,7 @@ async function handleSubmit({ data: formData }: FormSubmitEvent<Schema>) {
         id: split.id,
         reoccurrenceId: split.reoccurrenceId,
         transferAccountRegisterId: split.transferAccountRegisterId,
+        amountMode: split.amountMode ?? "FIXED",
         amount: Number(split.amount),
         description: split.description?.trim() || undefined,
         categoryId:
@@ -379,7 +383,11 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         .space-y-3(v-if="splitsRef.length > 0")
           .grid.grid-cols-1.gap-3.border.border-gray-700.rounded-lg.p-3(v-for="(split, index) in splitsRef" :key="split.id || 'new-split-' + index")
             .flex.gap-3.items-start.flex-wrap(class="max-sm:flex-col")
-              UFormField(label="Amount" class="flex-1 min-w-32")
+              UFormField(label="Amount type" class="flex-none min-w-36")
+                USelect(v-model="split.amountMode" class="w-full" :items="[{ id: 'FIXED', name: 'Fixed ($)' }, { id: 'PERCENT', name: 'Percent (%)' }]" valueKey="id" labelKey="name")
+              UFormField(v-if="split.amountMode === 'PERCENT'" label="Percent" hint="% of occurrence amount (after any amount adjustment)" class="flex-1 min-w-32")
+                UInputNumber(v-model="split.amount" :min="0.01" :max="100" :step="0.1" class="w-full")
+              UFormField(v-else label="Amount" class="flex-1 min-w-32")
                 UInputNumber(v-model="split.amount" :format-options="formatCurrencyOptions" :step="0.01" class="w-full")
               UFormField(label="Transfer into Account" class="flex-1 min-w-40")
                 USelect(v-model="split.transferAccountRegisterId" :items="splitTargetOptions" valueKey="id" labelKey="name" class="w-full" placeholder="Select account")

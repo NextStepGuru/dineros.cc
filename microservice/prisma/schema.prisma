@@ -18,6 +18,11 @@ enum AmountAdjustmentDirection {
   DECREASE
 }
 
+enum ReoccurrenceSplitAmountMode {
+  FIXED
+  PERCENT
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -406,6 +411,7 @@ model ReoccurrenceSplit {
   id                        Int      @id @default(autoincrement()) @db.UnsignedInt
   reoccurrenceId            Int      @map("reoccurrence_id") @db.UnsignedInt
   transferAccountRegisterId Int      @map("transfer_account_register_id") @db.UnsignedInt
+  amountMode                ReoccurrenceSplitAmountMode @default(FIXED) @map("amount_mode")
   amount                    Decimal  @db.Decimal(19, 2)
   description               String?  @db.VarChar(500)
   categoryId                String?  @map("category_id")

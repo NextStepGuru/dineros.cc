@@ -18,6 +18,11 @@ enum AmountAdjustmentDirection {
   DECREASE
 }
 
+enum ReoccurrenceSplitAmountMode {
+  FIXED
+  PERCENT
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -160,6 +165,7 @@ model SavingsGoal {
   targetAccountRegisterId   Int       @map("target_account_register_id") @db.UnsignedInt
   priorityOverDebt          Boolean   @default(false) @map("priority_over_debt")
   ignoreMinBalance          Boolean   @default(false) @map("ignore_min_balance")
+  categoryId                String?   @map("category_id")
   sortOrder                 Int       @default(0) @map("sort_order") @db.UnsignedInt
   isArchived                Boolean   @default(false) @map("is_archived")
   createdAt                 DateTime  @default(now()) @map("created_at")
@@ -169,9 +175,11 @@ model SavingsGoal {
   budget                  Budget         @relation(fields: [budgetId], references: [id])
   sourceAccountRegister   AccountRegister @relation("SavingsGoalSource", fields: [sourceAccountRegisterId], references: [id])
   targetAccountRegister   AccountRegister @relation("SavingsGoalTarget", fields: [targetAccountRegisterId], references: [id])
+  category                Category?       @relation(fields: [categoryId], references: [id])
 
   @@index([accountId])
   @@index([budgetId])
+  @@index([categoryId])
   @@map("savings_goal")
 }
 
@@ -379,6 +387,7 @@ model Category {
   reoccurrenceSplits  ReoccurrenceSplit[]
   accountRegistersPaymentDefault  AccountRegister[] @relation("AccountRegisterPaymentCategory")
   accountRegistersInterestDefault AccountRegister[] @relation("AccountRegisterInterestCategory")
+  savingsGoals                    SavingsGoal[]
 
   @@map("category")
 }
@@ -441,6 +450,7 @@ model ReoccurrenceSplit {
   id                        Int      @id @default(autoincrement()) @db.UnsignedInt
   reoccurrenceId            Int      @map("reoccurrence_id") @db.UnsignedInt
   transferAccountRegisterId Int      @map("transfer_account_register_id") @db.UnsignedInt
+  amountMode                ReoccurrenceSplitAmountMode @default(FIXED) @map("amount_mode")
   amount                    Decimal  @db.Decimal(19, 2)
   description               String?  @db.VarChar(500)
   categoryId                String?  @map("category_id")

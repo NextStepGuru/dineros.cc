@@ -6,6 +6,7 @@ import {
   formatAccountRegisters,
   formatCurrencyOptions,
 } from "~/lib/utils";
+import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 
 export type EditSavingsGoalProps = {
   goal: SavingsGoal | null;
@@ -32,12 +33,35 @@ const formState = ref({
   targetAccountRegisterId: 0,
   priorityOverDebt: false,
   ignoreMinBalance: false,
+  categoryId: null as string | null,
 });
 
 const accountRegisters = computed(() =>
   formatAccountRegisters(listStore.getAccountRegisters),
 );
 
+const accountIdForCategories = computed(() => {
+  const reg = listStore.getAccountRegisters.find(
+    (r) => r.id === formState.value.sourceAccountRegisterId,
+  );
+  return reg?.accountId ?? props.goal?.accountId ?? null;
+});
+
+const categorySelectItems = computed(() => {
+  const base = [{ id: null, name: "None", value: null, label: "None" }] as {
+    id: string | null;
+    name: string;
+    value: string | null;
+    label: string;
+  }[];
+  return [
+    ...base,
+    ...buildSortedCategorySelectItems(
+      listStore.getCategories,
+      accountIdForCategories.value,
+    ),
+  ];
+});
 
 watch(
   () => props.goal,
@@ -50,6 +74,7 @@ watch(
         targetAccountRegisterId: g.targetAccountRegisterId,
         priorityOverDebt: g.priorityOverDebt,
         ignoreMinBalance: g.ignoreMinBalance,
+        categoryId: g.categoryId ?? null,
       };
     } else {
       const first = accountRegisters.value[0];
@@ -60,10 +85,29 @@ watch(
         targetAccountRegisterId: first?.id ?? 0,
         priorityOverDebt: false,
         ignoreMinBalance: false,
+        categoryId: null,
       };
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => [
+    formState.value.sourceAccountRegisterId,
+    accountIdForCategories.value,
+  ] as const,
+  () => {
+    const allowed = new Set(
+      categorySelectItems.value
+        .map((i) => i.value)
+        .filter((v): v is string => v != null && v !== ""),
+    );
+    const cid = formState.value.categoryId;
+    if (cid && !allowed.has(cid)) {
+      formState.value.categoryId = null;
+    }
+  },
 );
 
 const schema = createSavingsGoalSchema;
@@ -151,6 +195,19 @@ defineShortcuts({
             class="w-full"
             placeholder="e.g. Boat fund"
             data-1p-ignore
+          />
+        </UFormField>
+
+        <UFormField label="Category" name="categoryId" for="goal-category">
+          <USelectMenu
+            id="goal-category"
+            v-model="formState.categoryId"
+            class="w-full"
+            :items="categorySelectItems"
+            value-key="value"
+            label-key="label"
+            :filter-fields="['label', 'name']"
+            placeholder="None"
           />
         </UFormField>
 

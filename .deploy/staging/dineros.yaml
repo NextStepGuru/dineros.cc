@@ -1,0 +1,289 @@
+# Staging: in-cluster MySQL (mysql.mysql.svc.cluster.local); adjust ingress host / TLS as needed.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dineros-staging
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dineros-staging-deployment
+  labels:
+    app: dineros-staging
+  namespace: dineros-staging
+spec:
+  selector:
+    matchLabels:
+      app: dineros-staging
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 10
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/change-cause: "Updated at $(date +%s)"
+      labels:
+        app: dineros-staging
+    spec:
+      serviceAccountName: dineros-staging
+      containers:
+        - name: dineros-staging-container
+          image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: service-account-volume
+              mountPath: /etc/google-service-account
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-mysql
+                  key: DATABASE_URL
+            - name: NATS_URL
+              value: "nats://nats.nats.svc.cluster.local:4222"
+            - name: DEPLOY_ENV
+              value: "staging"
+            - name: PORT
+              value: "80"
+            - name: GCP_PROJECT_ID
+              value: "nextstepguru"
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: NODE_ENV
+              value: "production"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_HOST
+              value: "redis-master.redis.svc.cluster.local"
+            - name: SHOW_BULL_MQ_ADMIN
+              value: "true"
+            - name: PROJECT_NAME
+              value: "comm"
+            - name: POSTMARK_SERVER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: POSTMARK_SERVER_TOKEN
+            - name: POSTMARK_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: POSTMARK_WEBHOOK_SECRET
+            - name: DB_DECRYPTION_KEY_1
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_1
+            - name: DB_DECRYPTION_KEY_2
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_2
+            - name: DB_DECRYPTION_KEY_3
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_3
+            - name: DB_DECRYPTION_KEY_4
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_4
+            - name: DB_DECRYPTION_KEY_5
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_5
+            - name: DB_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_ENCRYPTION_KEY
+            - name: CHAT_GPT_API
+              valueFrom:
+                secretKeyRef:
+                  name: staging-chat-gpt
+                  key: CHAT_GPT_API
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: staging-gs-secrets
+                  key: DINEROS_JWT_SECRET
+            - name: GCLOUD_KEY_NAME
+              value: "./cloud-logging.json"
+            - name: PLAID_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: PLAID_CLIENT_ID
+            - name: PLAID_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: PLAID_SECRET
+            - name: DEBUG
+              value: "dineros:*"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/google-service-account/service-account.json
+          readinessProbe:
+            httpGet:
+              path: /api/_ah/readiness
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/_ah/liveness
+              port: 80
+            initialDelaySeconds: 45
+            periodSeconds: 10
+      volumes:
+        - name: service-account-volume
+          secret:
+            secretName: google-service-account-staging
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dineros-microservice-staging-deployment
+  labels:
+    app: dineros-microservice-staging
+  namespace: dineros-staging
+spec:
+  selector:
+    matchLabels:
+      app: dineros-microservice-staging
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  minReadySeconds: 10
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/change-cause: "Updated at $(date +%s)"
+      labels:
+        app: dineros-microservice-staging
+    spec:
+      serviceAccountName: dineros-staging
+      containers:
+        - name: dineros-microservice-staging-container
+          image: us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3050
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-mysql
+                  key: DATABASE_URL
+            - name: DEPLOY_ENV
+              value: "staging"
+            - name: PORT
+              value: "3050"
+            - name: NODE_ENV
+              value: "production"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_HOST
+              value: "redis-master.redis.svc.cluster.local"
+            - name: DB_DECRYPTION_KEY_1
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_1
+            - name: DB_DECRYPTION_KEY_2
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_2
+            - name: DB_DECRYPTION_KEY_3
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_3
+            - name: DB_DECRYPTION_KEY_4
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_4
+            - name: DB_DECRYPTION_KEY_5
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_DECRYPTION_KEY_5
+            - name: DB_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: staging-db-secrets
+                  key: DB_ENCRYPTION_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dineros-staging-service
+  labels:
+    app: dineros-staging
+  namespace: dineros-staging
+spec:
+  selector:
+    app: dineros-staging
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      name: http
+  type: NodePort
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  labels:
+    app: dineros-staging
+  name: dineros-staging-ingress
+  namespace: dineros-staging
+spec:
+  rules:
+    - host: staging.dineros.cc
+      http:
+        paths:
+          - backend:
+              service:
+                name: dineros-staging-service
+                port:
+                  name: http
+            path: /
+            pathType: ImplementationSpecific
+  tls:
+    - hosts:
+        - staging.dineros.cc
+      secretName: dineros-staging-tls

@@ -359,15 +359,34 @@ export const reoccurrenceSchema = z
     }
   });
 
-export const reoccurrenceSplitSchema = z.object({
-  id: z.coerce.number().optional(),
-  reoccurrenceId: z.coerce.number().optional(),
-  transferAccountRegisterId: z.coerce.number().min(1),
-  amount: z.coerce.number(),
-  description: z.string().max(500).optional(),
-  categoryId: z.uuid().nullable().optional(),
-  sortOrder: z.coerce.number().min(0).default(0),
-});
+const reoccurrenceSplitAmountModeSchema = z.enum(["FIXED", "PERCENT"]);
+
+export const reoccurrenceSplitSchema = z
+  .object({
+    id: z.coerce.number().optional(),
+    reoccurrenceId: z.coerce.number().optional(),
+    transferAccountRegisterId: z.coerce.number().min(1),
+    amountMode: reoccurrenceSplitAmountModeSchema.default("FIXED"),
+    amount: z.coerce.number(),
+    description: z.string().max(500).optional(),
+    categoryId: z.uuid().nullable().optional(),
+    sortOrder: z.coerce.number().min(0).default(0),
+  })
+  .superRefine((data, ctx) => {
+    if (data.amountMode === "PERCENT") {
+      if (
+        !Number.isFinite(data.amount) ||
+        data.amount <= 0 ||
+        data.amount > 100
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Split percentage must be greater than 0 and at most 100.",
+          path: ["amount"],
+        });
+      }
+    }
+  });
 
 export const reoccurrenceWithSplitsSchema = reoccurrenceSchema.extend({
   splits: z.array(reoccurrenceSplitSchema).optional().default([]),
@@ -421,6 +440,7 @@ export const savingsGoalSchema = z.object({
   targetAccountRegisterId: z.number(),
   priorityOverDebt: z.boolean(),
   ignoreMinBalance: z.boolean(),
+  categoryId: z.string().uuid().nullable(),
   sortOrder: z.number(),
   isArchived: z.boolean(),
 });
@@ -432,6 +452,7 @@ export const createSavingsGoalSchema = z.object({
   targetAccountRegisterId: z.number(),
   priorityOverDebt: z.boolean().default(false),
   ignoreMinBalance: z.boolean().default(false),
+  categoryId: z.union([z.string().uuid(), z.null()]).optional(),
 });
 
 export const updateSavingsGoalSchema = createSavingsGoalSchema.partial();

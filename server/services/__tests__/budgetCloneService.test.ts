@@ -761,6 +761,136 @@ describe("budgetCloneService", () => {
           {
             reoccurrenceId: 200,
             transferAccountRegisterId: 101,
+            amountMode: "FIXED",
+            amount: 50,
+            description: "To savings",
+            categoryId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            sortOrder: 0,
+          },
+        ],
+      });
+    });
+
+    it("preserves PERCENT amountMode on cloned splits", async () => {
+      const {
+        tx,
+        accountRegister,
+        reoccurrence,
+        registerEntry,
+        reoccurrenceSplit,
+      } = createMockTx();
+      const sourceRegisters = [
+        {
+          id: 10,
+          accountId: "acc-1",
+          budgetId: 1,
+          typeId: 1,
+          name: "Checking",
+          sortOrder: 0,
+          subAccountRegisterId: null,
+          targetAccountRegisterId: null,
+          collateralAssetRegisterId: null,
+          balance: 0,
+          creditLimit: null,
+          latestBalance: null,
+          minPayment: null,
+          statementAt: null,
+          statementIntervalId: null,
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: null,
+          savingsGoalSortOrder: null,
+          accountSavingsGoal: null,
+          minAccountBalance: null,
+          allowExtraPayment: null,
+        },
+        {
+          id: 11,
+          accountId: "acc-1",
+          budgetId: 1,
+          typeId: 1,
+          name: "Savings",
+          sortOrder: 1,
+          subAccountRegisterId: null,
+          targetAccountRegisterId: null,
+          collateralAssetRegisterId: null,
+          balance: 0,
+          creditLimit: null,
+          latestBalance: null,
+          minPayment: null,
+          statementAt: null,
+          statementIntervalId: null,
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: null,
+          savingsGoalSortOrder: null,
+          accountSavingsGoal: null,
+          minAccountBalance: null,
+          allowExtraPayment: null,
+        },
+      ];
+      accountRegister.findMany.mockResolvedValue(sourceRegisters);
+      accountRegister.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: args.data.name === "Checking" ? 100 : 101 }),
+      );
+      reoccurrence.findMany.mockResolvedValue([
+        {
+          id: 1,
+          accountId: "acc-1",
+          accountRegisterId: 10,
+          intervalId: 1,
+          transferAccountRegisterId: 11,
+          adjustBeforeIfOnWeekend: null,
+          intervalCount: 1,
+          lastAt: new Date("2024-01-01"),
+          endAt: null,
+          totalIntervals: null,
+          elapsedIntervals: null,
+          amount: -50,
+          description: "Split",
+          categoryId: null,
+          splits: [
+            {
+              reoccurrenceId: 1,
+              transferAccountRegisterId: 11,
+              amountMode: "PERCENT",
+              amount: 50,
+              description: "To savings",
+              categoryId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              sortOrder: 0,
+            },
+          ],
+          skips: [],
+          plaidNameAliases: [],
+        },
+      ]);
+      reoccurrence.create.mockResolvedValue({ id: 200 });
+      registerEntry.findMany.mockResolvedValue([]);
+
+      await cloneBudget(tx as any, 1, 2, "acc-1");
+
+      expect(reoccurrenceSplit.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            reoccurrenceId: 200,
+            transferAccountRegisterId: 101,
+            amountMode: "PERCENT",
             amount: 50,
             description: "To savings",
             categoryId: "cccccccc-cccc-cccc-cccc-cccccccccccc",

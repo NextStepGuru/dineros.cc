@@ -290,6 +290,7 @@ export class DataLoaderService implements IDataLoaderService {
       this.cache.reoccurrenceSplit.insert({
         ...item,
         amount: Number(item.amount),
+        amountMode: item.amountMode ?? "FIXED",
       });
     });
 

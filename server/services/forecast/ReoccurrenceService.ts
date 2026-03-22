@@ -204,10 +204,16 @@ export class ReoccurrenceService implements IReoccurrenceService {
           ? `${occurrenceDescription} - ${splitEntry.description.trim()}`
           : `${occurrenceDescription} - Split`;
 
+        const splitMode = splitEntry.amountMode ?? "FIXED";
+        const splitAmount =
+          splitMode === "PERCENT"
+            ? effectiveAmount * (Number(splitEntry.amount) / 100)
+            : Number(splitEntry.amount) * splitRatio;
+
         this.transferService.transferBetweenAccounts({
           targetAccountRegisterId: splitEntry.transferAccountRegisterId,
           sourceAccountRegisterId: reoccurrence.accountRegisterId,
-          amount: Number(splitEntry.amount) * splitRatio,
+          amount: splitAmount,
           description: splitDescription,
           reoccurrence: reoccurrenceForEntry,
           categoryId:

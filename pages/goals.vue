@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import type { TableColumn } from "@nuxt/ui";
-import type { SavingsGoal } from "~/types/types";
+import type { Category, SavingsGoal } from "~/types/types";
 import type { EditSavingsGoalProps } from "~/components/modals/EditSavingsGoal.vue";
+import {
+  categoryDropdownLabel,
+  sortCategoriesForManageList,
+} from "~/lib/categorySelect";
+import {
+  CATEGORY_FILTER_ALL,
+  CATEGORY_FILTER_UNCATEGORIZED,
+  entryMatchesCategoryFilter,
+} from "~/lib/categoryFilter";
 import { getAccountRegisterLabel } from "~/lib/utils";
+import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 
 const ModalsEditSavingsGoal = defineAsyncComponent(
   () => import("~/components/modals/EditSavingsGoal.vue"),
@@ -16,6 +26,48 @@ const listStore = useListStore();
 const overlay = useOverlay();
 const modal = overlay.create(ModalsEditSavingsGoal);
 const globalFilter = ref("");
+const categoryFilter = ref(CATEGORY_FILTER_ALL);
+const combinedTableFilterRef = ref<{
+  collapse: () => void;
+  expandAndFocus: () => Promise<void>;
+} | null>(null);
+const showShortcuts = ref(false);
+
+const categoryFilterSelectItems = computed(() => {
+  const items: { label: string; value: string; name: string }[] = [
+    {
+      label: "All categories",
+      value: CATEGORY_FILTER_ALL,
+      name: "All categories",
+    },
+    {
+      label: "Uncategorized",
+      value: CATEGORY_FILTER_UNCATEGORIZED,
+      name: "Uncategorized",
+    },
+  ];
+  const sorted = sortCategoriesForManageList(listStore.getCategories);
+  const byId = new Map(listStore.getCategories.map((c) => [c.id, c]));
+  for (const c of sorted) {
+    const label = categoryDropdownLabel(c.id, byId);
+    items.push({
+      label,
+      value: c.id,
+      name: c.name,
+    });
+  }
+  return items;
+});
+
+const savingsGoalsForTable = computed(() =>
+  listStore.getSavingsGoalsForCurrentBudget.filter((g) =>
+    entryMatchesCategoryFilter(
+      g.categoryId,
+      categoryFilter.value,
+      listStore.getCategories,
+    ),
+  ),
+);
 
 const tableUi = ref({
   root: "!overflow-visible relative min-h-0",
@@ -25,6 +77,19 @@ const tableUi = ref({
 });
 
 const registers = computed(() => listStore.getAccountRegisters);
+
+const categoryById = computed(() => {
+  const m = new Map<string, Category>();
+  for (const c of listStore.getCategories) {
+    m.set(c.id, c);
+  }
+  return m;
+});
+
+function goalCategoryLabel(goal: SavingsGoal): string {
+  if (!goal.categoryId) return "—";
+  return categoryDropdownLabel(goal.categoryId, categoryById.value) || "—";
+}
 
 function handleTableClick(goal: SavingsGoal) {
   const props: EditSavingsGoalProps = {
@@ -64,6 +129,11 @@ const columns: TableColumn<SavingsGoal>[] = [
         },
         row.getValue("name"),
       ),
+  },
+  {
+    accessorKey: "categoryId",
+    header: () => h("div", {}, "Category"),
+    cell: ({ row }) => goalCategoryLabel(row.original),
   },
   {
     accessorKey: "targetAmount",
@@ -111,8 +181,18 @@ const columns: TableColumn<SavingsGoal>[] = [
 ];
 
 defineShortcuts({
-  escape: () => { globalFilter.value = ""; },
+  escape: {
+    usingInput: true,
+    handler: () => {
+      globalFilter.value = "";
+      categoryFilter.value = CATEGORY_FILTER_ALL;
+      combinedTableFilterRef.value?.collapse();
+    },
+  },
   meta_a: () => handleAddGoal(),
+  meta_f: () => {
+    combinedTableFilterRef.value?.expandAndFocus()?.catch(() => {});
+  },
 });
 
 const sectionEl = ref<HTMLElement | null>(null);
@@ -120,6 +200,7 @@ const tableHostEl = ref<HTMLElement | null>(null);
 const tableViewportMaxHeight = ref(
   "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
+const tableViewportAvailablePx = ref<number | null>(null);
 
 function updateTableViewportMaxHeight() {
   if (!tableHostEl.value) return;
@@ -129,6 +210,10 @@ function updateTableViewportMaxHeight() {
     220,
     Math.floor(window.innerHeight - tableTop - bottomSpacing),
   );
+  if (shouldSkipViewportTableHeightChange(available, tableViewportAvailablePx.value)) {
+    return;
+  }
+  tableViewportAvailablePx.value = available;
   tableViewportMaxHeight.value = `${available}px`;
 }
 
@@ -144,24 +229,39 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="sectionEl" class="m-4">
-    <div class="w-full min-w-0 flex flex-wrap gap-1 items-center mb-6">
-      <UTooltip text="Add goal" :delay-duration="150">
-        <UButton
-          color="primary"
-          size="sm"
-          square
-          icon="i-lucide-plus"
-          aria-label="Add goal"
-          @click="handleAddGoal"
-        />
-      </UTooltip>
-      <UInput
-        v-model="globalFilter"
-        placeholder="Filter goals..."
-        icon="i-lucide-search"
-        class="max-w-xs"
-      />
+    <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4">
+      <RegisterListToolbar
+        v-model:global-filter="globalFilter"
+        v-model:show-shortcuts="showShortcuts"
+        :show-refresh="false"
+        add-tooltip="Add goal"
+        add-title="Add goal"
+        add-aria-label="Add goal"
+        @add="handleAddGoal"
+      >
+        <template #filter>
+          <FiltersCombinedGlobalCategoryFilter
+            ref="combinedTableFilterRef"
+            v-model:global-filter="globalFilter"
+            v-model:category-filter="categoryFilter"
+            :category-items="categoryFilterSelectItems"
+            filter-input-id="search"
+            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+          />
+        </template>
+      </RegisterListToolbar>
     </div>
+
+    <UCard v-if="showShortcuts" class="mb-4">
+      <template #header>
+        <h3 class="font-semibold">Keyboard shortcuts</h3>
+      </template>
+      <ul class="space-y-2 text-sm">
+        <li>Clear text &amp; category filters: ⎋</li>
+        <li>Add goal: ⌘ + A</li>
+        <li>Open filters &amp; focus search: ⌘ + F</li>
+      </ul>
+    </UCard>
 
     <UCard
       v-if="listStore.getSavingsGoalsForCurrentBudget.length === 0 && !listStore.getIsListsLoading"
@@ -184,9 +284,20 @@ onBeforeUnmount(() => {
       class="flex-1 min-h-0 overflow-auto"
       :style="{ maxHeight: tableViewportMaxHeight }"
     >
+      <UAlert
+        v-if="
+          listStore.getSavingsGoalsForCurrentBudget.length > 0 &&
+          savingsGoalsForTable.length === 0
+        "
+        class="mb-2"
+        color="neutral"
+        variant="subtle"
+        title="No goals match this category filter"
+        description="Choose All categories, Uncategorized, or another category."
+      />
       <UTable
         v-model:global-filter="globalFilter"
-        :data="listStore.getSavingsGoalsForCurrentBudget"
+        :data="savingsGoalsForTable"
         :columns="columns"
         sticky
         :ui="tableUi"

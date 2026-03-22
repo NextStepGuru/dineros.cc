@@ -11,6 +11,10 @@ withDefaults(
     /** Tailwind classes for the filter input width */
     filterClass?: string;
     filterInputId?: string;
+    filterPlaceholder?: string;
+    addTooltip?: string;
+    addTitle?: string;
+    addAriaLabel?: string;
   }>(),
   {
     showAdd: true,
@@ -18,6 +22,10 @@ withDefaults(
     refreshLoading: false,
     filterClass: "min-w-[8rem] max-w-48",
     filterInputId: "search",
+    filterPlaceholder: "Filter...",
+    addTooltip: "Add entry",
+    addTitle: "Add entry",
+    addAriaLabel: "Add entry",
   },
 );
 
@@ -29,14 +37,14 @@ const emit = defineEmits<{
 
 <template>
   <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center">
-    <UTooltip v-if="showAdd" text="Add entry" :delay-duration="150">
+    <UTooltip v-if="showAdd" :text="addTooltip" :delay-duration="150">
       <UButton
         color="primary"
         size="sm"
         square
         icon="i-lucide-plus"
-        title="Add entry"
-        aria-label="Add entry"
+        :title="addTitle"
+        :aria-label="addAriaLabel"
         @click="emit('add')"
       />
     </UTooltip>
@@ -74,7 +82,7 @@ const emit = defineEmits<{
         v-model="globalFilter"
         size="sm"
         :class="filterClass"
-        placeholder="Filter..."
+        :placeholder="filterPlaceholder"
       />
     </slot>
     <slot name="trailing" />

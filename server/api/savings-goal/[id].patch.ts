@@ -3,6 +3,7 @@ import { createError, readBody, getRouterParam } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { updateSavingsGoalSchema, savingsGoalSchema } from "~/schema/zod";
+import { ensureCategoryForAccount } from "~/server/lib/ensureCategoryForAccount";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -87,6 +88,14 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    if (data.categoryId !== undefined) {
+      await ensureCategoryForAccount(
+        PrismaDb,
+        data.categoryId,
+        existing.accountId,
+      );
+    }
+
     const updated = await PrismaDb.savingsGoal.update({
       where: { id: goalId },
       data: {
@@ -104,6 +113,7 @@ export default defineEventHandler(async (event) => {
         ...(data.ignoreMinBalance !== undefined && {
           ignoreMinBalance: data.ignoreMinBalance,
         }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
       },
       select: {
         id: true,
@@ -115,6 +125,7 @@ export default defineEventHandler(async (event) => {
         targetAccountRegisterId: true,
         priorityOverDebt: true,
         ignoreMinBalance: true,
+        categoryId: true,
         sortOrder: true,
         isArchived: true,
       },
