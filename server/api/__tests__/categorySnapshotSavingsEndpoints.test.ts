@@ -389,6 +389,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         targetAccountRegisterId: 11,
         priorityOverDebt: false,
         ignoreMinBalance: false,
+        categoryId: null,
         sortOrder: 1,
         isArchived: false,
       });

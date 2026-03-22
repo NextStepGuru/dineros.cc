@@ -1,4 +1,5 @@
-# Runs on PRs: unit tests, build, lint, pre-security checks. E2E: .github/workflows/e2e.yml (manual).
+# Runs on PRs: unit tests, lint, pre-security checks; build/push app + microservice and deploy to GKE staging. E2E: .github/workflows/e2e.yml (manual).
+# Staging manifests: .deploy/staging/dineros.yaml (namespace dineros-staging). Fork PRs skip deploy (no WIF).
 name: PR Checks
 
 on:
@@ -64,47 +65,115 @@ jobs:
   #     - run: npx prisma generate
   #     - run: pnpm build
 
-  build-main-site-docker:
+  staging-build-main-site:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build main site image
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+      - name: Build and push main site (staging)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: false
-          load: true
+          push: true
+          tags: |
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
         env:
           CI: true
 
-  build-microservice-docker:
+  staging-build-microservice:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
       - name: Pre-configure microservice
         run: |
           cd microservice
           ./copy-files.sh
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build microservice image
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+      - name: Build and push microservice (staging)
         uses: docker/build-push-action@v6
         with:
           context: ./microservice/
           file: ./microservice/Dockerfile
-          push: false
-          load: true
+          push: true
+          tags: |
+            us-central1-docker.pkg.dev/nextstepguru/dineros/dineros-microservice:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
         env:
           CI: true
+
+  staging-deploy:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test
+      - staging-build-main-site
+      - staging-build-microservice
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/809557179036/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-service-account@nextstepguru.iam.gserviceaccount.com
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+      - id: get-credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: nsg-kube-01
+          location: us-central1-a
+      - name: Apply staging (pin images to this PR build)
+        run: |
+          TAG="pr-${{ github.event.pull_request.number }}-${{ github.sha }}"
+          sed -i "s|dineros:latest|dineros:${TAG}|g" ./.deploy/staging/dineros.yaml
+          sed -i "s|dineros-microservice:latest|dineros-microservice:${TAG}|g" ./.deploy/staging/dineros.yaml
+          kubectl apply -f ./.deploy/staging/dineros.yaml
 
   pre-commit-security:
     runs-on: ubuntu-latest

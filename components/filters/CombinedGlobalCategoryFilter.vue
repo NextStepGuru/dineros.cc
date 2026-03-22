@@ -13,11 +13,14 @@ const categoryFilter = defineModel<string>("categoryFilter", { default: "" });
 const props = withDefaults(
   defineProps<{
     categoryItems: CategoryFilterMenuItem[];
+    /** When false, only the text filter is shown (same chrome as category mode: sliders → search + reset). */
+    showCategoryFilter?: boolean;
     filterInputId?: string;
     inputClass?: string;
     menuClass?: string;
   }>(),
   {
+    showCategoryFilter: true,
     filterInputId: "search",
     inputClass: "min-w-32 max-w-48 grow",
     menuClass: "min-w-40 max-w-[16rem]",
@@ -74,7 +77,11 @@ defineExpose({
         placeholder="Filter..."
         aria-label="Filter table by text"
       />
-      <UTooltip text="Filter by category" :delay-duration="150">
+      <UTooltip
+        v-if="showCategoryFilter"
+        text="Filter by category"
+        :delay-duration="150"
+      >
         <USelectMenu
           v-model="categoryFilter"
           :items="props.categoryItems"

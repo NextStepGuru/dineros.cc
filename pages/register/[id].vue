@@ -12,6 +12,7 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
+import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 import type { TableColumn } from "@nuxt/ui";
 import type {
   AccountRegister,
@@ -1020,6 +1021,8 @@ const registerTableViewportMaxHeight = ref(
 const registerOnboardingMaxHeight = ref(
   "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
+const registerTableViewportAvailablePx = ref<number | null>(null);
+const registerOnboardingViewportAvailablePx = ref<number | null>(null);
 let registerResizeObserver: ResizeObserver | null = null;
 let registerViewportFrameId: number | null = null;
 
@@ -1029,6 +1032,7 @@ function updateRegisterTableViewportMaxHeight() {
   }
 
   registerViewportFrameId = requestAnimationFrame(() => {
+    registerViewportFrameId = null;
     const tabsHeight = registerTabsEl.value?.offsetHeight ?? 0;
     const bottomSpacing = 20;
     if (registerTableViewportEl.value) {
@@ -1038,7 +1042,15 @@ function updateRegisterTableViewportMaxHeight() {
         220,
         Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing),
       );
-      registerTableViewportMaxHeight.value = `${available}px`;
+      if (
+        !shouldSkipViewportTableHeightChange(
+          available,
+          registerTableViewportAvailablePx.value,
+        )
+      ) {
+        registerTableViewportAvailablePx.value = available;
+        registerTableViewportMaxHeight.value = `${available}px`;
+      }
     }
     if (registerOnboardingViewportEl.value) {
       const top =
@@ -1047,7 +1059,15 @@ function updateRegisterTableViewportMaxHeight() {
         220,
         Math.floor(window.innerHeight - top - tabsHeight - bottomSpacing),
       );
-      registerOnboardingMaxHeight.value = `${available}px`;
+      if (
+        !shouldSkipViewportTableHeightChange(
+          available,
+          registerOnboardingViewportAvailablePx.value,
+        )
+      ) {
+        registerOnboardingViewportAvailablePx.value = available;
+        registerOnboardingMaxHeight.value = `${available}px`;
+      }
     }
   });
 }

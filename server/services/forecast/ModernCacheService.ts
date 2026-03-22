@@ -105,6 +105,8 @@ export type CacheReoccurrenceSplit = {
   id: number;
   reoccurrenceId: number;
   transferAccountRegisterId: number;
+  /** Omitted in older mocks / pre-migration rows; treated as FIXED. */
+  amountMode?: "FIXED" | "PERCENT";
   amount: number;
   description: string | null;
   categoryId: string | null;

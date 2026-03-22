@@ -211,6 +211,7 @@ function buildAdjustmentFields(
 function normalizeSplits(splits: ReoccurrenceUpsertBody["splits"]) {
   return (splits ?? []).map((split, index) => ({
     transferAccountRegisterId: split.transferAccountRegisterId,
+    amountMode: split.amountMode ?? "FIXED",
     amount: split.amount,
     description: split.description?.trim() || null,
     categoryId: split.categoryId ?? null,

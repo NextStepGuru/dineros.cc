@@ -137,11 +137,6 @@ const items = computed(() => {
         to: "/signup",
         active: route.path.startsWith("/signup"),
       },
-      {
-        label: "Help",
-        to: "/help",
-        active: route.path.startsWith("/help"),
-      },
     ];
   }
 });

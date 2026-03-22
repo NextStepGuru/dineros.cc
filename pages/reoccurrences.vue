@@ -16,6 +16,7 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
+import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 
@@ -286,6 +287,7 @@ const tableHostEl = ref<HTMLElement | null>(null);
 const tableViewportMaxHeight = ref(
   "calc(100dvh - var(--ui-header-height) - 12rem)"
 );
+const tableViewportAvailablePx = ref<number | null>(null);
 
 let tableResizeObserver: ResizeObserver | null = null;
 let tableViewportFrameId: number | null = null;
@@ -298,12 +300,17 @@ function updateTableViewportMaxHeight() {
   }
 
   tableViewportFrameId = requestAnimationFrame(() => {
+    tableViewportFrameId = null;
     const tableTop = tableHostEl.value?.getBoundingClientRect().top ?? 0;
     const bottomSpacing = 16;
     const available = Math.max(
       220,
       Math.floor(window.innerHeight - tableTop - bottomSpacing)
     );
+    if (shouldSkipViewportTableHeightChange(available, tableViewportAvailablePx.value)) {
+      return;
+    }
+    tableViewportAvailablePx.value = available;
     tableViewportMaxHeight.value = `${available}px`;
   });
 }
@@ -358,47 +365,39 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="sectionEl" class="m-4")
-    div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center mb-6")
-      UTooltip(text="Add recurring entry" :delay-duration="150")
-        UButton(
-          color="primary"
-          size="sm"
-          square
-          icon="i-lucide-plus"
-          title="Add recurring entry"
-          aria-label="Add recurring entry"
-          @click="handleAddReoccurrence"
-        )
-      UTooltip(text="Recalculate forecast" :delay-duration="150")
-        UButton(
-          color="warning"
-          size="sm"
-          square
-          icon="i-lucide-calculator"
-          title="Recalculate forecast"
-          aria-label="Recalculate forecast"
-          @click="handleRecalculate"
-          :loading="isRecalculating"
-          :disabled="isRecalculating"
-        )
-      UTooltip(:text="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'" :delay-duration="150")
-        UButton(
-          variant="soft"
-          size="sm"
-          square
-          icon="i-lucide-keyboard"
-          :color="showShortcuts ? 'primary' : 'neutral'"
-          :title="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
-          :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
-          @click="showShortcuts = !showShortcuts"
-        )
-      FiltersCombinedGlobalCategoryFilter(
-        ref="combinedTableFilterRef"
+    div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
+      RegisterListToolbar(
         v-model:global-filter="globalFilter"
-        v-model:category-filter="categoryFilter"
-        :category-items="categoryFilterSelectItems"
-        filter-input-id="search"
+        v-model:show-shortcuts="showShortcuts"
+        :show-refresh="false"
+        filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+        add-tooltip="Add recurring entry"
+        add-title="Add recurring entry"
+        add-aria-label="Add recurring entry"
+        @add="handleAddReoccurrence"
       )
+        template(#middle)
+          UTooltip(text="Recalculate forecast" :delay-duration="150")
+            UButton(
+              color="error"
+              size="sm"
+              square
+              icon="i-lucide-calculator"
+              title="Recalculate forecast"
+              aria-label="Recalculate forecast"
+              @click="handleRecalculate"
+              :loading="isRecalculating"
+              :disabled="isRecalculating"
+            )
+        template(#filter)
+          FiltersCombinedGlobalCategoryFilter(
+            ref="combinedTableFilterRef"
+            v-model:global-filter="globalFilter"
+            v-model:category-filter="categoryFilter"
+            :category-items="categoryFilterSelectItems"
+            filter-input-id="search"
+            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+          )
 
     UCard(v-if="showShortcuts" class="mb-4")
       template(#header)

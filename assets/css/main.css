@@ -1,6 +1,11 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
 
+/* Reka UI modals lock body scroll; without a stable gutter the viewport width changes when the scrollbar is toggled and the layout jumps (often read as a vertical shift). */
+html {
+  scrollbar-gutter: stable;
+}
+
 :root {
   --frog-primary: #2f8f46;
   --frog-primary-soft: #5aac6b;

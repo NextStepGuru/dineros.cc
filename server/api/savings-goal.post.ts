@@ -3,6 +3,7 @@ import { createError, readBody, setResponseStatus } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { createSavingsGoalSchema, savingsGoalSchema } from "~/schema/zod";
+import { ensureCategoryForAccount } from "~/server/lib/ensureCategoryForAccount";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -65,6 +66,12 @@ export default defineEventHandler(async (event) => {
       });
     }
 
+    await ensureCategoryForAccount(
+      PrismaDb,
+      parsed.categoryId ?? null,
+      sourceRegister.accountId,
+    );
+
     const maxSort = await PrismaDb.savingsGoal.aggregate({
       where: { budgetId: sourceRegister.budgetId, isArchived: false },
       _max: { sortOrder: true },
@@ -81,6 +88,7 @@ export default defineEventHandler(async (event) => {
         targetAccountRegisterId: parsed.targetAccountRegisterId,
         priorityOverDebt: parsed.priorityOverDebt ?? false,
         ignoreMinBalance: parsed.ignoreMinBalance ?? false,
+        categoryId: parsed.categoryId ?? null,
         sortOrder,
       },
       select: {
@@ -93,6 +101,7 @@ export default defineEventHandler(async (event) => {
         targetAccountRegisterId: true,
         priorityOverDebt: true,
         ignoreMinBalance: true,
+        categoryId: true,
         sortOrder: true,
         isArchived: true,
       },

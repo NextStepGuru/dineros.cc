@@ -3,7 +3,9 @@ import type { TableColumn } from "@nuxt/ui";
 import type { AccountRegister } from "~/types/types";
 import { useListStore } from "../stores/listStore";
 import { formatDate, getAccountTypeLabel } from "~/lib/utils";
+import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
+import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 
 type AccountRegisterSortMode = "visual" | "loan" | "savings";
 
@@ -1123,29 +1125,41 @@ async function handlePocketDragEnd(updatedPockets: AccountRegister[]) {
   }
 }
 
+const globalFilter = ref("");
+const categoryFilter = ref(CATEGORY_FILTER_ALL);
+/** Satisfies `FiltersCombinedGlobalCategoryFilter` props when category dropdown is hidden. */
+const accountRegistersCategoryFilterItems: {
+  label: string;
+  value: string;
+  name: string;
+}[] = [];
+const combinedTableFilterRef = ref<{
+  collapse: () => void;
+  expandAndFocus: () => Promise<void>;
+} | null>(null);
+
 defineShortcuts({
   escape: {
     usingInput: true,
     handler: () => {
       globalFilter.value = "";
+      categoryFilter.value = CATEGORY_FILTER_ALL;
+      combinedTableFilterRef.value?.collapse();
     },
   },
   meta_a: () => handleAddAccountRegister(),
   meta_f: () => {
-    const search = document.getElementById("search");
-
-    if (search) {
-      search.focus();
-    }
+    combinedTableFilterRef.value?.expandAndFocus()?.catch(() => {});
   },
 });
 
-const globalFilter = ref("");
 const accountRegistersSectionEl = ref<HTMLElement | null>(null);
 const accountRegistersTableViewportEl = ref<HTMLElement | null>(null);
 const accountRegistersViewportMaxHeight = ref(
   "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
+/** Last applied pixel height (guards against modal/scrollbar micro-layout shifts). */
+const accountRegistersViewportAvailablePx = ref<number | null>(null);
 let accountRegistersResizeObserver: ResizeObserver | null = null;
 let accountRegistersViewportFrameId: number | null = null;
 
@@ -1157,6 +1171,7 @@ function updateAccountRegistersViewportMaxHeight() {
   }
 
   accountRegistersViewportFrameId = requestAnimationFrame(() => {
+    accountRegistersViewportFrameId = null;
     const tableTop =
       accountRegistersTableViewportEl.value?.getBoundingClientRect().top ?? 0;
     const bottomSpacing = 16;
@@ -1164,6 +1179,15 @@ function updateAccountRegistersViewportMaxHeight() {
       220,
       Math.floor(window.innerHeight - tableTop - bottomSpacing),
     );
+    if (
+      shouldSkipViewportTableHeightChange(
+        available,
+        accountRegistersViewportAvailablePx.value,
+      )
+    ) {
+      return;
+    }
+    accountRegistersViewportAvailablePx.value = available;
     accountRegistersViewportMaxHeight.value = `${available}px`;
   });
 }
@@ -1177,6 +1201,24 @@ const filteredAccountRegisters = computed(() => {
   });
   return sortAccounts(filtered);
 });
+
+const mainRegisterCount = computed(
+  () =>
+    registersForUi.value.filter((r) => !r.subAccountRegisterId).length,
+);
+
+/** Filter hid every main account, but the user still has accounts (bad search), not a true empty budget. */
+const isSearchNoMatches = computed(
+  () =>
+    globalFilter.value.trim().length > 0 &&
+    mainRegisterCount.value > 0 &&
+    filteredAccountRegisters.value.length === 0,
+);
+
+const showFirstAccountOnboarding = computed(
+  () =>
+    filteredAccountRegisters.value.length === 0 && !isSearchNoMatches.value,
+);
 
 function mainRowDcn(row: AccountRegister) {
   return registerDebitCreditNet(row, false);
@@ -1297,7 +1339,9 @@ onBeforeUnmount(() => {
         v-model:show-shortcuts="showShortcuts"
         :show-add="!isSnapshotMode"
         :show-refresh="false"
-        filter-class="min-w-[8rem] md:max-w-48 grow"
+        add-tooltip="Add account"
+        add-title="Add account"
+        add-aria-label="Add account"
         @add="handleAddAccountRegister"
       )
         template(#middle)
@@ -1358,6 +1402,16 @@ onBeforeUnmount(() => {
               :disabled="!!isSnapshotMode || draggableAccountRegisters.length === 0"
               @click="showProjectedBalanceTimeline = !showProjectedBalanceTimeline"
             )
+        template(#filter)
+          FiltersCombinedGlobalCategoryFilter(
+            ref="combinedTableFilterRef"
+            v-model:global-filter="globalFilter"
+            v-model:category-filter="categoryFilter"
+            :category-items="accountRegistersCategoryFilterItems"
+            :show-category-filter="false"
+            filter-input-id="search"
+            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+          )
         template(#trailing)
           .ml-auto(
             class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
@@ -1395,11 +1449,17 @@ onBeforeUnmount(() => {
       template(#header)
         h3(class="font-semibold") Keyboard shortcuts
       ul(class="space-y-2 text-sm")
-        li Clear filter: ⎋
+        li Clear text filter: ⎋
         li Add account: ⌘ + A
-        li Focus filter: ⌘ + F
+        li Open filters &amp; focus search: ⌘ + F
 
-    UCard(v-if="draggableAccountRegisters.length === 0" class="my-4")
+    UCard(v-if="isSearchNoMatches" class="my-4")
+      template(#header)
+        h3(class="font-semibold") No matching accounts
+      p(class="frog-text-muted mb-4") No account names match your search. Try another term or clear the filter (⎋).
+      UButton(variant="soft" size="sm" @click="globalFilter = ''") Clear search
+
+    UCard(v-else-if="showFirstAccountOnboarding" class="my-4")
       template(#header)
         h3(class="font-semibold") Create your first account
       p(class="frog-text-muted mb-4") Start with an account and opening balance, then add recurring items to improve your forecast.

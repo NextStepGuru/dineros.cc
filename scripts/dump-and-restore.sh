@@ -49,8 +49,10 @@ parse_mysql_url() {
 }
 
 # Function to dump database
+# Optional second arg: explicit output path (e.g. persisted .dumps file)
 dump_database() {
     local env=$1
+    local output_path=${2:-}
     local env_upper=$(echo "$env" | tr '[:lower:]' '[:upper:]')
     local url_var="DINEROS_${env_upper}_DATABASE_URL"
     local url="${!url_var}"
@@ -76,7 +78,13 @@ dump_database() {
     echo -e "${BLUE}   User: $DB_USER${NC}" >&2
     echo -e "${BLUE}   Database: $DB_NAME${NC}" >&2
 
-    local dump_file="/tmp/dineros-${env}-$(date +%Y%m%d-%H%M%S).sql"
+    local dump_file
+    if [ -n "$output_path" ]; then
+        dump_file="$output_path"
+        mkdir -p "$(dirname "$output_path")"
+    else
+        dump_file="/tmp/dineros-${env}-$(date +%Y%m%d-%H%M%S).sql"
+    fi
 
     echo -e "${YELLOW}💾 Dumping $env database ($DB_NAME) from $DB_HOST:$DB_PORT...${NC}" >&2
 
@@ -234,16 +242,28 @@ restore_database() {
 
 # Main script
 if [ $# -eq 0 ]; then
-    echo -e "${RED}Usage: $0 [staging|production] [--identical]${NC}"
+    echo -e "${RED}Usage: $0 [staging|production] [--identical] [--persist]${NC}"
     echo -e "  --identical  Restore an exact copy (skip re-encrypt). Use production DB_ENCRYPTION_KEY in .env to read data."
+    echo -e "  --persist    Write/read dump at <repo>/.dumps/dineros-<env>.sql; reuse if present (skip download)."
     exit 1
 fi
 
 ENV=$1
+shift
 RESTORE_IDENTICAL=0
-if [ "$2" = "--identical" ]; then
-    RESTORE_IDENTICAL=1
-fi
+PERSIST=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --identical) RESTORE_IDENTICAL=1 ;;
+        --persist) PERSIST=1 ;;
+        *)
+            echo -e "${RED}❌ Unknown option: $1${NC}"
+            echo -e "${RED}Usage: $0 [staging|production] [--identical] [--persist]${NC}"
+            exit 1
+            ;;
+    esac
+    shift
+done
 
 if [ "$ENV" != "staging" ] && [ "$ENV" != "production" ]; then
     echo -e "${RED}❌ Invalid environment. Use 'staging' or 'production'${NC}"
@@ -262,8 +282,19 @@ url="${!url_var}"
 parse_mysql_url "$url"
 SOURCE_DB_NAME="$DB_NAME"
 
-# Dump from remote
-DUMP_FILE=$(dump_database "$ENV")
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PERSIST_DUMP="$SCRIPT_ROOT/.dumps/dineros-${ENV}.sql"
+
+# Dump from remote (or reuse persisted file)
+if [ -f "$PERSIST_DUMP" ] && [ -s "$PERSIST_DUMP" ]; then
+    echo -e "${BLUE}📂 Using local dump (skip download): $PERSIST_DUMP${NC}"
+    echo -e "${YELLOW}   Remove this file to fetch a fresh dump from $ENV.${NC}"
+    DUMP_FILE="$PERSIST_DUMP"
+elif [ "$PERSIST" -eq 1 ]; then
+    DUMP_FILE=$(dump_database "$ENV" "$PERSIST_DUMP")
+else
+    DUMP_FILE=$(dump_database "$ENV")
+fi
 
 # Restore to local
 restore_database "$DUMP_FILE" "$SOURCE_DB_NAME"
@@ -280,14 +311,18 @@ else
     fi
 fi
 
-# Optionally clean up dump file
-read -p "$(echo -e ${YELLOW}Delete dump file $DUMP_FILE? [y/N]${NC}) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    rm "$DUMP_FILE"
-    echo -e "${GREEN}🗑️  Dump file deleted${NC}"
+# Optionally clean up dump file (not for persisted path)
+if [[ "$DUMP_FILE" == "$PERSIST_DUMP" ]]; then
+    echo -e "${BLUE}💾 Persisted dump at: $DUMP_FILE${NC}"
 else
-    echo -e "${BLUE}💾 Dump file kept at: $DUMP_FILE${NC}"
+    read -p "$(echo -e ${YELLOW}Delete dump file $DUMP_FILE? [y/N]${NC}) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm "$DUMP_FILE"
+        echo -e "${GREEN}🗑️  Dump file deleted${NC}"
+    else
+        echo -e "${BLUE}💾 Dump file kept at: $DUMP_FILE${NC}"
+    fi
 fi
 
 echo -e "${GREEN}✨ Done!${NC}"
