@@ -118,7 +118,7 @@ spec:
                 secretKeyRef:
                   name: staging-db-secrets
                   key: DB_ENCRYPTION_KEY
-            - name: CHAT_GPT_API
+            - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: staging-chat-gpt
@@ -140,6 +140,12 @@ spec:
                 secretKeyRef:
                   name: dineros-staging-secrets
                   key: PLAID_SECRET
+            - name: E2E_SEED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-staging-secrets
+                  key: E2E_SEED_TOKEN
+                  optional: true
             - name: DEBUG
               value: "dineros:*"
             - name: GOOGLE_APPLICATION_CREDENTIALS

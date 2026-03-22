@@ -1283,6 +1283,7 @@ const accountLiquiditySnapshot = computed(() => {
 });
 
 onMounted(async () => {
+  import("~/components/modals/EditAccountRegister.vue").catch(() => {});
   if (route.query.onboarding === "1") {
     toast.add({
       color: "success",

@@ -218,6 +218,7 @@ function updateTableViewportMaxHeight() {
 }
 
 onMounted(() => {
+  import("~/components/modals/EditSavingsGoal.vue").catch(() => {});
   window.addEventListener("resize", updateTableViewportMaxHeight);
   nextTick(updateTableViewportMaxHeight);
 });

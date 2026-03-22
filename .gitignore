@@ -38,6 +38,12 @@ output.txt
 coverage/
 *.json
 playwright-report/index.html
+
+# Playwright E2E (generated state + reports)
+.auth/
+tests/e2e/.e2e-context.json
+test-results/
+playwright-report/
 /.docker-build-cache
 /.pnpm-store
 /node-compile-cache

@@ -141,11 +141,12 @@ const items = computed(() => {
   }
 });
 
-// Logout function
-function logout() {
-  navigateTo("/");
+// Logout: navigate while session is still valid, then clear auth (logout-first can strand on protected route)
+async function logout() {
   clearInterval(poller);
-  authStore.logout();
+  poller = undefined;
+  await navigateTo("/");
+  await authStore.logout();
 }
 
 async function pollData() {
@@ -269,6 +270,7 @@ UHeader(
             @click="openBudgetModal('create', null); close()") Create budget
     ULink(
       @click="logout"
+      data-testid="header-sign-out"
       color="neutral"
       v-if="authStore.getIsUserLoggedIn"
       class="cursor-pointer") Sign out

@@ -190,8 +190,7 @@ jobs:
       E2E: "1"
       TZ: UTC
       PLAYWRIGHT_BASE_URL: "https://staging.dineros.cc"
-      E2E_STAGING_USER_EMAIL: ${{ secrets.E2E_STAGING_USER_EMAIL }}
-      E2E_STAGING_USER_PASSWORD: ${{ secrets.E2E_STAGING_USER_PASSWORD }}
+      E2E_SEED_TOKEN: ${{ secrets.E2E_SEED_TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -232,3 +231,15 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: E2E against staging
         run: set -o pipefail && pnpm test:e2e 2>&1 | tee ./output.txt
+      - name: Upload Playwright HTML report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+      - name: Upload Playwright test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/

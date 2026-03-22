@@ -13,6 +13,8 @@ jobs:
       E2E: "1"
       TZ: UTC
       NODE_ENV: development
+      DEPLOY_ENV: local
+      E2E_SEED_TOKEN: ${{ secrets.E2E_SEED_TOKEN }}
       DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
       DB_ENCRYPTION_KEY: "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c="

@@ -1,16 +1,13 @@
 /**
- * Conventions for post-deploy E2E against shared staging (`https://staging.dineros.cc`).
+ * Post-deploy E2E against shared staging (`https://staging.dineros.cc`).
  *
- * - **Shared environment**: The latest PR deploy wins; avoid tests that assume exclusive DB state unless you gate runs.
- * - **Current suite**: Most specs mock API routes (`page.route`); they do not mutate staging data and are safe to run in parallel.
- * - **Live API tests** (if you add them): Use a dedicated staging-only user, keep flows idempotent (same outcome on re-run), and prefer
- *   `test.describe.configure({ mode: "serial" })` for tests touching one account.
+ * - **Seed API**: `POST /api/e2e/seed` with header `x-e2e-token: <E2E_SEED_TOKEN>` creates
+ *   user `e2e-test@dineros.cc` and workspace data. Requires `DEPLOY_ENV=staging` (or local + `E2E=1`).
+ * - **CI**: GitHub Actions `staging-e2e` job sets `E2E_SEED_TOKEN` and runs Playwright global setup → auth setup → specs.
+ * - **Cleanup**: `POST /api/e2e/cleanup` (same token) removes the E2E user; also runs in global teardown.
  *
- * Optional credentials for live flows — set in GitHub Actions repository secrets and pass as env to the `staging-e2e` job:
- * - `E2E_STAGING_USER_EMAIL`
- * - `E2E_STAGING_USER_PASSWORD`
- *
- * Read via {@link getStagingE2ECredentials}; returns `null` if either is unset.
+ * Legacy env (optional, unused by the current suite):
+ * - `E2E_STAGING_USER_EMAIL` / `E2E_STAGING_USER_PASSWORD`
  */
 export function getStagingE2ECredentials(): {
   email: string;

@@ -18,6 +18,8 @@ const ignoredRoutes = [
   { type: "exact", path: "/api/forgot-password", method: "POST" },
   { type: "exact", path: "/api/account-invite/validate", method: "GET" },
   { type: "exact", path: "/api/account-invite/accept", method: "POST" },
+  { type: "exact", path: "/api/e2e/seed", method: "POST" },
+  { type: "exact", path: "/api/e2e/cleanup", method: "POST" },
   { type: "exact", path: "/private/bullmq", method: "GET" },
   { type: "regex", path: /^\/private\/bullmq\/.*/, method: "GET" },
   { type: "regex", path: /^\/api\/public\/.*/, method: "GET" },
