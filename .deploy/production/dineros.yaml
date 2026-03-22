@@ -136,7 +136,7 @@ spec:
                 secretKeyRef:
                   name: production-db-secrets
                   key: DB_ENCRYPTION_KEY
-            - name: CHAT_GPT_API
+            - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: production-chat-gpt

@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** When set to a non-loopback URL, Playwright hits that deployment and does not start `pnpm dev`. */
 function isLocalPlaywrightBase(url: string): boolean {
@@ -21,29 +25,45 @@ const useLocalWebServer =
   playwrightBaseUrlRaw.length === 0 ||
   isLocalPlaywrightBase(playwrightBaseUrl);
 
+const authStoragePath = path.join(__dirname, ".auth", "user.json");
+
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./tests/e2e/specs",
+  globalSetup: path.join(__dirname, "tests/e2e/setup/global-setup.ts"),
+  globalTeardown: path.join(__dirname, "tests/e2e/setup/global-teardown.ts"),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "list",
+  reporter: [
+    ["list"],
+    ["html", { open: process.env.CI ? "never" : "on-failure" }],
+  ],
+  outputDir: "test-results",
   use: {
     baseURL: playwrightBaseUrl,
     trace: "on-first-retry",
   },
   projects: [
     {
-      name: "chromium",
+      name: "auth-setup",
+      testDir: "./tests/e2e/setup",
+      testMatch: /auth\.setup\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
+      name: "chromium-public",
+      testDir: "./tests/e2e/specs/public",
+      use: { ...devices["Desktop Chrome"] },
     },
     {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
+      name: "chromium-authed",
+      testDir: "./tests/e2e/specs/authed",
+      dependencies: ["auth-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStoragePath,
+      },
     },
   ],
   ...(useLocalWebServer
