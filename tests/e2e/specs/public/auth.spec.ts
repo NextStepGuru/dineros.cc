@@ -12,6 +12,16 @@ test.describe("Auth pages (unauthenticated)", () => {
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
+  test("login page links to signup and forgot password", async ({ page }) => {
+    await page.goto("/login");
+    await expect(
+      page.getByRole("link", { name: /create account/i }),
+    ).toHaveAttribute("href", "/signup");
+    await expect(
+      page.getByRole("link", { name: /forgot password/i }),
+    ).toHaveAttribute("href", "/forgot-password");
+  });
+
   test("invalid credentials show feedback", async ({ page }) => {
     const helpers = createTestHelpers(page);
     await helpers.navigateTo("/login");
@@ -52,12 +62,39 @@ test.describe("Auth pages (unauthenticated)", () => {
     ).toBeVisible();
   });
 
+  test("signup form has all required fields", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/first name/i)).toBeVisible();
+    await expect(page.getByLabel(/last name/i)).toBeVisible();
+    await expect(page.getByLabel(/email address/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    await expect(page.getByLabel(/confirm password/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /create account/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /sign in/i }),
+    ).toBeVisible();
+  });
+
   test("protected routes redirect to login when unauthenticated", async ({
     page,
   }) => {
-    await page.goto("/account-registers");
-    await expect(page).toHaveURL(/\/login/);
-    await page.goto("/goals");
-    await expect(page).toHaveURL(/\/login/);
+    const protectedPaths = [
+      "/account-registers",
+      "/goals",
+      "/reoccurrences",
+      "/reports",
+      "/help",
+      "/edit-profile/profile",
+      "/register/1",
+    ];
+    for (const path of protectedPaths) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/login/);
+    }
   });
 });

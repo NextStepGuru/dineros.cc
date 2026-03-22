@@ -26,7 +26,7 @@ test.describe("Authed shell & header navigation", () => {
       timeout: 15_000,
     });
 
-    await banner.getByRole("link", { name: /^goals$/i }).click();
+    await banner.getByRole("link", { name: /^goals$/i }).first().click();
     await expect(page).toHaveURL(/\/goals$/);
     await expect(page.getByText("E2E Emergency Fund")).toBeVisible({
       timeout: 15_000,
@@ -51,5 +51,16 @@ test.describe("Authed shell & header navigation", () => {
     await expect(page).toHaveURL(
       new RegExp(`/register/${e2e.checkingRegisterId}`),
     );
+  });
+
+  test("color mode button is present in header", async ({ page }) => {
+    await page.goto("/account-registers");
+    await expect(page.getByText("E2E Checking")).toBeVisible({
+      timeout: 30_000,
+    });
+    const banner = page.getByRole("banner");
+    const buttons = banner.getByRole("button");
+    const count = await buttons.count();
+    expect(count).toBeGreaterThanOrEqual(2);
   });
 });

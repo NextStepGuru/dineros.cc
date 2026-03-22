@@ -9,6 +9,21 @@ test.describe("Account registers", () => {
     await expect(page.getByText("E2E Savings")).toBeVisible();
   });
 
+  test("shows seeded balances, type labels, and net worth", async ({
+    page,
+  }) => {
+    await page.goto("/account-registers");
+    await expect(page.getByText("E2E Checking")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText("Checking").first()).toBeVisible();
+    await expect(page.getByText("+$1,000.00").first()).toBeVisible();
+    await expect(page.getByText("+$0.00").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /\$1,000\.00/ }),
+    ).toBeVisible();
+  });
+
   test("add account button is enabled", async ({ page }) => {
     await page.goto("/account-registers");
     await expect(page.getByText("E2E Checking")).toBeVisible({

@@ -1464,11 +1464,12 @@ onBeforeUnmount(() => {
     UCard(v-else-if="showFirstAccountOnboarding" class="my-4")
       template(#header)
         h3(class="font-semibold") Create your first account
-      p(class="frog-text-muted mb-4") Start with an account and opening balance, then add recurring items to improve your forecast.
+      p(class="frog-text-muted mb-4") Start with an account and opening balance, add recurring items, then run Recalc to see your forecast.
       ol(class="list-decimal ml-4 mb-4 text-sm space-y-1")
-        li Add an account register
-        li Set an opening balance
-        li Add recurring entries for upcoming cash flow
+        li Add an account register and set an opening balance
+        li Add recurring entries (paychecks, bills, subscriptions)
+        li Run Recalc to generate projected entries
+        li Optional: link banks via Profile &rarr; Sync accounts
       UButton(color="primary" size="sm" @click="handleAddAccountRegister") Add first account
 
     UCard(v-if="showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")

@@ -28,7 +28,7 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
       h2(class="text-lg font-semibold") What’s new
     div(class="space-y-3 text-sm leading-relaxed frog-text-muted")
       p(class="text-sm")
-        | Recent product updates (spring 2026) — jump to a section for detail:
+        | Recent highlights — jump to a section for detail:
       ul(class="list-disc pl-5 space-y-1.5")
         li
           NuxtLink(to="#budgets" class="frog-link") Budgets
@@ -49,16 +49,24 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
           NuxtLink(to="#loan-asset-settings" class="frog-link") Loans &amp; assets
           span &nbsp;— payment/interest categories, depreciation and appreciation on eligible asset types.
 
-  nav(class="flex flex-wrap gap-2 text-sm")
-    NuxtLink(to="#budgets" class="inline-flex")
-      UButton(size="xs" variant="soft") Budgets
-    UButton(to="/account-registers" size="xs" variant="soft") Accounts
-    UButton(to="/reoccurrences" size="xs" variant="soft") Recurring
-    UButton(to="/goals" size="xs" variant="soft") Goals
-    UButton(to="/reports" size="xs" variant="soft") Reports
-    UButton(to="/edit-profile/profile" size="xs" variant="soft") Profile
-    UButton(to="/edit-profile/sync-accounts" size="xs" variant="soft") Sync accounts
-    UButton(to="/contact" size="xs" variant="outline") Contact support
+  nav(class="space-y-2")
+    p(class="text-xs font-medium frog-text-muted") Jump to section
+    div(class="flex flex-wrap gap-2 text-sm")
+      UButton(to="#first-time" size="xs" variant="soft") First-time setup
+      UButton(to="#budgets" size="xs" variant="soft") Budgets
+      UButton(to="#goals" size="xs" variant="soft") Goals
+      UButton(to="#accounts" size="xs" variant="soft") Accounts
+      UButton(to="#projected-balance" size="xs" variant="soft") Projected balance
+      UButton(to="#loan-asset-settings" size="xs" variant="soft") Loans & assets
+      UButton(to="#recurring" size="xs" variant="soft") Recurring
+      UButton(to="#register" size="xs" variant="soft") Register
+      UButton(to="#reports" size="xs" variant="soft") Reports
+      UButton(to="#export" size="xs" variant="soft") Export / print
+      UButton(to="#sync" size="xs" variant="soft") Bank sync
+      UButton(to="#profile" size="xs" variant="soft") Profile
+      UButton(to="#troubleshooting" size="xs" variant="soft") Troubleshooting
+      UButton(to="#shortcuts" size="xs" variant="soft") Shortcuts
+      UButton(to="/contact" size="xs" variant="outline") Contact support
 
   UCard(id="first-time")
     template(#header)
@@ -95,7 +103,7 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
           strong(class="frog-text") Create
           span &nbsp;— new budgets copy registers and data from your default budget. You can optionally check&nbsp;
           strong(class="frog-text") Create new financial account (copy categories and migrate references)
-          span &nbsp;to use a separate account workspace; your default budget stays unchanged.
+          span &nbsp;to give the new budget its own isolated workspace — separate accounts, categories, and recurring rules — so changes in one budget never affect another.
         li
           strong(class="frog-text") Reset from default
           span &nbsp;— replaces everything in the selected budget with a fresh copy from the default. This cannot be undone.
@@ -171,8 +179,8 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
           strong(class="frog-text") Balance growth
           span &nbsp;— some non-credit asset types accrue growth over time using the annual growth / return fields in the editor.
         li
-          strong(class="frog-text") Vehicle &amp; collectable assets
-          span &nbsp;— vehicle-type registers support depreciation (rate and method, start date). Collectable vehicle types use appreciation fields instead. Forecast entries reflect those settings after Recalc.
+          strong(class="frog-text") Vehicle &amp; collectible assets
+          span &nbsp;— vehicle-type registers lose value over time (depreciation); set the rate, method, and start date. Collectible vehicle types gain value instead (appreciation). Both show up as forecast entries after Recalc.
 
   UCard(id="recurring")
     template(#header)
@@ -210,7 +218,7 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
       p
         span Use&nbsp;
         strong(class="frog-text") Recalc
-        span &nbsp;on the Recurring page or Register to refresh projections.
+        span &nbsp;on the Recurring page or Register to regenerate projected entries after any changes.
 
   UCard(id="register")
     template(#header)
@@ -222,10 +230,10 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
           span &nbsp;— Future shows upcoming and projected activity; Past shows history-style ordering for review.
         li
           strong(class="frog-text") Refresh
-          span &nbsp;— reloads entries from the server without changing forecast rules.
+          span &nbsp;— reloads entries from the server without changing projected rows. Use this to pick up manual edits or Plaid-synced balances.
         li
           strong(class="frog-text") Recalc
-          span &nbsp;— rebuilds projected rows from recurring rules and your current setup for that account’s institution.
+          span &nbsp;— deletes old projected rows and regenerates them from your current recurring rules, account settings, and balances. Use this after adding or changing recurring items, opening balances, or loan fields.
         li
           strong(class="frog-text") Filter &amp; category
           span &nbsp;— narrow rows by text; use the combined category control where available to filter by category and subcategories.
@@ -284,7 +292,11 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
       li
         NuxtLink(to="/edit-profile/two-factor-auth" class="frog-link") Two-factor
         span &nbsp;— add an extra layer on your account when enabled.
-      li Privacy and terms are linked from the site footer when you need the legal details.
+      li
+        NuxtLink(to="/privacy-policy" class="frog-link") Privacy Policy
+        span &nbsp;and&nbsp;
+        NuxtLink(to="/terms-of-service" class="frog-link") Terms of Service
+        span &nbsp;— legal details about your data and how Dineros works.
 
   UCard(id="troubleshooting")
     template(#header)
@@ -356,6 +368,8 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
               kbd(class="px-1.5 py-0.5 rounded bg-elevated text-xs") R
               span(class="text-xs ml-2") Register only
 
-  footer(class="flex flex-wrap gap-3 pt-4 border-t frog-border")
+  footer(class="flex flex-wrap gap-3 pt-4 border-t frog-border items-center")
     UButton(to="/contact" color="primary" size="sm") Contact support
+    UButton(to="/privacy-policy" size="sm" variant="ghost" color="neutral") Privacy Policy
+    UButton(to="/terms-of-service" size="sm" variant="ghost" color="neutral") Terms of Service
 </template>
