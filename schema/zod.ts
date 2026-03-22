@@ -303,6 +303,38 @@ export const accountRegisterSchema = z.object({
   assetStartAt: z.coerce.date().nullable().default(null),
   paymentCategoryId: z.uuid().nullable().optional(),
   interestCategoryId: z.uuid().nullable().optional(),
+  vehicleDetails: z.unknown().nullable().optional(),
+});
+
+/** Body for POST /api/vehicle-value-estimate */
+export const vehicleValueEstimateRequestSchema = z.object({
+  accountId: z.string().min(1),
+  accountRegisterId: z.coerce.number().int().positive().optional(),
+  year: z.coerce.number().int().min(1900).max(2100),
+  make: z.string().min(1).max(100),
+  model: z.string().min(1).max(100),
+  trim: z.string().max(100).optional(),
+  mileage: z.coerce.number().nonnegative(),
+  condition: z.enum(["excellent", "good", "fair", "poor"]),
+  zip: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().regex(/^\d{5}$/).optional(),
+  ),
+  purchasePriceHint: z.coerce.number().nonnegative().optional(),
+  vinLast4: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().regex(/^[A-Za-z0-9]{1,4}$/).optional(),
+  ),
+});
+
+/** Parsed JSON from the model for vehicle valuation */
+export const vehicleValueEstimateAiResultSchema = z.object({
+  estimatedValueMid: z.number().finite(),
+  estimatedValueLow: z.number().finite(),
+  estimatedValueHigh: z.number().finite(),
+  currency: z.string().min(1).max(16).default("USD"),
+  rationale: z.string().max(800),
+  disclaimer: z.string().min(1).max(2000),
 });
 
 const amountAdjustmentModeSchema = z.enum(["NONE", "PERCENT", "FIXED"]);

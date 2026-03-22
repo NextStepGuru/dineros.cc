@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import type { H3Event } from "h3";
 import { createError } from "h3";
@@ -213,6 +214,7 @@ export default defineEventHandler(async (event: H3Event) => {
       assetStartAt,
       paymentCategoryId,
       interestCategoryId,
+      vehicleDetails,
     } = parsed;
 
     let { collateralAssetRegisterId, targetAccountRegisterId } = parsed;
@@ -302,6 +304,10 @@ export default defineEventHandler(async (event: H3Event) => {
         assetStartAt,
         paymentCategoryId: paymentCategoryIdResolved,
         interestCategoryId: interestCategoryIdResolved,
+        vehicleDetails:
+          vehicleDetails === null || vehicleDetails === undefined
+            ? undefined
+            : (vehicleDetails as Prisma.InputJsonValue),
       },
       update: {
         id,
@@ -341,6 +347,10 @@ export default defineEventHandler(async (event: H3Event) => {
         assetStartAt,
         paymentCategoryId: paymentCategoryIdResolved,
         interestCategoryId: interestCategoryIdResolved,
+        vehicleDetails:
+          vehicleDetails === null || vehicleDetails === undefined
+            ? undefined
+            : (vehicleDetails as Prisma.InputJsonValue),
       },
       where: {
         id,

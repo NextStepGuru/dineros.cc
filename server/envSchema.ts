@@ -28,6 +28,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   /** Model for Plaid register-entry enrichment (default gpt-5-nano). */
   OPENAI_PLAID_TX_MODEL: z.string().default("gpt-5-nano"),
+  /** Model for vehicle value estimate (default gpt-5-nano). */
+  OPENAI_VEHICLE_VALUE_MODEL: z.string().default("gpt-5-nano"),
 });
 
 export default envSchema;

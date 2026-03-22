@@ -797,6 +797,7 @@ function handleAddAccountRegister() {
       assetStartAt: null,
       paymentCategoryId: undefined,
       interestCategoryId: undefined,
+      vehicleDetails: null,
     },
     callback: (data: AccountRegister) => {
       listStore.patchAccountRegister(data);

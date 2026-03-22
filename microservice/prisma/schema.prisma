@@ -215,6 +215,7 @@ model AccountRegister {
   plaidBalanceLastSyncAt    DateTime? @map("plaid_balance_last_sync_at")
   paymentCategoryId  String?   @map("payment_category_id")
   interestCategoryId String?   @map("interest_category_id")
+  vehicleDetails            Json?     @map("vehicle_details")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budget              Budget            @relation(fields: [budgetId], references: [id])
