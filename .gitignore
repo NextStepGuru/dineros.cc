@@ -42,3 +42,4 @@ playwright-report/index.html
 /.pnpm-store
 /node-compile-cache
 /prisma/reencrypt
+dineros-secrets.yml

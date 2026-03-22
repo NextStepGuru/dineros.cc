@@ -4,16 +4,6 @@ kind: Namespace
 metadata:
   name: dineros-staging
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: dineros-staging-mysql
-  namespace: dineros-staging
-type: Opaque
-stringData:
-  # mysql://USER:PASSWORD@HOST:PORT/DATABASE — password lives only in this Secret
-  DATABASE_URL: "mysql://dineros-staging:dineros-staging@mysql.mysql.svc.cluster.local:3306/dineros-staging"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

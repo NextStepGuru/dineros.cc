@@ -175,14 +175,3 @@ jobs:
           sed -i "s|dineros:latest|dineros:${TAG}|g" ./.deploy/staging/dineros.yaml
           sed -i "s|dineros-microservice:latest|dineros-microservice:${TAG}|g" ./.deploy/staging/dineros.yaml
           kubectl apply -f ./.deploy/staging/dineros.yaml
-      - name: Staging cluster diagnostics + rollout
-        run: |
-          set -x
-          kubectl get deploy,svc,ingress,sa -n dineros-staging || true
-          kubectl get pods -n dineros-staging -o wide || true
-          kubectl get events -n dineros-staging --sort-by=.metadata.creationTimestamp | tail -40 || true
-          kubectl describe deployment dineros-staging-deployment -n dineros-staging || true
-          kubectl describe deployment dineros-microservice-staging-deployment -n dineros-staging || true
-          kubectl rollout status deployment/dineros-staging-deployment -n dineros-staging --timeout=5m
-          kubectl rollout status deployment/dineros-microservice-staging-deployment -n dineros-staging --timeout=5m
-          kubectl get pods -n dineros-staging -o wide
