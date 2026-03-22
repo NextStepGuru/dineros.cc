@@ -140,7 +140,12 @@ describe("Budget API Endpoints", () => {
         userId: 123,
       });
       expect(prisma.budget.findFirst).toHaveBeenCalledWith({
-        where: { userId: 123, isDefault: true },
+        where: {
+          isDefault: true,
+          account: {
+            userAccounts: { some: { userId: 123 } },
+          },
+        },
       });
       expect(prisma.budget.count).toHaveBeenCalledWith({
         where: { userId: 123, isArchived: false },
