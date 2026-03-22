@@ -16,6 +16,10 @@ import {
 import { dateTimeService } from "./forecast/DateTimeService";
 import TransactionMatchingService from "./TransactionMatchingService";
 import PlaidTransactionEnrichmentService from "./PlaidTransactionEnrichmentService";
+import {
+  sendPlaidSyncSummaryEmail,
+  type RegisterSyncStatsRow,
+} from "./PlaidSyncNotificationService";
 
 const DAYS_REQUESTED = 3;
 
@@ -41,6 +45,8 @@ interface SyncResult {
   matchedTransactions: number;
   totalProcessed: number;
   errors: string[];
+  byRegister: RegisterSyncStatsRow[];
+  ownerUserId: number | null;
 }
 
 class PlaidSyncService {
@@ -418,6 +424,7 @@ class PlaidSyncService {
     let totalNew = 0;
     let totalMatched = 0;
     const allErrors: string[] = [];
+    const byRegister: RegisterSyncStatsRow[] = [];
 
     // Process each account separately to avoid the 'in' clause issue
     for (const [plaidAccountId, accountTransactions] of transactionsByAccount) {
@@ -439,7 +446,20 @@ class PlaidSyncService {
       totalNew += result.newCount;
       totalMatched += result.matchedCount;
       allErrors.push(...result.errors);
+      if (result.newCount > 0 || result.matchedCount > 0) {
+        byRegister.push({
+          accountRegisterId: accountRegister.id,
+          name: accountRegister.name,
+          newCount: result.newCount,
+          updatedCount: result.matchedCount,
+        });
+      }
     }
+
+    const ownerUserId =
+      accountRegisters.length > 0
+        ? (userIdByAccountId.get(accountRegisters[0]!.accountId) ?? null)
+        : null;
 
     // Trigger recalculate jobs for affected accounts
     if (totalNew > 0 || totalMatched > 0) {
@@ -457,6 +477,8 @@ class PlaidSyncService {
       matchedTransactions: totalMatched,
       totalProcessed: totalNew + totalMatched,
       errors: allErrors,
+      byRegister,
+      ownerUserId,
     };
   }
 
@@ -519,6 +541,17 @@ class PlaidSyncService {
       accountRegisters.map((r) => [r.plaidId!, r]),
     );
 
+    const registerStats = new Map<number, { new: number; updated: number }>();
+    for (const ar of accountRegisters) {
+      registerStats.set(ar.id, { new: 0, updated: 0 });
+    }
+    const bumpRegister = (id: number, kind: "new" | "updated") => {
+      const row = registerStats.get(id);
+      if (!row) return;
+      if (kind === "new") row.new += 1;
+      else row.updated += 1;
+    };
+
     let hasMore = true;
     while (hasMore) {
       const response = await this.client.transactionsSync({
@@ -552,6 +585,7 @@ class PlaidSyncService {
                 "exact",
                 ar.type,
               );
+              bumpRegister(ar.id, "updated");
               log({
                 message:
                   "syncItemWithTransactionsSync: pending→posted updated in place",
@@ -593,6 +627,7 @@ class PlaidSyncService {
               matchResult.matchType as "exact" | "fuzzy" | "reoccurrence",
               ar.type,
             );
+            bumpRegister(ar.id, "updated");
           } else {
             const transactionData = await this.buildTransactionDataForCreate(
               tx,
@@ -605,6 +640,7 @@ class PlaidSyncService {
               ar.type,
               transactionData,
             );
+            bumpRegister(ar.id, "new");
           }
         } catch (err) {
           log({
@@ -629,6 +665,7 @@ class PlaidSyncService {
               "exact",
               ar.type,
             );
+            bumpRegister(ar.id, "updated");
           }
         } catch (err) {
           log({
@@ -655,6 +692,29 @@ class PlaidSyncService {
       create: { itemId, cursor },
       update: { cursor, updatedAt: dateTimeService.now().toDate() },
     });
+
+    const totalNewFromSync = [...registerStats.values()].reduce(
+      (a, s) => a + s.new,
+      0,
+    );
+    if (totalNewFromSync > 0 && itemOwnerUserId) {
+      const rows: RegisterSyncStatsRow[] = accountRegisters
+        .map((ar) => {
+          const s = registerStats.get(ar.id)!;
+          return {
+            accountRegisterId: ar.id,
+            name: ar.name,
+            newCount: s.new,
+            updatedCount: s.updated,
+          };
+        })
+        .filter((r) => r.newCount > 0 || r.updatedCount > 0);
+      await sendPlaidSyncSummaryEmail({
+        userId: itemOwnerUserId,
+        itemId,
+        registers: rows,
+      });
+    }
 
     for (const ar of accountRegisters) {
       addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
@@ -780,6 +840,17 @@ class PlaidSyncService {
           },
           level: "info",
         });
+
+        if (
+          syncResult.newTransactions > 0 &&
+          syncResult.ownerUserId &&
+          syncResult.byRegister.length > 0
+        ) {
+          await sendPlaidSyncSummaryEmail({
+            userId: syncResult.ownerUserId,
+            registers: syncResult.byRegister,
+          });
+        }
       } catch (error) {
         log({
           message: "error fetching account transactions",

@@ -38,5 +38,9 @@ export const plaidRootSchema = z
     request_id: z.string().optional(),
     access_token: z.string().optional(),
     public_token: z.string().optional(),
+    /** When false, skip email digest after Plaid transaction sync. Default true when unset. */
+    transactionSyncEmail: z.boolean().optional(),
+    /** When false, skip email when Plaid needs re-link (ITEM ERROR / LOGIN_REQUIRED). Default true when unset. */
+    connectionIssueEmail: z.boolean().optional(),
   })
   .default({ isEnabled: false });

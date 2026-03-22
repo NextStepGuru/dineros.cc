@@ -18,6 +18,9 @@ const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   "/edit-profile/password": defineAsyncComponent(
     () => import("~/components/profile/ChangePasswordTab.vue"),
   ),
+  "/edit-profile/notifications": defineAsyncComponent(
+    () => import("~/components/profile/NotificationsTab.vue"),
+  ),
   "/edit-profile/sync-accounts": defineAsyncComponent(
     () => import("~/components/profile/SyncAccountsTab.vue"),
   ),
@@ -66,6 +69,11 @@ const navigationItems = computed(() => {
       label: "Password",
       to: "/edit-profile/password",
       active: route.path.startsWith("/edit-profile/password"),
+    },
+    {
+      label: "Notifications",
+      to: "/edit-profile/notifications",
+      active: route.path.startsWith("/edit-profile/notifications"),
     },
     {
       label: "Sync Accounts",
