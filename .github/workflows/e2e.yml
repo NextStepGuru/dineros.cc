@@ -1,5 +1,5 @@
 # Run manually from Actions → E2E (Playwright) → Run workflow.
-# Kept separate from PR checks until stable.
+# Uses local MySQL/Redis + `pnpm dev`. For deployed staging, use PR workflow `staging-e2e` or set PLAYWRIGHT_BASE_URL (see playwright.config.ts).
 name: E2E (Playwright)
 
 on:
