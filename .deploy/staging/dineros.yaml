@@ -52,6 +52,8 @@ spec:
               value: "nats://nats.nats.svc.cluster.local:4222"
             - name: DEPLOY_ENV
               value: "staging"
+            - name: NUXT_PUBLIC_DEPLOY_ENV
+              value: "staging"
             - name: PORT
               value: "80"
             - name: GCP_PROJECT_ID
