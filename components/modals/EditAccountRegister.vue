@@ -774,7 +774,7 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
 
         p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
 
-        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
           UFormField(label="Year")
             UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
           UFormField(label="ZIP (optional)" hint="5-digit US")
@@ -785,7 +785,7 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
           UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
         UFormField(label="Trim (optional)")
           UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
-        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
           UFormField(label="Mileage")
             UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
           UFormField(label="Condition")
@@ -795,7 +795,7 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
               :items="vehicleConditionItems"
               valueKey="id"
               labelKey="name")
-        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
           UFormField(label="VIN last 4 (optional)")
             UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
           UFormField(label="Purchase / MSRP hint (optional)")
