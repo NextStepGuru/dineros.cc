@@ -6,8 +6,80 @@ import {
   formatCurrencyOptions,
 } from "~/lib/utils";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
-import { accountRegisterSchema } from "~/schema/zod";
+import type { z } from "zod";
+import {
+  accountRegisterSchema,
+  vehicleValueEstimateAiResultSchema,
+} from "~/schema/zod";
 import type { AccountRegister } from "~/types/types";
+
+type VehicleDetailsForm = {
+  year: number;
+  make: string;
+  model: string;
+  trim: string;
+  mileage: number;
+  condition: "excellent" | "good" | "fair" | "poor";
+  zip: string;
+  vinLast4: string;
+  purchasePriceHint: number | null;
+};
+
+type VehicleEstimateResult = z.infer<typeof vehicleValueEstimateAiResultSchema>;
+
+function defaultVehicleDetails(): VehicleDetailsForm {
+  return {
+    year: new Date().getFullYear(),
+    make: "",
+    model: "",
+    trim: "",
+    mileage: 0,
+    condition: "good",
+    zip: "",
+    vinLast4: "",
+    purchasePriceHint: null,
+  };
+}
+
+function parseVehicleDetails(raw: unknown): VehicleDetailsForm {
+  const d = defaultVehicleDetails();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return d;
+  }
+  const o = raw as Record<string, unknown>;
+  const year = typeof o.year === "number" && Number.isFinite(o.year) ? o.year : d.year;
+  const make = typeof o.make === "string" ? o.make : d.make;
+  const model = typeof o.model === "string" ? o.model : d.model;
+  const trim = typeof o.trim === "string" ? o.trim : d.trim;
+  const mileage =
+    typeof o.mileage === "number" && Number.isFinite(o.mileage) && o.mileage >= 0
+      ? o.mileage
+      : d.mileage;
+  const condition =
+    o.condition === "excellent" ||
+    o.condition === "good" ||
+    o.condition === "fair" ||
+    o.condition === "poor"
+      ? o.condition
+      : d.condition;
+  const zip = typeof o.zip === "string" ? o.zip : d.zip;
+  const vinLast4 = typeof o.vinLast4 === "string" ? o.vinLast4 : d.vinLast4;
+  const purchasePriceHint =
+    typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
+      ? o.purchasePriceHint
+      : null;
+  return {
+    year,
+    make,
+    model,
+    trim,
+    mileage,
+    condition,
+    zip,
+    vinLast4,
+    purchasePriceHint,
+  };
+}
 
 export type ModelAccountRegisterProps = {
   id: number;
@@ -86,12 +158,26 @@ function normalizeAccountRegisterState(
         : null,
     paymentCategoryId: accountRegister.paymentCategoryId ?? null,
     interestCategoryId: accountRegister.interestCategoryId ?? null,
+    vehicleDetails: parseVehicleDetails(
+      (accountRegister as AccountRegister & { vehicleDetails?: unknown })
+        .vehicleDetails,
+    ),
   };
 }
 
 const formState = ref<AccountRegister>(
   normalizeAccountRegisterState(props.accountRegister),
 );
+
+const vehicleDetailsLocal = reactive<VehicleDetailsForm>(
+  parseVehicleDetails(
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
+  ),
+);
+
+const isEstimatingVehicle = ref(false);
+const lastVehicleEstimate = ref<VehicleEstimateResult | null>(null);
 
 const fileInput = ref<any>(null);
 
@@ -136,6 +222,13 @@ const isSelectedAccountTypeDepreciatingOrAppreciatingAsset = computed(
 const assetSectionLabel = computed(() =>
   isSelectedAccountTypeVehicleAsset.value ? "Depreciation" : "Appreciation",
 );
+
+const estimateRangeLabel = computed(() => {
+  const e = lastVehicleEstimate.value;
+  if (!e) return "";
+  const f = new Intl.NumberFormat(undefined, formatCurrencyOptions);
+  return `${f.format(e.estimatedValueLow)} – ${f.format(e.estimatedValueHigh)} (mid ${f.format(e.estimatedValueMid)})`;
+});
 
 const depreciationRatePercent = computed({
   get: () =>
@@ -211,7 +304,108 @@ const statementAtString = computed({
 
 watch(props, () => {
   formState.value = normalizeAccountRegisterState(props.accountRegister);
+  Object.assign(
+    vehicleDetailsLocal,
+    parseVehicleDetails(
+      (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+        .vehicleDetails,
+    ),
+  );
+  lastVehicleEstimate.value = null;
 });
+
+watch(
+  vehicleDetailsLocal,
+  () => {
+    (formState.value as AccountRegister & { vehicleDetails?: unknown }).vehicleDetails =
+      { ...vehicleDetailsLocal };
+  },
+  { deep: true },
+);
+
+const vehicleConditionItems = [
+  { id: "excellent", name: "Excellent" },
+  { id: "good", name: "Good" },
+  { id: "fair", name: "Fair" },
+  { id: "poor", name: "Poor" },
+];
+
+async function runVehicleEstimate() {
+  if (!vehicleDetailsLocal.make.trim() || !vehicleDetailsLocal.model.trim()) {
+    toast.add({
+      color: "error",
+      description: "Make and model are required to estimate.",
+    });
+    return;
+  }
+  isEstimatingVehicle.value = true;
+  lastVehicleEstimate.value = null;
+  try {
+    const body: Record<string, unknown> = {
+      accountId: formState.value.accountId,
+      year: vehicleDetailsLocal.year,
+      make: vehicleDetailsLocal.make.trim(),
+      model: vehicleDetailsLocal.model.trim(),
+      mileage: vehicleDetailsLocal.mileage,
+      condition: vehicleDetailsLocal.condition,
+    };
+    if (formState.value.id > 0) {
+      body.accountRegisterId = formState.value.id;
+    }
+    const trim = vehicleDetailsLocal.trim.trim();
+    if (trim) body.trim = trim;
+    const zip = vehicleDetailsLocal.zip.trim();
+    if (zip) body.zip = zip;
+    const vin = vehicleDetailsLocal.vinLast4.trim();
+    if (vin) body.vinLast4 = vin;
+    if (
+      vehicleDetailsLocal.purchasePriceHint != null &&
+      Number.isFinite(vehicleDetailsLocal.purchasePriceHint)
+    ) {
+      body.purchasePriceHint = vehicleDetailsLocal.purchasePriceHint;
+    }
+
+    const res = await $api<{ estimate: VehicleEstimateResult }>(
+      "/api/vehicle-value-estimate",
+      { method: "POST", body },
+    );
+    lastVehicleEstimate.value = vehicleValueEstimateAiResultSchema.parse(
+      res.estimate,
+    );
+    toast.add({
+      color: "success",
+      description:
+        "Estimate received. Review the range, then apply to balance or original value if you want.",
+    });
+  } catch (e) {
+    handleError(e, toast);
+  } finally {
+    isEstimatingVehicle.value = false;
+  }
+}
+
+function applyEstimateToBalance() {
+  const e = lastVehicleEstimate.value;
+  if (!e) return;
+  const v = Math.round(e.estimatedValueMid * 100) / 100;
+  formState.value.balance = v;
+  formState.value.latestBalance = v;
+  toast.add({
+    color: "success",
+    description: "Balance updated using the mid estimate.",
+  });
+}
+
+function applyEstimateToOriginal() {
+  const e = lastVehicleEstimate.value;
+  if (!e) return;
+  const v = Math.round(e.estimatedValueMid * 100) / 100;
+  formState.value.assetOriginalValue = v;
+  toast.add({
+    color: "success",
+    description: "Asset original value updated using the mid estimate.",
+  });
+}
 
 watch(
   () => formState.value.typeId,
@@ -574,6 +768,59 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
             v-model="assetStartAtString"
             type="date"
             class="w-full")
+
+      div(v-if="isSelectedAccountTypeVehicleAsset" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
+        h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") Vehicle details (for AI estimate)
+
+        p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
+
+        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+          UFormField(label="Year")
+            UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+          UFormField(label="ZIP (optional)" hint="5-digit US")
+            UInput(v-model="vehicleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+        UFormField(label="Make")
+          UInput(v-model="vehicleDetailsLocal.make" type="text" class="w-full")
+        UFormField(label="Model")
+          UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
+        UFormField(label="Trim (optional)")
+          UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
+        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+          UFormField(label="Mileage")
+            UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+          UFormField(label="Condition")
+            USelect(
+              v-model="vehicleDetailsLocal.condition"
+              class="w-full"
+              :items="vehicleConditionItems"
+              valueKey="id"
+              labelKey="name")
+        .grid.grid-cols-1.sm:grid-cols-2.gap-3
+          UFormField(label="VIN last 4 (optional)")
+            UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
+          UFormField(label="Purchase / MSRP hint (optional)")
+            UInputNumber(
+              v-model="vehicleDetailsLocal.purchasePriceHint"
+              :format-options="formatCurrencyOptions"
+              :step="0.01"
+              class="w-full")
+
+        UButton(
+          color="primary"
+          variant="subtle"
+          :loading="isEstimatingVehicle"
+          :disabled="isSaving || isDeleting || isEstimatingVehicle"
+          @click.prevent="runVehicleEstimate"
+        ) Get estimate
+
+        div(v-if="lastVehicleEstimate" class="space-y-2 text-sm")
+          p(class="font-medium text-emerald-900 dark:text-emerald-100") {{ estimateRangeLabel }}
+          p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastVehicleEstimate.rationale }}
+          p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastVehicleEstimate.disclaimer }}
+
+        .flex.flex-wrap.gap-2(v-if="lastVehicleEstimate")
+          UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToBalance" :disabled="isSaving || isDeleting") Apply mid to balance
+          UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToOriginal" :disabled="isSaving || isDeleting") Apply mid to original value
 
       UFormField(label="Import Transactions" hint="optional, CSV File Import")
         UInput(type="file" accept=".csv" ref="fileInput" class="w-full")

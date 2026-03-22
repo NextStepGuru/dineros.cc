@@ -159,6 +159,9 @@ async function cloneAccountRegisterRows(
         assetResidualValue: reg.assetResidualValue,
         assetUsefulLifeYears: reg.assetUsefulLifeYears,
         assetStartAt: reg.assetStartAt,
+        vehicleDetails: (
+          reg as AccountRegister & { vehicleDetails?: Prisma.JsonValue | null }
+        ).vehicleDetails as Prisma.InputJsonValue | null | undefined,
         ...PLAID_NULL_FIELDS,
       },
       select: { id: true },

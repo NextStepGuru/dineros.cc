@@ -43,6 +43,15 @@ function buildSyntheticAccountRegisters(
     minAccountBalance: 0,
     allowExtraPayment: false,
     isArchived: false,
+    depreciationRate: null,
+    depreciationMethod: null,
+    assetOriginalValue: null,
+    assetResidualValue: null,
+    assetUsefulLifeYears: null,
+    assetStartAt: null,
+    paymentCategoryId: null,
+    interestCategoryId: null,
+    vehicleDetails: null,
   }));
 }
 

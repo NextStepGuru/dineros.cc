@@ -230,6 +230,7 @@ model AccountRegister {
   assetStartAt              DateTime? @map("asset_start_at")
   paymentCategoryId         String?   @map("payment_category_id")
   interestCategoryId        String?   @map("interest_category_id")
+  vehicleDetails            Json?     @map("vehicle_details")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budget              Budget            @relation(fields: [budgetId], references: [id])
