@@ -34,6 +34,7 @@
     "test:forecast:all": "npm run test:forecast:unit && npm run test:forecast:integration && npm run test:forecast",
     "test:forecast:watch": "vitest server/services/forecast/__tests__/",
     "test:e2e": "playwright test --project=chromium",
+    "test:e2e:staging": "PLAYWRIGHT_BASE_URL=https://staging.dineros.cc playwright test --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:install": "playwright install",
