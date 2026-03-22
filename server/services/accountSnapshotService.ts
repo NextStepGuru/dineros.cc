@@ -1,7 +1,11 @@
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
-import { createError } from "h3";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
+
+export {
+  assertUserHasAccountAccess,
+  assertUserOwnsAccount,
+} from "~/server/lib/accountAccess";
 
 /** Same OR filter as `server/api/register.ts` for `direction: "future"`. */
 export const futureRegisterEntryWhere = {
@@ -12,18 +16,6 @@ export const futureRegisterEntryWhere = {
     { isProjected: false, isManualEntry: true, isCleared: false },
   ],
 };
-
-export async function assertUserOwnsAccount(
-  userId: number,
-  accountId: string,
-): Promise<void> {
-  const link = await PrismaDb.userAccount.findFirst({
-    where: { userId, accountId },
-  });
-  if (!link) {
-    throw createError({ statusCode: 403, statusMessage: "Forbidden" });
-  }
-}
 
 export async function createAccountSnapshot(accountId: string) {
   const registers = await PrismaDb.accountRegister.findMany({

@@ -300,7 +300,9 @@ describe("Core API Endpoints", () => {
       expect(prisma.budget.findMany).toHaveBeenCalledWith({
         where: {
           isArchived: false,
-          userId: 123,
+          account: {
+            userAccounts: { some: { userId: 123 } },
+          },
         },
       });
     });
@@ -327,7 +329,9 @@ describe("Core API Endpoints", () => {
       expect(prisma.budget.findMany).toHaveBeenCalledWith({
         where: {
           isArchived: false,
-          userId: 456,
+          account: {
+            userAccounts: { some: { userId: 456 } },
+          },
         },
       });
 
@@ -418,7 +422,9 @@ describe("Core API Endpoints", () => {
       expect(prisma.budget.findMany).toHaveBeenCalledWith({
         where: {
           isArchived: false,
-          userId: 123,
+          account: {
+            userAccounts: { some: { userId: 123 } },
+          },
         },
       });
 
