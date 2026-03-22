@@ -11,9 +11,17 @@ export async function loggedChatCompletion(params: {
   client: OpenAI;
   body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
   purpose: string;
+  /** Stored on success and on failure (when present). */
   metadata?: Prisma.InputJsonValue;
+  /**
+   * When set, success rows use the merged JSON from this callback instead of `metadata` alone.
+   * Use for logging parsed model output. Failure rows still use `metadata` only.
+   */
+  metadataFromResponse?: (
+    _response: ChatCompletion,
+  ) => Prisma.InputJsonValue | Promise<Prisma.InputJsonValue>;
 }): Promise<ChatCompletion> {
-  const { client, body, purpose, metadata } = params;
+  const { client, body, purpose, metadata, metadataFromResponse } = params;
   const start = dateTimeService.now();
   const modelName =
     typeof body.model === "string" ? body.model : "unknown";
@@ -38,6 +46,10 @@ export async function loggedChatCompletion(params: {
       }
     }
 
+    const successMetadata = metadataFromResponse
+      ? await metadataFromResponse(response)
+      : metadata;
+
     await prisma.openAiRequestLog.create({
       data: {
         purpose,
@@ -52,7 +64,7 @@ export async function loggedChatCompletion(params: {
         success: true,
         errorMessage: null,
         httpStatus: null,
-        metadata: metadata ?? undefined,
+        metadata: successMetadata ?? undefined,
       },
     });
 
