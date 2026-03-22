@@ -93,6 +93,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "UserAccount",
  *       "isList": true
  *     },
+ *     "accountInvitesSent": {
+ *       "modelName": "AccountInvite",
+ *       "isList": true
+ *     },
  *     "country": {
  *       "modelName": "Country",
  *       "isList": false

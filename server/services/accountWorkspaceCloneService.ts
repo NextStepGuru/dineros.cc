@@ -1,6 +1,7 @@
 import type { prisma } from "~/server/clients/prismaClient";
 import { cloneBudget } from "~/server/services/budgetCloneService";
 import { cloneCategoriesForAccount } from "~/server/services/categoryCloneService";
+import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
 
 type Tx = typeof prisma;
 
@@ -26,8 +27,11 @@ export async function duplicateAccountWorkspace(
   const sourceBudget = await tx.budget.findFirst({
     where:
       sourceBudgetId === undefined || sourceBudgetId === null
-        ? { userId, isDefault: true }
-        : { id: sourceBudgetId, userId },
+        ? { isDefault: true, account: accountWhereUserIsMember(userId) }
+        : {
+            id: sourceBudgetId,
+            account: accountWhereUserIsMember(userId),
+          },
     select: { id: true, accountId: true },
   });
   if (!sourceBudget) {

@@ -37,7 +37,12 @@ export default defineEventHandler(async (event) => {
         orderBy: [{ lastAt: "asc" }, { id: "asc" }],
       }),
       PrismaDb.budget.findMany({
-        where: { isArchived: false, userId: user.userId },
+        where: {
+          isArchived: false,
+          account: {
+            userAccounts: { some: { userId: user.userId } },
+          },
+        },
       }),
       PrismaDb.interval.findMany({}),
       PrismaDb.accountType.findMany({}),

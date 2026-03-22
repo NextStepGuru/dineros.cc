@@ -10,6 +10,7 @@ import {
   stripRegisterEntryPlaidJson,
 } from "~/server/lib/registerLedgerFuture";
 import { dateTimeService } from "~/server/services/forecast";
+import { budgetWhereForAccountMember } from "~/server/lib/accountAccess";
 
 const querySchema = z.object({
   accountId: z.string().min(1),
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
     const q = querySchema.parse(getQuery(event));
 
     const budget = await PrismaDb.budget.findFirst({
-      where: { id: q.budgetId, userId: user.userId },
+      where: budgetWhereForAccountMember(user.userId, q.budgetId),
       select: { id: true },
     });
     if (!budget) {

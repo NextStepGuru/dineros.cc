@@ -6,6 +6,7 @@ import { createBudgetSchema, budgetSchema } from "~/schema/zod";
 import { cloneBudget } from "~/server/services/budgetCloneService";
 import { duplicateAccountWorkspace } from "~/server/services/accountWorkspaceCloneService";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
+import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
 
 const MAX_BUDGETS = 10;
 
@@ -60,7 +61,10 @@ export default defineEventHandler(async (event) => {
     }
 
     const defaultBudget = await PrismaDb.budget.findFirst({
-      where: { userId: user.userId, isDefault: true },
+      where: {
+        isDefault: true,
+        account: accountWhereUserIsMember(user.userId),
+      },
     });
     if (!defaultBudget) {
       throw createError({

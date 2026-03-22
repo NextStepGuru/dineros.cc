@@ -300,8 +300,10 @@ async function ensureCategoryReportAccess(
   const budget = await PrismaDb.budget.findFirst({
     where: {
       id: budgetId,
-      userId,
       isArchived: false,
+      account: {
+        userAccounts: { some: { userId } },
+      },
     },
     select: { id: true },
   });
