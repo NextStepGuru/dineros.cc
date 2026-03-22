@@ -3,6 +3,7 @@ import type { E2EContext } from "../utils/e2e-context";
 import { loadE2EContext } from "../utils/e2e-context";
 
 export const test = base.extend<{ e2e: E2EContext }>({
+  // eslint-disable-next-line no-empty-pattern
   e2e: async ({}, use) => {
     await use(loadE2EContext());
   },

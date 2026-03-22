@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,7 +76,7 @@ export default defineConfig({
           timeout: process.env.CI ? 180_000 : 60_000,
           env: {
             ...process.env,
-            ...(process.env.CI ? { E2E: "1" } : {}),
+            E2E: "1",
           },
         },
       }

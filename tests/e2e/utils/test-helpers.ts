@@ -40,16 +40,17 @@ export class TestHelpers {
   }
 
   async signOut(): Promise<void> {
-    const signOutLink = this.page.getByRole("link", { name: /sign out/i });
-    const signOutButton = this.page.getByRole("button", { name: /sign out/i });
-    if (await signOutLink.isVisible().catch(() => false)) {
-      await signOutLink.click();
-    } else if (await signOutButton.isVisible().catch(() => false)) {
-      await signOutButton.click();
-    } else {
-      await this.page.getByText(/^sign out$/i).first().click();
-    }
-    await this.page.waitForURL(/\/$|\/login/, { timeout: 15_000 });
+    await this.page
+      .getByRole("banner")
+      .getByRole("button", { name: /^sign out$/i })
+      .click();
+    await this.page.waitForURL(
+      (url) => {
+        const { pathname } = new URL(url);
+        return pathname === "/" || pathname === "/login" || pathname.startsWith("/login");
+      },
+      { timeout: 15_000 },
+    );
   }
 }
 

@@ -316,6 +316,7 @@ function updateTableViewportMaxHeight() {
 }
 
 onMounted(async () => {
+  import("~/components/modals/EditReoccurrence.vue").catch(() => {});
   await nextTick();
   updateTableViewportMaxHeight();
   window.addEventListener("resize", updateTableViewportMaxHeight);

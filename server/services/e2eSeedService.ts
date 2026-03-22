@@ -103,6 +103,11 @@ export async function deleteE2EUserByEmail(
       where: { accountRegisterId: { in: registerIds } },
     });
 
+    await tx.accountRegister.updateMany({
+      where: { id: { in: registerIds } },
+      data: { paymentCategoryId: null, interestCategoryId: null },
+    });
+
     await tx.category.deleteMany({
       where: { accountId: { in: accountIds } },
     });
@@ -213,7 +218,7 @@ export async function seedE2EUser(): Promise<E2ESeedResult> {
         balance: 1000,
         latestBalance: 1000,
         statementAt,
-        statementIntervalId: 3,
+        interval: { connect: { id: 3 } },
         account: { connect: { id: accountId } },
         type: { connect: { id: 1 } },
         budget: { connect: { id: budgetId } },
@@ -241,7 +246,7 @@ export async function seedE2EUser(): Promise<E2ESeedResult> {
         balance: 0,
         latestBalance: 0,
         statementAt,
-        statementIntervalId: 3,
+        interval: { connect: { id: 3 } },
         account: { connect: { id: accountId } },
         type: { connect: { id: 1 } },
         budget: { connect: { id: budgetId } },

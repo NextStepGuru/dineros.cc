@@ -8,6 +8,11 @@ build
 # Coverage and test files
 coverage
 
+# Playwright E2E local output (session storage, HTML report; not committed)
+\.auth/
+playwright-report/
+test-results/
+
 
 # Pre-commit and detector config (patterns could self-match)
 .pre-commit-config.yaml
