@@ -84,11 +84,12 @@ export default defineEventHandler(async (event) => {
     event.context.user = decoded;
 
     if (isTaskRoute) {
-      const currentUser = await prisma.user.findUnique({
+      const currentUser = (await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { email: true },
-      });
-      if (!isAdminEmail(currentUser?.email)) {
+      })) as { role?: string | null; email?: string | null } | null;
+      const role = typeof currentUser?.role === "string" ? currentUser.role : null;
+      const isAdmin = role === "ADMIN" || isAdminEmail(currentUser?.email);
+      if (!isAdmin) {
         setResponseStatus(event, 403);
         return { message: "Forbidden." };
       }

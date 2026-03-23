@@ -2,11 +2,11 @@ import type { Ref } from "vue";
 
 type SnapshotItem = {
   label: string;
-  value: string;
+  value: string | number | null;
 };
 
 export function useSnapshotMenuItems(args: {
-  selectedSnapshotValue: Ref<string>;
+  selectedSnapshotValue: Ref<string | number | null>;
   snapshotViewItems: Ref<SnapshotItem[]>;
 }) {
   const selectedSnapshotLabel = computed(

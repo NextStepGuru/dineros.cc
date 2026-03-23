@@ -27,6 +27,7 @@ export type Reoccurrence = z.infer<typeof reoccurrenceWithSplitsSchema>;
 export type Interval = z.infer<typeof intervalSchema>;
 export type AccountRegister = z.infer<typeof accountRegisterSchema>;
 export type User = z.infer<typeof publicProfileSchema> & {
+  role?: "USER" | "ADMIN";
   /** Present on `/api/user`; omitted on some other profile responses. */
   isAdmin?: boolean;
 };

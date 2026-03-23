@@ -23,6 +23,11 @@ enum ReoccurrenceSplitAmountMode {
   PERCENT
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -69,6 +74,7 @@ model User {
   isDaylightSaving Boolean?  @default(true) @map("is_daylight_saving") // Whether currently observing DST
   config           Json?
   settings         Json?
+  role             UserRole  @default(USER)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budgets    Budget[]

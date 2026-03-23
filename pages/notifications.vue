@@ -1,42 +1,30 @@
 <script setup lang="ts">
+import {
+  dispatchNotificationsRefresh,
+  dismissNotification,
+  fetchNotificationSnapshot,
+  type ForecastRiskAlert,
+  type NotificationFetchStatus,
+  type ReoccurrenceHealthIssue,
+} from "~/lib/notifications";
+import { formatDate } from "~/lib/utils";
+
 definePageMeta({
   middleware: "auth",
 });
 useHead({ title: "Notifications | Dineros" });
 
-type ForecastRiskAlert = {
-  key: string;
-  accountRegisterId: number;
-  accountRegisterName: string;
-  riskType: "negative_balance" | "below_min_balance";
-  threshold: number;
-  projectedBalanceAtRisk: number;
-  projectedLowestBalance: number;
-  riskAt: string;
-  daysUntilRisk: number;
-};
-
-type ReoccurrenceHealthIssue = {
-  type:
-    | "duplicate_rule"
-    | "ended_rule"
-    | "last_run_after_end"
-    | "stale_last_run"
-    | "zero_amount";
-  reoccurrenceId: number;
-  description: string;
-  accountRegisterId: number;
-  accountRegisterName: string;
-  details: string;
-};
-
 const authStore = useAuthStore();
 const { $api } = useNuxtApp();
+const notificationCount = useNotificationCount();
 const loading = ref(false);
 const riskAlerts = ref<ForecastRiskAlert[]>([]);
 const recurringHealthIssues = ref<ReoccurrenceHealthIssue[]>([]);
 const actionLoadingKeys = ref<Set<string>>(new Set());
 const currentTab = ref<"all" | "risk" | "recurring">("all");
+const riskFetchStatus = ref<NotificationFetchStatus>("ok");
+const recurringFetchStatus = ref<NotificationFetchStatus>("ok");
+const recurringDisplayLimit = 20;
 
 const totalNotifications = computed(
   () => riskAlerts.value.length + recurringHealthIssues.value.length,
@@ -47,6 +35,37 @@ const visibleRiskAlerts = computed(() =>
 const visibleRecurringIssues = computed(() =>
   currentTab.value === "risk" ? [] : recurringHealthIssues.value,
 );
+const shownRecurringIssues = computed(() =>
+  visibleRecurringIssues.value.slice(0, recurringDisplayLimit),
+);
+const hiddenRecurringCount = computed(() =>
+  Math.max(
+    0,
+    visibleRecurringIssues.value.length - shownRecurringIssues.value.length,
+  ),
+);
+const hasPartialData = computed(
+  () => riskFetchStatus.value !== "ok" || recurringFetchStatus.value !== "ok",
+);
+const formatNotificationDate = (dateIso: string): string | null =>
+  formatDate(dateIso);
+const tabFilteredEmptyMessage = computed(() => {
+  if (loading.value || totalNotifications.value === 0) return "";
+  if (currentTab.value === "risk" && visibleRiskAlerts.value.length === 0) {
+    return recurringHealthIssues.value.length > 0
+      ? "No risk alerts in this tab. You still have recurring rule issues."
+      : "No risk alerts in this tab.";
+  }
+  if (
+    currentTab.value === "recurring" &&
+    visibleRecurringIssues.value.length === 0
+  ) {
+    return riskAlerts.value.length > 0
+      ? "No recurring issues in this tab. You still have cash-flow risk alerts."
+      : "No recurring issues in this tab.";
+  }
+  return "";
+});
 
 function formatRiskEta(daysUntilRisk: number): string {
   if (daysUntilRisk <= 0) return "today";
@@ -58,59 +77,88 @@ async function fetchNotifications() {
   if (!authStore.getBudgetId) {
     riskAlerts.value = [];
     recurringHealthIssues.value = [];
+    riskFetchStatus.value = "ok";
+    recurringFetchStatus.value = "ok";
+    notificationCount.value = 0;
+    dispatchNotificationsRefresh({ count: 0, reason: "budget-change" });
     return;
   }
   loading.value = true;
   try {
-    const [riskData, recurringData] = await Promise.all([
-      ($api as typeof $fetch)<{ alerts: ForecastRiskAlert[] }>(
-        "/api/forecast-risk-alerts",
-        {
-          query: {
-            budgetId: authStore.getBudgetId,
-            daysAhead: 90,
-          },
-        },
-      ),
-      ($api as typeof $fetch)<{ issues: ReoccurrenceHealthIssue[] }>(
-        "/api/reoccurrence-health",
-        {
-          query: { budgetId: authStore.getBudgetId },
-        },
-      ),
-    ]);
-    riskAlerts.value = riskData.alerts ?? [];
-    recurringHealthIssues.value = recurringData.issues ?? [];
+    const snapshot = await fetchNotificationSnapshot({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      daysAhead: 90,
+      timeoutMs: 10000,
+    });
+    riskAlerts.value = snapshot.riskAlerts;
+    recurringHealthIssues.value = snapshot.recurringHealthIssues;
+    riskFetchStatus.value = snapshot.riskStatus;
+    recurringFetchStatus.value = snapshot.recurringStatus;
+    notificationCount.value = snapshot.total;
+    dispatchNotificationsRefresh({ count: snapshot.total, reason: "load" });
   } catch {
     riskAlerts.value = [];
     recurringHealthIssues.value = [];
+    riskFetchStatus.value = "error";
+    recurringFetchStatus.value = "error";
+    notificationCount.value = 0;
+    dispatchNotificationsRefresh({ count: 0, reason: "error" });
   } finally {
     loading.value = false;
   }
 }
 
 async function markRiskAlert(
-  key: string,
+  notificationId: number,
   status: "dismissed" | "resolved",
 ) {
   if (!authStore.getBudgetId) return;
-  actionLoadingKeys.value.add(key);
+  actionLoadingKeys.value.add(String(notificationId));
   try {
-    const data = await ($api as typeof $fetch)<{ alerts: ForecastRiskAlert[] }>(
-      `/api/forecast-risk-alerts/state?budgetId=${authStore.getBudgetId}`,
-      {
-        method: "PATCH",
-        body: { key, status },
-      },
-    );
-    riskAlerts.value = data.alerts ?? [];
-    if (import.meta.client) {
-      globalThis.dispatchEvent(new Event("notifications:refresh"));
-    }
+    const data = await dismissNotification({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      notificationId,
+      status,
+    });
+    riskAlerts.value = data.riskAlerts ?? [];
+    recurringHealthIssues.value = data.recurringHealthIssues ?? [];
+    notificationCount.value =
+      data.total ??
+      riskAlerts.value.length + recurringHealthIssues.value.length;
+    dispatchNotificationsRefresh({
+      count: notificationCount.value,
+      reason: "mutation",
+    });
   } catch {
     // Intentionally silent; global errors can be surfaced later via toasts.
   } finally {
-    actionLoadingKeys.value.delete(key);
+    actionLoadingKeys.value.delete(String(notificationId));
+  }
+}
+
+async function dismissRecurringIssue(notificationId: number) {
+  if (!authStore.getBudgetId) return;
+  actionLoadingKeys.value.add(String(notificationId));
+  try {
+    const data = await dismissNotification({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      notificationId,
+      status: "dismissed",
+    });
+    riskAlerts.value = data.riskAlerts ?? [];
+    recurringHealthIssues.value = data.recurringHealthIssues ?? [];
+    notificationCount.value =
+      data.total ??
+      riskAlerts.value.length + recurringHealthIssues.value.length;
+    dispatchNotificationsRefresh({
+      count: notificationCount.value,
+      reason: "mutation",
+    });
+  } finally {
+    actionLoadingKeys.value.delete(String(notificationId));
   }
 }
 
@@ -144,11 +192,31 @@ section(class="px-3 sm:px-4 py-4 max-w-5xl mx-auto space-y-4")
       @click="currentTab = 'recurring'") Recurring
 
   UAlert(
+    v-if="loading"
+    color="neutral"
+    variant="subtle"
+    title="Refreshing notifications"
+    description="Checking forecast and recurring-rule signals.")
+
+  UAlert(
+    v-if="!loading && hasPartialData"
+    color="warning"
+    variant="subtle"
+    title="Some notifications could not be loaded"
+    description="Showing available results. Refresh to retry missing data.")
+
+  UAlert(
     v-if="!loading && totalNotifications === 0"
     color="success"
     variant="subtle"
     title="All clear"
     description="No forecast risk alerts or recurring rule health issues right now.")
+
+  UAlert(
+    v-if="tabFilteredEmptyMessage"
+    color="neutral"
+    variant="subtle"
+    :description="tabFilteredEmptyMessage")
 
   UCard(v-if="visibleRiskAlerts.length > 0")
     template(#header)
@@ -157,29 +225,40 @@ section(class="px-3 sm:px-4 py-4 max-w-5xl mx-auto space-y-4")
       li(v-for="alert in visibleRiskAlerts" :key="`risk-${alert.accountRegisterId}-${alert.riskAt}`" class="frog-text-muted")
         b(class="frog-text") {{ alert.accountRegisterName }}:
         span &nbsp;{{ alert.riskType === "below_min_balance" ? "below minimum balance" : "projected negative" }} {{ formatRiskEta(alert.daysUntilRisk) }}
-        span &nbsp;({{ formatDate(alert.riskAt) }})
+        span &nbsp;({{ formatNotificationDate(alert.riskAt) }})
         UButton(size="xs" variant="soft" class="ml-2" :to="`/register/${alert.accountRegisterId}`") Open register
         UButton(
           size="xs"
           variant="ghost"
           class="ml-2"
-          :loading="actionLoadingKeys.has(alert.key)"
-          :disabled="actionLoadingKeys.has(alert.key)"
-          @click="markRiskAlert(alert.key, 'resolved')") Mark resolved
+          :loading="actionLoadingKeys.has(String(alert.notificationId))"
+          :disabled="actionLoadingKeys.has(String(alert.notificationId))"
+          @click="markRiskAlert(alert.notificationId, 'resolved')") Mark resolved
         UButton(
           size="xs"
           variant="ghost"
           class="ml-1"
-          :loading="actionLoadingKeys.has(alert.key)"
-          :disabled="actionLoadingKeys.has(alert.key)"
-          @click="markRiskAlert(alert.key, 'dismissed')") Dismiss
+          :loading="actionLoadingKeys.has(String(alert.notificationId))"
+          :disabled="actionLoadingKeys.has(String(alert.notificationId))"
+          @click="markRiskAlert(alert.notificationId, 'dismissed')") Dismiss
 
   UCard(v-if="visibleRecurringIssues.length > 0")
     template(#header)
       h2(class="font-semibold") Recurring rule health checks ({{ visibleRecurringIssues.length }})
+    p(
+      v-if="hiddenRecurringCount > 0"
+      class="text-xs frog-text-muted mb-2")
+      | Showing first {{ shownRecurringIssues.length }} of {{ visibleRecurringIssues.length }} recurring issues.
     ul(class="space-y-2 text-sm")
-      li(v-for="issue in visibleRecurringIssues.slice(0, 20)" :key="`rec-${issue.type}-${issue.reoccurrenceId}`" class="frog-text-muted")
+      li(v-for="issue in shownRecurringIssues" :key="`rec-${issue.type}-${issue.reoccurrenceId}`" class="frog-text-muted")
         b(class="frog-text") {{ issue.accountRegisterName }}:
         span &nbsp;{{ issue.description }} — {{ issue.details }}
         UButton(size="xs" variant="soft" class="ml-2" to="/reoccurrences") Review rule
+        UButton(
+          size="xs"
+          variant="ghost"
+          class="ml-1"
+          :loading="actionLoadingKeys.has(String(issue.notificationId))"
+          :disabled="actionLoadingKeys.has(String(issue.notificationId))"
+          @click="dismissRecurringIssue(issue.notificationId)") Dismiss
 </template>

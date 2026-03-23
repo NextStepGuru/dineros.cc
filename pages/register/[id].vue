@@ -151,7 +151,9 @@ const selectedAccountOption = computed(() =>
   ),
 );
 
-const hasReoccurrences = computed(() => listStore.getReoccurrencesForCurrentBudget.length > 0);
+const hasReoccurrences = computed(
+  () => listStore.getReoccurrencesForCurrentBudget.length > 0,
+);
 
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 
@@ -984,15 +986,20 @@ const registerRowsForTable = computed(() =>
     const categoryName =
       e.categoryId == null
         ? "uncategorized"
-        : (listStore.getCategories.find((c) => c.id === e.categoryId)?.name ?? "");
+        : (listStore.getCategories.find((c) => c.id === e.categoryId)?.name ??
+          "");
     const dateText = formatDate(e.createdAt) ?? "";
 
     return (
       (e.description ?? "").toLowerCase().includes(q) ||
       categoryName.toLowerCase().includes(q) ||
       dateText.toLowerCase().includes(q) ||
-      String(e.amount ?? "").toLowerCase().includes(q) ||
-      String(e.balance ?? "").toLowerCase().includes(q)
+      String(e.amount ?? "")
+        .toLowerCase()
+        .includes(q) ||
+      String(e.balance ?? "")
+        .toLowerCase()
+        .includes(q)
     );
   }),
 );
@@ -1159,7 +1166,7 @@ async function recalcAccount() {
 </script>
 
 <template lang="pug">
-  section.mx-4(ref="registerSectionEl" class="min-w-0")
+  section.mx-2(ref="registerSectionEl" class="min-w-0")
     h1(class="sr-only") Register
     div(
       class="sr-only"
@@ -1338,32 +1345,50 @@ async function recalcAccount() {
               UButton(size="xs" color="info" @click="handleAddEntry") Add entry
 
     //- Skeleton loading state
-    div(v-else-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }")
-      //- Table header skeleton
-      div(class="flex border-b frog-border p-4")
-        div(class="w-7 shrink-0")
-          USkeleton(class="h-4 w-2 mx-auto")
-        div(class="flex-1")
-          USkeleton(class="h-4 w-16")
-        div(class="flex-1")
-          USkeleton(class="h-4 w-24")
-        div(class="flex-1 text-right")
-          USkeleton(class="h-4 w-20 ml-auto")
-        div(class="flex-1 text-right")
-          USkeleton(class="h-4 w-20 ml-auto")
+    template(v-else-if="isLoading && tableEntries.length === 0")
+      //- Toolbar/loading controls skeleton (above table)
+      div(class="mt-4 mb-2 p-1")
+        div(class="flex flex-wrap xl:flex-nowrap items-start gap-3")
+          div(class="min-w-0 flex-1 flex flex-wrap items-center gap-2")
+            USkeleton(class="h-9 w-24 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md")
+          div(class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-2")
+            div(class="flex items-center gap-2")
+              USkeleton(class="h-4 w-28")
+              USkeleton(class="h-7 w-36 rounded-md")
+            USkeleton(class="h-4 w-56")
 
-      //- Table rows skeleton
-      div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
-        div(class="w-7 shrink-0")
-          USkeleton(class="h-4 w-2 mx-auto")
-        div(class="flex-1")
-          USkeleton(class="h-4 w-20")
-        div(class="flex-1")
-          USkeleton(class="h-4 w-32")
-        div(class="flex-1 text-right")
-          USkeleton(class="h-4 w-16 ml-auto")
-        div(class="flex-1 text-right")
-          USkeleton(class="h-4 w-16 ml-auto")
+      //- Table skeleton
+      div(ref="registerTableViewportEl" class="flex-1 overflow-hidden rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }")
+        //- Table header skeleton
+        div(class="flex border-b frog-border p-4")
+          div(class="w-7 shrink-0")
+            USkeleton(class="h-4 w-2 mx-auto")
+          div(class="flex-1")
+            USkeleton(class="h-4 w-16")
+          div(class="flex-1")
+            USkeleton(class="h-4 w-24")
+          div(class="flex-1 text-right")
+            USkeleton(class="h-4 w-20 ml-auto")
+          div(class="flex-1 text-right")
+            USkeleton(class="h-4 w-20 ml-auto")
+
+        //- Table rows skeleton
+        div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
+          div(class="w-7 shrink-0")
+            USkeleton(class="h-4 w-2 mx-auto")
+          div(class="flex-1")
+            USkeleton(class="h-4 w-20")
+          div(class="flex-1")
+            USkeleton(class="h-4 w-32")
+          div(class="flex-1 text-right")
+            USkeleton(class="h-4 w-16 ml-auto")
+          div(class="flex-1 text-right")
+            USkeleton(class="h-4 w-16 ml-auto")
 
     div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
       UAlert(

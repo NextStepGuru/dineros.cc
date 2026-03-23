@@ -2,6 +2,10 @@
 import type { User, Budget } from "~/types/types";
 import { formatAccountRegisters } from "~/lib/utils";
 import type { BudgetManagerProps } from "~/components/modals/BudgetManager.vue";
+import {
+  NOTIFICATIONS_REFRESH_EVENT,
+  type NotificationsRefreshDetail,
+} from "~/lib/notifications";
 
 const ModalsBudgetManager = defineAsyncComponent(
   () => import("~/components/modals/BudgetManager.vue"),
@@ -14,7 +18,7 @@ const route = useRoute();
 const { $api } = useNuxtApp();
 const overlay = useOverlay();
 const budgetModal = overlay.create(ModalsBudgetManager);
-const notificationCount = ref(0);
+const notificationCount = useNotificationCount();
 
 const currentBudgetName = computed(
   () =>
@@ -115,6 +119,15 @@ const items = computed(() => {
         to: "/help",
         active: route.path.startsWith("/help"),
       },
+      ...(authStore.getUser?.role === "ADMIN"
+        ? [
+            {
+              label: "Admin",
+              to: "/admin",
+              active: route.path.startsWith("/admin"),
+            },
+          ]
+        : []),
     ];
   } else {
     // Items for not logged-in users
@@ -187,26 +200,29 @@ async function refreshNotificationCount() {
     return;
   }
   try {
-    const [riskData, recurringData] = await Promise.all([
-      ($api as typeof $fetch)<{ alerts: unknown[] }>("/api/forecast-risk-alerts", {
+    const result = await ($api as typeof $fetch)<{ count: number }>(
+      "/api/notifications/count",
+      {
         query: { budgetId: authStore.getBudgetId, daysAhead: 90 },
-      }),
-      ($api as typeof $fetch)<{ issues: unknown[] }>("/api/reoccurrence-health", {
-        query: { budgetId: authStore.getBudgetId },
-      }),
-    ]);
-    notificationCount.value =
-      (riskData.alerts?.length ?? 0) + (recurringData.issues?.length ?? 0);
+      },
+    );
+    notificationCount.value = result.count ?? 0;
   } catch {
     notificationCount.value = 0;
   }
 }
 
-let poller: ReturnType<typeof setInterval> | undefined;
-const onNotificationsRefresh = () => {
+function onNotificationsRefresh(event: Event) {
+  const maybeCustom = event as CustomEvent<NotificationsRefreshDetail>;
+  const count = maybeCustom?.detail?.count;
+  if (typeof count === "number") {
+    notificationCount.value = Math.max(0, count);
+    return;
+  }
   refreshNotificationCount();
-};
+}
 
+let poller: ReturnType<typeof setInterval> | undefined;
 function start() {
   poller = setInterval(pollData, 1000 * 60 * 10); // 10 minutes);
 }
@@ -216,15 +232,18 @@ function stop() {
   poller = undefined;
 }
 
-watch(() => authStore.getIsUserLoggedIn, (isLoggedIn) => {
-  if (isLoggedIn && !poller) {
-    start();
-    refreshNotificationCount();
-  } else if (poller && !isLoggedIn) {
-    stop();
-    notificationCount.value = 0;
-  }
-});
+watch(
+  () => authStore.getIsUserLoggedIn,
+  (isLoggedIn) => {
+    if (isLoggedIn && !poller) {
+      start();
+      refreshNotificationCount();
+    } else if (poller && !isLoggedIn) {
+      stop();
+      notificationCount.value = 0;
+    }
+  },
+);
 
 watch(
   () => authStore.getBudgetId,
@@ -240,7 +259,10 @@ onMounted(() => {
     refreshNotificationCount();
   }
   if (import.meta.client) {
-    globalThis.addEventListener("notifications:refresh", onNotificationsRefresh);
+    globalThis.addEventListener(
+      NOTIFICATIONS_REFRESH_EVENT,
+      onNotificationsRefresh,
+    );
   }
 });
 
@@ -251,7 +273,7 @@ onBeforeUnmount(() => {
   }
   if (import.meta.client) {
     globalThis.removeEventListener(
-      "notifications:refresh",
+      NOTIFICATIONS_REFRESH_EVENT,
       onNotificationsRefresh,
     );
   }
@@ -354,7 +376,7 @@ UHeader(
             size="sm"
             class="justify-start"
             icon="lucide:user-cog"
-            @click="close") Edit profile
+            @click="close") Settings
           .flex.items-center.justify-between.rounded.px-2.py-1
             .flex.items-center.gap-2
               UIcon(name="i-lucide-moon-star")
@@ -429,7 +451,7 @@ UHeader(
             size="lg"
             class="w-full justify-start"
             icon="lucide:user-cog"
-            @click="close") Edit profile
+            @click="close") Settings
           .mobile-theme-row
             .flex.items-center.gap-2
               UIcon(name="i-lucide-moon-star")
@@ -491,8 +513,16 @@ UHeader(
 <style scoped>
 .mobile-menu-container {
   background:
-    radial-gradient(120% 90% at 90% -20%, rgb(59 130 246 / 18%), transparent 60%),
-    radial-gradient(120% 90% at -10% 100%, rgb(16 185 129 / 14%), transparent 60%),
+    radial-gradient(
+      120% 90% at 90% -20%,
+      rgb(59 130 246 / 18%),
+      transparent 60%
+    ),
+    radial-gradient(
+      120% 90% at -10% 100%,
+      rgb(16 185 129 / 14%),
+      transparent 60%
+    ),
     color-mix(in srgb, var(--frog-surface) 30%, #000 70%);
 }
 
