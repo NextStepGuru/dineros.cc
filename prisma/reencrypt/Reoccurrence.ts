@@ -103,6 +103,14 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "plaidNameAliases": {
  *       "modelName": "ReoccurrencePlaidNameAlias",
  *       "isList": true
+ *     },
+ *     "billProfile": {
+ *       "modelName": "BillProfile",
+ *       "isList": false
+ *     },
+ *     "billInstances": {
+ *       "modelName": "BillInstance",
+ *       "isList": true
  *     }
  *   }
  * }

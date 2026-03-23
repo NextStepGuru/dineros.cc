@@ -12,9 +12,9 @@
 <style scoped>
 .pepe-img {
   display: block;
-  width: 100%;
+  width: min(100%, 21rem);
   height: auto;
-  max-width: 40rem;
+  max-width: 21rem;
   border-radius: 1rem;
   filter: drop-shadow(0 20px 34px rgba(0, 0, 0, 0.35));
 }

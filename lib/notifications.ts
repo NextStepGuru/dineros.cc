@@ -26,11 +26,30 @@ export type ReoccurrenceHealthIssue = {
   details: string;
 };
 
+export type BillCenterAlert = {
+  billInstanceId: number;
+  accountRegisterId: number;
+  accountRegisterName: string;
+  description: string;
+  amount: number;
+  dueAt: string;
+  status: "OVERDUE" | "DUE_TODAY" | "DUE_SOON";
+};
+
+export type ReconciliationAlert = {
+  periodId: number;
+  accountRegisterId: number;
+  accountRegisterName: string;
+  updatedAt: string;
+};
+
 export type NotificationFetchStatus = "ok" | "timeout" | "error";
 
 type NotificationsResponse = {
   riskAlerts?: ForecastRiskAlert[];
   recurringHealthIssues?: ReoccurrenceHealthIssue[];
+  billAlerts?: BillCenterAlert[];
+  reconciliationAlerts?: ReconciliationAlert[];
   riskStatus?: NotificationFetchStatus;
   recurringStatus?: NotificationFetchStatus;
   total?: number;
@@ -40,6 +59,8 @@ type ApiFetcher = typeof $fetch;
 export type NotificationSnapshot = {
   riskAlerts: ForecastRiskAlert[];
   recurringHealthIssues: ReoccurrenceHealthIssue[];
+  billAlerts: BillCenterAlert[];
+  reconciliationAlerts: ReconciliationAlert[];
   riskStatus: NotificationFetchStatus;
   recurringStatus: NotificationFetchStatus;
   total: number;
@@ -92,6 +113,8 @@ export async function fetchNotificationSnapshot(params: {
     return {
       riskAlerts: [],
       recurringHealthIssues: [],
+      billAlerts: [],
+      reconciliationAlerts: [],
       riskStatus: "ok",
       recurringStatus: "ok",
       total: 0,
@@ -105,6 +128,8 @@ export async function fetchNotificationSnapshot(params: {
     {
       riskAlerts: [],
       recurringHealthIssues: [],
+      billAlerts: [],
+      reconciliationAlerts: [],
       riskStatus: "error",
       recurringStatus: "error",
       total: 0,
@@ -113,12 +138,21 @@ export async function fetchNotificationSnapshot(params: {
   );
   const riskAlerts = result.data.riskAlerts ?? [];
   const recurringHealthIssues = result.data.recurringHealthIssues ?? [];
+  const billAlerts = result.data.billAlerts ?? [];
+  const reconciliationAlerts = result.data.reconciliationAlerts ?? [];
   const riskStatus = result.data.riskStatus ?? result.status;
   const recurringStatus = result.data.recurringStatus ?? result.status;
-  const total = result.data.total ?? riskAlerts.length + recurringHealthIssues.length;
+  const total =
+    result.data.total ??
+    riskAlerts.length +
+      recurringHealthIssues.length +
+      billAlerts.length +
+      reconciliationAlerts.length;
   return {
     riskAlerts,
     recurringHealthIssues,
+    billAlerts,
+    reconciliationAlerts,
     riskStatus,
     recurringStatus,
     total,
@@ -132,13 +166,18 @@ export async function dismissNotification(params: {
   status?: "dismissed" | "resolved";
 }) {
   const { api, budgetId, notificationId, status = "dismissed" } = params;
-  return await api<NotificationsResponse>(`/api/notifications/${notificationId}/dismiss`, {
-    method: "PATCH",
-    body: { budgetId, status },
-  });
+  return await api<NotificationsResponse>(
+    `/api/notifications/${notificationId}/dismiss`,
+    {
+      method: "PATCH",
+      body: { budgetId, status },
+    },
+  );
 }
 
-export function dispatchNotificationsRefresh(detail: NotificationsRefreshDetail) {
+export function dispatchNotificationsRefresh(
+  detail: NotificationsRefreshDetail,
+) {
   if (!import.meta.client) return;
   globalThis.dispatchEvent(
     new CustomEvent<NotificationsRefreshDetail>(NOTIFICATIONS_REFRESH_EVENT, {

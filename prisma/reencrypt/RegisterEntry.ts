@@ -96,6 +96,18 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "category": {
  *       "modelName": "Category",
  *       "isList": false
+ *     },
+ *     "billInstancesPaid": {
+ *       "modelName": "BillInstance",
+ *       "isList": true
+ *     },
+ *     "reconciliationItems": {
+ *       "modelName": "ReconciliationItem",
+ *       "isList": true
+ *     },
+ *     "reconciliationClosingPeriods": {
+ *       "modelName": "ReconciliationPeriod",
+ *       "isList": true
  *     }
  *   }
  * }
