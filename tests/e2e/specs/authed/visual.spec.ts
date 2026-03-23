@@ -1,8 +1,9 @@
 import { test, expect } from "../../fixtures/e2e-fixtures";
 
-const SCREENSHOT_OPTS = { fullPage: true, maxDiffPixelRatio: 0.03 } as const;
+/** Viewport only — full-page height differs between local dev and staging (scroll length, banners). */
+const SCREENSHOT_OPTS = { fullPage: false, maxDiffPixelRatio: 0.03 } as const;
 const REPORTS_SCREENSHOT_OPTS = {
-  fullPage: true,
+  fullPage: false,
   maxDiffPixelRatio: 0.03,
 } as const;
 

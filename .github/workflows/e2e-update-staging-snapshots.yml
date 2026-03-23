@@ -26,8 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Regenerate snapshots vs staging (Linux)
-        run: set -o pipefail && pnpm test:e2e:update-snapshots:staging 2>&1 | tee ./output.txt
+      - name: Regenerate visual snapshots vs staging (Linux)
+        run: set -o pipefail && pnpm test:e2e:update-snapshots:staging:visual 2>&1 | tee ./output.txt
       - name: Upload Linux snapshot PNGs
         if: success()
         uses: actions/upload-artifact@v4

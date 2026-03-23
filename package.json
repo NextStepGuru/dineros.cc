@@ -36,6 +36,7 @@
     "test:e2e": "playwright test --project=chromium-public --project=chromium-authed",
     "test:e2e:update-snapshots": "playwright test --project=chromium-public --project=chromium-authed --update-snapshots",
     "test:e2e:update-snapshots:staging": "PLAYWRIGHT_BASE_URL=https://staging.dineros.cc playwright test --project=chromium-public --project=chromium-authed --update-snapshots",
+    "test:e2e:update-snapshots:staging:visual": "PLAYWRIGHT_BASE_URL=https://staging.dineros.cc playwright test tests/e2e/specs/authed/visual.spec.ts tests/e2e/specs/public/visual.spec.ts --project=chromium-public --project=chromium-authed --update-snapshots",
     "test:e2e:full": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile-public --project=mobile-authed",
     "test:e2e:webkit": "playwright test --project=webkit-public --project=webkit-authed",
