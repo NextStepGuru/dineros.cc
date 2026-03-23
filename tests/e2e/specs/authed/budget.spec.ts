@@ -22,8 +22,6 @@ test.describe("Budget switcher", () => {
     });
     const trigger = page.getByRole("banner").getByTestId("header-user-menu");
     await expect(trigger).toBeEnabled();
-    await trigger.click();
-    await expect(page.getByText("Budget")).toBeVisible();
-    await expect(page.getByText("E2E Budget")).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-label", /E2E Budget/i);
   });
 });

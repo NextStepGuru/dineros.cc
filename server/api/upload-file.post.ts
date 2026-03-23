@@ -31,16 +31,16 @@ export default defineEventHandler(async (event: H3Event) => {
       const scopedRegisterLookup =
         (
           prisma.accountRegister as {
-            findFirst?: (args: unknown) => Promise<{ accountId: string } | null>;
+            findFirst?: (_args: unknown) => Promise<{ accountId: string } | null>;
             findFirstOrThrow?: (
-              args: unknown,
+              _args: unknown,
             ) => Promise<{ accountId: string } | null>;
           }
         ).findFirst ??
         (
           prisma.accountRegister as {
             findFirstOrThrow?: (
-              args: unknown,
+              _args: unknown,
             ) => Promise<{ accountId: string } | null>;
           }
         ).findFirstOrThrow;
