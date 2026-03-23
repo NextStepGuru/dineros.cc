@@ -32,6 +32,7 @@ test.txt
 /temp
 /prisma/backup
 /microservice/prisma/backup
+app/prisma/backup
 output.txt
 
 # Test coverage reports

@@ -59,5 +59,6 @@ README\.md
 
 # Backup files with test keys that are not in git
 prisma/backup
+app/prisma/backup
 microservice/prisma/backup
 \.dumps/

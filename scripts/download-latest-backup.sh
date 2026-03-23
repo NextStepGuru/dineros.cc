@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download Latest Production Backup Script
-# Downloads the latest production zip file from backup-dineros bucket and extracts to prisma/backup/
+# Downloads the latest production zip file from backup-dineros bucket and extracts to app/prisma/backup/
 
 set -e
 
@@ -9,7 +9,7 @@ set -e
 BUCKET_NAME="backup-dineros"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BACKUP_DIR="$PROJECT_ROOT/prisma/backup"
+BACKUP_DIR="$PROJECT_ROOT/app/prisma/backup"
 TEMP_DIR="/tmp/dineros-backup"
 
 # Colors for output

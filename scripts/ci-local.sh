@@ -95,7 +95,7 @@ pnpm install --frozen-lockfile
 
 # Generate Prisma client
 echo '🔧 Generating Prisma client...'
-npx prisma generate
+pnpm --filter dineros-app exec prisma generate
 "
 
 if [ "$RUN_LINT" = true ]; then
@@ -142,12 +142,12 @@ echo '🎉 All CI checks passed!'
 # Run checks in Docker: mount source read-only; use volumes for install/generate (fully isolated)
 # - /workspace = project root (read-only)
 # - dineros-ci-node_modules = container's node_modules
-# - dineros-ci-nuxt = container's .nuxt (postinstall)
+# - dineros-ci-nuxt = container's app/.nuxt (postinstall)
 # - dineros-ci-pnpm_store = container's pnpm store
 if docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \
   -v "${CI_NODE_MODULES_VOLUME}:/workspace/node_modules" \
-  -v "${CI_NUXT_VOLUME}:/workspace/.nuxt" \
+  -v "${CI_NUXT_VOLUME}:/workspace/app/.nuxt" \
   -v "${CI_PNPM_VOLUME}:/ci-pnpm" \
   -w /workspace \
   -e NODE_ENV=test \

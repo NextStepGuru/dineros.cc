@@ -27,10 +27,10 @@ repos:
       - id: check-yaml
         exclude: ^(\.deploy/.*\.yaml|runner\.yaml)$
       - id: check-added-large-files
-        exclude: ^tests/e2e/.*\.spec\.ts-snapshots/
+        exclude: ^(tests|app/tests)/e2e/.*\.spec\.ts-snapshots/
       - id: check-merge-conflict
       - id: detect-private-key
-        exclude: ^(server/services/__tests__/.*\.test\.ts|nextstepguru-ce5dcf7b0730\.json)$
+        exclude: ^((server|app/server)/services/__tests__/.*\.test\.ts|nextstepguru-ce5dcf7b0730\.json)$
       - id: check-case-conflict
       - id: check-json
       - id: check-merge-conflict

@@ -33,9 +33,9 @@ if [[ ! -f .dockerignore ]]; then
   exit 1
 fi
 
-echo "Building (context: ., file: ./Dockerfile, .dockerignore applied, platform: $PLATFORM)..."
+echo "Building (context: ., file: ./app/Dockerfile, .dockerignore applied, platform: $PLATFORM)..."
 docker buildx build \
-  --file ./Dockerfile \
+  --file ./app/Dockerfile \
   --platform "$PLATFORM" \
   --cache-from "type=local,src=$CACHE_DIR" \
   --cache-to "type=local,dest=$CACHE_DIR,mode=max" \

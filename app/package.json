@@ -12,10 +12,10 @@
     "test:coverage:watch": "vitest --coverage --config vitest.config.coverage.ts",
     "coverage:view": "open coverage/index.html",
     "coverage:report": "TZ=UTC vitest --run --coverage --reporter=verbose --config vitest.config.coverage.ts",
-    "coverage:help": "node scripts/view-coverage.js help",
-    "coverage:open": "node scripts/view-coverage.js open",
-    "coverage:generate": "node scripts/view-coverage.js generate:all",
-    "coverage:serve": "node scripts/serve-coverage.js",
+    "coverage:help": "node ../scripts/view-coverage.js help",
+    "coverage:open": "node ../scripts/view-coverage.js open",
+    "coverage:generate": "node ../scripts/view-coverage.js generate:all",
+    "coverage:serve": "node ../scripts/serve-coverage.js",
     "typecheck": "nuxt typecheck",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
@@ -26,7 +26,7 @@
     "reset-database": "prisma migrate reset --force",
     "backup": "curl localhost:3000/api/tasks/backup",
     "generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(256).toString('base64'));\"",
-    "pre-commit": "node scripts/check-mixed-commit.js",
+    "pre-commit": "node ../scripts/check-mixed-commit.js",
     "test:forecast": "tsx server/services/forecast/__tests__/test-runner.ts",
     "test:forecast:performance": "tsx server/services/forecast/__tests__/test-runner.ts --performance",
     "test:forecast:unit": "TZ=UTC vitest run server/services/forecast/__tests__/modernCache.unit.test.ts",
@@ -44,13 +44,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:install": "playwright install",
-    "security:scan": "./scripts/trufflehog-enhanced.sh",
-    "reset-encrypted-users": "tsx scripts/reset-encrypted-users-after-restore.ts",
-    "prisma:check-governance": "node scripts/check-prisma-schema-governance.mjs",
-    "ci:local": "./scripts/ci-local.sh",
-    "ci:local:lint": "./scripts/ci-local.sh --lint-only",
-    "ci:local:test": "./scripts/ci-local.sh --test-only",
-    "ci:local:pre-commit": "./scripts/ci-local.sh --pre-commit-only"
+    "security:scan": "../scripts/trufflehog-enhanced.sh",
+    "reset-encrypted-users": "tsx ../scripts/reset-encrypted-users-after-restore.ts",
+    "prisma:check-governance": "node ../scripts/check-prisma-schema-governance.mjs",
+    "ci:local": "../scripts/ci-local.sh",
+    "ci:local:lint": "../scripts/ci-local.sh --lint-only",
+    "ci:local:test": "../scripts/ci-local.sh --test-only",
+    "ci:local:pre-commit": "../scripts/ci-local.sh --pre-commit-only"
   },
   "dependencies": {
     "@47ng/codec": "^1.1.0",
@@ -147,19 +147,6 @@
     "vue-router": "^4.6.4",
     "vue-tsc": "~2.1.10",
     "winston": "^3.19.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "prisma",
-      "@parcel/watcher",
-      "esbuild",
-      "msgpackr-extract",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver",
-      "vue-demi"
-    ]
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

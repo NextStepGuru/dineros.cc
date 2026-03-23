@@ -2,5 +2,5 @@
 #
 ls -alh .
 rm -rf ./prisma
-cp -r ../prisma ./
-cp ../server/clients/redisClient.ts ./clients
+cp -r ../app/prisma ./
+cp ../app/server/clients/redisClient.ts ./clients

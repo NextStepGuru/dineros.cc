@@ -1,7 +1,16 @@
 {
   "folders": [
     {
+      "name": "Root",
       "path": ".",
+    },
+    {
+      "name": "Website",
+      "path": "app",
+    },
+    {
+      "name": "Microservice",
+      "path": "microservice",
     },
   ],
   "settings": {
