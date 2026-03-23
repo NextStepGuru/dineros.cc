@@ -18,6 +18,10 @@ type BillStatus =
   | "SKIPPED"
   | "PARTIAL";
 
+function isManualResolvedStatus(status: BillStatus): boolean {
+  return status === "PAID" || status === "SKIPPED" || status === "PARTIAL";
+}
+
 type BillInstanceRow = {
   id: number;
   billProfileId: number;
@@ -181,6 +185,19 @@ export async function syncBillCenter(params: {
         completedSteps,
       );
       const computedStatus = deriveDueStatus(cursor, reminderDays);
+      const existing = await prismaBill.billInstance.findFirst({
+        where: {
+          billProfileId: profile.id,
+          dueAt: dateTimeService.startOf("day", cursor).toDate(),
+        },
+        select: {
+          status: true,
+        },
+      });
+      const nextStatus =
+        existing && isManualResolvedStatus(existing.status)
+          ? existing.status
+          : computedStatus;
 
       await prismaBill.billInstance.upsert({
         where: {
@@ -197,11 +214,11 @@ export async function syncBillCenter(params: {
           billProfileId: profile.id,
           dueAt: dateTimeService.startOf("day", cursor).toDate(),
           amount,
-          status: computedStatus,
+          status: nextStatus,
         },
         update: {
           amount,
-          status: computedStatus,
+          status: nextStatus,
           updatedAt: dateTimeService.toDate(),
         },
       });

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatMoneyUsd } from "~/lib/bankers-rounding";
+
 definePageMeta({
   middleware: "auth",
 });
@@ -95,12 +97,7 @@ const unresolvedCount = computed(
     data.value.counts.dueSoon,
 );
 
-function formatMoney(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+const formatMoney = (amount: number) => formatMoneyUsd(amount);
 
 function statusColor(status: BillStatus) {
   if (status === "OVERDUE") return "error";

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatMoneyUsd } from "~/lib/bankers-rounding";
+
 definePageMeta({
   middleware: "auth",
 });
@@ -68,12 +70,7 @@ const accountName = computed(
       ?.name ?? "Register",
 );
 
-function formatMoney(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+const formatMoney = (amount: number) => formatMoneyUsd(amount);
 
 async function loadOpenPeriod() {
   if (!authStore.getBudgetId || !accountRegisterId.value) return;

@@ -20,10 +20,10 @@ export type MonetaryValue = number | string | Prisma.Decimal;
  */
 export function roundToCents(value: MonetaryValue): number {
   const numericValue =
-    typeof value === "number" ? value : parseFloat(value.toString());
+    typeof value === "number" ? value : Number.parseFloat(value.toString());
 
-  if (isNaN(numericValue)) {
-    throw new Error(`Invalid monetary value: ${value}`);
+  if (Number.isNaN(numericValue)) {
+    throw new TypeError(`Invalid monetary value: ${value}`);
   }
 
   return bankersRounding(numericValue, 2);
@@ -46,7 +46,7 @@ export function toMonetaryDecimal(value: MonetaryValue): Prisma.Decimal {
  * @returns The sum rounded to 2 decimal places
  */
 export function addMoney(a: MonetaryValue, b: MonetaryValue): number {
-  const sum = parseFloat(a.toString()) + parseFloat(b.toString());
+  const sum = Number.parseFloat(a.toString()) + Number.parseFloat(b.toString());
   return roundToCents(sum);
 }
 
@@ -57,7 +57,8 @@ export function addMoney(a: MonetaryValue, b: MonetaryValue): number {
  * @returns The difference rounded to 2 decimal places
  */
 export function subtractMoney(a: MonetaryValue, b: MonetaryValue): number {
-  const difference = parseFloat(a.toString()) - parseFloat(b.toString());
+  const difference =
+    Number.parseFloat(a.toString()) - Number.parseFloat(b.toString());
   return roundToCents(difference);
 }
 
@@ -68,7 +69,8 @@ export function subtractMoney(a: MonetaryValue, b: MonetaryValue): number {
  * @returns The product rounded to 2 decimal places
  */
 export function multiplyMoney(a: MonetaryValue, b: MonetaryValue): number {
-  const product = parseFloat(a.toString()) * parseFloat(b.toString());
+  const product =
+    Number.parseFloat(a.toString()) * Number.parseFloat(b.toString());
   return roundToCents(product);
 }
 
@@ -79,12 +81,12 @@ export function multiplyMoney(a: MonetaryValue, b: MonetaryValue): number {
  * @returns The quotient rounded to 2 decimal places
  */
 export function divideMoney(a: MonetaryValue, b: MonetaryValue): number {
-  const divisor = parseFloat(b.toString());
+  const divisor = Number.parseFloat(b.toString());
   if (divisor === 0) {
     throw new Error("Division by zero in monetary calculation");
   }
 
-  const quotient = parseFloat(a.toString()) / divisor;
+  const quotient = Number.parseFloat(a.toString()) / divisor;
   return roundToCents(quotient);
 }
 
@@ -96,7 +98,7 @@ export function divideMoney(a: MonetaryValue, b: MonetaryValue): number {
  */
 export function calculatePercentage(
   principal: MonetaryValue,
-  percentage: MonetaryValue
+  percentage: MonetaryValue,
 ): number {
   return multiplyMoney(principal, percentage);
 }
@@ -111,10 +113,10 @@ export function calculatePercentage(
 export function calculateCompoundInterest(
   principal: MonetaryValue,
   rate: MonetaryValue,
-  periods: number
+  periods: number,
 ): number {
-  const p = parseFloat(principal.toString());
-  const r = parseFloat(rate.toString());
+  const p = Number.parseFloat(principal.toString());
+  const r = Number.parseFloat(rate.toString());
 
   // A = P(1 + r)^n - P
   const amount = p * Math.pow(1 + r, periods);
@@ -133,11 +135,13 @@ export function calculateCompoundInterest(
 export function calculateSimpleInterest(
   principal: MonetaryValue,
   rate: MonetaryValue,
-  time: number
+  time: number,
 ): number {
   // I = P * r * t
   const interest =
-    parseFloat(principal.toString()) * parseFloat(rate.toString()) * time;
+    Number.parseFloat(principal.toString()) *
+    Number.parseFloat(rate.toString()) *
+    time;
   return roundToCents(interest);
 }
 
@@ -152,6 +156,19 @@ export function formatMoney(value: MonetaryValue): string {
 }
 
 /**
+ * Formats a monetary value as localized USD currency after bankers rounding.
+ * @param value - The value to format
+ * @returns Localized currency string (e.g., $1,234.56)
+ */
+export function formatMoneyUsd(value: MonetaryValue): string {
+  const rounded = roundToCents(value);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(rounded);
+}
+
+/**
  * Validates that a value is a valid monetary amount
  * @param value - The value to validate
  * @returns True if valid, false otherwise
@@ -160,8 +177,8 @@ export function isValidMonetaryValue(value: any): value is MonetaryValue {
   if (value === null || value === undefined) return false;
 
   const numericValue =
-    typeof value === "number" ? value : parseFloat(value.toString());
-  return !isNaN(numericValue) && isFinite(numericValue);
+    typeof value === "number" ? value : Number.parseFloat(value.toString());
+  return !Number.isNaN(numericValue) && Number.isFinite(numericValue);
 }
 
 /**
@@ -193,7 +210,7 @@ export function isMonetaryEqual(a: MonetaryValue, b: MonetaryValue): boolean {
  * @returns The absolute value rounded to 2 decimal places
  */
 export function absoluteMoney(value: MonetaryValue): number {
-  return roundToCents(Math.abs(parseFloat(value.toString())));
+  return roundToCents(Math.abs(Number.parseFloat(value.toString())));
 }
 
 /**
@@ -223,8 +240,8 @@ export function minMoney(a: MonetaryValue, b: MonetaryValue): number {
  */
 export function sumMoney(values: MonetaryValue[]): number {
   const sum = values.reduce(
-    (acc: number, value) => acc + parseFloat(value.toString()),
-    0
+    (acc: number, value) => acc + Number.parseFloat(value.toString()),
+    0,
   );
   return roundToCents(sum);
 }

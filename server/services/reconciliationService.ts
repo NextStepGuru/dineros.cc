@@ -431,22 +431,6 @@ export async function closeReconciliationPeriod(params: {
   });
 }
 
-export async function getOpenReconciliationPeriodCount(params: {
-  userId: number;
-  budgetId: number;
-}) {
-  await assertBudgetAccess(params.userId, params.budgetId);
-  const rows = await prismaRecon.reconciliationPeriod.findMany({
-    where: {
-      budgetId: params.budgetId,
-      status: "OPEN",
-      account: { userAccounts: { some: { userId: params.userId } } },
-    },
-    select: { id: true },
-  });
-  return rows.length;
-}
-
 export async function getOpenReconciliationPeriodSummaries(params: {
   userId: number;
   budgetId: number;
