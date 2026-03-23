@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import {
+  type BillCenterAlert,
   dispatchNotificationsRefresh,
   dismissNotification,
   fetchNotificationSnapshot,
   type ForecastRiskAlert,
   type NotificationFetchStatus,
+  type ReconciliationAlert,
   type ReoccurrenceHealthIssue,
 } from "~/lib/notifications";
 import { formatDate } from "~/lib/utils";
@@ -20,20 +22,50 @@ const notificationCount = useNotificationCount();
 const loading = ref(false);
 const riskAlerts = ref<ForecastRiskAlert[]>([]);
 const recurringHealthIssues = ref<ReoccurrenceHealthIssue[]>([]);
+const billAlerts = ref<BillCenterAlert[]>([]);
+const reconciliationAlerts = ref<ReconciliationAlert[]>([]);
 const actionLoadingKeys = ref<Set<string>>(new Set());
-const currentTab = ref<"all" | "risk" | "recurring">("all");
+const currentTab = ref<
+  "all" | "risk" | "recurring" | "bills" | "reconciliation"
+>("all");
 const riskFetchStatus = ref<NotificationFetchStatus>("ok");
 const recurringFetchStatus = ref<NotificationFetchStatus>("ok");
 const recurringDisplayLimit = 20;
 
 const totalNotifications = computed(
-  () => riskAlerts.value.length + recurringHealthIssues.value.length,
+  () =>
+    riskAlerts.value.length +
+    recurringHealthIssues.value.length +
+    billAlerts.value.length +
+    reconciliationAlerts.value.length,
 );
 const visibleRiskAlerts = computed(() =>
-  currentTab.value === "recurring" ? [] : riskAlerts.value,
+  currentTab.value === "recurring" ||
+  currentTab.value === "bills" ||
+  currentTab.value === "reconciliation"
+    ? []
+    : riskAlerts.value,
 );
 const visibleRecurringIssues = computed(() =>
-  currentTab.value === "risk" ? [] : recurringHealthIssues.value,
+  currentTab.value === "risk" ||
+  currentTab.value === "bills" ||
+  currentTab.value === "reconciliation"
+    ? []
+    : recurringHealthIssues.value,
+);
+const visibleBillAlerts = computed(() =>
+  currentTab.value === "risk" ||
+  currentTab.value === "recurring" ||
+  currentTab.value === "reconciliation"
+    ? []
+    : billAlerts.value,
+);
+const visibleReconciliationAlerts = computed(() =>
+  currentTab.value === "risk" ||
+  currentTab.value === "recurring" ||
+  currentTab.value === "bills"
+    ? []
+    : reconciliationAlerts.value,
 );
 const shownRecurringIssues = computed(() =>
   visibleRecurringIssues.value.slice(0, recurringDisplayLimit),
@@ -77,6 +109,8 @@ async function fetchNotifications() {
   if (!authStore.getBudgetId) {
     riskAlerts.value = [];
     recurringHealthIssues.value = [];
+    billAlerts.value = [];
+    reconciliationAlerts.value = [];
     riskFetchStatus.value = "ok";
     recurringFetchStatus.value = "ok";
     notificationCount.value = 0;
@@ -93,6 +127,8 @@ async function fetchNotifications() {
     });
     riskAlerts.value = snapshot.riskAlerts;
     recurringHealthIssues.value = snapshot.recurringHealthIssues;
+    billAlerts.value = snapshot.billAlerts;
+    reconciliationAlerts.value = snapshot.reconciliationAlerts;
     riskFetchStatus.value = snapshot.riskStatus;
     recurringFetchStatus.value = snapshot.recurringStatus;
     notificationCount.value = snapshot.total;
@@ -100,6 +136,8 @@ async function fetchNotifications() {
   } catch {
     riskAlerts.value = [];
     recurringHealthIssues.value = [];
+    billAlerts.value = [];
+    reconciliationAlerts.value = [];
     riskFetchStatus.value = "error";
     recurringFetchStatus.value = "error";
     notificationCount.value = 0;
@@ -124,9 +162,14 @@ async function markRiskAlert(
     });
     riskAlerts.value = data.riskAlerts ?? [];
     recurringHealthIssues.value = data.recurringHealthIssues ?? [];
+    billAlerts.value = data.billAlerts ?? [];
+    reconciliationAlerts.value = data.reconciliationAlerts ?? [];
     notificationCount.value =
       data.total ??
-      riskAlerts.value.length + recurringHealthIssues.value.length;
+      riskAlerts.value.length +
+        recurringHealthIssues.value.length +
+        billAlerts.value.length +
+        reconciliationAlerts.value.length;
     dispatchNotificationsRefresh({
       count: notificationCount.value,
       reason: "mutation",
@@ -150,9 +193,14 @@ async function dismissRecurringIssue(notificationId: number) {
     });
     riskAlerts.value = data.riskAlerts ?? [];
     recurringHealthIssues.value = data.recurringHealthIssues ?? [];
+    billAlerts.value = data.billAlerts ?? [];
+    reconciliationAlerts.value = data.reconciliationAlerts ?? [];
     notificationCount.value =
       data.total ??
-      riskAlerts.value.length + recurringHealthIssues.value.length;
+      riskAlerts.value.length +
+        recurringHealthIssues.value.length +
+        billAlerts.value.length +
+        reconciliationAlerts.value.length;
     dispatchNotificationsRefresh({
       count: notificationCount.value,
       reason: "mutation",
@@ -190,6 +238,14 @@ section(class="px-3 sm:px-4 py-4 max-w-5xl mx-auto space-y-4")
       size="xs"
       :variant="currentTab === 'recurring' ? 'solid' : 'soft'"
       @click="currentTab = 'recurring'") Recurring
+    UButton(
+      size="xs"
+      :variant="currentTab === 'bills' ? 'solid' : 'soft'"
+      @click="currentTab = 'bills'") Bills
+    UButton(
+      size="xs"
+      :variant="currentTab === 'reconciliation' ? 'solid' : 'soft'"
+      @click="currentTab = 'reconciliation'") Reconciliation
 
   UAlert(
     v-if="loading"
@@ -261,4 +317,23 @@ section(class="px-3 sm:px-4 py-4 max-w-5xl mx-auto space-y-4")
           :loading="actionLoadingKeys.has(String(issue.notificationId))"
           :disabled="actionLoadingKeys.has(String(issue.notificationId))"
           @click="dismissRecurringIssue(issue.notificationId)") Dismiss
+
+  UCard(v-if="visibleBillAlerts.length > 0")
+    template(#header)
+      h2(class="font-semibold") Bill center due items ({{ visibleBillAlerts.length }})
+    ul(class="space-y-2 text-sm")
+      li(v-for="bill in visibleBillAlerts" :key="`bill-${bill.billInstanceId}`" class="frog-text-muted")
+        b(class="frog-text") {{ bill.accountRegisterName }}:
+        span &nbsp;{{ bill.description }} · {{ bill.status.toLowerCase().replace('_', ' ') }} · {{ formatNotificationDate(bill.dueAt) }}
+        UButton(size="xs" variant="soft" class="ml-2" :to="`/bills`") Open Bill Center
+        UButton(size="xs" variant="ghost" class="ml-1" :to="`/register/${bill.accountRegisterId}`") Open register
+
+  UCard(v-if="visibleReconciliationAlerts.length > 0")
+    template(#header)
+      h2(class="font-semibold") Open reconciliation periods ({{ visibleReconciliationAlerts.length }})
+    ul(class="space-y-2 text-sm")
+      li(v-for="rec in visibleReconciliationAlerts" :key="`recon-${rec.periodId}`" class="frog-text-muted")
+        b(class="frog-text") {{ rec.accountRegisterName }}:
+        span &nbsp;period still open (updated {{ formatNotificationDate(rec.updatedAt) }}).
+        UButton(size="xs" variant="soft" class="ml-2" :to="`/reconciliation/${rec.accountRegisterId}`") Resume reconciliation
 </template>

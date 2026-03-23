@@ -1503,5 +1503,13 @@ async function recalcAccount() {
           :class="isSelectedTab('past')"
           class="min-h-11 min-w-18 sm:min-h-0 sm:min-w-0 touch-manipulation"
           @click="selectedTab = 'past'") Past
+    div(
+      v-if="selectedTab === 'past' && tableEntries.length > 0 && !isSnapshotMode"
+      class="flex justify-end -mt-3 mb-4")
+      UButton(
+        size="xs"
+        variant="soft"
+        icon="i-lucide-calculator"
+        :to="`/reconciliation/${accountRegisterId}`") Open reconciliation workspace
 
 </template>

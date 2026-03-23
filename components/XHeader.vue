@@ -105,6 +105,21 @@ const items = computed(() => {
         active: route.path.startsWith("/reoccurrences"),
       },
       {
+        label: "Bills",
+        to: "/bills",
+        active: route.path.startsWith("/bills"),
+      },
+      {
+        label: "Reconciliation",
+        to: `${
+          listStore.getAccountRegisters.length
+            ? "/reconciliation/" +
+              formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
+            : "/account-registers?onboarding=1"
+        }`,
+        active: route.path.startsWith("/reconciliation"),
+      },
+      {
         label: "Goals",
         to: "/goals",
         active: route.path.startsWith("/goals"),

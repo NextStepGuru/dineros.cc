@@ -146,6 +146,18 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *       "modelName": "ReoccurrencePlaidNameAlias",
  *       "isList": true
  *     },
+ *     "billProfiles": {
+ *       "modelName": "BillProfile",
+ *       "isList": true
+ *     },
+ *     "billInstances": {
+ *       "modelName": "BillInstance",
+ *       "isList": true
+ *     },
+ *     "reconciliationPeriods": {
+ *       "modelName": "ReconciliationPeriod",
+ *       "isList": true
+ *     },
  *     "children": {
  *       "modelName": "AccountRegister",
  *       "isList": true

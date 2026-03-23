@@ -97,7 +97,7 @@ const features = [
           </div>
         </div>
         <div class="flex shrink-0 justify-center lg:justify-end">
-          <PepeHeroSvg class="w-md" />
+          <PepeHeroSvg class="w-72 sm:w-80 lg:w-84" />
         </div>
       </div>
     </section>

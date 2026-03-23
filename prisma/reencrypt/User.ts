@@ -112,6 +112,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "notificationDismissals": {
  *       "modelName": "NotificationDismissal",
  *       "isList": true
+ *     },
+ *     "reconciliationPeriodsClosed": {
+ *       "modelName": "ReconciliationPeriod",
+ *       "isList": true
  *     }
  *   }
  * }

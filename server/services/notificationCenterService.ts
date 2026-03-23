@@ -14,6 +14,8 @@ import {
   type ReoccurrenceHealthIssue,
 } from "~/server/services/reoccurrenceHealthService";
 import { dateTimeService } from "~/server/services/forecast";
+import { getBillCenterSnapshot } from "~/server/services/billCenterService";
+import { getOpenReconciliationPeriodSummaries } from "~/server/services/reconciliationService";
 
 type NotificationKind = "FORECAST_RISK" | "REOCCURRENCE_HEALTH";
 
@@ -59,6 +61,21 @@ export type NotificationSnapshot = {
   recurringHealthIssues: (ReoccurrenceHealthIssue & {
     notificationId: number;
   })[];
+  billAlerts: Array<{
+    billInstanceId: number;
+    accountRegisterId: number;
+    accountRegisterName: string;
+    description: string;
+    amount: number;
+    dueAt: string;
+    status: "OVERDUE" | "DUE_TODAY" | "DUE_SOON";
+  }>;
+  reconciliationAlerts: Array<{
+    periodId: number;
+    accountRegisterId: number;
+    accountRegisterName: string;
+    updatedAt: string;
+  }>;
   total: number;
 };
 
@@ -378,36 +395,33 @@ export async function getNotificationSnapshot(params: {
     orderBy: [{ lastSeenAt: "desc" }, { id: "desc" }],
   });
 
-  if (events.length === 0) {
-    const empty: NotificationSnapshot = {
-      riskAlerts: [],
-      recurringHealthIssues: [],
-      total: 0,
-    };
-    return empty;
-  }
-
-  const dismissals = await prismaNotifications.notificationDismissal.findMany({
-    where: {
-      userId: params.userId,
-      budgetId: params.budgetId,
-      OR: events.map((event) => ({
-        kind: event.kind,
-        occurrenceKey: event.occurrenceKey,
-      })),
-    },
-    select: {
-      kind: true,
-      occurrenceKey: true,
-    },
-  });
+  const dismissals =
+    events.length > 0
+      ? await prismaNotifications.notificationDismissal.findMany({
+          where: {
+            userId: params.userId,
+            budgetId: params.budgetId,
+            OR: events.map((event) => ({
+              kind: event.kind,
+              occurrenceKey: event.occurrenceKey,
+            })),
+          },
+          select: {
+            kind: true,
+            occurrenceKey: true,
+          },
+        })
+      : [];
 
   const dismissed = new Set(
     dismissals.map((d) => `${d.kind}:${d.occurrenceKey}`),
   );
-  const visible = events.filter(
-    (event) => !dismissed.has(`${event.kind}:${event.occurrenceKey}`),
-  );
+  const visible =
+    events.length > 0
+      ? events.filter(
+          (event) => !dismissed.has(`${event.kind}:${event.occurrenceKey}`),
+        )
+      : [];
 
   const riskAlerts: (ForecastRiskAlert & { notificationId: number })[] = [];
   const recurringHealthIssues: (ReoccurrenceHealthIssue & {
@@ -432,10 +446,52 @@ export async function getNotificationSnapshot(params: {
     if (parsed) recurringHealthIssues.push(parsed);
   }
 
+  const [billSnapshot, openReconPeriods] = await Promise.all([
+    getBillCenterSnapshot({
+      userId: params.userId,
+      budgetId: params.budgetId,
+    }),
+    getOpenReconciliationPeriodSummaries({
+      userId: params.userId,
+      budgetId: params.budgetId,
+    }),
+  ]);
+
+  const billAlerts = billSnapshot.items
+    .filter(
+      (item) =>
+        item.status === "OVERDUE" ||
+        item.status === "DUE_TODAY" ||
+        item.status === "DUE_SOON",
+    )
+    .slice(0, 25)
+    .map((item) => ({
+      billInstanceId: item.id,
+      accountRegisterId: item.profile.register.id,
+      accountRegisterName: item.profile.register.name,
+      description: item.profile.payee || item.profile.description,
+      amount: item.amount,
+      dueAt: dateTimeService.toISOString(item.dueAt),
+      status: item.status as "OVERDUE" | "DUE_TODAY" | "DUE_SOON",
+    }));
+
+  const reconciliationAlerts = openReconPeriods.map((row) => ({
+    periodId: row.id,
+    accountRegisterId: row.accountRegisterId,
+    accountRegisterName: row.accountRegisterName,
+    updatedAt: dateTimeService.toISOString(row.updatedAt),
+  }));
+
   return {
     riskAlerts,
     recurringHealthIssues,
-    total: riskAlerts.length + recurringHealthIssues.length,
+    billAlerts,
+    reconciliationAlerts,
+    total:
+      riskAlerts.length +
+      recurringHealthIssues.length +
+      billAlerts.length +
+      reconciliationAlerts.length,
   };
 }
 

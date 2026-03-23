@@ -33,6 +33,27 @@ enum NotificationKind {
   REOCCURRENCE_HEALTH
 }
 
+enum BillItemKind {
+  BILL
+  INCOME
+  TRANSFER
+}
+
+enum BillInstanceStatus {
+  UPCOMING
+  DUE_SOON
+  DUE_TODAY
+  OVERDUE
+  PAID
+  SKIPPED
+  PARTIAL
+}
+
+enum ReconciliationPeriodStatus {
+  OPEN
+  CLOSED
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -50,14 +71,17 @@ model Account {
   lastAccessedAt DateTime? @map("last_accessed_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  userAccounts  UserAccount[]
-  accountInvites AccountInvite[]
-  reoccurrences Reoccurrence[]
-  registers     AccountRegister[]
-  budgets       Budget[]
-  categories    Category[]
-  snapshots     AccountSnapshot[]
-  savingsGoals  SavingsGoal[]
+  userAccounts          UserAccount[]
+  accountInvites        AccountInvite[]
+  reoccurrences         Reoccurrence[]
+  registers             AccountRegister[]
+  budgets               Budget[]
+  categories            Category[]
+  snapshots             AccountSnapshot[]
+  savingsGoals          SavingsGoal[]
+  billProfiles          BillProfile[]
+  billInstances         BillInstance[]
+  reconciliationPeriods ReconciliationPeriod[]
 
   @@map("account")
 }
@@ -83,14 +107,15 @@ model User {
   role             UserRole  @default(USER)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  budgets    Budget[]
-  social     UserSocial[]
-  accounts   UserAccount[]
-  accountInvitesSent AccountInvite[] @relation("AccountInviteInvitedBy")
-  country    Country?      @relation(fields: [countryId], references: [id])
-  plaidItems PlaidItem[]
-  notifications NotificationEvent[]
-  notificationDismissals NotificationDismissal[]
+  budgets                     Budget[]
+  social                      UserSocial[]
+  accounts                    UserAccount[]
+  accountInvitesSent          AccountInvite[]         @relation("AccountInviteInvitedBy")
+  country                     Country?                @relation(fields: [countryId], references: [id])
+  plaidItems                  PlaidItem[]
+  notifications               NotificationEvent[]
+  notificationDismissals      NotificationDismissal[]
+  reconciliationPeriodsClosed ReconciliationPeriod[]
 
   @@map("user")
 }
@@ -129,15 +154,15 @@ model UserAccount {
 }
 
 model AccountInvite {
-  id               Int       @id @default(autoincrement()) @db.UnsignedInt
-  accountId        String    @map("account_id")
-  email            String    @db.VarChar(500)
-  invitedByUserId  Int       @map("invited_by_user_id") @db.UnsignedInt
-  tokenHash        String    @unique @map("token_hash") @db.VarChar(64)
-  expiresAt        DateTime  @map("expires_at")
-  acceptedAt       DateTime? @map("accepted_at")
-  revokedAt        DateTime? @map("revoked_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  id              Int       @id @default(autoincrement()) @db.UnsignedInt
+  accountId       String    @map("account_id")
+  email           String    @db.VarChar(500)
+  invitedByUserId Int       @map("invited_by_user_id") @db.UnsignedInt
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt       DateTime  @map("expires_at")
+  acceptedAt      DateTime? @map("accepted_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   invitedBy User    @relation("AccountInviteInvitedBy", fields: [invitedByUserId], references: [id])
@@ -181,29 +206,32 @@ model Budget {
   isDefault  Boolean @default(false) @map("is_default")
   userId     Int?    @map("user_id") @db.UnsignedInt
 
-  account      Account           @relation(fields: [accountId], references: [id])
-  accounts     AccountRegister[]
-  User         User?             @relation(fields: [userId], references: [id])
-  savingsGoals SavingsGoal[]
-  notifications NotificationEvent[]
+  account                Account                 @relation(fields: [accountId], references: [id])
+  accounts               AccountRegister[]
+  User                   User?                   @relation(fields: [userId], references: [id])
+  savingsGoals           SavingsGoal[]
+  notifications          NotificationEvent[]
   notificationDismissals NotificationDismissal[]
+  billProfiles           BillProfile[]
+  billInstances          BillInstance[]
+  reconciliationPeriods  ReconciliationPeriod[]
 
   @@map("budget")
 }
 
 model NotificationEvent {
-  id             Int              @id @default(autoincrement()) @db.UnsignedInt
-  userId         Int              @map("user_id") @db.UnsignedInt
-  budgetId       Int              @map("budget_id") @db.UnsignedInt
-  kind           NotificationKind
-  fingerprint    String           @db.VarChar(191)
-  occurrenceKey  String           @map("occurrence_key") @db.VarChar(191)
-  isActive       Boolean          @default(true) @map("is_active")
-  payload        Json
-  firstSeenAt    DateTime         @default(now()) @map("first_seen_at")
-  lastSeenAt     DateTime         @default(now()) @map("last_seen_at")
-  resolvedAt     DateTime?        @map("resolved_at")
-  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+  id            Int              @id @default(autoincrement()) @db.UnsignedInt
+  userId        Int              @map("user_id") @db.UnsignedInt
+  budgetId      Int              @map("budget_id") @db.UnsignedInt
+  kind          NotificationKind
+  fingerprint   String           @db.VarChar(191)
+  occurrenceKey String           @map("occurrence_key") @db.VarChar(191)
+  isActive      Boolean          @default(true) @map("is_active")
+  payload       Json
+  firstSeenAt   DateTime         @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime         @default(now()) @map("last_seen_at")
+  resolvedAt    DateTime?        @map("resolved_at")
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at")
 
   user   User   @relation(fields: [userId], references: [id])
   budget Budget @relation(fields: [budgetId], references: [id])
@@ -216,13 +244,13 @@ model NotificationEvent {
 }
 
 model NotificationDismissal {
-  id             Int              @id @default(autoincrement()) @db.UnsignedInt
-  userId         Int              @map("user_id") @db.UnsignedInt
-  budgetId       Int              @map("budget_id") @db.UnsignedInt
-  kind           NotificationKind
-  occurrenceKey  String           @map("occurrence_key") @db.VarChar(191)
-  dismissedAt    DateTime         @default(now()) @map("dismissed_at")
-  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+  id            Int              @id @default(autoincrement()) @db.UnsignedInt
+  userId        Int              @map("user_id") @db.UnsignedInt
+  budgetId      Int              @map("budget_id") @db.UnsignedInt
+  kind          NotificationKind
+  occurrenceKey String           @map("occurrence_key") @db.VarChar(191)
+  dismissedAt   DateTime         @default(now()) @map("dismissed_at")
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at")
 
   user   User   @relation(fields: [userId], references: [id])
   budget Budget @relation(fields: [budgetId], references: [id])
@@ -233,26 +261,26 @@ model NotificationDismissal {
 }
 
 model SavingsGoal {
-  id                        Int       @id @default(autoincrement()) @db.UnsignedInt
-  accountId                 String    @map("account_id")
-  budgetId                  Int       @map("budget_id") @db.UnsignedInt
-  name                      String    @db.VarChar(255)
-  targetAmount              Decimal   @map("target_amount") @db.Decimal(12, 2)
-  sourceAccountRegisterId   Int       @map("source_account_register_id") @db.UnsignedInt
-  targetAccountRegisterId   Int       @map("target_account_register_id") @db.UnsignedInt
-  priorityOverDebt          Boolean   @default(false) @map("priority_over_debt")
-  ignoreMinBalance          Boolean   @default(false) @map("ignore_min_balance")
-  categoryId                String?   @map("category_id")
-  sortOrder                 Int       @default(0) @map("sort_order") @db.UnsignedInt
-  isArchived                Boolean   @default(false) @map("is_archived")
-  createdAt                 DateTime  @default(now()) @map("created_at")
-  updatedAt                 DateTime  @updatedAt @map("updated_at")
+  id                      Int      @id @default(autoincrement()) @db.UnsignedInt
+  accountId               String   @map("account_id")
+  budgetId                Int      @map("budget_id") @db.UnsignedInt
+  name                    String   @db.VarChar(255)
+  targetAmount            Decimal  @map("target_amount") @db.Decimal(12, 2)
+  sourceAccountRegisterId Int      @map("source_account_register_id") @db.UnsignedInt
+  targetAccountRegisterId Int      @map("target_account_register_id") @db.UnsignedInt
+  priorityOverDebt        Boolean  @default(false) @map("priority_over_debt")
+  ignoreMinBalance        Boolean  @default(false) @map("ignore_min_balance")
+  categoryId              String?  @map("category_id")
+  sortOrder               Int      @default(0) @map("sort_order") @db.UnsignedInt
+  isArchived              Boolean  @default(false) @map("is_archived")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
-  account                 Account         @relation(fields: [accountId], references: [id])
-  budget                  Budget         @relation(fields: [budgetId], references: [id])
-  sourceAccountRegister   AccountRegister @relation("SavingsGoalSource", fields: [sourceAccountRegisterId], references: [id])
-  targetAccountRegister   AccountRegister @relation("SavingsGoalTarget", fields: [targetAccountRegisterId], references: [id])
-  category                Category?       @relation(fields: [categoryId], references: [id])
+  account               Account         @relation(fields: [accountId], references: [id])
+  budget                Budget          @relation(fields: [budgetId], references: [id])
+  sourceAccountRegister AccountRegister @relation("SavingsGoalSource", fields: [sourceAccountRegisterId], references: [id])
+  targetAccountRegister AccountRegister @relation("SavingsGoalTarget", fields: [targetAccountRegisterId], references: [id])
+  category              Category?       @relation(fields: [categoryId], references: [id])
 
   @@index([accountId])
   @@index([budgetId])
@@ -299,8 +327,8 @@ model AccountRegister {
   plaidJson                 Json?     @map("plaid_json")
   plaidLastSyncAt           DateTime? @map("plaid_last_sync_at")
   plaidBalanceLastSyncAt    DateTime? @map("plaid_balance_last_sync_at")
-  depreciationRate         Decimal?  @map("depreciation_rate") @db.Decimal(7, 5)
-  depreciationMethod       String?   @map("depreciation_method") @db.VarChar(30)
+  depreciationRate          Decimal?  @map("depreciation_rate") @db.Decimal(7, 5)
+  depreciationMethod        String?   @map("depreciation_method") @db.VarChar(30)
   assetOriginalValue        Decimal?  @map("asset_original_value") @db.Decimal(19, 2)
   assetResidualValue        Decimal?  @map("asset_residual_value") @db.Decimal(19, 2)
   assetUsefulLifeYears      Int?      @map("asset_useful_life_years")
@@ -324,10 +352,13 @@ model AccountRegister {
   reoccurrences         Reoccurrence[]
   splitTargets          ReoccurrenceSplit[]
   plaidNameAliases      ReoccurrencePlaidNameAlias[]
-  children              AccountRegister[]             @relation("ar_children")
+  billProfiles          BillProfile[]
+  billInstances         BillInstance[]
+  reconciliationPeriods ReconciliationPeriod[]
+  children              AccountRegister[]            @relation("ar_children")
   snapshotRows          AccountRegisterSnapshot[]
-  sourceForSavingsGoals SavingsGoal[] @relation("SavingsGoalSource")
-  targetForSavingsGoals SavingsGoal[] @relation("SavingsGoalTarget")
+  sourceForSavingsGoals SavingsGoal[]                @relation("SavingsGoalSource")
+  targetForSavingsGoals SavingsGoal[]                @relation("SavingsGoalTarget")
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
@@ -347,18 +378,18 @@ model AccountSnapshot {
 }
 
 model AccountRegisterSnapshot {
-  id                      Int      @id @default(autoincrement()) @db.UnsignedInt
-  snapshotId              Int      @map("snapshot_id") @db.UnsignedInt
-  accountRegisterId       Int      @map("account_register_id") @db.UnsignedInt
-  subAccountRegisterId    Int?     @map("sub_account_register_id") @db.UnsignedInt
-  collateralAssetRegisterId Int?   @map("collateral_asset_register_id") @db.UnsignedInt
-  name                    String   @db.VarChar(500)
-  balance                 Decimal  @default(0) @db.Decimal(19, 2)
-  latestBalance           Decimal  @default(0) @map("latest_balance") @db.Decimal(19, 2)
-  typeId                  Int      @map("type_id") @db.UnsignedInt
+  id                        Int     @id @default(autoincrement()) @db.UnsignedInt
+  snapshotId                Int     @map("snapshot_id") @db.UnsignedInt
+  accountRegisterId         Int     @map("account_register_id") @db.UnsignedInt
+  subAccountRegisterId      Int?    @map("sub_account_register_id") @db.UnsignedInt
+  collateralAssetRegisterId Int?    @map("collateral_asset_register_id") @db.UnsignedInt
+  name                      String  @db.VarChar(500)
+  balance                   Decimal @default(0) @db.Decimal(19, 2)
+  latestBalance             Decimal @default(0) @map("latest_balance") @db.Decimal(19, 2)
+  typeId                    Int     @map("type_id") @db.UnsignedInt
 
-  snapshot AccountSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  register AccountRegister        @relation(fields: [accountRegisterId], references: [id], onDelete: Restrict)
+  snapshot AccountSnapshot         @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  register AccountRegister         @relation(fields: [accountRegisterId], references: [id], onDelete: Restrict)
   entries  RegisterEntrySnapshot[]
 
   @@index([snapshotId])
@@ -425,10 +456,13 @@ model RegisterEntry {
   memo                    String?  @db.VarChar(500)
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
 
-  register     AccountRegister    @relation(fields: [accountRegisterId], references: [id])
-  reoccurrence Reoccurrence?      @relation(fields: [reoccurrenceId], references: [id])
-  type         RegisterEntryType? @relation(fields: [typeId], references: [id])
-  category     Category?          @relation(fields: [categoryId], references: [id])
+  register                     AccountRegister        @relation(fields: [accountRegisterId], references: [id])
+  reoccurrence                 Reoccurrence?          @relation(fields: [reoccurrenceId], references: [id])
+  type                         RegisterEntryType?     @relation(fields: [typeId], references: [id])
+  category                     Category?              @relation(fields: [categoryId], references: [id])
+  billInstancesPaid            BillInstance[]
+  reconciliationItems          ReconciliationItem[]
+  reconciliationClosingPeriods ReconciliationPeriod[] @relation("ReconciliationPeriodClosingEntry")
 
   @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
   @@index([accountRegisterId, isCleared, isProjected, isManualEntry])
@@ -456,52 +490,54 @@ model Category {
   isArchived    Boolean  @default(false) @map("is_archived")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  account           Account?        @relation(fields: [accountId], references: [id])
-  parent            Category?       @relation("cat_children", fields: [subCategoryId], references: [id])
-  children          Category[]      @relation("cat_children")
-  accountRegisterId Int?            @db.UnsignedInt
-  entries             RegisterEntry[]
-  reoccurrences       Reoccurrence[]
-  reoccurrenceSplits  ReoccurrenceSplit[]
-  accountRegistersPaymentDefault  AccountRegister[] @relation("AccountRegisterPaymentCategory")
-  accountRegistersInterestDefault AccountRegister[] @relation("AccountRegisterInterestCategory")
+  account                         Account?            @relation(fields: [accountId], references: [id])
+  parent                          Category?           @relation("cat_children", fields: [subCategoryId], references: [id])
+  children                        Category[]          @relation("cat_children")
+  accountRegisterId               Int?                @db.UnsignedInt
+  entries                         RegisterEntry[]
+  reoccurrences                   Reoccurrence[]
+  reoccurrenceSplits              ReoccurrenceSplit[]
+  accountRegistersPaymentDefault  AccountRegister[]   @relation("AccountRegisterPaymentCategory")
+  accountRegistersInterestDefault AccountRegister[]   @relation("AccountRegisterInterestCategory")
   savingsGoals                    SavingsGoal[]
 
   @@map("category")
 }
 
 model Reoccurrence {
-  id                        Int       @id @default(autoincrement()) @db.UnsignedInt
-  accountId                 String    @map("account_id")
-  accountRegisterId         Int       @map("account_register_id") @db.UnsignedInt
-  intervalId                Int       @map("interval_id") @db.UnsignedInt
-  adjustBeforeIfOnWeekend   Boolean   @default(false) @map("adjust_before_if_on_weekend")
-  transferAccountRegisterId Int?      @map("transfer_account_register_id") @db.UnsignedInt
-  intervalCount             Int       @default(1) @map("interval_count") @db.UnsignedInt
-  lastAt                    DateTime? @map("last_at")
-  endAt                     DateTime? @map("end_at")
-  totalIntervals            Int?      @map("total_intervals") @db.UnsignedInt
-  elapsedIntervals          Int?      @map("elapsed_intervals") @db.UnsignedInt
-  amount                    Decimal   @db.Decimal(19, 2)
-  description               String    @db.VarChar(1500) /// @encrypted
-  categoryId                String?   @map("category_id")
-  amountAdjustmentMode               AmountAdjustmentMode   @default(NONE) @map("amount_adjustment_mode")
-  amountAdjustmentDirection          AmountAdjustmentDirection? @map("amount_adjustment_direction")
-  amountAdjustmentValue              Decimal?                 @map("amount_adjustment_value") @db.Decimal(19, 6)
-  amountAdjustmentIntervalId         Int?                     @map("amount_adjustment_interval_id") @db.UnsignedInt
-  amountAdjustmentIntervalCount      Int                      @default(1) @map("amount_adjustment_interval_count") @db.UnsignedInt
-  amountAdjustmentAnchorAt           DateTime?                @map("amount_adjustment_anchor_at")
-  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                            Int                        @id @default(autoincrement()) @db.UnsignedInt
+  accountId                     String                     @map("account_id")
+  accountRegisterId             Int                        @map("account_register_id") @db.UnsignedInt
+  intervalId                    Int                        @map("interval_id") @db.UnsignedInt
+  adjustBeforeIfOnWeekend       Boolean                    @default(false) @map("adjust_before_if_on_weekend")
+  transferAccountRegisterId     Int?                       @map("transfer_account_register_id") @db.UnsignedInt
+  intervalCount                 Int                        @default(1) @map("interval_count") @db.UnsignedInt
+  lastAt                        DateTime?                  @map("last_at")
+  endAt                         DateTime?                  @map("end_at")
+  totalIntervals                Int?                       @map("total_intervals") @db.UnsignedInt
+  elapsedIntervals              Int?                       @map("elapsed_intervals") @db.UnsignedInt
+  amount                        Decimal                    @db.Decimal(19, 2)
+  description                   String                     @db.VarChar(1500) /// @encrypted
+  categoryId                    String?                    @map("category_id")
+  amountAdjustmentMode          AmountAdjustmentMode       @default(NONE) @map("amount_adjustment_mode")
+  amountAdjustmentDirection     AmountAdjustmentDirection? @map("amount_adjustment_direction")
+  amountAdjustmentValue         Decimal?                   @map("amount_adjustment_value") @db.Decimal(19, 6)
+  amountAdjustmentIntervalId    Int?                       @map("amount_adjustment_interval_id") @db.UnsignedInt
+  amountAdjustmentIntervalCount Int                        @default(1) @map("amount_adjustment_interval_count") @db.UnsignedInt
+  amountAdjustmentAnchorAt      DateTime?                  @map("amount_adjustment_anchor_at")
+  updatedAt                     DateTime                   @default(now()) @updatedAt @map("updated_at")
 
-  account          Account                      @relation(fields: [accountId], references: [id])
-  register         AccountRegister              @relation(fields: [accountRegisterId], references: [id])
-  interval         Interval                     @relation("ReoccurrenceScheduleInterval", fields: [intervalId], references: [id])
-  amountAdjustmentInterval Interval?            @relation("ReoccurrenceAmountAdjustmentInterval", fields: [amountAdjustmentIntervalId], references: [id])
-  category         Category?                    @relation(fields: [categoryId], references: [id])
-  entries          RegisterEntry[]
-  skips            ReoccurrenceSkip[]
-  splits           ReoccurrenceSplit[]
-  plaidNameAliases ReoccurrencePlaidNameAlias[]
+  account                  Account                      @relation(fields: [accountId], references: [id])
+  register                 AccountRegister              @relation(fields: [accountRegisterId], references: [id])
+  interval                 Interval                     @relation("ReoccurrenceScheduleInterval", fields: [intervalId], references: [id])
+  amountAdjustmentInterval Interval?                    @relation("ReoccurrenceAmountAdjustmentInterval", fields: [amountAdjustmentIntervalId], references: [id])
+  category                 Category?                    @relation(fields: [categoryId], references: [id])
+  entries                  RegisterEntry[]
+  skips                    ReoccurrenceSkip[]
+  splits                   ReoccurrenceSplit[]
+  plaidNameAliases         ReoccurrencePlaidNameAlias[]
+  billProfile              BillProfile?
+  billInstances            BillInstance[]
 
   @@index([accountId])
   @@index([accountId, lastAt])
@@ -525,15 +561,15 @@ model ReoccurrencePlaidNameAlias {
 }
 
 model ReoccurrenceSplit {
-  id                        Int      @id @default(autoincrement()) @db.UnsignedInt
-  reoccurrenceId            Int      @map("reoccurrence_id") @db.UnsignedInt
-  transferAccountRegisterId Int      @map("transfer_account_register_id") @db.UnsignedInt
+  id                        Int                         @id @default(autoincrement()) @db.UnsignedInt
+  reoccurrenceId            Int                         @map("reoccurrence_id") @db.UnsignedInt
+  transferAccountRegisterId Int                         @map("transfer_account_register_id") @db.UnsignedInt
   amountMode                ReoccurrenceSplitAmountMode @default(FIXED) @map("amount_mode")
-  amount                    Decimal  @db.Decimal(19, 2)
-  description               String?  @db.VarChar(500)
-  categoryId                String?  @map("category_id")
-  sortOrder                 Int      @default(0) @map("sort_order") @db.UnsignedInt
-  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
+  amount                    Decimal                     @db.Decimal(19, 2)
+  description               String?                     @db.VarChar(500)
+  categoryId                String?                     @map("category_id")
+  sortOrder                 Int                         @default(0) @map("sort_order") @db.UnsignedInt
+  updatedAt                 DateTime                    @default(now()) @updatedAt @map("updated_at")
 
   reoccurrence   Reoccurrence    @relation(fields: [reoccurrenceId], references: [id])
   targetRegister AccountRegister @relation(fields: [transferAccountRegisterId], references: [id])
@@ -555,6 +591,110 @@ model ReoccurrenceSkip {
   @@map("reoccurrence_skip")
 }
 
+model BillProfile {
+  id                 Int          @id @default(autoincrement()) @db.UnsignedInt
+  accountId          String       @map("account_id")
+  budgetId           Int          @map("budget_id") @db.UnsignedInt
+  accountRegisterId  Int          @map("account_register_id") @db.UnsignedInt
+  reoccurrenceId     Int          @unique @map("reoccurrence_id") @db.UnsignedInt
+  kind               BillItemKind @default(BILL)
+  payee              String?      @db.VarChar(255)
+  isAutoPay          Boolean      @default(false) @map("is_auto_pay")
+  graceDays          Int          @default(0) @map("grace_days") @db.UnsignedInt
+  expectedAmountLow  Decimal?     @map("expected_amount_low") @db.Decimal(19, 2)
+  expectedAmountHigh Decimal?     @map("expected_amount_high") @db.Decimal(19, 2)
+  reminderDaysBefore String?      @map("reminder_days_before") @db.VarChar(100)
+  priority           Int          @default(0) @db.UnsignedInt
+  isArchived         Boolean      @default(false) @map("is_archived")
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  account       Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  budget        Budget          @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  register      AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  reoccurrence  Reoccurrence    @relation(fields: [reoccurrenceId], references: [id], onDelete: Cascade)
+  billInstances BillInstance[]
+
+  @@index([budgetId, kind, isArchived], map: "bill_profile_budget_kind_archived_idx")
+  @@index([accountRegisterId], map: "bill_profile_register_idx")
+  @@map("bill_profile")
+}
+
+model BillInstance {
+  id                  Int                @id @default(autoincrement()) @db.UnsignedInt
+  accountId           String             @map("account_id")
+  budgetId            Int                @map("budget_id") @db.UnsignedInt
+  accountRegisterId   Int                @map("account_register_id") @db.UnsignedInt
+  reoccurrenceId      Int                @map("reoccurrence_id") @db.UnsignedInt
+  billProfileId       Int                @map("bill_profile_id") @db.UnsignedInt
+  dueAt               DateTime           @map("due_at")
+  amount              Decimal            @db.Decimal(19, 2)
+  status              BillInstanceStatus @default(UPCOMING)
+  paidAt              DateTime?          @map("paid_at")
+  paidAmount          Decimal?           @map("paid_amount") @db.Decimal(19, 2)
+  paidRegisterEntryId String?            @map("paid_register_entry_id")
+  reminderLastSentAt  DateTime?          @map("reminder_last_sent_at")
+  note                String?            @db.VarChar(500)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  account           Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  budget            Budget          @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  register          AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  reoccurrence      Reoccurrence    @relation(fields: [reoccurrenceId], references: [id], onDelete: Cascade)
+  billProfile       BillProfile     @relation(fields: [billProfileId], references: [id], onDelete: Cascade)
+  paidRegisterEntry RegisterEntry?  @relation(fields: [paidRegisterEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([billProfileId, dueAt], map: "bill_instance_profile_due_uidx")
+  @@index([budgetId, status, dueAt], map: "bill_instance_budget_status_due_idx")
+  @@index([accountRegisterId, dueAt], map: "bill_instance_register_due_idx")
+  @@map("bill_instance")
+}
+
+model ReconciliationPeriod {
+  id                       Int                        @id @default(autoincrement()) @db.UnsignedInt
+  accountId                String                     @map("account_id")
+  budgetId                 Int                        @map("budget_id") @db.UnsignedInt
+  accountRegisterId        Int                        @map("account_register_id") @db.UnsignedInt
+  status                   ReconciliationPeriodStatus @default(OPEN)
+  startDate                DateTime                   @map("start_date")
+  endDate                  DateTime                   @map("end_date")
+  statementEndingBalance   Decimal                    @map("statement_ending_balance") @db.Decimal(19, 2)
+  ledgerClearedBalance     Decimal?                   @map("ledger_cleared_balance") @db.Decimal(19, 2)
+  differenceAmount         Decimal?                   @map("difference_amount") @db.Decimal(19, 2)
+  closedAt                 DateTime?                  @map("closed_at")
+  closedByUserId           Int?                       @map("closed_by_user_id") @db.UnsignedInt
+  closingAdjustmentEntryId String?                    @map("closing_adjustment_entry_id")
+  closeNote                String?                    @map("close_note") @db.VarChar(500)
+  updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at")
+
+  account                Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  budget                 Budget               @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  register               AccountRegister      @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  closedByUser           User?                @relation(fields: [closedByUserId], references: [id], onDelete: SetNull)
+  closingAdjustmentEntry RegisterEntry?       @relation("ReconciliationPeriodClosingEntry", fields: [closingAdjustmentEntryId], references: [id], onDelete: SetNull)
+  items                  ReconciliationItem[]
+
+  @@index([budgetId, status, accountRegisterId], map: "reconciliation_period_budget_status_register_idx")
+  @@index([accountRegisterId, startDate, endDate], map: "reconciliation_period_register_window_idx")
+  @@map("reconciliation_period")
+}
+
+model ReconciliationItem {
+  id                     Int       @id @default(autoincrement()) @db.UnsignedInt
+  reconciliationPeriodId Int       @map("reconciliation_period_id") @db.UnsignedInt
+  registerEntryId        String    @map("register_entry_id")
+  isCleared              Boolean   @default(false) @map("is_cleared")
+  clearedAt              DateTime? @map("cleared_at")
+  note                   String?   @db.VarChar(500)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  period        ReconciliationPeriod @relation(fields: [reconciliationPeriodId], references: [id], onDelete: Cascade)
+  registerEntry RegisterEntry        @relation(fields: [registerEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([reconciliationPeriodId, registerEntryId], map: "reconciliation_item_period_entry_uidx")
+  @@index([registerEntryId], map: "reconciliation_item_entry_idx")
+  @@map("reconciliation_item")
+}
+
 model AccountType {
   id                   Int      @id @default(autoincrement()) @db.UnsignedInt
   type                 String
@@ -574,9 +714,9 @@ model Interval {
   name      String
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  reoccurrenceSchedules          Reoccurrence[]    @relation("ReoccurrenceScheduleInterval")
-  reoccurrenceAmountAdjustments  Reoccurrence[]    @relation("ReoccurrenceAmountAdjustmentInterval")
-  AccountRegister AccountRegister[]
+  reoccurrenceSchedules         Reoccurrence[]    @relation("ReoccurrenceScheduleInterval")
+  reoccurrenceAmountAdjustments Reoccurrence[]    @relation("ReoccurrenceAmountAdjustmentInterval")
+  AccountRegister               AccountRegister[]
 
   @@map("interval")
 }
@@ -594,21 +734,21 @@ model Rsa {
 }
 
 model OpenAiRequestLog {
-  id                  String   @id @default(uuid())
-  createdAt           DateTime @default(now()) @map("created_at")
-  purpose             String   @db.VarChar(191)
-  model               String   @db.VarChar(191)
-  promptTokens        Int?     @map("prompt_tokens")
-  completionTokens    Int?     @map("completion_tokens")
-  totalTokens         Int?     @map("total_tokens")
-  cachedPromptTokens  Int?     @map("cached_prompt_tokens")
-  openaiResponseId    String?  @map("openai_response_id") @db.VarChar(191)
-  finishReason        String?  @map("finish_reason") @db.VarChar(64)
-  durationMs          Int      @map("duration_ms")
-  success             Boolean
-  errorMessage        String?  @map("error_message") @db.Text
-  httpStatus          Int?     @map("http_status")
-  metadata            Json?
+  id                 String   @id @default(uuid())
+  createdAt          DateTime @default(now()) @map("created_at")
+  purpose            String   @db.VarChar(191)
+  model              String   @db.VarChar(191)
+  promptTokens       Int?     @map("prompt_tokens")
+  completionTokens   Int?     @map("completion_tokens")
+  totalTokens        Int?     @map("total_tokens")
+  cachedPromptTokens Int?     @map("cached_prompt_tokens")
+  openaiResponseId   String?  @map("openai_response_id") @db.VarChar(191)
+  finishReason       String?  @map("finish_reason") @db.VarChar(64)
+  durationMs         Int      @map("duration_ms")
+  success            Boolean
+  errorMessage       String?  @map("error_message") @db.Text
+  httpStatus         Int?     @map("http_status")
+  metadata           Json?
 
   @@index([createdAt])
   @@index([purpose])
