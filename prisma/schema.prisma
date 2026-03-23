@@ -23,6 +23,16 @@ enum ReoccurrenceSplitAmountMode {
   PERCENT
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum NotificationKind {
+  FORECAST_RISK
+  REOCCURRENCE_HEALTH
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -70,6 +80,7 @@ model User {
   isDaylightSaving Boolean?  @default(true) @map("is_daylight_saving") // Whether currently observing DST
   config           Json?
   settings         Json?
+  role             UserRole  @default(USER)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budgets    Budget[]
@@ -78,6 +89,8 @@ model User {
   accountInvitesSent AccountInvite[] @relation("AccountInviteInvitedBy")
   country    Country?      @relation(fields: [countryId], references: [id])
   plaidItems PlaidItem[]
+  notifications NotificationEvent[]
+  notificationDismissals NotificationDismissal[]
 
   @@map("user")
 }
@@ -172,8 +185,51 @@ model Budget {
   accounts     AccountRegister[]
   User         User?             @relation(fields: [userId], references: [id])
   savingsGoals SavingsGoal[]
+  notifications NotificationEvent[]
+  notificationDismissals NotificationDismissal[]
 
   @@map("budget")
+}
+
+model NotificationEvent {
+  id             Int              @id @default(autoincrement()) @db.UnsignedInt
+  userId         Int              @map("user_id") @db.UnsignedInt
+  budgetId       Int              @map("budget_id") @db.UnsignedInt
+  kind           NotificationKind
+  fingerprint    String           @db.VarChar(191)
+  occurrenceKey  String           @map("occurrence_key") @db.VarChar(191)
+  isActive       Boolean          @default(true) @map("is_active")
+  payload        Json
+  firstSeenAt    DateTime         @default(now()) @map("first_seen_at")
+  lastSeenAt     DateTime         @default(now()) @map("last_seen_at")
+  resolvedAt     DateTime?        @map("resolved_at")
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  budget Budget @relation(fields: [budgetId], references: [id])
+
+  @@unique([userId, budgetId, kind, fingerprint], map: "notification_event_user_budget_kind_fingerprint_uidx")
+  @@unique([userId, budgetId, kind, occurrenceKey], map: "notification_event_user_budget_kind_occurrence_uidx")
+  @@index([userId, budgetId, kind, isActive], map: "notification_event_user_budget_kind_active_idx")
+  @@index([budgetId, kind, isActive], map: "notification_event_budget_kind_active_idx")
+  @@map("notification_event")
+}
+
+model NotificationDismissal {
+  id             Int              @id @default(autoincrement()) @db.UnsignedInt
+  userId         Int              @map("user_id") @db.UnsignedInt
+  budgetId       Int              @map("budget_id") @db.UnsignedInt
+  kind           NotificationKind
+  occurrenceKey  String           @map("occurrence_key") @db.VarChar(191)
+  dismissedAt    DateTime         @default(now()) @map("dismissed_at")
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  budget Budget @relation(fields: [budgetId], references: [id])
+
+  @@unique([userId, budgetId, kind, occurrenceKey], map: "notification_dismissal_user_budget_kind_occurrence_uidx")
+  @@index([userId, budgetId, kind], map: "notification_dismissal_user_budget_kind_idx")
+  @@map("notification_dismissal")
 }
 
 model SavingsGoal {

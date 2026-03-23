@@ -210,6 +210,8 @@ export const loginSchema = z.object({
   tokenChallenge: z.string().optional(),
 });
 
+export const userRoleSchema = z.enum(["USER", "ADMIN"]);
+
 export const passwordSchema = z
   .object({
     newPassword: z
@@ -223,6 +225,35 @@ export const passwordSchema = z
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
+
+export const adminUsersQuerySchema = z.object({
+  q: z.string().trim().max(255).optional().default(""),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const adminUserUpdateSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(255).optional(),
+    lastName: z.string().trim().min(1).max(255).optional(),
+    email: z.email().optional(),
+    countryId: z.number().int().nullable().optional(),
+    timezoneOffset: z.number().int().nullable().optional(),
+    isDaylightSaving: z.boolean().nullable().optional(),
+    role: userRoleSchema.optional(),
+    isArchived: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required",
+  });
+
+export const adminUserPasswordResetSchema = passwordSchema;
+
+export const adminAccountsQuerySchema = z.object({
+  q: z.string().trim().max(255).optional().default(""),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
 
 export const registerSchema = z
   .object({

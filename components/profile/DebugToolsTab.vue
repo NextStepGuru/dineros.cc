@@ -2,7 +2,7 @@
 const toast = useToast();
 const authStore = useAuthStore();
 
-if (authStore.getUser?.isAdmin !== true) {
+if (authStore.getUser?.role !== "ADMIN") {
   throw createError({
     statusCode: 403,
     statusMessage: "Access Denied",
@@ -96,7 +96,7 @@ const runDebugTask = async (taskName: string) => {
       description: `Starting ${taskName} debug task...`,
     });
 
-    const { data, error } = await useAPI(`/api/tasks/${taskName}`, {
+    const { error } = await useAPI(`/api/tasks/${taskName}`, {
       method: "POST",
     });
 
@@ -112,9 +112,13 @@ const runDebugTask = async (taskName: string) => {
       });
     }
   } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : `An error occurred while running ${taskName} debug task.`;
     toast.add({
       color: "error",
-      description: `An error occurred while running ${taskName} debug task.`,
+      description: message,
     });
   } finally {
     isRunning.value = false;
@@ -124,8 +128,7 @@ const runDebugTask = async (taskName: string) => {
 </script>
 
 <template lang="pug">
-div(class="max-w-4xl min-h-96 my-4 m-auto")
-  h2(class="text-xl font-bold text-center mb-6") Debug Tasks
+div(class="max-w-4xl mx-auto")
 
   div(class="space-y-6")
     // Task Buttons Grid

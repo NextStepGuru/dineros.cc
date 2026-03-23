@@ -106,9 +106,8 @@ function inviterLabel(row: InviteRow) {
 </script>
 
 <template lang="pug">
-div.p-4
-  h2(class="text-xl font-bold text-center mb-2") Team & invitations
-  p(class="text-sm text-center frog-text-muted mb-6 max-w-xl mx-auto")
+div
+  p(class="text-sm frog-text-muted mb-6 max-w-xl")
     | Invite someone by email. They will have full access to the selected account after they accept.
 
   UAlert(
@@ -149,10 +148,9 @@ div.p-4
 
   .max-w-3xl.mx-auto.mt-10(v-if="accountId")
     h3(class="text-lg font-semibold mb-3") Pending invitations
-    div(v-if="isLoading")
-      p.frog-text-muted.text-sm Loading…
-    div(v-else-if="invites.length === 0")
+    div(v-if="invites.length === 0")
       p.frog-text-muted.text-sm No pending invitations.
+      p.frog-text-muted.text-xs.mt-1(v-if="isLoading") Loading…
     ul(v-else class="space-y-2")
       li(
         v-for="row in invites"

@@ -17,11 +17,16 @@ import {
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
 import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
+import {
+  dismissNotification,
+  dispatchNotificationsRefresh,
+  fetchNotificationSnapshot,
+} from "~/lib/notifications";
 import type { Reoccurrence } from "~/types/types";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 
 const ModalsEditReoccurrence = defineAsyncComponent(
-  () => import("~/components/modals/EditReoccurrence.vue")
+  () => import("~/components/modals/EditReoccurrence.vue"),
 );
 
 definePageMeta({
@@ -35,6 +40,7 @@ const toast = useToast();
 const { $api } = useNuxtApp();
 
 type ReoccurrenceHealthIssue = {
+  notificationId: number;
   type:
     | "duplicate_rule"
     | "ended_rule"
@@ -46,6 +52,7 @@ type ReoccurrenceHealthIssue = {
   accountRegisterId: number;
   accountRegisterName: string;
   details: string;
+  occurrenceKey?: string;
 };
 
 /** Root `overflow-auto` + table `overflow-clip` break sticky headers when the real scroll is the outer wrapper. */
@@ -79,7 +86,7 @@ function handleTableClick(data: Reoccurrence) {
     callback: (data: Reoccurrence) => {
       listStore.patchReoccurrence(data);
       listStore.fetchLists();
-      modal.close()
+      modal.close();
     },
     cancel: () => modal.close(),
   };
@@ -87,10 +94,12 @@ function handleTableClick(data: Reoccurrence) {
 }
 
 function handleAddReoccurrence() {
-  const accountRegisters = formatAccountRegisters(listStore.getAccountRegisters);
+  const accountRegisters = formatAccountRegisters(
+    listStore.getAccountRegisters,
+  );
   const firstAccountRegisterId = accountRegisters[0]?.id ?? 0;
   const monthInterval = listStore.getIntervals.find((i) =>
-    /month/i.test(i.name)
+    /month/i.test(i.name),
   );
   const defaultIntervalId = monthInterval?.id ?? 0;
 
@@ -100,7 +109,7 @@ function handleAddReoccurrence() {
     callback: (data: Reoccurrence) => {
       listStore.patchReoccurrence(data);
       listStore.fetchLists();
-      modal.close()
+      modal.close();
     },
     cancel: () => modal.close(),
     reoccurrence: {
@@ -143,7 +152,12 @@ async function handleRecalculate() {
     if (authStore.budgetId > 0) {
       body.budgetId = authStore.budgetId;
     }
-    const data = await ($api as typeof $fetch)<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>("/api/recalculate", {
+    const data = await ($api as typeof $fetch)<{
+      success: boolean;
+      entriesCalculated: number;
+      entriesBalance: number;
+      accountRegisters: number;
+    }>("/api/recalculate", {
       method: "POST",
       body,
     });
@@ -174,7 +188,7 @@ const columns: TableColumn<Reoccurrence>[] = [
     cell: ({ row }) =>
       getAccountRegisterLabel(
         row.getValue("accountRegisterId"),
-        listStore.getAccountRegisters
+        listStore.getAccountRegisters,
       ),
   },
   {
@@ -218,10 +232,11 @@ const columns: TableColumn<Reoccurrence>[] = [
     accessorKey: "amount",
     header: () => h("div", { class: "text-right" }, "Amount"),
     cell: ({ row }) => {
-      const className = `text-right ${Number.parseInt(String(row.getValue("amount")), 10) < 0
-        ? "dark:text-red-300 text-red-700"
-        : ""
-        }`;
+      const className = `text-right ${
+        Number.parseInt(String(row.getValue("amount")), 10) < 0
+          ? "dark:text-red-300 text-red-700"
+          : ""
+      }`;
 
       return h(
         "div",
@@ -229,7 +244,7 @@ const columns: TableColumn<Reoccurrence>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("amount"))
+        }).format(row.getValue("amount")),
       );
     },
   },
@@ -240,7 +255,7 @@ const columns: TableColumn<Reoccurrence>[] = [
       return h(
         "div",
         { class: "text-right" },
-        formatDate(row.getValue("lastAt"))
+        formatDate(row.getValue("lastAt")),
       );
     },
   },
@@ -295,11 +310,15 @@ const reoccurrencesForTable = computed(() =>
       r.accountRegisterId,
       listStore.getAccountRegisters,
     );
-    const intervalLabel = getIntervalLabel(r.intervalId, listStore.getIntervals);
+    const intervalLabel = getIntervalLabel(
+      r.intervalId,
+      listStore.getIntervals,
+    );
     const categoryLabel =
       r.categoryId == null
         ? "uncategorized"
-        : (listStore.getCategories.find((c) => c.id === r.categoryId)?.name ?? "");
+        : (listStore.getCategories.find((c) => c.id === r.categoryId)?.name ??
+          "");
 
     return (
       (r.description ?? "").toLowerCase().includes(q) ||
@@ -307,7 +326,9 @@ const reoccurrencesForTable = computed(() =>
       intervalLabel.toLowerCase().includes(q) ||
       categoryLabel.toLowerCase().includes(q) ||
       formatDate(r.lastAt)?.toLowerCase().includes(q) ||
-      String(r.amount ?? "").toLowerCase().includes(q)
+      String(r.amount ?? "")
+        .toLowerCase()
+        .includes(q)
     );
   }),
 );
@@ -330,11 +351,12 @@ defineShortcuts({
 const isRecalculating = ref(false);
 const reoccurrenceHealthLoading = ref(false);
 const reoccurrenceHealthIssues = ref<ReoccurrenceHealthIssue[]>([]);
+const reoccurrenceActionLoading = ref<Set<number>>(new Set());
 const sectionEl = ref<HTMLElement | null>(null);
 const controlsEl = ref<HTMLElement | null>(null);
 const tableHostEl = ref<HTMLElement | null>(null);
 const tableViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)"
+  "calc(100dvh - var(--ui-header-height) - 12rem)",
 );
 const tableViewportAvailablePx = ref<number | null>(null);
 
@@ -354,9 +376,14 @@ function updateTableViewportMaxHeight() {
     const bottomSpacing = 16;
     const available = Math.max(
       220,
-      Math.floor(window.innerHeight - tableTop - bottomSpacing)
+      Math.floor(window.innerHeight - tableTop - bottomSpacing),
     );
-    if (shouldSkipViewportTableHeightChange(available, tableViewportAvailablePx.value)) {
+    if (
+      shouldSkipViewportTableHeightChange(
+        available,
+        tableViewportAvailablePx.value,
+      )
+    ) {
       return;
     }
     tableViewportAvailablePx.value = available;
@@ -378,16 +405,42 @@ async function fetchReoccurrenceHealth() {
   }
   reoccurrenceHealthLoading.value = true;
   try {
-    const data = await ($api as typeof $fetch)<{
-      issues: ReoccurrenceHealthIssue[];
-    }>("/api/reoccurrence-health", {
-      query: { budgetId: authStore.getBudgetId },
+    const snapshot = await fetchNotificationSnapshot({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      daysAhead: 90,
+      timeoutMs: 10000,
     });
-    reoccurrenceHealthIssues.value = data.issues ?? [];
+    reoccurrenceHealthIssues.value =
+      (snapshot.recurringHealthIssues as ReoccurrenceHealthIssue[]) ?? [];
   } catch {
     reoccurrenceHealthIssues.value = [];
   } finally {
     reoccurrenceHealthLoading.value = false;
+  }
+}
+
+async function dismissRecurringIssue(notificationId: number) {
+  if (!authStore.getBudgetId) return;
+  reoccurrenceActionLoading.value.add(notificationId);
+  try {
+    const snapshot = await dismissNotification({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      notificationId,
+      status: "dismissed",
+    });
+    reoccurrenceHealthIssues.value =
+      (snapshot.recurringHealthIssues as ReoccurrenceHealthIssue[]) ?? [];
+    dispatchNotificationsRefresh({
+      count:
+        snapshot.total ??
+        (snapshot.riskAlerts?.length ?? 0) +
+          (snapshot.recurringHealthIssues?.length ?? 0),
+      reason: "mutation",
+    });
+  } finally {
+    reoccurrenceActionLoading.value.delete(notificationId);
   }
 }
 
@@ -415,7 +468,7 @@ watch(
   async () => {
     await nextTick();
     updateTableViewportMaxHeight();
-  }
+  },
 );
 
 watch(
@@ -424,7 +477,7 @@ watch(
     await nextTick();
     updateTableViewportMaxHeight();
     await fetchReoccurrenceHealth();
-  }
+  },
 );
 
 watch(
@@ -450,7 +503,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template lang="pug">
-  section(ref="sectionEl" class="m-4")
+  section(
+    ref="sectionEl"
+    class="my-4 mx-2 overflow-y-auto"
+    style="max-height: calc(100dvh - var(--ui-header-height) - 2rem);")
     h1(class="sr-only") Recurring Entries
     div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
@@ -512,8 +568,18 @@ onBeforeUnmount(() => {
         li(v-for="issue in reoccurrenceHealthIssues.slice(0, 8)" :key="`${issue.type}-${issue.reoccurrenceId}`" class="frog-text-muted")
           b(class="frog-text") {{ issue.accountRegisterName }}:
           span &nbsp;{{ issue.description }} — {{ issue.details }}
+          UButton(
+            size="xs"
+            variant="ghost"
+            class="ml-2"
+            :loading="reoccurrenceActionLoading.has(issue.notificationId)"
+            :disabled="reoccurrenceActionLoading.has(issue.notificationId)"
+            @click="dismissRecurringIssue(issue.notificationId)") Dismiss
 
-    div(v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto rounded-md border border-primary/40" :style="{ maxHeight: tableViewportMaxHeight }")
+    div(
+      v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading"
+      ref="tableHostEl"
+      class="rounded-md border border-primary/40 overflow-x-auto")
       UAlert(
         v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 && reoccurrencesForTable.length === 0"
         class="mb-2"
@@ -542,7 +608,7 @@ onBeforeUnmount(() => {
             USkeleton(class="h-4 w-16 ml-auto")
       table(
         v-if="reoccurrencesForTable.length > 0"
-        class="w-full min-w-full text-xs sm:text-sm border-collapse")
+        class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
         caption(class="sr-only") Recurring entries
         thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
           tr

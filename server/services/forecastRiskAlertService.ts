@@ -22,13 +22,6 @@ export type ForecastRiskAlert = {
   daysUntilRisk: number;
 };
 
-export type ForecastRiskAlertStateStatus = "dismissed" | "resolved";
-export type ForecastRiskAlertStateEntry = {
-  key: string;
-  status: ForecastRiskAlertStateStatus;
-  actedAt: string;
-};
-
 type RegisterForRisk = {
   id: number;
   name: string;
@@ -127,36 +120,10 @@ function alertKey(params: {
   return `${params.accountRegisterId}:${params.riskType}:${params.riskAt.slice(0, 10)}`;
 }
 
-export async function getForecastRiskAlertStateEntries(userId: number) {
-  const user = await PrismaDb.user.findUnique({
-    where: { id: userId },
-    select: { settings: true },
-  });
-  const settings = (user?.settings ?? {}) as Record<string, unknown>;
-  const root =
-    typeof settings.forecastRiskAlerts === "object" &&
-    settings.forecastRiskAlerts !== null
-      ? (settings.forecastRiskAlerts as Record<string, unknown>)
-      : {};
-  const itemsRaw = Array.isArray(root.items) ? root.items : [];
-  return itemsRaw
-    .filter((i): i is ForecastRiskAlertStateEntry => {
-      if (typeof i !== "object" || i == null) return false;
-      const row = i as Record<string, unknown>;
-      return (
-        typeof row.key === "string" &&
-        (row.status === "dismissed" || row.status === "resolved") &&
-        typeof row.actedAt === "string"
-      );
-    })
-    .slice(-500);
-}
-
 export async function evaluateForecastRiskAlerts(params: {
   userId: number;
   budgetId: number;
   daysAhead?: number;
-  includeInactive?: boolean;
 }) {
   const daysAhead = params.daysAhead ?? 90;
   const budget = await PrismaDb.budget.findFirst({
@@ -223,15 +190,9 @@ export async function evaluateForecastRiskAlerts(params: {
   }
 
   sortRiskAlerts(alerts);
-  const stateEntries = await getForecastRiskAlertStateEntries(params.userId);
-  const stateMap = new Map(stateEntries.map((s) => [s.key, s.status]));
-  const activeAlerts = params.includeInactive
-    ? alerts
-    : alerts.filter((a) => !stateMap.has(a.key));
-
   return {
     evaluatedAt: dateTimeService.toISOString(),
     daysAhead,
-    alerts: activeAlerts,
+    alerts,
   };
 }

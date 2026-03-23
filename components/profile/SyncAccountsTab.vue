@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PlaidLinkOptions } from "@jcss/vue-plaid-link";
-import { PlaidLink } from "@jcss/vue-plaid-link";
 import type { TableColumn } from "@nuxt/ui";
 import { h, resolveComponent } from "vue";
 import type { PlaidAccount, User } from "../../types/types";
@@ -24,8 +23,6 @@ const stripedTheme = ref({
 const toast = useToast();
 const authStore = useAuthStore();
 const listStore = useListStore();
-
-
 
 const isLoaded = ref(false);
 const publicToken = ref("");
@@ -81,7 +78,7 @@ async function loadSyncedAccounts() {
   isLoading.value = true;
   try {
     const { data: res, error } = await useAPI<{ accounts: any[] }>(
-      "/api/plaid-synced-accounts"
+      "/api/plaid-synced-accounts",
     );
 
     if (res?.value && !error?.value) {
@@ -96,9 +93,13 @@ async function loadSyncedAccounts() {
       }
     }
   } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to load synced accounts.";
     toast.add({
       color: "error",
-      description: "Failed to load synced accounts.",
+      description: message,
     });
   } finally {
     isLoading.value = false;
@@ -112,7 +113,7 @@ async function loadAvailablePlaidAccounts() {
 
   try {
     const { data: res, error } = await useAPI<{ accounts: PlaidAccount[] }>(
-      "/api/plaid-list-accounts"
+      "/api/plaid-list-accounts",
     );
 
     if (res?.value && !error?.value) {
@@ -130,11 +131,11 @@ async function loadAvailablePlaidAccounts() {
 
 // Load data when component mounts or auth state changes
 // Always try to load synced accounts, regardless of Plaid connection status
-loadSyncedAccounts();
+// Do not top-level await: that makes async setup and blocks first paint (Suspense).
+loadSyncedAccounts(); // NOSONAR — intentional fire-and-forget; await would defer tab content
 
-// Only load available accounts if Plaid is connected
 if (authStore.hasPlaidConnected) {
-  loadAvailablePlaidAccounts();
+  loadAvailablePlaidAccounts(); // NOSONAR — same as above
 }
 
 watch(authStore, () => {
@@ -172,9 +173,13 @@ async function disconnectAccount(accountRegisterId: number) {
       });
     }
   } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to disconnect account.";
     toast.add({
       color: "error",
-      description: "Failed to disconnect account.",
+      description: message,
     });
   } finally {
     isDisconnecting.value = null;
@@ -199,7 +204,7 @@ const linkBankAccounts = computed<LinkedAccountType[]>(() => {
         id: ar.id,
         name: ar.name,
         disabled: selectedAccountIds.has(ar.id),
-      })
+      }),
     )
     .concat([
       { id: 0, name: "Add Bank Account", disabled: false },
@@ -223,7 +228,7 @@ async function linkAccounts() {
       {
         method: "POST",
         body: { linkAccounts: linkAccountsArray },
-      }
+      },
     );
 
     if (res?.value && !error?.value) {
@@ -243,9 +248,13 @@ async function linkAccounts() {
       });
     }
   } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to link accounts.";
     toast.add({
       color: "error",
-      description: "Failed to link accounts.",
+      description: message,
     });
   } finally {
     isLinkingAccounts.value = false;
@@ -273,7 +282,7 @@ function formatBalance(balance: number, isCredit: boolean) {
 }
 
 const syncedColumns = computed<TableColumn<SyncedAccountRow>[]>(() => {
-  void isDisconnecting.value;
+  const disconnectingId = isDisconnecting.value;
   return [
     {
       accessorKey: "name",
@@ -313,7 +322,7 @@ const syncedColumns = computed<TableColumn<SyncedAccountRow>[]>(() => {
           {
             color: "error",
             size: "sm",
-            loading: isDisconnecting.value === row.original.id,
+            loading: disconnectingId === row.original.id,
             onClick: () => disconnectAccount(row.original.id),
           },
           { default: () => "Disconnect" },
@@ -323,8 +332,8 @@ const syncedColumns = computed<TableColumn<SyncedAccountRow>[]>(() => {
 });
 
 const linkColumns = computed<TableColumn<PlaidAccount>[]>(() => {
-  void selectedAccounts.value;
-  void linkBankAccounts.value;
+  const selectedAccountMap = selectedAccounts.value;
+  const linkAccountItems = linkBankAccounts.value;
   return [
     {
       accessorKey: "name",
@@ -351,14 +360,14 @@ const linkColumns = computed<TableColumn<PlaidAccount>[]>(() => {
       cell: ({ row }) => {
         const plaidId = row.original.id;
         return h(USelect, {
-          modelValue: selectedAccounts.value[plaidId],
+          modelValue: selectedAccountMap[plaidId],
           "onUpdate:modelValue": (v: number | string | null) => {
             selectedAccounts.value = {
               ...selectedAccounts.value,
               [plaidId]: v as number | null,
             };
           },
-          items: linkBankAccounts.value,
+          items: linkAccountItems,
           valueKey: "id",
           labelKey: "name",
           class: "w-full",
@@ -370,9 +379,8 @@ const linkColumns = computed<TableColumn<PlaidAccount>[]>(() => {
 </script>
 
 <template lang="pug">
-div.p-4
-  h2(class="text-xl font-bold text-center") Sync Accounts
-  p(class="text-sm text-center frog-text-muted max-w-2xl mx-auto mb-4")
+div
+  p(class="text-sm frog-text-muted max-w-2xl mb-4")
     | Bank connections are tied to your login. Everyone you invite can see shared account data; only this profile&apos;s Plaid connection is used for bank linking.
 
   // Connect to Plaid section

@@ -65,12 +65,9 @@ async function savePlaidSyncEmail(value: boolean) {
   plaidSyncEmailEnabled.value = value;
   savingPlaidSyncEmail.value = true;
   try {
-    await patchNotifications(
-      { plaidTransactionSyncEmail: value },
-      () => {
-        plaidSyncEmailEnabled.value = previous;
-      },
-    );
+    await patchNotifications({ plaidTransactionSyncEmail: value }, () => {
+      plaidSyncEmailEnabled.value = previous;
+    });
   } finally {
     savingPlaidSyncEmail.value = false;
   }
@@ -81,12 +78,9 @@ async function savePlaidConnectionIssueEmail(value: boolean) {
   plaidConnectionIssueEmailEnabled.value = value;
   savingPlaidConnectionIssue.value = true;
   try {
-    await patchNotifications(
-      { plaidConnectionIssueEmail: value },
-      () => {
-        plaidConnectionIssueEmailEnabled.value = previous;
-      },
-    );
+    await patchNotifications({ plaidConnectionIssueEmail: value }, () => {
+      plaidConnectionIssueEmailEnabled.value = previous;
+    });
   } finally {
     savingPlaidConnectionIssue.value = false;
   }
@@ -94,8 +88,7 @@ async function savePlaidConnectionIssueEmail(value: boolean) {
 </script>
 
 <template lang="pug">
-div(class="max-w-2xl min-h-96 my-4 m-auto space-y-8")
-  h2(class="text-xl font-bold text-center mb-2") Notifications
+div(class="max-w-2xl mx-auto space-y-8")
 
   div(class="space-y-2")
     h3(class="text-sm font-semibold frog-text-muted") Banking (Plaid)

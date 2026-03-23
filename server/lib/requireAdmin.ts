@@ -6,11 +6,12 @@ import { isAdminEmail } from "~/server/lib/adminConfig";
 
 export async function requireAdmin(event: H3Event<EventHandlerRequest>) {
   const { userId } = getUser(event);
-  const user = await prisma.user.findUnique({
+  const user = (await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true },
-  });
-  if (!isAdminEmail(user?.email)) {
+  })) as { role?: string | null; email?: string | null } | null;
+  const role = typeof user?.role === "string" ? user.role : null;
+  const isAdmin = role === "ADMIN" || isAdminEmail(user?.email);
+  if (!isAdmin) {
     throw createError({
       statusCode: 403,
       statusMessage: "Forbidden",

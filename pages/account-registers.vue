@@ -5,10 +5,14 @@ import { useListStore } from "../stores/listStore";
 import { formatDate, getAccountTypeLabel } from "~/lib/utils";
 import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
-import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
+import {
+  dispatchNotificationsRefresh,
+  dismissNotification,
+} from "~/lib/notifications";
 
 type AccountRegisterSortMode = "visual" | "loan" | "savings";
 type ForecastRiskAlert = {
+  notificationId: number;
   key: string;
   accountRegisterId: number;
   accountRegisterName: string;
@@ -716,19 +720,14 @@ async function dismissTopRiskAlert() {
   if (!topRiskAlert.value || !authStore.getBudgetId) return;
   riskActionLoading.value = true;
   try {
-    const data = await ($api as typeof $fetch)<{
-      alerts: ForecastRiskAlert[];
-    }>(`/api/forecast-risk-alerts/state?budgetId=${authStore.getBudgetId}`, {
-      method: "PATCH",
-      body: {
-        key: topRiskAlert.value.key,
-        status: "dismissed",
-      },
+    const data = await dismissNotification({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      notificationId: topRiskAlert.value.notificationId,
+      status: "dismissed",
     });
-    riskAlerts.value = data.alerts ?? [];
-    if (import.meta.client) {
-      globalThis.dispatchEvent(new Event("notifications:refresh"));
-    }
+    riskAlerts.value = data.riskAlerts ?? [];
+    dispatchNotificationsRefresh({ reason: "mutation" });
   } catch {
     // Avoid noisy repeated toasts here; banner remains if action failed.
   } finally {
@@ -740,19 +739,14 @@ async function resolveTopRiskAlert() {
   if (!topRiskAlert.value || !authStore.getBudgetId) return;
   riskActionLoading.value = true;
   try {
-    const data = await ($api as typeof $fetch)<{
-      alerts: ForecastRiskAlert[];
-    }>(`/api/forecast-risk-alerts/state?budgetId=${authStore.getBudgetId}`, {
-      method: "PATCH",
-      body: {
-        key: topRiskAlert.value.key,
-        status: "resolved",
-      },
+    const data = await dismissNotification({
+      api: $api as typeof $fetch,
+      budgetId: authStore.getBudgetId,
+      notificationId: topRiskAlert.value.notificationId,
+      status: "resolved",
     });
-    riskAlerts.value = data.alerts ?? [];
-    if (import.meta.client) {
-      globalThis.dispatchEvent(new Event("notifications:refresh"));
-    }
+    riskAlerts.value = data.riskAlerts ?? [];
+    dispatchNotificationsRefresh({ reason: "mutation" });
   } catch {
     // Avoid noisy repeated toasts here; banner remains if action failed.
   } finally {
@@ -810,7 +804,6 @@ async function handleSaveSnapshot() {
     });
   }
 }
-
 
 const isSavingSnapshot = ref(false);
 
@@ -1298,45 +1291,6 @@ defineShortcuts({
   },
 });
 
-const accountRegistersSectionEl = ref<HTMLElement | null>(null);
-const accountRegistersTableViewportEl = ref<HTMLElement | null>(null);
-const accountRegistersViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)",
-);
-/** Last applied pixel height (guards against modal/scrollbar micro-layout shifts). */
-const accountRegistersViewportAvailablePx = ref<number | null>(null);
-let accountRegistersResizeObserver: ResizeObserver | null = null;
-let accountRegistersViewportFrameId: number | null = null;
-
-function updateAccountRegistersViewportMaxHeight() {
-  if (!accountRegistersTableViewportEl.value) return;
-
-  if (accountRegistersViewportFrameId != null) {
-    cancelAnimationFrame(accountRegistersViewportFrameId);
-  }
-
-  accountRegistersViewportFrameId = requestAnimationFrame(() => {
-    accountRegistersViewportFrameId = null;
-    const tableTop =
-      accountRegistersTableViewportEl.value?.getBoundingClientRect().top ?? 0;
-    const bottomSpacing = 16;
-    const available = Math.max(
-      220,
-      Math.floor(window.innerHeight - tableTop - bottomSpacing),
-    );
-    if (
-      shouldSkipViewportTableHeightChange(
-        available,
-        accountRegistersViewportAvailablePx.value,
-      )
-    ) {
-      return;
-    }
-    accountRegistersViewportAvailablePx.value = available;
-    accountRegistersViewportMaxHeight.value = `${available}px`;
-  });
-}
-
 const filteredAccountRegisters = computed(() => {
   const filterText = globalFilter.value.toLowerCase();
   const filtered = registersForUi.value.filter((f) => {
@@ -1348,8 +1302,7 @@ const filteredAccountRegisters = computed(() => {
 });
 
 const mainRegisterCount = computed(
-  () =>
-    registersForUi.value.filter((r) => !r.subAccountRegisterId).length,
+  () => registersForUi.value.filter((r) => !r.subAccountRegisterId).length,
 );
 
 /** Filter hid every main account, but the user still has accounts (bad search), not a true empty budget. */
@@ -1407,9 +1360,7 @@ const estimatedNetWorth = computed(() => {
 
 /** Main registers only: lowest computed balance + risk signal for cross-account snapshot */
 const accountLiquiditySnapshot = computed(() => {
-  const mains = registersForUi.value.filter(
-    (r) => !r.subAccountRegisterId,
-  );
+  const mains = registersForUi.value.filter((r) => !r.subAccountRegisterId);
   if (mains.length === 0) return null;
   const withNet = mains.map((r) => ({
     register: r,
@@ -1436,18 +1387,6 @@ onMounted(async () => {
       description: "Welcome! Add your first account to start forecasting.",
     });
   }
-
-  await nextTick();
-  updateAccountRegistersViewportMaxHeight();
-  window.addEventListener("resize", updateAccountRegistersViewportMaxHeight);
-
-  accountRegistersResizeObserver = new ResizeObserver(() => {
-    updateAccountRegistersViewportMaxHeight();
-  });
-
-  if (accountRegistersSectionEl.value) {
-    accountRegistersResizeObserver.observe(accountRegistersSectionEl.value);
-  }
 });
 
 onBeforeUnmount(() => {
@@ -1455,21 +1394,11 @@ onBeforeUnmount(() => {
     clearTimeout(longPressTimer.value);
     longPressTimer.value = null;
   }
-
-  window.removeEventListener("resize", updateAccountRegistersViewportMaxHeight);
-  if (accountRegistersResizeObserver) {
-    accountRegistersResizeObserver.disconnect();
-    accountRegistersResizeObserver = null;
-  }
-  if (accountRegistersViewportFrameId != null) {
-    cancelAnimationFrame(accountRegistersViewportFrameId);
-    accountRegistersViewportFrameId = null;
-  }
 });
 </script>
 
 <template lang="pug">
-  section(ref="accountRegistersSectionEl" class="m-4")
+  section(class="my-4 mx-2 overflow-y-auto" style="max-height: calc(100dvh - var(--ui-header-height) - 2rem);")
     h1(class="sr-only") Accounts
     UAlert(
       v-if="isSnapshotMode && activeSnapshotCreatedAt"
@@ -1642,9 +1571,7 @@ onBeforeUnmount(() => {
 
     div(
       v-else-if="listStore.getIsListsLoading"
-      ref="accountRegistersTableViewportEl"
-      class="relative overflow-auto flex-1 w-full rounded-md border border-primary/40 p-2 sm:p-4"
-      :style="{ maxHeight: accountRegistersViewportMaxHeight }"
+      class="relative overflow-x-auto w-full rounded-md border border-primary/40 p-2 sm:p-4"
     )
       div(class="grid grid-cols-4 gap-2 sm:gap-4 pb-3 border-b border-default")
         USkeleton(class="h-4 w-8")
@@ -1676,8 +1603,8 @@ onBeforeUnmount(() => {
           variant="soft"
           :to="`/register/${accountLiquiditySnapshot.lowest.id}`") Open lowest-balance register
 
-    div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full rounded-md border border-primary/40" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
-      table(class="w-full min-w-full text-xs sm:text-sm border-collapse")
+    div(v-if="draggableAccountRegisters.length > 0" class="relative overflow-x-auto w-full rounded-md border border-primary/40")
+      table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
         caption(class="sr-only") Account registers with balances
         thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
           tr

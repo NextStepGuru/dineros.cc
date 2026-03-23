@@ -1,5 +1,5 @@
 # Runs on PRs: unit tests, lint, pre-security checks; build/push app + microservice, deploy to GKE staging, then Playwright E2E vs https://staging.dineros.cc.
-# Local/mock E2E (mysql + dev server): .github/workflows/e2e.yml (manual).
+# Refresh Linux visual baselines vs staging: .github/workflows/e2e-update-staging-snapshots.yml (manual).
 # Staging manifests: .deploy/staging/dineros.yaml (namespace dineros-staging). Fork PRs skip deploy and staging E2E (no WIF).
 name: PR Checks
 

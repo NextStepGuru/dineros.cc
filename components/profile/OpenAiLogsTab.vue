@@ -2,7 +2,7 @@
 const toast = useToast();
 const authStore = useAuthStore();
 
-if (authStore.getUser?.isAdmin !== true) {
+if (authStore.getUser?.role !== "ADMIN") {
   throw createError({
     statusCode: 403,
     statusMessage: "Access Denied",
@@ -90,10 +90,9 @@ function formatJson(meta: unknown) {
 </script>
 
 <template lang="pug">
-div(class="max-w-5xl min-h-96 my-4 m-auto px-2")
-  h2(class="text-xl font-bold text-center mb-4") OpenAI request logs
+div(class="max-w-5xl mx-auto px-2")
 
-  p(class="text-sm text-gray-500 text-center mb-4")
+  p(class="text-sm text-gray-500 mb-4")
     | Usage rows from Plaid enrichment and other logged completions. Showing {{ items.length }} of {{ total }}.
 
   div(v-if="loading && items.length === 0" class="text-center py-8") Loading…

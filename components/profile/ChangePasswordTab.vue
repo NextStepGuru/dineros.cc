@@ -24,13 +24,10 @@ const handlePasswordSubmit = async ({
 }: FormSubmitEvent<PasswordSchemaType>) => {
   try {
     isPasswordChanging.value = true;
-    const { data: responseData, error } = await useAPI<User>(
-      "/api/change-password",
-      {
-        method: "POST",
-        body: passwordState,
-      }
-    );
+    const { error } = await useAPI<User>("/api/change-password", {
+      method: "POST",
+      body: passwordState,
+    });
 
     if (error?.value) {
       isPasswordChanging.value = false;
@@ -66,11 +63,8 @@ const handleErrorForTemplate = handleError;
 </script>
 
 <template lang="pug">
-UCard(class="max-w-md min-h-96 my-4 m-auto")
-  template(#header)
-    h2(class="text-xl font-bold text-center") Change Password
-
-  UForm(class="m-4 space-y-4" @submit.prevent="handlePasswordSubmit" :state="passwordState" :schema="passwordSchema" @error="handleError($event, toast)" :disabled="isPasswordChanging")
+UCard(class="max-w-md mx-auto")
+  UForm(class="space-y-4" @submit.prevent="handlePasswordSubmit" :state="passwordState" :schema="passwordSchema" @error="handleError($event, toast)" :disabled="isPasswordChanging")
     UFormField(label="Password" for="newPassword")
       UInput(
         id="newPassword"
