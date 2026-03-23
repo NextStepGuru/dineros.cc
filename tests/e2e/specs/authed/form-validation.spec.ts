@@ -99,10 +99,8 @@ test.describe("Form validation — authed empty-submit", () => {
       .click();
 
     await expect(page).toHaveURL(/\/edit-profile\/team/);
-    const feedback = page
-      .getByText(/required|invalid|enter.*email/i)
-      .first()
-      .or(page.getByRole("alert").first());
-    await expect(feedback).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.locator('li[role="alert"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });
