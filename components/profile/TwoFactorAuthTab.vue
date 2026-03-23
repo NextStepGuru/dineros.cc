@@ -20,17 +20,25 @@ const mfaSettings = computed(() => authStore.user?.settings?.mfa);
 const hasTotpEnabled = computed(
   () =>
     Boolean(mfaSettings.value?.totp?.isEnabled) &&
-    Boolean(mfaSettings.value?.totp?.isVerified)
+    Boolean(mfaSettings.value?.totp?.isVerified),
 );
 const passkeys = computed(() => mfaSettings.value?.passkeys || []);
-const emailOtpEnabled = computed(() => Boolean(mfaSettings.value?.emailOtp?.isEnabled));
+const emailOtpEnabled = computed(() =>
+  Boolean(mfaSettings.value?.emailOtp?.isEnabled),
+);
 const hasAnyMfaEnabled = computed(
-  () => hasTotpEnabled.value || passkeys.value.length > 0 || emailOtpEnabled.value
+  () =>
+    hasTotpEnabled.value || passkeys.value.length > 0 || emailOtpEnabled.value,
 );
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === "object" && "data" in error) {
-    return String((error as { data?: { message?: string; errors?: string } }).data?.errors || (error as { data?: { message?: string } }).data?.message || "");
+    return String(
+      (error as { data?: { message?: string; errors?: string } }).data
+        ?.errors ||
+        (error as { data?: { message?: string } }).data?.message ||
+        "",
+    );
   }
   return "";
 }
@@ -38,20 +46,24 @@ function getErrorMessage(error: unknown) {
 async function twoFactorAuth() {
   isTwoFaSaving.value = true;
   try {
-    const res = await $api<{ dataUri: string; backupCodes: string[] }>("/api/two-factor-auth");
+    const res = await $api<{ dataUri: string; backupCodes: string[] }>(
+      "/api/two-factor-auth",
+    );
     if (res?.dataUri) {
       twoFaImage.value = res.dataUri;
       backupCodes.value = res.backupCodes || [];
       showQRCode.value = true;
       toast.add({
         color: "success",
-        description: "QR code generated. Scan it and verify with your app code.",
+        description:
+          "QR code generated. Scan it and verify with your app code.",
       });
     }
   } catch (error: unknown) {
     toast.add({
       color: "error",
-      description: getErrorMessage(error) || "Failed to start authenticator setup.",
+      description:
+        getErrorMessage(error) || "Failed to start authenticator setup.",
     });
   } finally {
     isTwoFaSaving.value = false;
@@ -157,7 +169,8 @@ async function toggleEmailOtp() {
   } catch (error: unknown) {
     toast.add({
       color: "error",
-      description: getErrorMessage(error) || "Failed to update email OTP setting.",
+      description:
+        getErrorMessage(error) || "Failed to update email OTP setting.",
     });
   } finally {
     isTwoFaSaving.value = false;
@@ -179,7 +192,9 @@ async function disable2fa() {
   } catch (error: unknown) {
     toast.add({
       color: "error",
-      description: getErrorMessage(error) || "Failed to disable two-factor authentication.",
+      description:
+        getErrorMessage(error) ||
+        "Failed to disable two-factor authentication.",
     });
   } finally {
     isTwoFaSaving.value = false;
@@ -200,8 +215,7 @@ function toggleBackupCodes() {
 </script>
 
 <template lang="pug">
-div(class="max-w-2xl min-h-96 my-4 m-auto space-y-5")
-  h2(class="text-xl font-bold text-center mb-3") Two-Factor Authentication
+div(class="max-w-2xl mx-auto space-y-5")
 
   div(class="rounded-lg border border-gray-200 dark:border-gray-800 p-4")
     .flex.items-center.justify-between.mb-3

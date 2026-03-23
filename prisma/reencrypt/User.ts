@@ -104,6 +104,14 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "plaidItems": {
  *       "modelName": "PlaidItem",
  *       "isList": true
+ *     },
+ *     "notifications": {
+ *       "modelName": "NotificationEvent",
+ *       "isList": true
+ *     },
+ *     "notificationDismissals": {
+ *       "modelName": "NotificationDismissal",
+ *       "isList": true
  *     }
  *   }
  * }

@@ -6,6 +6,7 @@ definePageMeta({
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const isAdminUser = computed(() => authStore.getUser?.role === "ADMIN");
 
 // Lazy-load tab components so Plaid and other heavy deps load only when tab is selected
 const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
@@ -46,78 +47,98 @@ const adminOnlyPaths = new Set([
 
 const currentTabComponent = computed(() => {
   const path = route.path;
-  if (adminOnlyPaths.has(path) && authStore.getUser?.isAdmin !== true) {
+  if (adminOnlyPaths.has(path) && !isAdminUser.value) {
     return null;
   }
   return tabComponents[path] ?? null;
 });
 
-// Define available tabs
-const navigationItems = computed(() => {
-  const baseItems = [
+type NavItem = {
+  label: string;
+  to: string;
+  active: boolean;
+};
+
+const coreNavigationItems = computed<NavItem[]>(() => [
+  {
+    label: "Profile",
+    to: "/edit-profile/profile",
+    active: route.path.startsWith("/edit-profile/profile"),
+  },
+  {
+    label: "Team",
+    to: "/edit-profile/team",
+    active: route.path.startsWith("/edit-profile/team"),
+  },
+  {
+    label: "Password",
+    to: "/edit-profile/password",
+    active: route.path.startsWith("/edit-profile/password"),
+  },
+  {
+    label: "Notifications",
+    to: "/edit-profile/notifications",
+    active: route.path.startsWith("/edit-profile/notifications"),
+  },
+  {
+    label: "Sync Accounts",
+    to: "/edit-profile/sync-accounts",
+    active: route.path.startsWith("/edit-profile/sync-accounts"),
+  },
+  {
+    label: "2FA",
+    to: "/edit-profile/two-factor-auth",
+    active: route.path.startsWith("/edit-profile/two-factor-auth"),
+  },
+]);
+
+const adminNavigationItems = computed<NavItem[]>(() => {
+  if (!isAdminUser.value) return [];
+  return [
     {
-      label: "Profile",
-      to: "/edit-profile/profile",
-      active: route.path.startsWith("/edit-profile/profile"),
+      label: "Admin Console",
+      to: "/admin",
+      active: route.path.startsWith("/admin"),
     },
     {
-      label: "Team",
-      to: "/edit-profile/team",
-      active: route.path.startsWith("/edit-profile/team"),
+      label: "Legacy Admin Tasks",
+      to: "/edit-profile/admin-settings",
+      active: route.path.startsWith("/edit-profile/admin-settings"),
     },
     {
-      label: "Password",
-      to: "/edit-profile/password",
-      active: route.path.startsWith("/edit-profile/password"),
-    },
-    {
-      label: "Notifications",
-      to: "/edit-profile/notifications",
-      active: route.path.startsWith("/edit-profile/notifications"),
-    },
-    {
-      label: "Sync Accounts",
-      to: "/edit-profile/sync-accounts",
-      active: route.path.startsWith("/edit-profile/sync-accounts"),
-    },
-    {
-      label: "2FA",
-      to: "/edit-profile/two-factor-auth",
-      active: route.path.startsWith("/edit-profile/two-factor-auth"),
+      label: "OpenAI logs",
+      to: "/edit-profile/openai-logs",
+      active: route.path.startsWith("/edit-profile/openai-logs"),
     },
   ];
-
-  if (authStore.getUser?.isAdmin === true) {
-    return [
-      ...baseItems,
-      {
-        label: "Admin",
-        to: "/edit-profile/admin-settings",
-        active: route.path.startsWith("/edit-profile/admin-settings"),
-      },
-      {
-        label: "OpenAI logs",
-        to: "/edit-profile/openai-logs",
-        active: route.path.startsWith("/edit-profile/openai-logs"),
-      },
-    ];
-  }
-
-  return baseItems;
 });
+
+const allNavigationItems = computed(() => [
+  ...coreNavigationItems.value,
+  ...adminNavigationItems.value,
+]);
+
+const tabHeadingOverrides: Record<string, string> = {
+  "/edit-profile/password": "Change password",
+  "/edit-profile/team": "Team & Invitations",
+  "/edit-profile/two-factor-auth": "Two-Factor Authentication",
+};
+
+const currentTabLabel = computed(
+  () =>
+    tabHeadingOverrides[route.path] ??
+    allNavigationItems.value.find((item) => item.to === route.path)?.label ??
+    "Profile",
+);
 
 // Set up page head for SSR
 useHead(() => {
-  const currentPath = route.path;
-  const tabLabel =
-    navigationItems.value.find((item) => item.to === currentPath)?.label ||
-    "Profile";
   return {
-    title: `Edit Profile - ${tabLabel}`,
+    title: `Settings - ${currentTabLabel.value}`,
     meta: [
       {
         name: "description",
-        content: `Edit your profile settings - ${tabLabel}`,
+        content: `Manage your account settings - ${currentTabLabel.value}`,
       },
     ],
   };
@@ -132,17 +153,48 @@ onMounted(() => {
 </script>
 
 <template lang="pug">
-div(class="container mx-auto px-4 py-8")
-  h1(class="text-2xl font-bold text-center mb-8") Edit Profile
+div(class="container mx-auto px-4 py-6 lg:py-8")
+  div(class="mx-auto max-w-7xl space-y-6")
+    div(class="space-y-1")
+      h1(class="text-2xl font-bold") Edit Profile
+      p(class="text-sm frog-text-muted") Manage your profile, security, notifications, and connected services.
 
-  // Tab Navigation
-  div(class="flex justify-center mb-8")
-    UNavigationMenu(
-      :items="navigationItems"
-      class="w-full max-w-2xl justify-center"
-    )
+    div(class="grid gap-4 lg:gap-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]")
+      aside(class="lg:sticky lg:top-24 lg:self-start")
+        div(class="rounded-lg border border-default p-2 bg-default/40")
+          p(class="px-2 py-1 text-xs font-semibold uppercase tracking-wide frog-text-muted") General
+          nav(class="mt-1 space-y-1")
+            NuxtLink(
+              v-for="item in coreNavigationItems"
+              :key="item.to"
+              :to="item.to"
+              class="block rounded-md px-2.5 py-2 text-sm transition-colors"
+              :class="item.active ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-elevated text-muted hover:text-highlighted'")
+              | {{ item.label }}
 
-  // Tab Content (lazy-loaded per tab)
-  div(class="flex justify-center")
-    component(:is="currentTabComponent" v-if="currentTabComponent")
+          template(v-if="adminNavigationItems.length > 0")
+            USeparator(class="my-2")
+            p(class="px-2 py-1 text-xs font-semibold uppercase tracking-wide frog-text-muted") Admin
+            nav(class="mt-1 space-y-1")
+              NuxtLink(
+                v-for="item in adminNavigationItems"
+                :key="item.to"
+                :to="item.to"
+                class="block rounded-md px-2.5 py-2 text-sm transition-colors"
+                :class="item.active ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-elevated text-muted hover:text-highlighted'")
+                | {{ item.label }}
+
+      div(class="min-w-0")
+        UCard
+          template(#header)
+            div(class="flex items-center justify-between gap-3")
+              h2(class="text-base sm:text-lg font-semibold") {{ currentTabLabel }}
+          component(:is="currentTabComponent" v-if="currentTabComponent")
+          UAlert(
+            v-else
+            color="error"
+            variant="soft"
+            title="Settings page unavailable"
+            description="You do not have access to this section, or the page does not exist."
+          )
 </template>

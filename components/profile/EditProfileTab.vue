@@ -4,7 +4,7 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import type { z } from "zod";
 import type { User } from "../../types/types";
 
-import type { publicProfileSchema } from "~/schema/zod";
+import { publicProfileSchema } from "~/schema/zod";
 
 interface Country {
   id: number;
@@ -14,6 +14,7 @@ interface Country {
 }
 
 type ProfileSchemaType = z.infer<typeof publicProfileSchema>;
+const profileSchema = publicProfileSchema;
 
 const toast = useToast();
 const authStore = useAuthStore();
@@ -70,7 +71,7 @@ watch(
         formState.value.timezoneOffset = firstTimezone.value;
       }
     }
-  }
+  },
 );
 
 // All timezone options with country mappings
@@ -202,7 +203,7 @@ const timezoneOptions = computed(() => {
   }
 
   const filteredOptions = allTimezoneOptions.filter((option) =>
-    option.countries.includes(selectedCountryId)
+    option.countries.includes(selectedCountryId),
   );
 
   // If no specific timezones found for the country, show all options
@@ -228,7 +229,7 @@ if (formState.value.isDaylightSaving === undefined) {
 const selectedTimezoneInfo = computed(() => {
   if (!formState.value.timezoneOffset) return null;
   const timezone = allTimezoneOptions.find(
-    (tz) => tz.value === formState.value.timezoneOffset
+    (tz) => tz.value === formState.value.timezoneOffset,
   );
   return timezone
     ? {
@@ -260,15 +261,17 @@ const handleSubmit = async ({
       description: "Profile updated successfully.",
     });
   } catch (e: unknown) {
-    const msg =
-      e && typeof e === "object" && "data" in e
-        ? String((e as { data?: { message?: string } }).data?.message)
-        : e &&
-            typeof e === "object" &&
-            "message" in e &&
-            typeof (e as { message: string }).message === "string"
-          ? (e as { message: string }).message
-          : "An error occurred during profile update.";
+    let msg = "An error occurred during profile update.";
+    if (e && typeof e === "object" && "data" in e) {
+      msg = String((e as { data?: { message?: string } }).data?.message);
+    } else if (
+      e &&
+      typeof e === "object" &&
+      "message" in e &&
+      typeof (e as { message: string }).message === "string"
+    ) {
+      msg = (e as { message: string }).message;
+    }
     toast.add({ color: "error", description: msg });
   } finally {
     isProfileSaving.value = false;
@@ -280,10 +283,8 @@ const handleErrorForTemplate = handleError;
 </script>
 
 <template lang="pug">
-div(class="max-w-md min-h-96 my-4 m-auto")
-  h2(class="text-xl font-bold text-center") Edit Profile
-
-  UForm(class="m-4 space-y-4" @submit.prevent="handleSubmit" :state="formState" :schema="publicProfileSchema" @error="handleError($event, toast)" :disabled="isProfileSaving")
+div(class="max-w-2xl mx-auto")
+  UForm(class="space-y-4" @submit.prevent="handleSubmit" :state="formState" :schema="profileSchema" @error="handleError($event, toast)" :disabled="isProfileSaving")
     UFormField(label="First Name" for="firstName")
       UInput(
         id="firstName"

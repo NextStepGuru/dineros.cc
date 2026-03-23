@@ -55,7 +55,7 @@ onMounted(() => {
 
     UMain#main-content(
       tabindex="-1"
-      :class="route.path === '/' ? 'w-full px-3 sm:px-4 md:px-0' : 'max-w-(--ui-container) mx-auto px-3 sm:px-4 md:px-0'")
+      :class="route.path === '/' ? 'w-full px-0 sm:px-4 md:px-0' : 'max-w-(--ui-container) mx-auto px-0 sm:px-4 md:px-0'")
       NuxtPage
 
     USeparator(v-if="!isFooterHidden" type="dashed" class="h-px pt-0 px-4")

@@ -5,7 +5,6 @@ import {
   getNotificationSnapshot,
   syncNotificationsForBudget,
 } from "~/server/services/notificationCenterService";
-import { dateTimeService } from "~/server/services/forecast";
 
 const querySchema = z.object({
   budgetId: z.coerce.number().int().positive(),
@@ -14,22 +13,18 @@ const querySchema = z.object({
 
 export default defineEventHandler(async (event) => {
   try {
-    const user = getUser(event);
-    const q = querySchema.parse(getQuery(event));
+    const { userId } = getUser(event);
+    const query = querySchema.parse(getQuery(event));
     await syncNotificationsForBudget({
-      userId: user.userId,
-      budgetId: q.budgetId,
-      daysAhead: q.daysAhead,
+      userId,
+      budgetId: query.budgetId,
+      daysAhead: query.daysAhead,
     });
     const snapshot = await getNotificationSnapshot({
-      userId: user.userId,
-      budgetId: q.budgetId,
+      userId,
+      budgetId: query.budgetId,
     });
-    return {
-      evaluatedAt: dateTimeService.toISOString(),
-      daysAhead: q.daysAhead,
-      alerts: snapshot.riskAlerts,
-    };
+    return { count: snapshot.total };
   } catch (error) {
     handleApiError(error);
     throw error;
