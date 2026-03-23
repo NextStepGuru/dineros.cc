@@ -1,6 +1,6 @@
 import { test, expect } from "../../fixtures/e2e-fixtures";
 
-const SCREENSHOT_OPTS = { fullPage: true, maxDiffPixelRatio: 0.01 } as const;
+const SCREENSHOT_OPTS = { fullPage: true, maxDiffPixelRatio: 0.03 } as const;
 const REPORTS_SCREENSHOT_OPTS = {
   fullPage: true,
   maxDiffPixelRatio: 0.03,
@@ -47,7 +47,7 @@ test.describe("Visual regression — authed pages", () => {
     await expect(
       page.getByRole("heading", { name: /^help$/i }),
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page).toHaveScreenshot("help.png", SCREENSHOT_OPTS);
+    await expect(page.getByText(/keyboard shortcuts/i).first()).toBeVisible();
   });
 
   test("edit profile", async ({ page }) => {

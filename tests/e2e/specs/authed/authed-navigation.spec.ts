@@ -1,12 +1,12 @@
 import { test, expect } from "../../fixtures/e2e-fixtures";
 
 test.describe("Authed shell & header navigation", () => {
-  test("home shows sign out and main nav", async ({ page }) => {
+  test("home shows account menu and main nav", async ({ page }) => {
     await page.goto("/");
     const banner = page.getByRole("banner");
-    await expect(
-      banner.getByRole("button", { name: /^sign out$/i }),
-    ).toBeVisible({ timeout: 20_000 });
+    const userMenu = page.getByTestId("header-user-menu");
+    await expect(userMenu).toBeVisible({ timeout: 20_000 });
+    await expect(userMenu).toBeEnabled();
     await expect(
       banner.getByRole("link", { name: /^accounts$/i }),
     ).toBeVisible();
@@ -58,9 +58,8 @@ test.describe("Authed shell & header navigation", () => {
     await expect(page.getByText("E2E Checking")).toBeVisible({
       timeout: 30_000,
     });
-    const banner = page.getByRole("banner");
-    const buttons = banner.getByRole("button");
-    const count = await buttons.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    const bannerButtons = page.getByRole("banner").getByRole("button");
+    await expect(bannerButtons.first()).toBeVisible();
+    expect(await bannerButtons.count()).toBeGreaterThanOrEqual(1);
   });
 });

@@ -5,6 +5,7 @@ import type { AccountRegister } from "~/types/types";
 definePageMeta({
   middleware: "auth",
 });
+useHead({ title: "Reports | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
@@ -18,7 +19,6 @@ const {
   loading,
   data,
   errorMessage,
-  currencyFmt,
 } = useCategoryReports();
 
 const registersSorted = computed((): AccountRegister[] =>
@@ -115,15 +115,18 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
           UCard(class="ring-1 ring-default")
             template(#header)
               span(class="text-sm font-medium text-muted") Money in
-            p(class="text-lg font-semibold tabular-nums") {{ currencyFmt.format(data.summary.totalIn) }}
+            p(class="text-lg font-semibold tabular-nums")
+              DollarFormat(:amount="data.summary.totalIn")
           UCard(class="ring-1 ring-default")
             template(#header)
               span(class="text-sm font-medium text-muted") Money out
-            p(class="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400") {{ currencyFmt.format(data.summary.totalOut) }}
+            p(class="text-lg font-semibold tabular-nums")
+              DollarFormat(:amount="data.summary.totalOut")
           UCard(class="ring-1 ring-default")
             template(#header)
               span(class="text-sm font-medium text-muted") Net
-            p(class="text-lg font-semibold tabular-nums") {{ currencyFmt.format(data.summary.net) }}
+            p(class="text-lg font-semibold tabular-nums")
+              DollarFormat(:amount="data.summary.net")
           UCard(class="ring-1 ring-default")
             template(#header)
               span(class="text-sm font-medium text-muted") Entries
@@ -133,8 +136,7 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
           template(#header)
             h2(class="font-medium") By category
           .space-y-8
-            ReportsCategoryReportsDonut(:categories="data.donutCategories" :currencyFmt="currencyFmt")
+            ReportsCategoryReportsDonut(:categories="data.donutCategories")
             ReportsCategoryReportsGroupedTable(
-              :groups="data.tableGroups"
-              :currencyFmt="currencyFmt")
+              :groups="data.tableGroups")
 </template>

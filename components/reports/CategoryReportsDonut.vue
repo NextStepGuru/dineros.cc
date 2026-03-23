@@ -3,7 +3,6 @@ import type { CategoryReportRow } from "~/server/services/reports/types";
 
 const props = defineProps<{
   categories: CategoryReportRow[];
-  currencyFmt: Intl.NumberFormat;
 }>();
 
 const segments = computed(() => {
@@ -68,5 +67,6 @@ const legendListClass = computed(() => {
       .flex.flex-col.min-w-0.flex-1
         span.font-medium.truncate {{ c.segmentLabel }}
         span.text-sm.frog-text-muted
-          | {{ currencyFmt.format(c.total) }} · {{ c.shareOfAbs.toFixed(1) }}%
+          DollarFormat(:amount="c.total")
+          |  · {{ c.shareOfAbs.toFixed(1) }}%
 </template>

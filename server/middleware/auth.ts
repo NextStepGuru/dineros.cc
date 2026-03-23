@@ -5,6 +5,8 @@ import {
   setResponseStatus,
 } from "h3";
 import JwtService from "../services/JwtService";
+import { prisma } from "~/server/clients/prismaClient";
+import { isAdminEmail } from "~/server/lib/adminConfig";
 
 const ignoredRoutes = [
   { type: "exact", path: "/api/login", method: "POST" },
@@ -25,14 +27,13 @@ const ignoredRoutes = [
   { type: "regex", path: /^\/api\/public\/.*/, method: "GET" },
   { type: "regex", path: /^\/api\/webhook\/.*/, method: "GET" },
   { type: "regex", path: /^\/api\/webhook\/.*/, method: "POST" },
-  { type: "regex", path: /^\/api\/tasks\/.*/, method: "GET" },
-  { type: "regex", path: /^\/api\/tasks\/.*/, method: "POST" },
   { type: "regex", path: /^\/api\/_ah\/.*/, method: "GET" },
   { type: "regex", path: /^\/api\/_nuxt_icon\/.*/, method: "GET" },
 ];
 
 export default defineEventHandler(async (event) => {
   const { url, method } = event.node.req;
+  const isTaskRoute = !!url?.startsWith("/api/tasks/");
 
   if (
     !url?.startsWith("/api") ||
@@ -47,6 +48,17 @@ export default defineEventHandler(async (event) => {
       }
       return false;
     })
+  ) {
+    return;
+  }
+
+  const suppliedInternalToken = getHeader(event, "x-internal-token")?.trim();
+  const expectedInternalToken = process.env.INTERNAL_API_TOKEN?.trim();
+
+  if (
+    isTaskRoute &&
+    expectedInternalToken &&
+    suppliedInternalToken === expectedInternalToken
   ) {
     return;
   }
@@ -70,6 +82,17 @@ export default defineEventHandler(async (event) => {
     const decoded = await new JwtService().verify(token);
 
     event.context.user = decoded;
+
+    if (isTaskRoute) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { email: true },
+      });
+      if (!isAdminEmail(currentUser?.email)) {
+        setResponseStatus(event, 403);
+        return { message: "Forbidden." };
+      }
+    }
   } catch (error) {
     if (error instanceof Error) {
       setResponseStatus(event, 401);

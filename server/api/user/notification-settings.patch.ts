@@ -8,11 +8,15 @@ const bodySchema = z
   .object({
     plaidTransactionSyncEmail: z.boolean().optional(),
     plaidConnectionIssueEmail: z.boolean().optional(),
+    forecastRiskAlertsInApp: z.boolean().optional(),
+    forecastRiskAlertsEmail: z.boolean().optional(),
   })
   .refine(
     (d) =>
       d.plaidTransactionSyncEmail !== undefined ||
-      d.plaidConnectionIssueEmail !== undefined,
+      d.plaidConnectionIssueEmail !== undefined ||
+      d.forecastRiskAlertsInApp !== undefined ||
+      d.forecastRiskAlertsEmail !== undefined,
     { message: "At least one notification field is required" },
   );
 
@@ -20,7 +24,12 @@ export default defineEventHandler(async (event) => {
   try {
     const { userId } = getUser(event);
     const body = await readBody(event);
-    const { plaidTransactionSyncEmail, plaidConnectionIssueEmail } =
+    const {
+      plaidTransactionSyncEmail,
+      plaidConnectionIssueEmail,
+      forecastRiskAlertsInApp,
+      forecastRiskAlertsEmail,
+    } =
       bodySchema.parse(body);
 
     const user = await PrismaDb.user.findUniqueOrThrow({
@@ -41,6 +50,20 @@ export default defineEventHandler(async (event) => {
       }),
       ...(plaidConnectionIssueEmail !== undefined && {
         connectionIssueEmail: plaidConnectionIssueEmail,
+      }),
+    };
+
+    const existingForecast =
+      typeof settings.forecast === "object" && settings.forecast !== null
+        ? (settings.forecast as Record<string, unknown>)
+        : {};
+    settings.forecast = {
+      ...existingForecast,
+      ...(forecastRiskAlertsInApp !== undefined && {
+        riskAlertsInApp: forecastRiskAlertsInApp,
+      }),
+      ...(forecastRiskAlertsEmail !== undefined && {
+        riskAlertsEmail: forecastRiskAlertsEmail,
       }),
     };
 

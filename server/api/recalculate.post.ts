@@ -6,6 +6,9 @@ import {
   dateTimeService,
 } from "~/server/services/forecast";
 import { prisma } from "~/server/clients/prismaClient";
+import { getUser } from "~/server/lib/getUser";
+import { evaluateForecastRiskAlerts } from "~/server/services/forecastRiskAlertService";
+import { log } from "~/server/logger";
 
 const replaySchema = z.object({
   accountRegisterId: z.coerce.number().optional(),
@@ -69,6 +72,29 @@ export default defineEventHandler(async (event) => {
       });
     }
 
+    let riskAlertCount: number | null = null;
+    if (budgetId != null && budgetId > 0) {
+      try {
+        const user = getUser(event);
+        const riskResult = await evaluateForecastRiskAlerts({
+          userId: user.userId,
+          budgetId,
+          daysAhead: 90,
+        });
+        riskAlertCount = riskResult.alerts.length;
+      } catch (riskError) {
+        log({
+          level: "warn",
+          message: "Failed to evaluate forecast risk alerts after recalc",
+          data: {
+            userId: user.userId,
+            budgetId,
+            error: riskError,
+          },
+        });
+      }
+    }
+
     return {
       success: true,
       entriesCalculated: result.registerEntries.length,
@@ -76,6 +102,7 @@ export default defineEventHandler(async (event) => {
         (entry) => entry.isBalanceEntry
       ).length,
       accountRegisters: result.accountRegisters.length,
+      ...(riskAlertCount !== null ? { riskAlertCount } : {}),
     };
   } catch (error) {
     handleApiError(error);

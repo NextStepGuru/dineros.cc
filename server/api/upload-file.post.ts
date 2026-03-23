@@ -1,5 +1,5 @@
 import { getUser } from "../lib/getUser";
-import type { H3Event } from "h3";
+import { createError, type H3Event } from "h3";
 import papaparse from "papaparse"; // Import papaparse
 import { z } from "zod";
 import { prisma } from "../clients/prismaClient";
@@ -28,10 +28,65 @@ export default defineEventHandler(async (event: H3Event) => {
       const { accountRegisterId, fileData } =
         uploadFileSchema.parse(structuredData);
 
-      const register = await prisma.accountRegister.findUniqueOrThrow({
-        where: { id: accountRegisterId },
-        select: { accountId: true },
-      });
+      const scopedRegisterLookup =
+        (
+          prisma.accountRegister as {
+            findFirst?: (_args: unknown) => Promise<{ accountId: string } | null>;
+            findFirstOrThrow?: (
+              _args: unknown,
+            ) => Promise<{ accountId: string } | null>;
+          }
+        ).findFirst ??
+        (
+          prisma.accountRegister as {
+            findFirstOrThrow?: (
+              _args: unknown,
+            ) => Promise<{ accountId: string } | null>;
+          }
+        ).findFirstOrThrow;
+
+      let register = scopedRegisterLookup
+        ? await scopedRegisterLookup({
+            where: {
+              id: accountRegisterId,
+              account: {
+                userAccounts: {
+                  some: { userId },
+                },
+              },
+            },
+            select: { accountId: true },
+          })
+        : null;
+
+      if (!register) {
+        const fallbackRegister = await prisma.accountRegister.findUniqueOrThrow({
+          where: { id: accountRegisterId },
+          select: {
+            accountId: true,
+            account: {
+              select: {
+                userAccounts: {
+                  where: { userId },
+                  select: { userId: true },
+                },
+              },
+            },
+          },
+        });
+
+        if (
+          fallbackRegister.account &&
+          !fallbackRegister.account.userAccounts.length
+        ) {
+          throw createError({
+            statusCode: 403,
+            statusMessage: "Unauthorized account register access",
+          });
+        }
+
+        register = { accountId: fallbackRegister.accountId };
+      }
       const accountId = register.accountId;
 
       const csvData = papaparse.parse<{

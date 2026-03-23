@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TableColumn } from "@nuxt/ui";
 import type { Category, SavingsGoal } from "~/types/types";
 import type { EditSavingsGoalProps } from "~/components/modals/EditSavingsGoal.vue";
 import {
@@ -21,6 +20,7 @@ const ModalsEditSavingsGoal = defineAsyncComponent(
 definePageMeta({
   middleware: "auth",
 });
+useHead({ title: "Goals | Dineros" });
 
 const listStore = useListStore();
 const overlay = useOverlay();
@@ -60,21 +60,34 @@ const categoryFilterSelectItems = computed(() => {
 });
 
 const savingsGoalsForTable = computed(() =>
-  listStore.getSavingsGoalsForCurrentBudget.filter((g) =>
-    entryMatchesCategoryFilter(
+  listStore.getSavingsGoalsForCurrentBudget.filter((g) => {
+    const matchesCategory = entryMatchesCategoryFilter(
       g.categoryId,
       categoryFilter.value,
       listStore.getCategories,
-    ),
-  ),
-);
+    );
+    if (!matchesCategory) return false;
 
-const tableUi = ref({
-  root: "!overflow-visible relative min-h-0",
-  base: "!overflow-visible min-w-full",
-  thead: "!z-30",
-  tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
-});
+    const q = globalFilter.value.trim().toLowerCase();
+    if (!q) return true;
+
+    const sourceLabel = getAccountRegisterLabel(g.sourceAccountRegisterId, registers.value);
+    const pocketLabel = getAccountRegisterLabel(g.targetAccountRegisterId, registers.value);
+    const categoryLabel = goalCategoryLabel(g);
+    const overDebt = g.priorityOverDebt ? "yes" : "no";
+    const ignoreMin = g.ignoreMinBalance ? "yes" : "no";
+
+    return (
+      (g.name ?? "").toLowerCase().includes(q) ||
+      categoryLabel.toLowerCase().includes(q) ||
+      sourceLabel.toLowerCase().includes(q) ||
+      pocketLabel.toLowerCase().includes(q) ||
+      overDebt.includes(q) ||
+      ignoreMin.includes(q) ||
+      String(g.targetAmount ?? "").toLowerCase().includes(q)
+    );
+  }),
+);
 
 const registers = computed(() => listStore.getAccountRegisters);
 
@@ -116,77 +129,12 @@ function handleAddGoal() {
   modal.open(props);
 }
 
-const columns: TableColumn<SavingsGoal>[] = [
-  {
-    accessorKey: "name",
-    header: () => h("div", {}, "Name"),
-    cell: ({ row }) =>
-      h(
-        "div",
-        {
-          class: "cursor-pointer font-semibold text-white",
-          role: "button",
-          tabindex: 0,
-          onClick: () => handleTableClick(row.original),
-          onKeydown: (e: KeyboardEvent) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleTableClick(row.original);
-            }
-          },
-        },
-        row.getValue("name"),
-      ),
-  },
-  {
-    accessorKey: "categoryId",
-    header: () => h("div", {}, "Category"),
-    cell: ({ row }) => goalCategoryLabel(row.original),
-  },
-  {
-    accessorKey: "targetAmount",
-    header: () => h("div", { class: "text-right" }, "Target"),
-    cell: ({ row }) =>
-      h(
-        "div",
-        { class: "text-right" },
-        new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        }).format(row.getValue("targetAmount")),
-      ),
-  },
-  {
-    accessorKey: "sourceAccountRegisterId",
-    header: () => h("div", {}, "Source"),
-    cell: ({ row }) =>
-      getAccountRegisterLabel(
-        row.getValue("sourceAccountRegisterId"),
-        registers.value,
-      ),
-  },
-  {
-    accessorKey: "targetAccountRegisterId",
-    header: () => h("div", {}, "Pocket"),
-    cell: ({ row }) =>
-      getAccountRegisterLabel(
-        row.getValue("targetAccountRegisterId"),
-        registers.value,
-      ),
-  },
-  {
-    accessorKey: "priorityOverDebt",
-    header: () => h("div", {}, "Over debt"),
-    cell: ({ row }) =>
-      h("div", {}, row.getValue("priorityOverDebt") ? "Yes" : "No"),
-  },
-  {
-    accessorKey: "ignoreMinBalance",
-    header: () => h("div", {}, "Ignore min"),
-    cell: ({ row }) =>
-      h("div", {}, row.getValue("ignoreMinBalance") ? "Yes" : "No"),
-  },
-];
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+}
 
 defineShortcuts({
   escape: {
@@ -291,7 +239,7 @@ onBeforeUnmount(() => {
     <div
       v-if="listStore.getSavingsGoalsForCurrentBudget.length > 0 || listStore.getIsListsLoading"
       ref="tableHostEl"
-      class="flex-1 min-h-0 overflow-auto"
+      class="flex-1 min-h-0 overflow-auto rounded-md border border-primary/40"
       :style="{ maxHeight: tableViewportMaxHeight }"
     >
       <UAlert
@@ -305,16 +253,87 @@ onBeforeUnmount(() => {
         title="No goals match this category filter"
         description="Choose All categories, Uncategorized, or another category."
       />
-      <UTable
-        v-model:global-filter="globalFilter"
-        :data="savingsGoalsForTable"
-        :columns="columns"
-        sticky
-        :ui="tableUi"
-        :loading="listStore.getIsListsLoading"
-        loading-color="primary"
-        loading-animation="carousel"
-      />
+      <div
+        v-else-if="listStore.getIsListsLoading && savingsGoalsForTable.length === 0"
+        class="p-2 sm:p-4"
+      >
+        <div class="grid grid-cols-7 gap-2 sm:gap-4 pb-3 border-b border-default">
+          <USkeleton class="h-4 w-12" />
+          <USkeleton class="h-4 w-16" />
+          <USkeleton class="h-4 w-12 ml-auto" />
+          <USkeleton class="h-4 w-16" />
+          <USkeleton class="h-4 w-16" />
+          <USkeleton class="h-4 w-14" />
+          <USkeleton class="h-4 w-14" />
+        </div>
+        <div class="space-y-3 pt-3">
+          <div
+            v-for="i in 12"
+            :key="`goal-skeleton-${i}`"
+            class="grid grid-cols-7 gap-2 sm:gap-4 items-center"
+          >
+            <USkeleton class="h-4 w-24" />
+            <USkeleton class="h-4 w-20" />
+            <USkeleton class="h-4 w-16 ml-auto" />
+            <USkeleton class="h-4 w-20" />
+            <USkeleton class="h-4 w-20" />
+            <USkeleton class="h-4 w-10" />
+            <USkeleton class="h-4 w-10" />
+          </div>
+        </div>
+      </div>
+      <table
+        v-if="savingsGoalsForTable.length > 0"
+        class="w-full min-w-full text-xs sm:text-sm border-collapse"
+      >
+        <caption class="sr-only">Savings goals</caption>
+        <thead class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border">
+          <tr>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold">Name</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap">Category</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap">Target</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap">Source</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap">Pocket</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap">Over debt</th>
+            <th scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap">Ignore min</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(goal, index) in savingsGoalsForTable"
+            :key="goal.id ?? `goal-${index}`"
+            class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+          >
+            <td class="p-2 sm:p-4 text-xs sm:text-sm border-b border-default">
+              <button
+                type="button"
+                class="cursor-pointer font-semibold frog-text text-left"
+                @click="handleTableClick(goal)"
+              >
+                {{ goal.name }}
+              </button>
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default">
+              {{ goalCategoryLabel(goal) }}
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default">
+              <DollarFormat :amount="goal.targetAmount" />
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default">
+              {{ getAccountRegisterLabel(goal.sourceAccountRegisterId, registers) }}
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default">
+              {{ getAccountRegisterLabel(goal.targetAccountRegisterId, registers) }}
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default">
+              {{ goal.priorityOverDebt ? "Yes" : "No" }}
+            </td>
+            <td class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default">
+              {{ goal.ignoreMinBalance ? "Yes" : "No" }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 </template>

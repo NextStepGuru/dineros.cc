@@ -25,7 +25,7 @@ export const useListStore = defineStore("listStore", {
   }),
   getters: {
     getReoccurrences: (state) => {
-      return state.reoccurrences.sort((a, b) => {
+      return [...state.reoccurrences].sort((a, b) => {
         if (a.lastAt < b.lastAt) return -1;
         if (a.lastAt > b.lastAt) return 1;
         if (a.description < b.description) return -1;
@@ -43,7 +43,7 @@ export const useListStore = defineStore("listStore", {
           )
           .map((ar) => ar.id),
       );
-      return state.reoccurrences
+      return [...state.reoccurrences]
         .filter((r) => registerIds.has(r.accountRegisterId))
         .sort((a, b) => {
           if (a.lastAt < b.lastAt) return -1;

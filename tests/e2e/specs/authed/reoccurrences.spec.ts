@@ -13,7 +13,7 @@ test.describe("Reoccurrences", () => {
     await expect(page.getByText("E2E Monthly Bill")).toBeVisible({
       timeout: 45_000,
     });
-    await expect(page.getByText("-$50.00").first()).toBeVisible();
+    await expect(page.getByText(/[−-]\$50\.00/).first()).toBeVisible();
     await expect(page.getByText(/^month$/i).first()).toBeVisible();
     await expect(page.getByText("E2E Groceries")).toBeVisible();
   });

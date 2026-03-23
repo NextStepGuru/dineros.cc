@@ -18,7 +18,7 @@ test.describe("Account registers", () => {
     });
     await expect(page.getByText("Checking").first()).toBeVisible();
     await expect(page.getByText("+$1,000.00").first()).toBeVisible();
-    await expect(page.getByText("+$0.00").first()).toBeVisible();
+    await expect(page.getByText(/\+?\$0\.00/).first()).toBeVisible();
     await expect(
       page.getByRole("button", { name: /\$1,000\.00/ }),
     ).toBeVisible();
@@ -41,9 +41,7 @@ test.describe("Logout (authed)", () => {
     await expect(page.getByText("E2E Checking")).toBeVisible({
       timeout: 30_000,
     });
-    const signOut = page
-      .getByRole("banner")
-      .getByRole("button", { name: /^sign out$/i });
+    const signOut = page.getByTestId("header-user-menu");
     await expect(signOut).toBeVisible();
     await expect(signOut).toBeEnabled();
   });

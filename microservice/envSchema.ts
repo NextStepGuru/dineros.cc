@@ -8,12 +8,13 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Number.parseInt(val, 10))
     .default(6379),
   PORT: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Number.parseInt(val, 10))
     .default(3000),
+  INTERNAL_API_TOKEN: z.string().optional(),
 });
 
 export default envSchema;
