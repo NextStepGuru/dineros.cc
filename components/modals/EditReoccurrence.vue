@@ -5,7 +5,6 @@ import {
   formatDate,
   handleError,
   formatAccountRegisters,
-  formatCurrencyOptions,
 } from "~/lib/utils";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import type { Reoccurrence } from "~/types/types";
@@ -30,6 +29,7 @@ type Schema = z.output<typeof reoccurrenceWithSplitsSchema>;
 
 const isSaving = ref(false);
 const isDeleting = ref(false);
+const showDeleteConfirm = ref(false);
 const formState = reactive<Partial<Schema>>({
   ...props.reoccurrence,
   amountAdjustmentMode: props.reoccurrence.amountAdjustmentMode ?? "NONE",
@@ -227,6 +227,7 @@ async function deleteReoccurrence() {
 
   if (!deleteReoccurrence) {
     isSaving.value = false;
+    showDeleteConfirm.value = false;
     toast.add({
       color: "error",
       description: "Failed to delete reoccurrence.",
@@ -242,18 +243,17 @@ async function deleteReoccurrence() {
     await listStore.fetchLists();
 
     isDeleting.value = false;
+    showDeleteConfirm.value = false;
     props.cancel();
   }
 }
 
 function confirmDelete() {
-  if (
-    confirm(
-      "Are you sure you want to delete this reoccurrence? This action cannot be undone.",
-    )
-  ) {
-    deleteReoccurrence();
-  }
+  showDeleteConfirm.value = true;
+}
+
+function cancelDeleteConfirmation() {
+  showDeleteConfirm.value = false;
 }
 
 const splitCountLabel = computed(() => {
@@ -407,7 +407,24 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         p.text-xs.text-gray-500(v-else) No split transfers configured.
 
   template(#footer)
-    .flex.justify-between.w-full
+    .w-full
+      div(
+        v-if="showDeleteConfirm"
+        class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
+        p(class="mb-2") Are you sure you want to delete this reoccurrence? This action cannot be undone.
+        div(class="flex gap-2")
+          UButton(
+            color="error"
+            @click="deleteReoccurrence"
+            :loading="isDeleting"
+            :disabled="isSaving || isDeleting"
+          ) Confirm delete
+          UButton(
+            color="neutral"
+            @click="cancelDeleteConfirmation"
+            :disabled="isDeleting"
+          ) Cancel
+      .flex.justify-between.w-full
       UButton(
         color="primary"
         @click.prevent="form?.submit()"
@@ -420,7 +437,7 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         v-if="formState.id"
         @click="confirmDelete"
         :loading="isDeleting"
-        :disabled="isSaving || isDeleting"
+        :disabled="isSaving || isDeleting || showDeleteConfirm"
       ) Delete
 
       UButton(color="neutral" @click="cancel" :disabled="isSaving || isDeleting") Close

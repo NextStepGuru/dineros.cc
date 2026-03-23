@@ -69,9 +69,9 @@ watch(
     if (g) {
       formState.value = {
         name: g.name,
-        targetAmount: g.targetAmount,
-        sourceAccountRegisterId: g.sourceAccountRegisterId,
-        targetAccountRegisterId: g.targetAccountRegisterId,
+        targetAmount: toNumberInput(g.targetAmount),
+        sourceAccountRegisterId: toIntegerInput(g.sourceAccountRegisterId),
+        targetAccountRegisterId: toIntegerInput(g.targetAccountRegisterId),
         priorityOverDebt: g.priorityOverDebt,
         ignoreMinBalance: g.ignoreMinBalance,
         categoryId: g.categoryId ?? null,
@@ -112,13 +112,44 @@ watch(
 
 const schema = createSavingsGoalSchema;
 
+function toNumberInput(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.replaceAll(/[^0-9.-]/g, "");
+    if (!normalized) return 0;
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toIntegerInput(value: unknown): number {
+  const parsed = toNumberInput(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+}
+
+const targetAmountModel = computed({
+  get: () => toNumberInput(formState.value.targetAmount),
+  set: (value: unknown) => {
+    formState.value.targetAmount = toNumberInput(value);
+  },
+});
+
 function handleSubmit({ data }: { data: typeof formState.value }) {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
+  const payload = {
+    ...data,
+    targetAmount: toNumberInput(data.targetAmount),
+    sourceAccountRegisterId: toIntegerInput(data.sourceAccountRegisterId),
+    targetAccountRegisterId: toIntegerInput(data.targetAccountRegisterId),
+  };
   if (isCreate.value) {
     $api<SavingsGoal>("/api/savings-goal", {
       method: "POST",
-      body: data,
+      body: payload,
     })
       .then((created) => {
         listStore.addSavingsGoal(created);
@@ -132,7 +163,7 @@ function handleSubmit({ data }: { data: typeof formState.value }) {
   } else if (props.goal) {
     $api<SavingsGoal>(`/api/savings-goal/${props.goal.id}`, {
       method: "PATCH",
-      body: data,
+      body: payload,
     })
       .then((updated) => {
         listStore.patchSavingsGoal(updated);
@@ -214,7 +245,7 @@ defineShortcuts({
         <UFormField label="Target amount" name="targetAmount" for="goal-targetAmount" required>
           <UInputNumber
             id="goal-targetAmount"
-            v-model="formState.targetAmount"
+            v-model="targetAmountModel"
             class="w-full"
             :format-options="formatCurrencyOptions"
             :min="0.01"

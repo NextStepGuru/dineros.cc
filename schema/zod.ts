@@ -494,9 +494,9 @@ export const savingsGoalSchema = z.object({
 
 export const createSavingsGoalSchema = z.object({
   name: z.string().min(1).max(255),
-  targetAmount: z.number().positive(),
-  sourceAccountRegisterId: z.number(),
-  targetAccountRegisterId: z.number(),
+  targetAmount: z.coerce.number().positive(),
+  sourceAccountRegisterId: z.coerce.number(),
+  targetAccountRegisterId: z.coerce.number(),
   priorityOverDebt: z.boolean().default(false),
   ignoreMinBalance: z.boolean().default(false),
   categoryId: z.union([z.string().uuid(), z.null()]).optional(),

@@ -40,10 +40,8 @@ export class TestHelpers {
   }
 
   async signOut(): Promise<void> {
-    await this.page
-      .getByRole("banner")
-      .getByRole("button", { name: /^sign out$/i })
-      .click();
+    await this.page.getByTestId("header-user-menu").click();
+    await this.page.getByTestId("header-sign-out").click();
     await this.page.waitForURL(
       (url) => {
         const { pathname } = new URL(url);

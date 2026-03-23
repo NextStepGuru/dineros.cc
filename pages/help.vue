@@ -327,7 +327,7 @@ section(class="mx-auto max-w-3xl px-4 py-10 space-y-10 pb-20")
       strong(class="frog-text") ⌘
       span &nbsp;below means the primary meta key (Command on Mac, Windows key on many PCs).
 
-    div(class="overflow-x-auto")
+    div(class="overflow-x-auto rounded-md border border-primary/40")
       table(class="w-full text-sm border-collapse")
         thead
           tr(class="border-b frog-border text-left")

@@ -49,6 +49,7 @@ definePageMeta({
 
   middleware: "auth",
 });
+useHead({ title: "Register | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
@@ -61,23 +62,10 @@ const {
   snapshotViewItems,
   exitSnapshotView,
 } = snapshotMode;
-const selectedSnapshotLabel = computed(
-  () =>
-    snapshotViewItems.value.find((i) => i.value === selectedSnapshotValue.value)
-      ?.label ?? "Live",
-);
-const snapshotMenuItems = computed(() => [
-  snapshotViewItems.value.map((item) => ({
-    label: item.label,
-    icon:
-      selectedSnapshotValue.value === item.value
-        ? "i-lucide-check"
-        : "i-lucide-circle",
-    onSelect: () => {
-      selectedSnapshotValue.value = item.value;
-    },
-  })),
-]);
+const { selectedSnapshotLabel, snapshotMenuItems } = useSnapshotMenuItems({
+  selectedSnapshotValue,
+  snapshotViewItems,
+});
 
 const registersForRegisterPage = computed((): AccountRegister[] =>
   snapshotMode.isSnapshotMode.value &&
@@ -391,7 +379,7 @@ const handleScroll = (event?: Event) => {
   const tableElement =
     (event?.target as HTMLElement | null) ??
     registerTableViewportEl.value ??
-    tableRef.value?.$el;
+    tableRef.value;
   if (!tableElement) return;
 
   const scrollTop = tableElement.scrollTop;
@@ -902,7 +890,7 @@ function scrollToLowestBalance() {
 
   if (targetIndex !== -1 && tableRef.value) {
     // Scroll to the specific row
-    const tableElement = tableRef.value.$el;
+    const tableElement = tableRef.value;
     const rows = tableElement.querySelectorAll("tbody tr");
 
     if (rows[targetIndex]) {
@@ -925,15 +913,15 @@ function scrollToLowestBalance() {
 
 function isSelectedTab(tab: string) {
   const isActive =
-    "cursor-pointer px-5 pt-1 pb-2 text-xs text-[var(--ui-primary)] text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 bg-slate-800 rounded-b-lg border-l border-b border-r border-gray-600 border-b-gray-700 shadow-sm focus:outline-none hover:bg-gray-900";
+    "relative z-20 cursor-pointer px-5 pt-1 pb-2 text-xs text-primary text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 rounded-b-lg border border-primary/40 border-t-0 bg-primary/12 shadow-sm focus:outline-none translate-y-[2px]";
   const isInactive =
-    "cursor-pointer px-5 pt-1 pb-2 text-xs text-[var(--ui-text-muted)] hover:text-white text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 bg-slate-700 rounded-b-lg border-l border-b border-r border-gray-600 border-b-gray-700 shadow-sm focus:outline-none hover:bg-gray-500";
+    "relative z-10 cursor-pointer px-5 pt-1 pb-2 text-xs text-muted/80 text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 rounded-b-lg border border-default/70 border-t-0 bg-muted/20 opacity-70 shadow-sm focus:outline-none hover:opacity-90";
   return selectedTab.value === tab ? isActive : isInactive;
 }
 
 const globalFilter = ref("");
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
-const tableRef = ref();
+const tableRef = ref<HTMLElement | null>(null);
 const combinedTableFilterRef = ref<{
   collapse: () => void;
   expandAndFocus: () => Promise<void>;
@@ -982,13 +970,31 @@ const categoryFilterSelectItems = computed(() => {
 });
 
 const registerRowsForTable = computed(() =>
-  tableEntries.value.filter((e) =>
-    entryMatchesCategoryFilter(
+  tableEntries.value.filter((e) => {
+    const matchesCategory = entryMatchesCategoryFilter(
       e.categoryId,
       categoryFilter.value,
       listStore.getCategories,
-    ),
-  ),
+    );
+    if (!matchesCategory) return false;
+
+    const q = globalFilter.value.trim().toLowerCase();
+    if (!q) return true;
+
+    const categoryName =
+      e.categoryId == null
+        ? "uncategorized"
+        : (listStore.getCategories.find((c) => c.id === e.categoryId)?.name ?? "");
+    const dateText = formatDate(e.createdAt) ?? "";
+
+    return (
+      (e.description ?? "").toLowerCase().includes(q) ||
+      categoryName.toLowerCase().includes(q) ||
+      dateText.toLowerCase().includes(q) ||
+      String(e.amount ?? "").toLowerCase().includes(q) ||
+      String(e.balance ?? "").toLowerCase().includes(q)
+    );
+  }),
 );
 
 watch(accountRegisterId, () => {
@@ -1244,7 +1250,9 @@ async function recalcAccount() {
 
         div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
           span The lowest balance of&nbsp;
-          b(@click="scrollToLowestBalance" class="cursor-pointer frog-link") {{ formatCurrency(lowestEntry.balance) }}&nbsp;
+          b(@click="scrollToLowestBalance" class="cursor-pointer frog-link")
+            DollarFormat(:amount="lowestEntry.balance")
+            | &nbsp;
           span &nbsp;on
           b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
         div(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
@@ -1330,7 +1338,7 @@ async function recalcAccount() {
               UButton(size="xs" color="info" @click="handleAddEntry") Add entry
 
     //- Skeleton loading state
-    div(v-else-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden" :style="{ maxHeight: registerTableViewportMaxHeight }")
+    div(v-else-if="isLoading && tableEntries.length === 0" ref="registerTableViewportEl" class="flex-1 overflow-hidden rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }")
       //- Table header skeleton
       div(class="flex border-b frog-border p-4")
         div(class="w-7 shrink-0")
@@ -1357,7 +1365,7 @@ async function recalcAccount() {
         div(class="flex-1 text-right")
           USkeleton(class="h-4 w-16 ml-auto")
 
-    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
+    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
       UAlert(
         v-if="registerRowsForTable.length === 0"
         class="mb-2"
@@ -1365,18 +1373,73 @@ async function recalcAccount() {
         variant="subtle"
         title="No rows match this category filter"
         description="Choose All categories, Uncategorized, or another category.")
-      UTable(
+      table(
+        v-if="registerRowsForTable.length > 0"
         ref="tableRef"
         :key="tableKey"
-        class="h-full min-w-[min(100%,42rem)] sm:min-w-0"
-        :data="registerRowsForTable"
-        sticky
-        v-model:globalFilter="globalFilter"
-        :ui="tableUi"
-        :columns="columns"
-        :loading="accountEntriesStatus === 'pending'"
-        loading-color="primary"
-        loading-animation="carousel")
+        class="w-full min-w-full text-xs sm:text-sm border-collapse")
+        caption(class="sr-only") Register entries
+        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+          tr
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold w-7")
+              span(class="sr-only") Import review
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Date
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold") Description
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Category
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Amount
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Balance
+        tbody
+          tr(
+            v-for="(entry, index) in registerRowsForTable"
+            :key="entry.id ?? `reg-entry-${index}-${entry.createdAt}`"
+            :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700`")
+            td(class="p-2 sm:p-4 border-b border-default w-7")
+              .flex.justify-center.w-7
+                UTooltip(
+                  v-if="isPlaidImportAwaitingReview(entry)"
+                  text="Bank import not reviewed yet. Clear, reconcile, or match to a recurrence using the row actions."
+                  :delay-duration="200")
+                  span(class="inline-flex cursor-default items-center justify-center p-1.5 -m-1 rounded-sm")
+                    span(
+                      class="inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0"
+                      role="img"
+                      aria-label="Bank import not reviewed yet.")
+                span(v-else class="inline-block size-2 shrink-0")
+            td(class="p-2 sm:p-4 border-b border-default text-right tabular-nums whitespace-nowrap") {{ formatDate(entry.createdAt) }}
+            td(class="p-2 sm:p-4 border-b border-default")
+              .flex.items-center.gap-1.min-w-0
+                div(
+                  class="cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0"
+                  role="button"
+                  tabindex="0"
+                  @click="handleTableClick(entry)"
+                  @keydown.enter.prevent="handleTableClick(entry)"
+                  @keydown.space.prevent="handleTableClick(entry)") {{ entry.description }}
+                template(v-if="isPlaidImportAwaitingReview(entry)")
+                  UTooltip(
+                    text="Create a recurring rule from this import and link this row to it."
+                    :delay-duration="200")
+                    BaseIconButton(
+                      size="xs"
+                      icon="i-lucide-repeat"
+                      class="shrink-0"
+                      aria-label="Create recurrence from this import and link this transaction"
+                      @click.stop="openReoccurrenceFromPlaidEntry(entry)")
+                  UTooltip(
+                    text="Match to an existing recurrence and remember this bank name for the next Plaid sync."
+                    :delay-duration="200")
+                    BaseIconButton(
+                      size="xs"
+                      icon="i-lucide-link"
+                      class="shrink-0"
+                      aria-label="Match to existing recurrence and save name alias for future syncs"
+                      @click.stop="openMatchToRecurrence(entry)")
+            td(class="p-2 sm:p-4 border-b border-default text-muted whitespace-nowrap")
+              | {{ entry.categoryId == null ? "—" : (listStore.getCategories.find((c) => c.id === entry.categoryId)?.name ?? "—") }}
+            td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
+              DollarFormat(:amount="Number(entry.amount)")
+            td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
+              DollarFormat(:amount="Number(entry.balance)")
     UCard(v-else class="my-4 max-w-lg mx-auto")
       template(#header)
         h3(class="font-semibold") No entries in this register
@@ -1396,7 +1459,7 @@ async function recalcAccount() {
     ul(
       v-if="tableEntries.length > 0 && !isSnapshotMode"
       ref="registerTabsEl"
-      class="flex flex-wrap gap-2 -mt-1 ml-1 sm:ml-5 mb-5"
+      class="relative z-30 flex flex-wrap gap-2 -mt-1 ml-1 sm:ml-5 mb-5"
       role="tablist"
       aria-label="Register time range")
       li(role="presentation")

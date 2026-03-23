@@ -1,12 +1,12 @@
 # Dineros.cc - Predictive Budgeting & Financial Management
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-org/dineros.cc)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/deyoungjd/dineros.cc)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24.14.0-brightgreen)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-ISC-blue)](LICENSE)
 
 > **The solution to predictive budgeting, real-time spending optimization, & accounting made simple**
 
-Dineros.cc is a comprehensive financial management platform that provides predictive budgeting, real-time spending optimization, and simplified accounting. Built with Nuxt 3, TypeScript, and a modern microservice architecture.
+Dineros.cc is a comprehensive financial management platform that provides predictive budgeting, real-time spending optimization, and simplified accounting. Built with Nuxt 4, TypeScript, and a modern microservice architecture.
 
 ## 🚀 Features
 
@@ -22,7 +22,7 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 
 ### 🔧 **Technical Features**
 
-- **Modern Architecture**: Nuxt 3 with TypeScript and modular service design
+- **Modern Architecture**: Nuxt 4 with TypeScript and modular service design
 - **High-Performance Forecasting**: Custom ModernCacheService for lightning-fast calculations
 - **Microservice Support**: Separate microservice for specialized operations
 - **Database Encryption**: Field-level encryption for sensitive financial data
@@ -44,7 +44,7 @@ Dineros.cc is a comprehensive financial management platform that provides predic
 ### **Main Application**
 
 ```
-Frontend (Nuxt 3)
+Frontend (Nuxt 4)
 ├── Pages & Components
 ├── State Management (Pinia)
 ├── UI Components (@nuxt/ui)
@@ -90,7 +90,7 @@ ForecastEngine (Orchestrator)
 
 ### **Frontend**
 
-- **Nuxt 3**: Vue.js framework with SSR/SSG
+- **Nuxt 4**: Vue.js framework with SSR/SSG
 - **TypeScript**: Full type safety
 - **@nuxt/ui**: Modern UI components
 - **Pinia**: State management
@@ -98,7 +98,7 @@ ForecastEngine (Orchestrator)
 
 ### **Backend**
 
-- **Node.js 22+**: Runtime environment
+- **Node.js 24.14+**: Runtime environment
 - **Prisma**: Database ORM with migrations
 - **PostgreSQL/MySQL**: Primary database
 - **Redis**: Caching and session storage
@@ -116,7 +116,7 @@ ForecastEngine (Orchestrator)
 
 ### **Prerequisites**
 
-- Node.js 22.0.0 or higher
+- Node.js 24.14.0 or higher
 - Docker and Docker Compose
 - Git
 
@@ -125,7 +125,7 @@ ForecastEngine (Orchestrator)
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/your-org/dineros.cc.git
+git clone https://github.com/deyoungjd/dineros.cc.git
 cd dineros.cc
 ```
 
@@ -329,7 +329,7 @@ POSTMARK_API_KEY="your-postmark-api-key"
 
 ### **Code Style**
 
-- **TypeScript**: Strict type checking enabled
+- **TypeScript**: Incremental strictness (project currently runs with relaxed type checks)
 - **ESLint**: Code quality enforcement
 - **Pre-commit hooks**: Automated quality checks
 - **Conventional Commits**: Standardized commit messages
@@ -425,7 +425,7 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 
 ## 🎉 Acknowledgments
 
-- **Nuxt Team**: For the amazing Nuxt 3 framework
+- **Nuxt Team**: For the amazing Nuxt 4 framework
 - **Prisma Team**: For the excellent database toolkit
 - **Plaid**: For secure financial data integration
 - **Community Contributors**: For all the valuable contributions

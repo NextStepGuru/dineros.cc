@@ -4,8 +4,11 @@ test.describe("Authed shell & header navigation", () => {
   test("home shows sign out and main nav", async ({ page }) => {
     await page.goto("/");
     const banner = page.getByRole("banner");
+    const userMenu = page.getByTestId("header-user-menu");
+    await expect(userMenu).toBeVisible({ timeout: 20_000 });
+    await userMenu.click();
     await expect(
-      banner.getByRole("button", { name: /^sign out$/i }),
+      page.getByTestId("header-sign-out"),
     ).toBeVisible({ timeout: 20_000 });
     await expect(
       banner.getByRole("link", { name: /^accounts$/i }),
@@ -58,9 +61,7 @@ test.describe("Authed shell & header navigation", () => {
     await expect(page.getByText("E2E Checking")).toBeVisible({
       timeout: 30_000,
     });
-    const banner = page.getByRole("banner");
-    const buttons = banner.getByRole("button");
-    const count = await buttons.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    await page.getByTestId("header-user-menu").click();
+    await expect(page.getByTestId("header-color-mode")).toBeVisible();
   });
 });

@@ -8,6 +8,17 @@ import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountR
 import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 
 type AccountRegisterSortMode = "visual" | "loan" | "savings";
+type ForecastRiskAlert = {
+  key: string;
+  accountRegisterId: number;
+  accountRegisterName: string;
+  riskType: "negative_balance" | "below_min_balance";
+  threshold: number;
+  projectedBalanceAtRisk: number;
+  projectedLowestBalance: number;
+  riskAt: string;
+  daysUntilRisk: number;
+};
 
 const ModalsEditAccountRegister = defineAsyncComponent(
   () => import("~/components/modals/EditAccountRegister.vue"),
@@ -20,6 +31,7 @@ const ModalsManageCategories = defineAsyncComponent(
 definePageMeta({
   middleware: "auth",
 });
+useHead({ title: "Accounts | Dineros" });
 
 const snapshotMode = useSnapshotMode();
 const {
@@ -29,23 +41,10 @@ const {
   snapshotViewItems,
   exitSnapshotView,
 } = snapshotMode;
-const selectedSnapshotLabel = computed(
-  () =>
-    snapshotViewItems.value.find((i) => i.value === selectedSnapshotValue.value)
-      ?.label ?? "Live",
-);
-const snapshotMenuItems = computed(() => [
-  snapshotViewItems.value.map((item) => ({
-    label: item.label,
-    icon:
-      selectedSnapshotValue.value === item.value
-        ? "i-lucide-check"
-        : "i-lucide-circle",
-    onSelect: () => {
-      selectedSnapshotValue.value = item.value;
-    },
-  })),
-]);
+const { selectedSnapshotLabel, snapshotMenuItems } = useSnapshotMenuItems({
+  selectedSnapshotValue,
+  snapshotViewItems,
+});
 
 // Drag and drop functions (defined early to ensure availability)
 function handleDragStart(event: DragEvent, index: number) {
@@ -566,6 +565,9 @@ const forecastMonthsAhead = ref(0);
 const forecastBalancesById = ref<Record<number, number> | null>(null);
 const forecastBalancesMeta = ref<{ asOf: string } | null>(null);
 const forecastBalancesLoading = ref(false);
+const riskAlerts = ref<ForecastRiskAlert[]>([]);
+const riskAlertsLoading = ref(false);
+const riskActionLoading = ref(false);
 
 const forecastSliderLabel = computed(() => {
   if (forecastMonthsAhead.value === 0) return "Current (live)";
@@ -595,6 +597,39 @@ const currentBudgetAccountId = computed(
     listStore.getAccounts?.[0]?.id ??
     null,
 );
+
+const riskAlertByRegisterId = computed(() => {
+  const m = new Map<number, ForecastRiskAlert>();
+  for (const alert of riskAlerts.value) {
+    if (!m.has(alert.accountRegisterId)) {
+      m.set(alert.accountRegisterId, alert);
+    }
+  }
+  return m;
+});
+
+const topRiskAlert = computed(() => riskAlerts.value[0] ?? null);
+const hasRiskAlerts = computed(() => riskAlerts.value.length > 0);
+
+const riskSummaryTitle = computed(() => {
+  if (!topRiskAlert.value) return "";
+  const count = riskAlerts.value.length;
+  if (count === 1) {
+    return `Cash-flow risk detected in ${topRiskAlert.value.accountRegisterName}`;
+  }
+  return `${count} cash-flow risks detected across accounts`;
+});
+
+const riskSummaryDescription = computed(() => {
+  if (!topRiskAlert.value) return "";
+  const when = formatDate(topRiskAlert.value.riskAt) ?? "soon";
+  const eta = formatRiskEta(topRiskAlert.value.daysUntilRisk);
+  const level =
+    topRiskAlert.value.riskType === "below_min_balance"
+      ? "below minimum balance"
+      : "negative";
+  return `${topRiskAlert.value.accountRegisterName} is projected ${level} ${eta} (${when}).`;
+});
 
 watch(
   [
@@ -640,6 +675,106 @@ watch(
       forecastBalancesLoading.value = false;
     }
   },
+);
+
+function formatRiskEta(daysUntilRisk: number): string {
+  if (daysUntilRisk <= 0) return "today";
+  if (daysUntilRisk === 1) return "in 1 day";
+  return `in ${daysUntilRisk} days`;
+}
+
+function riskAlertForRegister(id: number): ForecastRiskAlert | null {
+  return riskAlertByRegisterId.value.get(id) ?? null;
+}
+
+async function fetchForecastRiskAlerts() {
+  const budgetId = authStore.getBudgetId;
+  if (!budgetId || isSnapshotMode.value) {
+    riskAlerts.value = [];
+    riskAlertsLoading.value = false;
+    return;
+  }
+  riskAlertsLoading.value = true;
+  try {
+    const data = await ($api as typeof $fetch)<{
+      alerts: ForecastRiskAlert[];
+    }>("/api/forecast-risk-alerts", {
+      query: {
+        budgetId,
+        daysAhead: 90,
+      },
+    });
+    riskAlerts.value = data.alerts ?? [];
+  } catch {
+    riskAlerts.value = [];
+  } finally {
+    riskAlertsLoading.value = false;
+  }
+}
+
+async function dismissTopRiskAlert() {
+  if (!topRiskAlert.value || !authStore.getBudgetId) return;
+  riskActionLoading.value = true;
+  try {
+    const data = await ($api as typeof $fetch)<{
+      alerts: ForecastRiskAlert[];
+    }>(`/api/forecast-risk-alerts/state?budgetId=${authStore.getBudgetId}`, {
+      method: "PATCH",
+      body: {
+        key: topRiskAlert.value.key,
+        status: "dismissed",
+      },
+    });
+    riskAlerts.value = data.alerts ?? [];
+    if (import.meta.client) {
+      globalThis.dispatchEvent(new Event("notifications:refresh"));
+    }
+  } catch {
+    // Avoid noisy repeated toasts here; banner remains if action failed.
+  } finally {
+    riskActionLoading.value = false;
+  }
+}
+
+async function resolveTopRiskAlert() {
+  if (!topRiskAlert.value || !authStore.getBudgetId) return;
+  riskActionLoading.value = true;
+  try {
+    const data = await ($api as typeof $fetch)<{
+      alerts: ForecastRiskAlert[];
+    }>(`/api/forecast-risk-alerts/state?budgetId=${authStore.getBudgetId}`, {
+      method: "PATCH",
+      body: {
+        key: topRiskAlert.value.key,
+        status: "resolved",
+      },
+    });
+    riskAlerts.value = data.alerts ?? [];
+    if (import.meta.client) {
+      globalThis.dispatchEvent(new Event("notifications:refresh"));
+    }
+  } catch {
+    // Avoid noisy repeated toasts here; banner remains if action failed.
+  } finally {
+    riskActionLoading.value = false;
+  }
+}
+
+watch(
+  [
+    () => authStore.getBudgetId,
+    () => listStore.getAccountRegisters.length,
+    () => isSnapshotMode.value,
+  ],
+  async ([budgetId, registerCount, snap]) => {
+    if (snap || !budgetId || registerCount === 0) {
+      riskAlerts.value = [];
+      riskAlertsLoading.value = false;
+      return;
+    }
+    await fetchForecastRiskAlerts();
+  },
+  { immediate: true },
 );
 
 async function refreshSnapshotList() {
@@ -1227,7 +1362,9 @@ const isSearchNoMatches = computed(
 
 const showFirstAccountOnboarding = computed(
   () =>
-    filteredAccountRegisters.value.length === 0 && !isSearchNoMatches.value,
+    !listStore.getIsListsLoading &&
+    filteredAccountRegisters.value.length === 0 &&
+    !isSearchNoMatches.value,
 );
 
 function mainRowDcn(row: AccountRegister) {
@@ -1419,7 +1556,43 @@ onBeforeUnmount(() => {
             @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
           )
             span Your estimated net worth
-            b.text-nowrap &nbsp;{{ formatCurrency(estimatedNetWorth) }}&nbsp;
+            b.text-nowrap
+              | &nbsp;
+              DollarFormat(:amount="estimatedNetWorth")
+              | &nbsp;
+
+    UAlert(
+      v-if="!isSnapshotMode && hasRiskAlerts"
+      class="mb-4"
+      color="warning"
+      variant="subtle"
+      :title="riskSummaryTitle"
+    )
+      template(#description)
+        .flex.flex-wrap.items-center.gap-2
+          span {{ riskSummaryDescription }}
+          UButton(
+            v-if="topRiskAlert"
+            size="xs"
+            variant="soft"
+            :to="`/register/${topRiskAlert.accountRegisterId}`"
+          ) Open highest-risk register
+          UButton(
+            v-if="topRiskAlert"
+            size="xs"
+            variant="ghost"
+            :loading="riskActionLoading"
+            :disabled="riskActionLoading"
+            @click="resolveTopRiskAlert"
+          ) Mark resolved
+          UButton(
+            v-if="topRiskAlert"
+            size="xs"
+            variant="ghost"
+            :loading="riskActionLoading"
+            :disabled="riskActionLoading"
+            @click="dismissTopRiskAlert"
+          ) Dismiss
 
     div(
       v-if="showProjectedBalanceTimeline && !isSnapshotMode && draggableAccountRegisters.length > 0"
@@ -1467,6 +1640,24 @@ onBeforeUnmount(() => {
         li Optional: link banks via Profile &rarr; Sync accounts
       UButton(color="primary" size="sm" @click="handleAddAccountRegister") Add first account
 
+    div(
+      v-else-if="listStore.getIsListsLoading"
+      ref="accountRegistersTableViewportEl"
+      class="relative overflow-auto flex-1 w-full rounded-md border border-primary/40 p-2 sm:p-4"
+      :style="{ maxHeight: accountRegistersViewportMaxHeight }"
+    )
+      div(class="grid grid-cols-4 gap-2 sm:gap-4 pb-3 border-b border-default")
+        USkeleton(class="h-4 w-8")
+        USkeleton(class="h-4 w-14")
+        USkeleton(class="h-4 w-24")
+        USkeleton(class="h-4 w-16 ml-auto")
+      .space-y-3.pt-3
+        div(class="grid grid-cols-4 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`acct-skeleton-${i}`")
+          USkeleton(class="h-4 w-6")
+          USkeleton(class="h-4 w-16")
+          USkeleton(class="h-4 w-28")
+          USkeleton(class="h-4 w-18 ml-auto")
+
     UCard(v-if="showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
       template(#header)
         h3(class="font-semibold") Cross-account snapshot
@@ -1485,18 +1676,18 @@ onBeforeUnmount(() => {
           variant="soft"
           :to="`/register/${accountLiquiditySnapshot.lowest.id}`") Open lowest-balance register
 
-    div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
-      table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
+    div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full rounded-md border border-primary/40" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
+      table(class="w-full min-w-full text-xs sm:text-sm border-collapse")
         caption(class="sr-only") Account registers with balances
-        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented)")
-          tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")
-            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
+        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+          tr
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold w-12 sm:w-16")
               span(class="sr-only") Drag handle
-            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
-            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
-            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
-            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
-            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold w-1/5") Type
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold") Account Name
+            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Debit
+            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Credit
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
@@ -1520,15 +1711,15 @@ onBeforeUnmount(() => {
               @touchend="handleTouchEnd($event, index)"
               style="touch-action: pan-y;"
             )
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16 border-b border-default")
                 a(
                   v-if="!isSnapshotMode"
                   :aria-label="`Drag to reorder ${row.name}`"
                   role="button"
                   class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                   UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5 border-b border-default") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
                 div(class="flex items-center")
                   button(
                     v-if="pocketSubs(row.id).length > 0"
@@ -1541,23 +1732,26 @@ onBeforeUnmount(() => {
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
                   div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
+                  div(
+                    v-if="riskAlertForRegister(row.id)"
+                    class="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+                  )
+                    UIcon(name="i-lucide-triangle-alert" class="text-xs")
+                    span {{ formatRiskEta(riskAlertForRegister(row.id)?.daysUntilRisk ?? 0) }}
               template(v-for="dcn in [mainRowDcn(row)]" :key="`dcn-${row.id}`")
-                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
-                  span(v-if="dcn.debit != null" class="dark:text-red-300 text-red-700") −${{ formatCurrency(dcn.debit).replace(/^\$/, '') }}
-                  span(v-else class="frog-text-muted") —
-                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
-                  span(v-if="dcn.credit != null" class="dark:text-green-300 text-green-700") +${{ formatCurrency(dcn.credit).replace(/^\$/, '') }}
-                  span(v-else class="frog-text-muted") —
-                td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
-                  span(v-if="dcn.net != null" :class="dcn.net >= 0 ? 'dark:text-green-300 text-green-700' : 'dark:text-red-300 text-red-700'") {{ dcn.net >= 0 ? '+' : '−' }}${{ formatCurrency(Math.abs(dcn.net)).replace(/^\$/, '') }}
-                  span(v-else class="frog-text-muted") —
+                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default")
+                  DollarFormat(:amount="dcn.debit != null ? -Math.abs(dcn.debit) : null")
+                td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default")
+                  DollarFormat(:amount="dcn.credit")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
+                  DollarFormat(:amount="dcn.net")
 
             // Sub-accounts for this main account (draggable pocket accounts)
             template(v-if="!row.subAccountRegisterId && !collapsedParents.has(row.id)")
               tr(
                 v-for="(subRow, subIndex) in pocketSubs(row.id)"
                 :key="`sub-${subRow.id}`"
-                :class="`odd:bg-gray-200 even:bg-gray-150 dark:odd:bg-gray-600 dark:even:bg-gray-500 transition-all duration-200 ease-in-out border-l-2 border-green-200 dark:border-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === pocketSubs(row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
+                :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-700 dark:even:bg-gray-700/85 transition-all duration-200 ease-in-out border-l-2 border-l-green-200 dark:border-l-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === pocketSubs(row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
                 :draggable="!isSnapshotMode"
                 @dragstart="handlePocketDragStart($event, subRow, row.id)"
                 @dragover="handlePocketDragOver($event, subRow, row.id)"
@@ -1568,31 +1762,28 @@ onBeforeUnmount(() => {
                 @touchmove="handlePocketTouchMove($event, subRow, row.id)"
                 @touchend="handlePocketTouchEnd($event, subRow, row.id)"
                 style="touch-action: pan-y;")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16 border-b border-default")
                   a(
                     v-if="!isSnapshotMode"
                     :aria-label="`Drag to reorder ${subRow.name}`"
                     role="button"
                     class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5 border-b border-default")
                   div(class="flex items-center")
                     div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
                   div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center frog-text")
                     div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ subRow.name }}
                 template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")
-                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
-                    span(v-if="dcn.debit != null" class="dark:text-red-300 text-red-700") −${{ formatCurrency(dcn.debit).replace(/^\$/, '') }}
-                    span(v-else class="frog-text-muted") —
-                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
-                    span(v-if="dcn.credit != null" class="dark:text-green-300 text-green-700") +${{ formatCurrency(dcn.credit).replace(/^\$/, '') }}
-                    span(v-else class="frog-text-muted") —
-                  td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right")
-                    span(v-if="dcn.net != null" :class="dcn.net >= 0 ? 'dark:text-green-300 text-green-700' : 'dark:text-red-300 text-red-700'") {{ dcn.net >= 0 ? '+' : '−' }}${{ formatCurrency(Math.abs(dcn.net)).replace(/^\$/, '') }}
-                    span(v-else class="frog-text-muted") —
+                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
+                    DollarFormat(:amount="dcn.debit != null ? -Math.abs(dcn.debit) : null")
+                  td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
+                    DollarFormat(:amount="dcn.credit")
+                  td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
+                    DollarFormat(:amount="dcn.net")
 </template>

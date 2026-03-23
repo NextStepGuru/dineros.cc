@@ -11,8 +11,10 @@ const authStore = useAuthStore();
 const listStore = useListStore();
 const toast = useToast();
 const route = useRoute();
+const { $api } = useNuxtApp();
 const overlay = useOverlay();
 const budgetModal = overlay.create(ModalsBudgetManager);
+const notificationCount = ref(0);
 
 const currentBudgetName = computed(
   () =>
@@ -150,7 +152,6 @@ async function logout() {
 }
 
 async function pollData() {
-  const $api = useNuxtApp().$api as typeof $fetch;
   try {
     const data = await $api<{ token: string; user?: User }>(
       "/api/validate-token",
@@ -180,7 +181,31 @@ async function pollData() {
   }
 }
 
-let poller;
+async function refreshNotificationCount() {
+  if (!authStore.getIsUserLoggedIn || !authStore.getBudgetId) {
+    notificationCount.value = 0;
+    return;
+  }
+  try {
+    const [riskData, recurringData] = await Promise.all([
+      ($api as typeof $fetch)<{ alerts: unknown[] }>("/api/forecast-risk-alerts", {
+        query: { budgetId: authStore.getBudgetId, daysAhead: 90 },
+      }),
+      ($api as typeof $fetch)<{ issues: unknown[] }>("/api/reoccurrence-health", {
+        query: { budgetId: authStore.getBudgetId },
+      }),
+    ]);
+    notificationCount.value =
+      (riskData.alerts?.length ?? 0) + (recurringData.issues?.length ?? 0);
+  } catch {
+    notificationCount.value = 0;
+  }
+}
+
+let poller: ReturnType<typeof setInterval> | undefined;
+const onNotificationsRefresh = () => {
+  refreshNotificationCount();
+};
 
 function start() {
   poller = setInterval(pollData, 1000 * 60 * 10); // 10 minutes);
@@ -191,25 +216,44 @@ function stop() {
   poller = undefined;
 }
 
-watch(authStore, () => {
-  if (authStore.getIsUserLoggedIn && !poller) {
+watch(() => authStore.getIsUserLoggedIn, (isLoggedIn) => {
+  if (isLoggedIn && !poller) {
     start();
-  } else if (poller && !authStore.getIsUserLoggedIn) {
+    refreshNotificationCount();
+  } else if (poller && !isLoggedIn) {
     stop();
+    notificationCount.value = 0;
   }
 });
+
+watch(
+  () => authStore.getBudgetId,
+  () => {
+    refreshNotificationCount();
+  },
+);
 
 onMounted(() => {
   // Set up the interval to poll every 10 minutes
   if (authStore.getIsUserLoggedIn && !poller) {
     start();
+    refreshNotificationCount();
+  }
+  if (import.meta.client) {
+    globalThis.addEventListener("notifications:refresh", onNotificationsRefresh);
   }
 });
 
 onBeforeUnmount(() => {
   // Clear the interval when the component is unmounted
-  if (!poller) {
+  if (poller) {
     stop();
+  }
+  if (import.meta.client) {
+    globalThis.removeEventListener(
+      "notifications:refresh",
+      onNotificationsRefresh,
+    );
   }
 });
 </script>
@@ -225,75 +269,119 @@ UHeader(
 
   template(#right)
     UPopover(
-      v-if="authStore.getIsUserLoggedIn && listStore.getBudgets.length > 0"
-      class="my-0 mr-4"
+      v-if="authStore.getIsUserLoggedIn"
+      class="my-0 mr-2 hidden lg:block"
       :content="{ align: 'end', sideOffset: 4 }")
       UButton(
-        size="xs"
-        variant="soft"
+        variant="ghost"
         color="neutral"
-        class="min-w-0 max-w-48")
-        span.truncate {{ currentBudgetName }}
-        UIcon(name="i-lucide-chevron-down" class="ml-1 shrink-0")
+        square
+        :aria-label="`User menu, current budget ${currentBudgetName}`"
+        data-testid="header-user-menu"
+        class="toolbar-icon-button relative")
+        UIcon(name="lucide:user" class="toolbar-icon")
+        UBadge(
+          v-if="notificationCount > 0"
+          color="error"
+          variant="solid"
+          size="xs"
+          class="absolute -top-1 -right-1 min-w-4 h-4 px-1 leading-none flex items-center justify-center")
+          | {{ notificationCount > 99 ? '99+' : notificationCount }}
       template(#content="{ close }")
-        .flex.flex-col.p-1.min-w-48
-          div(
-            v-for="b in listStore.getBudgets"
-            :key="b.id"
-            class="flex items-center justify-between gap-2 py-2 px-2 rounded cursor-pointer hover:bg-elevated"
-            :class="{ 'bg-primary/15': b.id === authStore.getBudgetId }"
-            @click="selectBudget(b.id); close()")
-            span.truncate.flex-1 {{ b.name }}
-            UBadge(
-              v-if="b.isDefault"
-              size="xs"
-              color="neutral"
-              variant="subtle") Default
-            UDropdownMenu(
-              v-else
-              :items="budgetMenuItems(b)"
-              @click.stop)
-              UButton(
+        .flex.flex-col.p-1.min-w-64.max-w-80
+          .px-2.pt-2.pb-1.text-xs.frog-text-muted Budget
+          .max-h-52.overflow-auto
+            div(
+              v-for="b in listStore.getBudgets"
+              :key="b.id"
+              class="flex items-center justify-between gap-2 py-2 px-2 rounded cursor-pointer hover:bg-elevated"
+              :class="{ 'bg-primary/15': b.id === authStore.getBudgetId }"
+              @click="selectBudget(b.id); close()")
+              span.truncate.flex-1 {{ b.name }}
+              UBadge(
+                v-if="b.isDefault"
                 size="xs"
-                icon="i-lucide-more-horizontal"
-                square
-                variant="ghost"
                 color="neutral"
-                :aria-label="`Budget options for ${b.name}`"
+                variant="subtle") Default
+              UDropdownMenu(
+                v-else
+                :items="budgetMenuItems(b)"
                 @click.stop)
-          USeparator.my-1
+                UButton(
+                  size="xs"
+                  icon="i-lucide-more-horizontal"
+                  square
+                  variant="ghost"
+                  color="neutral"
+                  :aria-label="`Budget options for ${b.name}`"
+                  @click.stop)
           UButton(
             variant="ghost"
             color="neutral"
             size="sm"
-            class="justify-start"
+            class="justify-start mt-1"
             icon="i-lucide-plus"
             @click="openBudgetModal('create', null); close()") Create budget
-    ULink(
-      @click="logout"
-      data-testid="header-sign-out"
-      color="neutral"
-      v-if="authStore.getIsUserLoggedIn"
-      class="cursor-pointer") Sign out
-    ULink(
-      to="/edit-profile/profile"
-      aria-label="Edit profile"
-      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors text-highlighted before:bg-(--ui-bg-elevated)/50' : 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors hover:text-highlighted hover:before:bg-(--ui-bg-elevated)/50'"
-      v-if="authStore.getIsUserLoggedIn")
-      UIcon(name="lucide:user" class="toolbar-icon")
-    UColorModeButton(class="toolbar-icon-button")
+          USeparator.my-1
+          UButton(
+            to="/notifications"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="justify-between"
+            @click="close")
+            .flex.items-center.gap-2
+              UIcon(name="lucide:bell")
+              span Notifications
+            UBadge(
+              v-if="notificationCount > 0"
+              color="error"
+              variant="solid"
+              size="xs")
+              | {{ notificationCount > 99 ? '99+' : notificationCount }}
+          UButton(
+            to="/help"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="justify-start"
+            icon="i-lucide-circle-help"
+            @click="close") Help
+          UButton(
+            to="/edit-profile/profile"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="justify-start"
+            icon="lucide:user-cog"
+            @click="close") Edit profile
+          .flex.items-center.justify-between.rounded.px-2.py-1
+            .flex.items-center.gap-2
+              UIcon(name="i-lucide-moon-star")
+              span.text-sm Theme
+            UColorModeButton(class="toolbar-icon-button" data-testid="header-color-mode")
+          UButton(
+            data-testid="header-sign-out"
+            variant="ghost"
+            color="error"
+            size="sm"
+            class="justify-start"
+            icon="i-lucide-log-out"
+            @click="logout(); close()") Sign out
+    UColorModeButton(v-else class="toolbar-icon-button hidden lg:inline-flex")
 
   template(#content="{ close }")
-    .mobile-menu-container(class="flex h-dvh flex-col overflow-y-auto p-6")
-      .mobile-menu-header(class="mb-4 flex w-full max-w-sm items-center justify-end self-center")
+    .mobile-menu-container(class="flex h-dvh flex-col overflow-y-auto px-4 pb-6 pt-4")
+      .mobile-menu-header(class="mb-4 flex w-full max-w-md items-center justify-end self-center")
         UButton(
           icon="i-lucide-x"
           color="neutral"
-          variant="ghost"
+          variant="soft"
           size="lg"
+          class="mobile-close-button"
           aria-label="Close menu"
           @click="close")
-      .mobile-menu-items(class="w-full max-w-sm space-y-4 self-center pb-6")
+      .mobile-menu-items(class="w-full max-w-md space-y-3 self-center pb-6")
         .mobile-menu-item(
           v-for="item in items"
           :key="item.label"
@@ -301,26 +389,154 @@ UHeader(
           UButton(
             :to="item.to"
             :color="item.active ? 'primary' : 'neutral'"
-            :variant="item.active ? 'solid' : 'ghost'"
-            size="lg"
-            class="w-full h-16 text-lg font-semibold justify-center"
-            :class="!item.active ? 'text-white/80! hover:text-white! hover:bg-white/10!' : ''"
+            :variant="item.active ? 'solid' : 'soft'"
+            size="xl"
+            class="mobile-nav-button w-full justify-start"
             @click="close") {{ item.label }}
 
-        //- Logout button for logged-in users
+        div(
+          v-if="authStore.getIsUserLoggedIn"
+          class="mobile-menu-card space-y-3")
+          div(class="mobile-card-title") Account
+          UButton(
+            to="/notifications"
+            variant="soft"
+            color="neutral"
+            size="lg"
+            class="w-full justify-between"
+            @click="close")
+            .flex.items-center.gap-2
+              UIcon(name="lucide:bell")
+              span Notifications
+            UBadge(
+              v-if="notificationCount > 0"
+              color="error"
+              variant="solid"
+              size="xs")
+              | {{ notificationCount > 99 ? '99+' : notificationCount }}
+          UButton(
+            to="/help"
+            variant="soft"
+            color="neutral"
+            size="lg"
+            class="w-full justify-start"
+            icon="i-lucide-circle-help"
+            @click="close") Help
+          UButton(
+            to="/edit-profile/profile"
+            variant="soft"
+            color="neutral"
+            size="lg"
+            class="w-full justify-start"
+            icon="lucide:user-cog"
+            @click="close") Edit profile
+          .mobile-theme-row
+            .flex.items-center.gap-2
+              UIcon(name="i-lucide-moon-star")
+              span Theme
+            UColorModeButton(class="toolbar-icon-button")
+
+        div(
+          v-if="authStore.getIsUserLoggedIn && listStore.getBudgets.length > 0"
+          class="mobile-menu-card space-y-2")
+          div(class="mobile-card-title") Budgets
+          .max-h-48.overflow-auto.space-y-1
+            div(
+              v-for="b in listStore.getBudgets"
+              :key="`mobile-budget-${b.id}`"
+              class="flex items-center gap-2")
+              UButton(
+                variant="soft"
+                color="neutral"
+                size="sm"
+                class="flex-1 justify-between"
+                :class="{ 'bg-primary/20': b.id === authStore.getBudgetId }"
+                @click="selectBudget(b.id); close()")
+                span.truncate {{ b.name }}
+                UBadge(
+                  v-if="b.isDefault"
+                  size="xs"
+                  color="neutral"
+                  variant="subtle") Default
+              UDropdownMenu(
+                v-if="!b.isDefault"
+                :items="budgetMenuItems(b)"
+                @click.stop)
+                UButton(
+                  size="xs"
+                  icon="i-lucide-more-horizontal"
+                  square
+                  variant="ghost"
+                  color="neutral"
+                  :aria-label="`Budget options for ${b.name}`"
+                  @click.stop)
+          UButton(
+            variant="soft"
+            color="neutral"
+            size="sm"
+            class="w-full justify-start"
+            icon="i-lucide-plus"
+            @click="openBudgetModal('create', null); close()") Create budget
+
         UButton(
           v-if="authStore.getIsUserLoggedIn"
           @click="logout(); close()"
           color="error"
-          variant="ghost"
+          variant="soft"
           size="lg"
-          class="w-full h-16 text-lg font-semibold justify-center mt-8") Sign out
+          class="mobile-signout-button w-full justify-center mt-6") Sign out
 
 </template>
 
 <style scoped>
 .mobile-menu-container {
-  background: color-mix(in srgb, var(--frog-surface) 20%, #000 80%);
+  background:
+    radial-gradient(120% 90% at 90% -20%, rgb(59 130 246 / 18%), transparent 60%),
+    radial-gradient(120% 90% at -10% 100%, rgb(16 185 129 / 14%), transparent 60%),
+    color-mix(in srgb, var(--frog-surface) 30%, #000 70%);
+}
+
+.mobile-menu-card {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 1.1rem;
+  padding: 0.85rem;
+  background: rgb(255 255 255 / 5%);
+  backdrop-filter: blur(14px);
+}
+
+.mobile-card-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 62%);
+}
+
+.mobile-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0.9rem;
+  padding: 0.45rem 0.6rem;
+  background: rgb(255 255 255 / 4%);
+}
+
+.mobile-close-button {
+  border-radius: 9999px;
+}
+
+.mobile-nav-button {
+  min-height: 3.25rem;
+  border-radius: 1rem;
+  padding-inline: 1rem;
+  font-size: 1.04rem;
+  font-weight: 600;
+}
+
+.mobile-signout-button {
+  min-height: 3rem;
+  border-radius: 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .toolbar-icon-button,

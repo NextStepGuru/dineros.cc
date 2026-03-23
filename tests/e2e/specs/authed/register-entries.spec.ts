@@ -7,7 +7,7 @@ test.describe("Register entries", () => {
       timeout: 45_000,
     });
     await expect(page.getByText(/E2E Checking/i).first()).toBeVisible();
-    await expect(page.getByText("-$25.50")).toBeVisible();
+    await expect(page.getByText(/[−-]\$25\.50/)).toBeVisible();
   });
 
   test("register toolbar: recalculate, refresh, and filter", async ({

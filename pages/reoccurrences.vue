@@ -27,10 +27,26 @@ const ModalsEditReoccurrence = defineAsyncComponent(
 definePageMeta({
   middleware: "auth",
 });
+useHead({ title: "Reoccurrences | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
 const toast = useToast();
+const { $api } = useNuxtApp();
+
+type ReoccurrenceHealthIssue = {
+  type:
+    | "duplicate_rule"
+    | "ended_rule"
+    | "last_run_after_end"
+    | "stale_last_run"
+    | "zero_amount";
+  reoccurrenceId: number;
+  description: string;
+  accountRegisterId: number;
+  accountRegisterName: string;
+  details: string;
+};
 
 /** Root `overflow-auto` + table `overflow-clip` break sticky headers when the real scroll is the outer wrapper. */
 const tableUi = ref({
@@ -127,7 +143,7 @@ async function handleRecalculate() {
     if (authStore.budgetId > 0) {
       body.budgetId = authStore.budgetId;
     }
-    const data = await (useNuxtApp().$api as typeof $fetch)<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>("/api/recalculate", {
+    const data = await ($api as typeof $fetch)<{ success: boolean; entriesCalculated: number; entriesBalance: number; accountRegisters: number }>("/api/recalculate", {
       method: "POST",
       body,
     });
@@ -264,13 +280,36 @@ const categoryFilterSelectItems = computed(() => {
 });
 
 const reoccurrencesForTable = computed(() =>
-  listStore.getReoccurrencesForCurrentBudget.filter((r) =>
-    entryMatchesCategoryFilter(
+  listStore.getReoccurrencesForCurrentBudget.filter((r) => {
+    const matchesCategory = entryMatchesCategoryFilter(
       r.categoryId,
       categoryFilter.value,
       listStore.getCategories,
-    ),
-  ),
+    );
+    if (!matchesCategory) return false;
+
+    const q = globalFilter.value.trim().toLowerCase();
+    if (!q) return true;
+
+    const accountLabel = getAccountRegisterLabel(
+      r.accountRegisterId,
+      listStore.getAccountRegisters,
+    );
+    const intervalLabel = getIntervalLabel(r.intervalId, listStore.getIntervals);
+    const categoryLabel =
+      r.categoryId == null
+        ? "uncategorized"
+        : (listStore.getCategories.find((c) => c.id === r.categoryId)?.name ?? "");
+
+    return (
+      (r.description ?? "").toLowerCase().includes(q) ||
+      accountLabel.toLowerCase().includes(q) ||
+      intervalLabel.toLowerCase().includes(q) ||
+      categoryLabel.toLowerCase().includes(q) ||
+      formatDate(r.lastAt)?.toLowerCase().includes(q) ||
+      String(r.amount ?? "").toLowerCase().includes(q)
+    );
+  }),
 );
 
 defineShortcuts({
@@ -289,6 +328,8 @@ defineShortcuts({
 });
 
 const isRecalculating = ref(false);
+const reoccurrenceHealthLoading = ref(false);
+const reoccurrenceHealthIssues = ref<ReoccurrenceHealthIssue[]>([]);
 const sectionEl = ref<HTMLElement | null>(null);
 const controlsEl = ref<HTMLElement | null>(null);
 const tableHostEl = ref<HTMLElement | null>(null);
@@ -323,6 +364,33 @@ function updateTableViewportMaxHeight() {
   });
 }
 
+const reoccurrenceHealthSummary = computed(() => {
+  const total = reoccurrenceHealthIssues.value.length;
+  if (total === 0) return "";
+  if (total === 1) return "1 recurring rule may need attention.";
+  return `${total} recurring rules may need attention.`;
+});
+
+async function fetchReoccurrenceHealth() {
+  if (!authStore.getBudgetId) {
+    reoccurrenceHealthIssues.value = [];
+    return;
+  }
+  reoccurrenceHealthLoading.value = true;
+  try {
+    const data = await ($api as typeof $fetch)<{
+      issues: ReoccurrenceHealthIssue[];
+    }>("/api/reoccurrence-health", {
+      query: { budgetId: authStore.getBudgetId },
+    });
+    reoccurrenceHealthIssues.value = data.issues ?? [];
+  } catch {
+    reoccurrenceHealthIssues.value = [];
+  } finally {
+    reoccurrenceHealthLoading.value = false;
+  }
+}
+
 onMounted(async () => {
   import("~/components/modals/EditReoccurrence.vue").catch(() => {});
   await nextTick();
@@ -339,6 +407,7 @@ onMounted(async () => {
   if (controlsEl.value) {
     tableResizeObserver.observe(controlsEl.value);
   }
+  await fetchReoccurrenceHealth();
 });
 
 watch(
@@ -354,7 +423,15 @@ watch(
   async () => {
     await nextTick();
     updateTableViewportMaxHeight();
+    await fetchReoccurrenceHealth();
   }
+);
+
+watch(
+  () => authStore.getBudgetId,
+  async () => {
+    await fetchReoccurrenceHealth();
+  },
 );
 
 onBeforeUnmount(() => {
@@ -414,13 +491,29 @@ onBeforeUnmount(() => {
         li Add reoccurrence: ⌘ + A
         li Open filters &amp; focus search: ⌘ + F
 
+    UAlert(
+      v-if="!reoccurrenceHealthLoading && reoccurrenceHealthIssues.length > 0"
+      class="mb-4"
+      color="warning"
+      variant="subtle"
+      title="Recurring rule health checks"
+      :description="reoccurrenceHealthSummary")
+
     UCard(v-if="listStore.getReoccurrencesForCurrentBudget.length === 0 && !listStore.getIsListsLoading" class="mb-4")
       template(#header)
         h3(class="font-semibold") No recurring entries yet
       p(class="frog-text-muted mb-4") Add recurring income and bills so forecasts stay accurate without manual entry.
       UButton(color="primary" size="sm" @click="handleAddReoccurrence") Add first recurring entry
 
-    div(v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto" :style="{ maxHeight: tableViewportMaxHeight }")
+    UCard(v-if="!reoccurrenceHealthLoading && reoccurrenceHealthIssues.length > 0" class="mb-4")
+      template(#header)
+        h3(class="font-semibold") Rules to review
+      ul(class="space-y-2 text-sm")
+        li(v-for="issue in reoccurrenceHealthIssues.slice(0, 8)" :key="`${issue.type}-${issue.reoccurrenceId}`" class="frog-text-muted")
+          b(class="frog-text") {{ issue.accountRegisterName }}:
+          span &nbsp;{{ issue.description }} — {{ issue.details }}
+
+    div(v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading" ref="tableHostEl" class="flex-1 min-h-0 overflow-auto rounded-md border border-primary/40" :style="{ maxHeight: tableViewportMaxHeight }")
       UAlert(
         v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 && reoccurrencesForTable.length === 0"
         class="mb-2"
@@ -428,14 +521,55 @@ onBeforeUnmount(() => {
         variant="subtle"
         title="No recurring items match this category filter"
         description="Choose All categories, Uncategorized, or another category.")
-      UTable(
-        class="h-full"
-        v-model:global-filter="globalFilter"
-        :data="reoccurrencesForTable"
-        :columns="columns"
-        sticky
-        :ui="tableUi"
-        :loading="listStore.getIsListsLoading"
-        loading-color="primary"
-        loading-animation="carousel")
+      div(
+        v-else-if="listStore.getIsListsLoading && reoccurrencesForTable.length === 0"
+        class="p-2 sm:p-4"
+      )
+        div(class="grid grid-cols-6 gap-2 sm:gap-4 pb-3 border-b border-default")
+          USkeleton(class="h-4 w-16")
+          USkeleton(class="h-4 w-14")
+          USkeleton(class="h-4 w-16")
+          USkeleton(class="h-4 w-24")
+          USkeleton(class="h-4 w-12 ml-auto")
+          USkeleton(class="h-4 w-14 ml-auto")
+        .space-y-3.pt-3
+          div(class="grid grid-cols-6 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`reocc-skeleton-${i}`")
+            USkeleton(class="h-4 w-20")
+            USkeleton(class="h-4 w-16")
+            USkeleton(class="h-4 w-20")
+            USkeleton(class="h-4 w-28")
+            USkeleton(class="h-4 w-14 ml-auto")
+            USkeleton(class="h-4 w-16 ml-auto")
+      table(
+        v-if="reoccurrencesForTable.length > 0"
+        class="w-full min-w-full text-xs sm:text-sm border-collapse")
+        caption(class="sr-only") Recurring entries
+        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+          tr
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Account
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Interval
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Category
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold") Description
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Amount
+            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Last run
+        tbody
+          tr(
+            v-for="(row, index) in reoccurrencesForTable"
+            :key="row.id ?? `reocc-${index}`"
+            class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
+            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getAccountRegisterLabel(row.accountRegisterId, listStore.getAccountRegisters) }}
+            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getIntervalLabel(row.intervalId, listStore.getIntervals) }}
+            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
+              | {{ row.categoryId == null ? "—" : (listStore.getCategories.find((c) => c.id === row.categoryId)?.name ?? row.categoryId) }}
+            td(class="p-2 sm:p-4 text-xs sm:text-sm border-b border-default")
+              div(
+                class="cursor-pointer font-semibold frog-text"
+                role="button"
+                tabindex="0"
+                @click="handleTableClick(row)"
+                @keydown.enter.prevent="handleTableClick(row)"
+                @keydown.space.prevent="handleTableClick(row)") {{ row.description }}
+            td(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default")
+              DollarFormat(:amount="Number(row.amount)")
+            td(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default") {{ formatDate(row.lastAt) }}
 </template>

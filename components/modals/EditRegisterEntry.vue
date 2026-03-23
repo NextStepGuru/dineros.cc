@@ -2,7 +2,6 @@
 import type { FormSubmitEvent } from "@nuxt/ui";
 import {
   handleError,
-  formatCurrencyOptions,
   formatAccountRegisters,
 } from "~/lib/utils";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
@@ -39,6 +38,7 @@ const form = ref<{ submit?: () => void } | null>(null);
 const selectedApplyAccountRegisterId = ref<number>(0);
 const selectedTransferAccountRegisterId = ref<number>(0);
 const transferTargetDescription = ref<string>("");
+const showDeleteConfirm = ref(false);
 
 const { $api } = useNuxtApp();
 
@@ -280,6 +280,7 @@ async function deleteRegisterEntry() {
 
   if (!deleteEntry) {
     state.isDeleting = false;
+    showDeleteConfirm.value = false;
     toast.add({
       color: "error",
       description: "Failed to delete register entry.",
@@ -295,19 +296,18 @@ async function deleteRegisterEntry() {
     props.callback();
 
     state.isDeleting = false;
+    showDeleteConfirm.value = false;
     props.cancel();
   }
   state.isDeleting = false;
 }
 
 function confirmDelete() {
-  if (
-    confirm(
-      "Are you sure you want to delete this register entry? This action cannot be undone.",
-    )
-  ) {
-    deleteRegisterEntry();
-  }
+  showDeleteConfirm.value = true;
+}
+
+function cancelDeleteConfirmation() {
+  showDeleteConfirm.value = false;
 }
 
 async function markAsCleared() {
@@ -631,7 +631,26 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
       ) Cancel
 
     // Regular Action Footer
-    div(v-else class="flex justify-between w-full")
+    div(v-else class="w-full")
+      div(
+        v-if="showDeleteConfirm"
+        class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
+        p(class="mb-2") Are you sure you want to delete this register entry? This action cannot be undone.
+        div(class="flex gap-2")
+          UButton(
+            color="error"
+            @click="deleteRegisterEntry"
+            :loading="state.isDeleting"
+            :disabled="isDisabled || isPlaidTabActive"
+            class="cursor-pointer"
+          ) Confirm delete
+          UButton(
+            color="neutral"
+            @click="cancelDeleteConfirmation"
+            :disabled="state.isDeleting"
+            class="cursor-pointer"
+          ) Cancel
+      div(class="flex justify-between w-full")
       UButton(
         color="primary"
         @click.prevent="form?.submit()"
@@ -662,7 +681,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         color="error"
         @click="confirmDelete"
         :loading="state.isDeleting"
-        :disabled="isDisabled || isPlaidTabActive"
+        :disabled="isDisabled || isPlaidTabActive || showDeleteConfirm"
         v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
         class="cursor-pointer"
       ) Delete

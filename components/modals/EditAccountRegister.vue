@@ -94,6 +94,7 @@ const { $api } = useNuxtApp();
 
 const isSaving = ref(false);
 const isDeleting = ref(false);
+const showArchiveConfirm = ref(false);
 
 const form = ref<{ submit?: () => void } | null>(null);
 const toast = useToast();
@@ -552,6 +553,7 @@ async function archiveAccountRegister() {
 
   if (!result) {
     isSaving.value = false;
+    showArchiveConfirm.value = false;
     toast.add({
       color: "error",
       description: "Failed to archive account register.",
@@ -566,18 +568,17 @@ async function archiveAccountRegister() {
 
     await listStore.fetchLists();
     isDeleting.value = false;
+    showArchiveConfirm.value = false;
     props.cancel();
   }
 }
 
 function confirmArchive() {
-  if (
-    confirm(
-      "Archive this account? It will be hidden from your account list and from dropdowns.",
-    )
-  ) {
-    archiveAccountRegister();
-  }
+  showArchiveConfirm.value = true;
+}
+
+function cancelArchiveConfirmation() {
+  showArchiveConfirm.value = false;
 }
 
 // ESC key handler to close modal
@@ -826,7 +827,24 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
         UInput(type="file" accept=".csv" ref="fileInput" class="w-full")
 
   template(#footer)
-    .flex.justify-between.w-full
+    .w-full
+      div(
+        v-if="showArchiveConfirm"
+        class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
+        p(class="mb-2") Archive this account? It will be hidden from your account list and from dropdowns.
+        div(class="flex gap-2")
+          UButton(
+            color="error"
+            @click="archiveAccountRegister"
+            :loading="isDeleting"
+            :disabled="isSaving || isDeleting"
+          ) Confirm archive
+          UButton(
+            color="neutral"
+            @click="cancelArchiveConfirmation"
+            :disabled="isDeleting"
+          ) Cancel
+      .flex.justify-between.w-full
       UButton(
         color="primary"
         @click.prevent="form?.submit()"
@@ -839,7 +857,7 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
         v-if="formState.id"
         @click="confirmArchive"
         :loading="isDeleting"
-        :disabled="isSaving || isDeleting"
+        :disabled="isSaving || isDeleting || showArchiveConfirm"
       ) Archive
 
       UButton(@click="cancel" color="neutral" :disabled="isSaving || isDeleting") Close

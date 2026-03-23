@@ -3,12 +3,7 @@ import type { CategoryReportTableGroup } from "~/server/services/reports/types";
 
 defineProps<{
   groups: CategoryReportTableGroup[];
-  currencyFmt: Intl.NumberFormat;
 }>();
-
-function amtClass(v: number) {
-  return v < 0 ? "text-red-700 dark:text-red-300" : "";
-}
 </script>
 
 <template lang="pug">
@@ -44,9 +39,8 @@ function amtClass(v: number) {
             .flex.items-center.gap-2.min-w-0
               span.rounded-full.shrink-0(class="w-2.5 h-2.5" :style="{ background: g.parent.color }")
               span.font-semibold.frog-text.truncate {{ g.parent.name }}
-          td(
-            class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap"
-            :class="amtClass(g.parent.total)") {{ currencyFmt.format(g.parent.total) }}
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap")
+            DollarFormat(:amount="g.parent.total")
           td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ g.parent.shareOfAbs.toFixed(1) }}%
           td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ g.parent.count }}
         tr(
@@ -57,9 +51,8 @@ function amtClass(v: number) {
             .flex.items-center.gap-2.min-w-0
               span.rounded-full.shrink-0(class="w-2 h-2 opacity-90" :style="{ background: c.color }")
               span.truncate {{ c.name }}
-          td(
-            class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap"
-            :class="amtClass(c.total)") {{ currencyFmt.format(c.total) }}
+          td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums whitespace-nowrap")
+            DollarFormat(:amount="c.total")
           td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ c.shareOfAbs.toFixed(1) }}%
           td(class="p-2 sm:p-4 text-xs sm:text-sm text-right tabular-nums text-muted whitespace-nowrap") {{ c.count }}
 </template>
