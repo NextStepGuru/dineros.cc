@@ -303,6 +303,8 @@ async function startPasskeySignIn() {
               v-model="formState.tokenChallenge"
               type="text"
               :placeholder="selectedMfaMethod === 'email' ? 'Enter the code from your email' : 'Enter your two-factor authentication code'"
+              aria-label="Verification code"
+              autocomplete="one-time-code"
               class="w-full"
               :disabled="selectedMfaMethod === 'passkey'"
             )
@@ -321,6 +323,8 @@ async function startPasskeySignIn() {
               v-model="formState.email"
               type="text"
               placeholder="Enter your email"
+              autocomplete="email"
+              aria-label="Email address"
               class="w-full"
             )
           UFormField(v-if="!tokenChallengeRequired" label="Password" for="password")
@@ -329,6 +333,8 @@ async function startPasskeySignIn() {
               v-model="formState.password"
               type="password"
               placeholder="Enter your password"
+              autocomplete="current-password"
+              aria-label="Password"
               class="w-full"
             )
           UButton(

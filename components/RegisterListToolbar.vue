@@ -36,12 +36,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center">
+  <div aria-label="List actions" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center">
     <UTooltip v-if="showAdd" :text="addTooltip" :delay-duration="150">
-      <UButton
-        color="primary"
-        size="sm"
-        square
+      <BaseIconButton
         icon="i-lucide-plus"
         :title="addTitle"
         :aria-label="addAriaLabel"
@@ -49,10 +46,7 @@ const emit = defineEmits<{
       />
     </UTooltip>
     <UTooltip v-if="showRefresh" text="Refresh register" :delay-duration="150">
-      <UButton
-        color="success"
-        size="sm"
-        square
+      <BaseIconButton
         icon="i-lucide-refresh-cw"
         title="Refresh register"
         aria-label="Refresh register"
@@ -65,12 +59,9 @@ const emit = defineEmits<{
       :text="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
       :delay-duration="150"
     >
-      <UButton
-        variant="soft"
-        size="sm"
-        square
+      <BaseIconButton
         icon="i-lucide-keyboard"
-        :color="showShortcuts ? 'primary' : 'neutral'"
+        :active="showShortcuts"
         :title="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
         :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
         @click="showShortcuts = !showShortcuts"
@@ -83,6 +74,7 @@ const emit = defineEmits<{
         size="sm"
         :class="filterClass"
         :placeholder="filterPlaceholder"
+        aria-label="Filter list"
       />
     </slot>
     <slot name="trailing" />

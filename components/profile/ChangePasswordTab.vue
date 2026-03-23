@@ -77,6 +77,8 @@ UCard(class="max-w-md min-h-96 my-4 m-auto")
         v-model="passwordState.newPassword"
         type="password"
         placeholder="Enter new your password"
+        aria-label="New password"
+        autocomplete="new-password"
         class="w-full"
       )
     UFormField(label="Confirm Password" for="confirmPassword")
@@ -85,6 +87,8 @@ UCard(class="max-w-md min-h-96 my-4 m-auto")
         v-model="passwordState.confirmPassword"
         type="password"
         placeholder="Confirm your new password"
+        aria-label="Confirm new password"
+        autocomplete="new-password"
         class="w-full"
       )
     UButton(

@@ -180,36 +180,21 @@ const contactMethods = [
           >Published March 14, 2026</time
         >
       </p>
-      <p class="mt-3 text-lg frog-text-muted max-w-2xl mx-auto hidden">
+      <p class="mt-3 text-lg frog-text-muted max-w-2xl mx-auto">
         Have a question or feedback? Send us a message and we’ll get back to you
         as soon as we can.
       </p>
-      <p class="mt-4 text-base frog-text max-w-3xl mx-auto hidden">
+      <p class="mt-4 text-sm frog-text-muted max-w-3xl mx-auto">
         Dineros support can help with account access, forecasting setup, budget
         structure questions, recurring schedule behavior, and general product
         guidance. For privacy and legal inquiries, we route requests directly to
         dedicated inboxes so your message reaches the right team quickly.
       </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
-        When contacting us, include relevant context such as the email on your
-        profile, the page or workflow you were using, and a brief description of
-        what you expected to happen. This helps us diagnose issues faster and
-        provide a clear, practical response without unnecessary back and forth.
-      </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
-        We review support, privacy, and legal messages in the order received and
-        prioritize anything tied to account security or data access. If your
-        request is time-sensitive, mention that in the subject line and include
-        any deadlines so we can triage appropriately.
-      </p>
-      <p class="mt-3 text-base frog-text max-w-3xl mx-auto hidden">
-        If you are reporting a bug, include the route you visited, the exact
-        sequence of actions, and any error text shown in the interface. If
-        possible, include a screenshot so we can confirm visual state. This
-        speeds up reproduction and reduces follow-up questions. For billing,
-        policy, or legal requests, include your preferred response method and
-        the specific outcome you need so we can route your message to the right
-        reviewer without delay.
+      <p class="mt-3 text-sm frog-text-muted max-w-3xl mx-auto">
+        Include the email on your profile, the page you were using, and what you
+        expected to happen. For bug reports, add the exact steps and any error
+        text shown on screen. This helps us respond faster without extra back
+        and forth.
       </p>
     </div>
 

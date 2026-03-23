@@ -12,6 +12,12 @@ test.describe("Auth pages (unauthenticated)", () => {
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
+  test("login page links to signup and forgot password", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.locator('a[href="/signup"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/forgot-password"]').first()).toBeVisible();
+  });
+
   test("invalid credentials show feedback", async ({ page }) => {
     const helpers = createTestHelpers(page);
     await helpers.navigateTo("/login");
@@ -52,12 +58,119 @@ test.describe("Auth pages (unauthenticated)", () => {
     ).toBeVisible();
   });
 
+  test("signup form has all required fields", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/first name/i)).toBeVisible();
+    await expect(page.getByLabel(/last name/i)).toBeVisible();
+    await expect(page.getByLabel(/email address/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    await expect(page.getByLabel(/confirm password/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /create account/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /sign in/i }),
+    ).toBeVisible();
+  });
+
   test("protected routes redirect to login when unauthenticated", async ({
     page,
   }) => {
-    await page.goto("/account-registers");
-    await expect(page).toHaveURL(/\/login/);
-    await page.goto("/goals");
-    await expect(page).toHaveURL(/\/login/);
+    const protectedPaths = [
+      "/account-registers",
+      "/goals",
+      "/reoccurrences",
+      "/reports",
+      "/help",
+      "/edit-profile/profile",
+      "/register/1",
+    ];
+    for (const path of protectedPaths) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/login/);
+    }
+  });
+});
+
+test.describe("Signup form validation", () => {
+  test("mismatched passwords do not submit", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+
+    await page.getByLabel(/first name/i).fill("Test");
+    await page.getByLabel(/last name/i).fill("User");
+    await page.getByLabel(/email address/i).fill("signup-test@example.com");
+    await page.locator("#password").fill("validPass1");
+    await page.locator("#confirmPassword").fill("differentPass2");
+    await page.getByRole("button", { name: /create account/i }).click();
+    await page.waitForTimeout(1_000);
+
+    await expect(page).toHaveURL(/\/signup/);
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+  });
+
+  test("too-short password does not submit", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+
+    await page.getByLabel(/first name/i).fill("Test");
+    await page.getByLabel(/last name/i).fill("User");
+    await page.getByLabel(/email address/i).fill("signup-test@example.com");
+    await page.locator("#password").fill("ab");
+    await page.locator("#confirmPassword").fill("ab");
+    await page.getByRole("button", { name: /create account/i }).click();
+    await page.waitForTimeout(1_000);
+
+    await expect(page).toHaveURL(/\/signup/);
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+  });
+
+  test("duplicate email shows server-side error", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(
+      page.getByRole("heading", { name: /create your account/i }),
+    ).toBeVisible();
+
+    await page.getByLabel(/first name/i).fill("Test");
+    await page.getByLabel(/last name/i).fill("User");
+    await page.getByLabel(/email address/i).fill("e2e-test@dineros.cc");
+    await page.locator("#password").fill("validPass123");
+    await page.locator("#confirmPassword").fill("validPass123");
+    await page.getByRole("button", { name: /create account/i }).click();
+
+    const errorFeedback = page
+      .getByText(/already|error|exists|registered/i)
+      .first()
+      .or(page.locator('li[role="alert"]').first());
+    await expect(errorFeedback).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("forgot password with nonexistent email does not crash", async ({
+    page,
+  }) => {
+    await page.goto("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: /recover your account/i }),
+    ).toBeVisible();
+
+    await page.getByLabel(/email address/i).fill("nonexistent@example.com");
+    await page.getByRole("button", { name: /send reset code/i }).click();
+
+    await page.waitForTimeout(3_000);
+    await expect(page.locator("body")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /recover your account/i }),
+    ).toBeVisible();
   });
 });

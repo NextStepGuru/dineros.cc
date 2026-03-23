@@ -101,6 +101,8 @@ const handleSubmit = async ({
             v-model="formState.resetCode"
             type="text"
             placeholder="Enter the reset code"
+            aria-label="Reset code"
+            autocomplete="one-time-code"
             class="w-full")
         UFormField(label="Password" for="newPassword")
           UInput(
@@ -108,6 +110,8 @@ const handleSubmit = async ({
             v-model="formState.newPassword"
             type="password"
             placeholder="Enter your new password"
+            aria-label="New password"
+            autocomplete="new-password"
             class="w-full")
         UFormField(label="Confirm Password" for="confirmPassword")
           UInput(
@@ -115,6 +119,8 @@ const handleSubmit = async ({
             v-model="formState.confirmPassword"
             type="password"
             placeholder="Confirm your new password"
+            aria-label="Confirm new password"
+            autocomplete="new-password"
             class="w-full")
         UButton(
           color="primary"

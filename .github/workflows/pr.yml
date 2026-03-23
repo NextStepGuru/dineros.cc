@@ -243,3 +243,11 @@ jobs:
         with:
           name: test-results
           path: test-results/
+      - name: Upload visual snapshots (actual)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-linux
+          path: |
+            tests/e2e/specs/authed/visual.spec.ts-snapshots/
+            tests/e2e/specs/public/visual.spec.ts-snapshots/

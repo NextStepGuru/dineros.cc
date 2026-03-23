@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
 <template lang="pug">
 UHeader(
   title="DinerosPredictive budgeting"
-  :toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full' }")
+  :toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full toolbar-icon-button' }")
   template(#title)
     XLogo(class="h-6 w-auto")
 
@@ -259,6 +259,7 @@ UHeader(
                 square
                 variant="ghost"
                 color="neutral"
+                :aria-label="`Budget options for ${b.name}`"
                 @click.stop)
           USeparator.my-1
           UButton(
@@ -276,14 +277,23 @@ UHeader(
       class="cursor-pointer") Sign out
     ULink(
       to="/edit-profile/profile"
-      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer transition-colors before:transition-colors text-highlighted before:bg-(--ui-bg-elevated)/50' : 'cursor-pointer transition-colors before:transition-colors hover:text-highlighted hover:before:bg-(--ui-bg-elevated)/50'"
+      aria-label="Edit profile"
+      :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors text-highlighted before:bg-(--ui-bg-elevated)/50' : 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors hover:text-highlighted hover:before:bg-(--ui-bg-elevated)/50'"
       v-if="authStore.getIsUserLoggedIn")
-      UIcon(name="lucide:user" class="2x")
-    UColorModeButton
+      UIcon(name="lucide:user" class="toolbar-icon")
+    UColorModeButton(class="toolbar-icon-button")
 
-  template(#content)
-    .mobile-menu-container(class="flex flex-col items-center justify-center min-h-screen p-8")
-      .mobile-menu-items(class="w-full max-w-sm space-y-4")
+  template(#content="{ close }")
+    .mobile-menu-container(class="flex h-dvh flex-col overflow-y-auto p-6")
+      .mobile-menu-header(class="mb-4 flex w-full max-w-sm items-center justify-end self-center")
+        UButton(
+          icon="i-lucide-x"
+          color="neutral"
+          variant="ghost"
+          size="lg"
+          aria-label="Close menu"
+          @click="close")
+      .mobile-menu-items(class="w-full max-w-sm space-y-4 self-center pb-6")
         .mobile-menu-item(
           v-for="item in items"
           :key="item.label"
@@ -294,12 +304,13 @@ UHeader(
             :variant="item.active ? 'solid' : 'ghost'"
             size="lg"
             class="w-full h-16 text-lg font-semibold justify-center"
-            @click="$emit('close')") {{ item.label }}
+            :class="!item.active ? 'text-white/80! hover:text-white! hover:bg-white/10!' : ''"
+            @click="close") {{ item.label }}
 
         //- Logout button for logged-in users
         UButton(
           v-if="authStore.getIsUserLoggedIn"
-          @click="logout"
+          @click="logout(); close()"
           color="error"
           variant="ghost"
           size="lg"
@@ -310,5 +321,27 @@ UHeader(
 <style scoped>
 .mobile-menu-container {
   background: color-mix(in srgb, var(--frog-surface) 20%, #000 80%);
+}
+
+.toolbar-icon-button,
+.toolbar-icon-link {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+}
+
+.toolbar-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.toolbar-icon-button :deep(svg) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 </style>

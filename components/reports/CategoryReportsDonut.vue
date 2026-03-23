@@ -47,12 +47,17 @@ const legendListClass = computed(() => {
 .flex.flex-col(class="md:flex-row md:items-start gap-8")
   .flex.flex-col.items-center.gap-2
     //- 13rem (w-52) × 1.2 — ring hole scaled to match
-    .relative.rounded-full(class="size-[15.6rem] shrink-0")
+    .relative.rounded-full(
+      class="size-[15.6rem] shrink-0"
+      role="img"
+      :aria-label="hasData ? 'Donut chart showing category spending distribution' : 'Empty chart — no activity'"
+    )
       .rounded-full.w-full.h-full.transition-opacity(
         class="ring-1 ring-default"
         :style="gradientStyle"
+        aria-hidden="true"
         :class="hasData ? 'opacity-100' : 'opacity-20'")
-      .absolute.rounded-full.bg-default(class="inset-[2.4rem] ring-1 ring-default")
+      .absolute.rounded-full.bg-default(class="inset-[2.4rem] ring-1 ring-default" aria-hidden="true")
     p.text-sm.frog-text-muted(v-if="!hasData") No activity to chart for this range.
 
   ul(:class="legendListClass" aria-label="Category breakdown")

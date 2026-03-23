@@ -290,6 +290,7 @@ div(class="max-w-md min-h-96 my-4 m-auto")
         v-model="formState.firstName"
         type="text"
         placeholder="Enter your first name"
+        autocomplete="given-name"
         class="w-full"
       )
     UFormField(label="Last Name" for="lastName")
@@ -298,6 +299,7 @@ div(class="max-w-md min-h-96 my-4 m-auto")
         v-model="formState.lastName"
         type="text"
         placeholder="Enter your last name"
+        autocomplete="family-name"
         class="w-full"
       )
     UFormField(label="Email Address" for="email")
@@ -306,6 +308,7 @@ div(class="max-w-md min-h-96 my-4 m-auto")
         v-model="formState.email"
         type="text"
         placeholder="Enter your email"
+        autocomplete="email"
         required
         class="w-full"
       )

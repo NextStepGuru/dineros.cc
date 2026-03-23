@@ -56,14 +56,11 @@ defineExpose({
   <div class="flex flex-wrap xl:flex-nowrap items-center gap-1 min-w-0">
     <template v-if="!expanded">
       <UTooltip text="Table filters" :delay-duration="150">
-        <UButton
-          variant="soft"
-          size="sm"
-          square
+        <BaseIconButton
           icon="i-lucide-sliders-horizontal"
           title="Table filters"
           aria-label="Open table filters"
-          aria-expanded="false"
+          :aria-expanded="expanded"
           @click="expandAndFocus()"
         />
       </UTooltip>
@@ -96,10 +93,7 @@ defineExpose({
         />
       </UTooltip>
       <UTooltip text="Reset filters" :delay-duration="150">
-        <UButton
-          variant="soft"
-          size="sm"
-          square
+        <BaseIconButton
           icon="i-lucide-x"
           title="Reset filters"
           aria-label="Reset filters"

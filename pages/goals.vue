@@ -125,7 +125,15 @@ const columns: TableColumn<SavingsGoal>[] = [
         "div",
         {
           class: "cursor-pointer font-semibold text-white",
+          role: "button",
+          tabindex: 0,
           onClick: () => handleTableClick(row.original),
+          onKeydown: (e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleTableClick(row.original);
+            }
+          },
         },
         row.getValue("name"),
       ),
@@ -230,6 +238,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="sectionEl" class="m-4">
+    <h1 class="sr-only">Savings Goals</h1>
     <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4">
       <RegisterListToolbar
         v-model:global-filter="globalFilter"
