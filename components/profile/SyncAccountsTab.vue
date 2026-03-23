@@ -131,11 +131,11 @@ async function loadAvailablePlaidAccounts() {
 
 // Load data when component mounts or auth state changes
 // Always try to load synced accounts, regardless of Plaid connection status
-await loadSyncedAccounts();
+// Do not top-level await: that makes async setup and blocks first paint (Suspense).
+loadSyncedAccounts(); // NOSONAR — intentional fire-and-forget; await would defer tab content
 
-// Only load available accounts if Plaid is connected
 if (authStore.hasPlaidConnected) {
-  await loadAvailablePlaidAccounts();
+  loadAvailablePlaidAccounts(); // NOSONAR — same as above
 }
 
 watch(authStore, () => {

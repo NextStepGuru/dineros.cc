@@ -1,6 +1,10 @@
 import { createError } from "h3";
+import type { Prisma } from "@prisma/client";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
-import { budgetWhereForAccountMember } from "~/server/lib/accountAccess";
+import {
+  accountWhereUserIsMember,
+  budgetWhereForAccountMember,
+} from "~/server/lib/accountAccess";
 import {
   evaluateForecastRiskAlerts,
   type ForecastRiskAlert,
@@ -39,6 +43,9 @@ type PrismaNotificationBridge = {
 };
 
 const prismaNotifications = PrismaDb as unknown as PrismaNotificationBridge;
+
+/** Avoid re-reading settings / re-running migration after legacy data is gone or migrated. */
+const legacyForecastDismissalMigrationDoneForUser = new Set<number>();
 
 type NotificationSignal = {
   kind: NotificationKind;
@@ -182,12 +189,19 @@ async function ensureBudgetAccess(userId: number, budgetId: number) {
   }
 }
 
-export async function migrateLegacyForecastDismissals(params: {
+export async function migrateLegacyForecastDismissals({
+  userId,
+  budgetId: _budgetId,
+}: {
   userId: number;
   budgetId: number;
 }) {
+  if (legacyForecastDismissalMigrationDoneForUser.has(userId)) {
+    return;
+  }
+
   const user = await PrismaDb.user.findUnique({
-    where: { id: params.userId },
+    where: { id: userId },
     select: { settings: true },
   });
   const settings = (user?.settings ?? {}) as Record<string, unknown>;
@@ -204,27 +218,62 @@ export async function migrateLegacyForecastDismissals(params: {
       typeof (i as Record<string, unknown>).key === "string"
     );
   });
-  for (const entry of entries) {
-    const occurrenceKey = String(entry.key);
-    if (!occurrenceKey) continue;
-    await prismaNotifications.notificationDismissal.upsert({
-      where: {
-        userId_budgetId_kind_occurrenceKey: {
-          userId: params.userId,
-          budgetId: params.budgetId,
-          kind: "FORECAST_RISK",
-          occurrenceKey,
-        },
-      },
-      update: {},
-      create: {
-        userId: params.userId,
-        budgetId: params.budgetId,
-        kind: "FORECAST_RISK",
-        occurrenceKey,
-      },
-    });
+  if (entries.length === 0) {
+    legacyForecastDismissalMigrationDoneForUser.add(userId);
+    return;
   }
+
+  const budgetRows = await PrismaDb.budget.findMany({
+    where: {
+      isArchived: false,
+      account: accountWhereUserIsMember(userId),
+    },
+    select: { id: true },
+  });
+  const budgetIds = budgetRows.map((b) => b.id);
+
+  const occurrenceKeys = entries
+    .map((e) => String(e.key))
+    .filter((k) => k.length > 0);
+
+  const { items: _legacyItems, ...restForecastRiskAlerts } = root;
+  const nextSettings: Record<string, unknown> = { ...settings };
+  if (Object.keys(restForecastRiskAlerts).length > 0) {
+    nextSettings.forecastRiskAlerts = restForecastRiskAlerts;
+  } else {
+    delete nextSettings.forecastRiskAlerts;
+  }
+
+  await PrismaDb.$transaction(async (tx) => {
+    const notify = tx as unknown as PrismaNotificationBridge;
+    for (const budgetId of budgetIds) {
+      for (const occurrenceKey of occurrenceKeys) {
+        await notify.notificationDismissal.upsert({
+          where: {
+            userId_budgetId_kind_occurrenceKey: {
+              userId,
+              budgetId,
+              kind: "FORECAST_RISK",
+              occurrenceKey,
+            },
+          },
+          update: {},
+          create: {
+            userId,
+            budgetId,
+            kind: "FORECAST_RISK",
+            occurrenceKey,
+          },
+        });
+      }
+    }
+    await tx.user.update({
+      where: { id: userId },
+      data: { settings: nextSettings as Prisma.InputJsonValue },
+    });
+  });
+
+  legacyForecastDismissalMigrationDoneForUser.add(userId);
 }
 
 export async function syncNotificationsForBudget(params: {

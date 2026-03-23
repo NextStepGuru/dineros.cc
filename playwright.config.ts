@@ -101,7 +101,8 @@ export default defineConfig({
           command: "pnpm dev",
           url: "http://localhost:3000",
           reuseExistingServer: !process.env.CI,
-          timeout: process.env.CI ? 180_000 : 60_000,
+          // CI cold compile (Nuxt + large graph) often exceeds 3m on ubuntu-latest.
+          timeout: process.env.CI ? 360_000 : 60_000,
           env: {
             ...process.env,
             E2E: "1",

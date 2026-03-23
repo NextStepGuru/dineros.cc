@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ALL_TIMEZONE_OPTIONS as allTimezoneOptions } from "~/lib/timezoneOptions";
+
 definePageMeta({
   middleware: ["auth", "admin"],
 });
@@ -41,8 +43,8 @@ const resetPasswordForm = reactive({
   confirmPassword: "",
 });
 
-const selectedUser = computed(() =>
-  items.value.find((item) => item.id === selectedUserId.value) ?? null,
+const selectedUser = computed(
+  () => items.value.find((item) => item.id === selectedUserId.value) ?? null,
 );
 
 const editableUser = reactive({
@@ -72,107 +74,6 @@ const countryOptions = computed(() => {
     value: country.id,
   }));
 });
-
-const allTimezoneOptions = [
-  {
-    label: "Pacific Time (PST/PDT) - UTC-8/-7",
-    value: -480,
-    countries: [840],
-  },
-  {
-    label: "Mountain Time (MST/MDT) - UTC-7/-6",
-    value: -420,
-    countries: [840, 124],
-  },
-  {
-    label: "Central Time (CST/CDT) - UTC-6/-5",
-    value: -360,
-    countries: [840, 124, 484],
-  },
-  {
-    label: "Eastern Time (EST/EDT) - UTC-5/-4",
-    value: -300,
-    countries: [840, 124],
-  },
-  {
-    label: "Atlantic Time (AST/ADT) - UTC-4/-3",
-    value: -240,
-    countries: [124, 52, 212, 308],
-  },
-  {
-    label: "Newfoundland Time (NST/NDT) - UTC-3.5/-2.5",
-    value: -210,
-    countries: [124],
-  },
-  {
-    label: "Argentina Time (ART) - UTC-3",
-    value: -180,
-    countries: [32, 76, 858],
-  },
-  {
-    label: "UTC - UTC+0",
-    value: 0,
-    countries: [826, 372, 620, 288, 694],
-  },
-  {
-    label: "Central European Time (CET/CEST) - UTC+1/+2",
-    value: 60,
-    countries: [
-      276, 250, 380, 724, 528, 56, 756, 40, 348, 616, 203, 703, 705, 191, 688,
-      499, 807, 70, 100, 438, 442, 470, 674, 336,
-    ],
-  },
-  {
-    label: "Eastern European Time (EET/EEST) - UTC+2/+3",
-    value: 120,
-    countries: [300, 246, 233, 428, 440, 642, 804, 112, 818],
-  },
-  {
-    label: "Moscow Time (MSK) - UTC+3",
-    value: 180,
-    countries: [643, 762],
-  },
-  {
-    label: "Gulf Standard Time (GST) - UTC+4",
-    value: 240,
-    countries: [784, 512, 414, 634],
-  },
-  {
-    label: "Pakistan Standard Time (PKT) - UTC+5",
-    value: 300,
-    countries: [586, 356, 398, 860, 417],
-  },
-  {
-    label: "Bangladesh Standard Time (BST) - UTC+6",
-    value: 360,
-    countries: [50],
-  },
-  {
-    label: "Indochina Time (ICT) - UTC+7",
-    value: 420,
-    countries: [764, 704, 418, 116],
-  },
-  {
-    label: "China Standard Time (CST) - UTC+8",
-    value: 480,
-    countries: [156, 458, 702, 608, 96, 344],
-  },
-  {
-    label: "Japan Standard Time (JST) - UTC+9",
-    value: 540,
-    countries: [392, 410],
-  },
-  {
-    label: "Australian Eastern Time (AEST/AEDT) - UTC+10/+11",
-    value: 600,
-    countries: [36],
-  },
-  {
-    label: "New Zealand Time (NZST/NZDT) - UTC+12/+13",
-    value: 720,
-    countries: [554],
-  },
-];
 
 const timezoneOptions = computed(() => {
   const selectedCountryId = editableUser.countryId;
@@ -206,10 +107,14 @@ async function loadCountries() {
     if (list?.length > 0) {
       countries.value = list;
     } else {
-      countries.value = [{ id: 840, name: "United States", code: "US", code3: "USA" }];
+      countries.value = [
+        { id: 840, name: "United States", code: "US", code3: "USA" },
+      ];
     }
   } catch {
-    countries.value = [{ id: 840, name: "United States", code: "US", code3: "USA" }];
+    countries.value = [
+      { id: 840, name: "United States", code: "US", code3: "USA" },
+    ];
   } finally {
     isLoadingCountries.value = false;
   }
