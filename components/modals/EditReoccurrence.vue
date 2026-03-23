@@ -403,7 +403,7 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
               UFormField(label="Label" class="flex-1 min-w-32")
                 UInput(v-model="split.description" class="w-full" placeholder="Optional")
               UTooltip(text="Remove split" :delay-duration="150")
-                UButton(color="error" variant="soft" size="xs" square icon="i-lucide-trash-2" class="mt-6 shrink-0" aria-label="Remove split" @click="removeSplit(index)")
+                BaseIconButton(icon="i-lucide-trash-2" size="xs" class="mt-6 shrink-0" aria-label="Remove split" @click="removeSplit(index)")
         p.text-xs.text-gray-500(v-else) No split transfers configured.
 
   template(#footer)

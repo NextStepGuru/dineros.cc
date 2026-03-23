@@ -36,6 +36,7 @@ const ModalsMatchRegisterEntryReoccurrence = defineAsyncComponent(
 
 const UButton = resolveComponent("UButton");
 const UTooltip = resolveComponent("UTooltip");
+const BaseIconBtn = resolveComponent("BaseIconButton");
 
 const overlay = useOverlay();
 const route = useRoute();
@@ -726,9 +727,7 @@ const columns: TableColumn<RegisterEntry>[] = [
                 },
                 {
                   default: () =>
-                    h(UButton, {
-                      color: "neutral",
-                      variant: "ghost",
+                    h(BaseIconBtn, {
                       size: "xs",
                       icon: "i-lucide-repeat",
                       class: "shrink-0",
@@ -749,9 +748,7 @@ const columns: TableColumn<RegisterEntry>[] = [
                 },
                 {
                   default: () =>
-                    h(UButton, {
-                      color: "neutral",
-                      variant: "ghost",
+                    h(BaseIconBtn, {
                       size: "xs",
                       icon: "i-lucide-link",
                       class: "shrink-0",
@@ -1190,20 +1187,14 @@ async function recalcAccount() {
           template(#middle)
             UDropdownMenu(:items="snapshotMenuItems")
               UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
-                UButton(
-                  variant="soft"
-                  size="md"
-                  square
+                BaseIconButton(
                   icon="i-lucide-camera"
-                  :color="isSnapshotMode ? 'primary' : 'neutral'"
+                  :active="!!isSnapshotMode"
                   :title="`Snapshot view: ${selectedSnapshotLabel}`"
                   :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
                 )
             UTooltip(v-if="!isSnapshotMode" text="Recalculate forecast" :delay-duration="150")
-              UButton(
-                color="error"
-                size="md"
-                square
+              BaseIconButton(
                 icon="i-lucide-calculator"
                 title="Recalculate forecast"
                 aria-label="Recalculate forecast"

@@ -379,11 +379,9 @@ onBeforeUnmount(() => {
       )
         template(#middle)
           UTooltip(text="Recalculate forecast" :delay-duration="150")
-            UButton(
-              color="error"
-              size="sm"
-              square
+            BaseIconButton(
               icon="i-lucide-calculator"
+              size="sm"
               title="Recalculate forecast"
               aria-label="Recalculate forecast"
               @click="handleRecalculate"

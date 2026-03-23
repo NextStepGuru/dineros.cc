@@ -189,10 +189,8 @@ UModal(
             UButton(size="xs" color="neutral" variant="ghost" @click="cancelEdit") Cancel
           template(v-else)
             span.flex-1.min-w-0.truncate {{ cat.name }}
-            UButton(
+            BaseIconButton(
               size="xs"
-              variant="ghost"
-              color="neutral"
               icon="i-lucide-plus"
               :title="'Add subcategory under ' + cat.name"
               :aria-label="'Set parent to ' + cat.name + ' for new category'"

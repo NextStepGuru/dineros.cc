@@ -1348,10 +1348,7 @@ onBeforeUnmount(() => {
       )
         template(#middle)
           UTooltip(text="Manage categories" :delay-duration="150")
-            UButton(
-              color="info"
-              size="md"
-              square
+            BaseIconButton(
               icon="i-lucide-tags"
               title="Manage categories"
               aria-label="Manage categories"
@@ -1359,10 +1356,7 @@ onBeforeUnmount(() => {
               @click="handleManageCategories"
             )
           UTooltip(text="Save snapshot" :delay-duration="150")
-            UButton(
-              color="success"
-              size="md"
-              square
+            BaseIconButton(
               icon="i-lucide-save"
               title="Save snapshot"
               aria-label="Save snapshot"
@@ -1372,10 +1366,7 @@ onBeforeUnmount(() => {
             )
           UDropdownMenu(:items="sortMenuItems")
             UTooltip(text="Sort accounts" :delay-duration="150")
-              UButton(
-                color="warning"
-                size="md"
-                square
+              BaseIconButton(
                 icon="i-lucide-arrow-up-down"
                 title="Sort accounts"
                 aria-label="Sort accounts"
@@ -1383,22 +1374,16 @@ onBeforeUnmount(() => {
               )
           UDropdownMenu(:items="snapshotMenuItems")
             UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
-              UButton(
-                variant="soft"
-                size="md"
-                square
+              BaseIconButton(
                 icon="i-lucide-camera"
-                :color="isSnapshotMode ? 'primary' : 'neutral'"
+                :active="!!isSnapshotMode"
                 :title="`Snapshot view: ${selectedSnapshotLabel}`"
                 :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
               )
           UTooltip(text="Projected balance (end of month)" :delay-duration="150")
-            UButton(
-              variant="soft"
-              size="md"
-              square
+            BaseIconButton(
               icon="i-lucide-line-chart"
-              :color="showProjectedBalanceTimeline ? 'primary' : 'neutral'"
+              :active="showProjectedBalanceTimeline"
               title="Projected balance timeline"
               aria-label="Toggle projected balance timeline"
               :disabled="!!isSnapshotMode || draggableAccountRegisters.length === 0"

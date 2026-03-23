@@ -302,6 +302,7 @@ UHeader(
             :variant="item.active ? 'solid' : 'ghost'"
             size="lg"
             class="w-full h-16 text-lg font-semibold justify-center"
+            :class="!item.active ? 'text-white/80! hover:text-white! hover:bg-white/10!' : ''"
             @click="close") {{ item.label }}
 
         //- Logout button for logged-in users
