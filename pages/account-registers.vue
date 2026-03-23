@@ -725,7 +725,16 @@ const columns: TableColumn<AccountRegister>[] = [
       h(
         "div",
         {
+          role: "button",
+          tabindex: 0,
+          class: "cursor-pointer",
           onClick: () => handleTableClick(row.original),
+          onKeydown: (e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleTableClick(row.original);
+            }
+          },
         },
         row.getValue("name"),
       ),
@@ -1324,6 +1333,7 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="accountRegistersSectionEl" class="m-4")
+    h1(class="sr-only") Accounts
     UAlert(
       v-if="isSnapshotMode && activeSnapshotCreatedAt"
       color="info"
@@ -1477,14 +1487,16 @@ onBeforeUnmount(() => {
 
     div(v-if="draggableAccountRegisters.length > 0" ref="accountRegistersTableViewportEl" class="relative overflow-auto flex-1 w-full" :style="{ maxHeight: accountRegistersViewportMaxHeight }")
       table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
+        caption(class="sr-only") Account registers with balances
         thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-(--ui-border-accented)")
           tr(class="data-[selected=true]:bg-(--ui-bg-elevated)/50 frog-surface-elevated")
-            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
-            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
-            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
-            th(v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
-            th(v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
-            th(class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
+            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-12 sm:w-16")
+              span(class="sr-only") Drag handle
+            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold w-1/5") Type
+            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-left rtl:text-right font-semibold") Account Name
+            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Debit
+            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Credit
+            th(scope="col" class="sticky top-0 z-20 bg-default backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-highlighted text-right font-semibold whitespace-nowrap") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
@@ -1511,19 +1523,24 @@ onBeforeUnmount(() => {
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
                 a(
                   v-if="!isSnapshotMode"
+                  :aria-label="`Drag to reorder ${row.name}`"
+                  role="button"
                   class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                   UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
               td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
                 div(class="flex items-center")
-                  div(
+                  button(
                     v-if="pocketSubs(row.id).length > 0"
+                    type="button"
+                    :aria-expanded="!collapsedParents.has(row.id)"
+                    :aria-label="`${collapsedParents.has(row.id) ? 'Expand' : 'Collapse'} pocket accounts for ${row.name}`"
                     @click="togglePocketAccounts(row.id)"
                     class="cursor-pointer mr-2 transition-transform duration-200 hover:scale-110"
                     :class="collapsedParents.has(row.id) ? 'rotate-0' : 'rotate-90'"
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
-                  div(@click.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
+                  div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
               template(v-for="dcn in [mainRowDcn(row)]" :key="`dcn-${row.id}`")
                 td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
                   span(v-if="dcn.debit != null" class="dark:text-red-300 text-red-700") −${{ formatCurrency(dcn.debit).replace(/^\$/, '') }}
@@ -1554,16 +1571,18 @@ onBeforeUnmount(() => {
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16")
                   a(
                     v-if="!isSnapshotMode"
+                    :aria-label="`Drag to reorder ${subRow.name}`"
+                    role="button"
                     class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5")
                   div(class="flex items-center")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap")
-                  div(@click.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center frog-text")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive")
+                  div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center frog-text")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ subRow.name }}
                 template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")

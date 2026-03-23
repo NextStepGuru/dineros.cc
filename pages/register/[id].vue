@@ -713,7 +713,15 @@ const columns: TableColumn<RegisterEntry>[] = [
           {
             class:
               "cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0",
+            role: "button",
+            tabindex: 0,
             onClick: () => handleTableClick(entry),
+            onKeydown: (e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleTableClick(entry);
+              }
+            },
           },
           row.getValue("description"),
         ),
@@ -1146,6 +1154,7 @@ async function recalcAccount() {
 
 <template lang="pug">
   section.mx-4(ref="registerSectionEl" class="min-w-0")
+    h1(class="sr-only") Register
     div(
       class="sr-only"
       aria-live="polite"

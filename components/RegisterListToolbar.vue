@@ -36,7 +36,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center">
+  <div aria-label="List actions" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap gap-1 items-center">
     <UTooltip v-if="showAdd" :text="addTooltip" :delay-duration="150">
       <BaseIconButton
         icon="i-lucide-plus"
@@ -74,6 +74,7 @@ const emit = defineEmits<{
         size="sm"
         :class="filterClass"
         :placeholder="filterPlaceholder"
+        aria-label="Filter list"
       />
     </slot>
     <slot name="trailing" />

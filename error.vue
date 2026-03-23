@@ -9,7 +9,7 @@ async function goLogin() {
 </script>
 
 <template lang="pug">
-section(class="min-h-[calc(100dvh-var(--ui-header-height))] flex items-center justify-center px-4")
+section(role="alert" class="min-h-[calc(100dvh-var(--ui-header-height))] flex items-center justify-center px-4")
   UCard(class="w-full max-w-xl")
     template(#header)
       div(class="flex items-center gap-3")

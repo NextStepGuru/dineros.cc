@@ -259,6 +259,7 @@ UHeader(
                 square
                 variant="ghost"
                 color="neutral"
+                :aria-label="`Budget options for ${b.name}`"
                 @click.stop)
           USeparator.my-1
           UButton(
@@ -276,6 +277,7 @@ UHeader(
       class="cursor-pointer") Sign out
     ULink(
       to="/edit-profile/profile"
+      aria-label="Edit profile"
       :class="route.path.startsWith('/edit-profile') ? 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors text-highlighted before:bg-(--ui-bg-elevated)/50' : 'cursor-pointer toolbar-icon-link transition-colors before:transition-colors hover:text-highlighted hover:before:bg-(--ui-bg-elevated)/50'"
       v-if="authStore.getIsUserLoggedIn")
       UIcon(name="lucide:user" class="toolbar-icon")

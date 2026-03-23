@@ -225,7 +225,7 @@ div(class="max-w-2xl min-h-96 my-4 m-auto space-y-5")
             div(class="text-left")
               span(class="font-semibold text-gray-900 dark:text-gray-100") Dineros.cc
               p(class="text-xs text-gray-600 dark:text-gray-400") This account will appear with this name and your email in your app
-          img(:src="twoFaImage" class="mx-auto mb-4 max-w-64")
+          img(:src="twoFaImage" alt="QR code — scan with your authenticator app" class="mx-auto mb-4 max-w-64")
 
         div(
           class="mb-4 p-4 rounded-lg border border-amber-200/90 dark:border-amber-800/70 bg-amber-50/90 dark:bg-amber-950/30"

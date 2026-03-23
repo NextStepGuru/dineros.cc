@@ -163,33 +163,41 @@ section(class="auth-page flex items-center justify-center")
         | Expires {{ new Date(validation.expiresAt).toLocaleString() }}
       UForm(class="auth-form" @submit.prevent="submit")
         template(v-if="validation.needsName")
-          UFormField(label="First Name" name="firstName")
+          UFormField(label="First Name" name="firstName" for="inviteFirstName")
             UInput(
+              id="inviteFirstName"
               v-model="formState.firstName"
               type="text"
               autocomplete="given-name"
+              aria-label="First name"
               class="w-full"
             )
-          UFormField(label="Last Name" name="lastName")
+          UFormField(label="Last Name" name="lastName" for="inviteLastName")
             UInput(
+              id="inviteLastName"
               v-model="formState.lastName"
               type="text"
               autocomplete="family-name"
+              aria-label="Last name"
               class="w-full"
             )
         template(v-if="validation.needsPassword")
-          UFormField(label="Password" name="password")
+          UFormField(label="Password" name="password" for="invitePassword")
             UInput(
+              id="invitePassword"
               v-model="formState.password"
               type="password"
               autocomplete="new-password"
+              aria-label="Password"
               class="w-full"
             )
-          UFormField(label="Confirm Password" name="confirmPassword")
+          UFormField(label="Confirm Password" name="confirmPassword" for="inviteConfirmPassword")
             UInput(
+              id="inviteConfirmPassword"
               v-model="formState.confirmPassword"
               type="password"
               autocomplete="new-password"
+              aria-label="Confirm password"
               class="w-full"
             )
         UButton(

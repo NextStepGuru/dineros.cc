@@ -4,6 +4,11 @@ name: E2E (Playwright)
 
 on:
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Update visual-regression baselines (generates new -linux.png snapshots)"
+        type: boolean
+        default: false
 
 jobs:
   e2e:
@@ -61,4 +66,13 @@ jobs:
         run: npx prisma migrate deploy
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - name: Run E2E tests
+        run: pnpm test:e2e ${{ inputs.update_snapshots && '--update-snapshots' || '' }}
+      - name: Upload visual snapshots
+        if: ${{ always() && inputs.update_snapshots }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-linux
+          path: |
+            tests/e2e/specs/authed/visual.spec.ts-snapshots/
+            tests/e2e/specs/public/visual.spec.ts-snapshots/

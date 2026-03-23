@@ -185,9 +185,17 @@ const columns: TableColumn<Reoccurrence>[] = [
         "div",
         {
           class: "cursor-pointer font-semibold text-white",
+          role: "button",
+          tabindex: 0,
           onClick: () => handleTableClick(row.original),
+          onKeydown: (e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleTableClick(row.original);
+            }
+          },
         },
-        row.getValue("description")
+        row.getValue("description"),
       ),
   },
   {
@@ -366,6 +374,7 @@ onBeforeUnmount(() => {
 
 <template lang="pug">
   section(ref="sectionEl" class="m-4")
+    h1(class="sr-only") Recurring Entries
     div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
@@ -381,7 +390,6 @@ onBeforeUnmount(() => {
           UTooltip(text="Recalculate forecast" :delay-duration="150")
             BaseIconButton(
               icon="i-lucide-calculator"
-              size="sm"
               title="Recalculate forecast"
               aria-label="Recalculate forecast"
               @click="handleRecalculate"

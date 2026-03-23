@@ -60,7 +60,7 @@ defineExpose({
           icon="i-lucide-sliders-horizontal"
           title="Table filters"
           aria-label="Open table filters"
-          aria-expanded="false"
+          :aria-expanded="expanded"
           @click="expandAndFocus()"
         />
       </UTooltip>

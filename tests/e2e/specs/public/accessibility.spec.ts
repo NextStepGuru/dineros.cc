@@ -1,17 +1,16 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Nuxt UI framework / theme-level violations tracked separately
+// Nuxt UI framework / theme-level violations — rules triggered by Nuxt UI
+// component internals (UHeader duplicate <nav>, USelect combobox buttons,
+// UCheckbox hidden inputs, theme contrast) that we cannot fix at app level.
 const KNOWN_FRAMEWORK_RULES = [
   "button-name",
   "color-contrast",
   "label",
-  "label-title-only",
   "landmark-unique",
   "link-in-text-block",
-  "link-name",
   "nested-interactive",
-  "page-has-heading-one",
 ];
 
 const PUBLIC_ROUTES = [

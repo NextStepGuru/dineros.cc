@@ -2,6 +2,7 @@
 withDefaults(
   defineProps<{
     icon: string;
+    ariaLabel: string;
     size?: string;
     disabled?: boolean;
     loading?: boolean;
@@ -11,9 +12,11 @@ withDefaults(
     active?: boolean;
   }>(),
   {
-    size: "md",
+    size: "lg",
     disabled: false,
     loading: false,
+    to: undefined,
+    target: undefined,
     active: false,
   },
 );
@@ -23,9 +26,10 @@ withDefaults(
   <UButton
     square
     :icon="icon"
+    :aria-label="ariaLabel"
     :size="size as any"
     :color="active ? 'primary' : 'neutral'"
-    :variant="active ? 'soft' : 'ghost'"
+    :variant="active ? 'soft' : 'outline'"
     :disabled="disabled"
     :loading="loading"
     :to="to"
