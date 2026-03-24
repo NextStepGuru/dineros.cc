@@ -21,7 +21,6 @@
     "test:e2e:debug": "pnpm --filter dineros-app test:e2e:debug",
     "test:e2e:install": "pnpm --filter dineros-app test:e2e:install",
     "typecheck": "pnpm --filter dineros-app typecheck",
-    "postinstall": "pnpm --filter dineros-app postinstall",
     "ci:local": "pnpm --filter dineros-app ci:local",
     "ci:local:lint": "pnpm --filter dineros-app ci:local:lint",
     "ci:local:test": "pnpm --filter dineros-app ci:local:test",
