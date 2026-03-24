@@ -41,7 +41,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./app/Dockerfile
           push: true
           tags: |
             us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:latest
@@ -92,7 +92,7 @@ jobs:
       - name: Build and push microservice
         uses: docker/build-push-action@v6
         with:
-          context: ./microservice/
+          context: .
           file: ./microservice/Dockerfile
           push: true
           tags: |

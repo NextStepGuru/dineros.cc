@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
 
 try {
   const stagedFiles = execSync("git diff --cached --name-only", {
@@ -8,11 +8,12 @@ try {
     .filter(Boolean);
 
   const hasMigrationFiles = stagedFiles.some((file) =>
-    file.startsWith("prisma/migration/")
+    file.startsWith("app/prisma/migrations/"),
   );
   const hasOtherFiles = stagedFiles.some(
     (file) =>
-      !file.startsWith("prisma/migration/") && !file.includes("schema.prisma")
+      !file.startsWith("app/prisma/migrations/") &&
+      !file.includes("app/prisma/schema.prisma"),
   );
 
   if (hasMigrationFiles && hasOtherFiles) {

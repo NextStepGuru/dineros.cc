@@ -1,6 +1,6 @@
 ---
 description: Backend API structure, Nitro routes, and service layer
-globs: server/**/*.ts
+globs: app/server/**/*.ts
 alwaysApply: false
 ---
 
@@ -8,16 +8,16 @@ alwaysApply: false
 
 ## API Routes
 
-- **Location**: `server/api/`. Use Nitro file-based routing. Method-specific files: `*.get.ts`, `*.post.ts`, `*.patch.ts`, `*.delete.ts`. Sub-routes: `server/api/tasks/`, `server/api/webhook/`, `server/api/_ah/`.
-- **Handlers**: Prefer wrapping handlers with `withErrorHandler(handler)` from `server/lib/withErrorHandler.ts`. For `handleApiError` behavior, try/catch patterns, and edge cases, see **Error Handling** in `backend-best-practices.mdc`.
-- **Thin routes**: Keep route handlers thin. Put business logic in `server/services/` and data access via `server/clients/` (Prisma, Redis, etc.). Use `getUser(event)` from `server/lib/getUser` to get `userId` for authenticated routes.
+- **Location**: `app/server/api/`. Use Nitro file-based routing. Method-specific files: `*.get.ts`, `*.post.ts`, `*.patch.ts`, `*.delete.ts`. Sub-routes: `app/server/api/tasks/`, `app/server/api/webhook/`, `app/server/api/_ah/`.
+- **Handlers**: Prefer wrapping handlers with `withErrorHandler(handler)` from `app/server/lib/withErrorHandler.ts`. For `handleApiError` behavior, try/catch patterns, and edge cases, see **Error Handling** in `backend-best-practices.mdc`.
+- **Thin routes**: Keep route handlers thin. Put business logic in `app/server/services/` and data access via `app/server/clients/` (Prisma, Redis, etc.). Use `getUser(event)` from `app/server/lib/getUser` to get `userId` for authenticated routes.
 
 ## Services and Clients
 
-- **Services**: `server/services/` (e.g. JwtService, ForecastEngine, PlaidSyncService). Use for domain logic and orchestration.
-- **Clients**: `server/clients/` for Prisma, Redis, NATS, Postmark, queue facade. Access DB through the shared Prisma client; do not create ad-hoc Prisma instances.
-- **Microservice**: `microservice/` is a separate h3 app with its own Prisma, Redis, BullMQ. Keep its conventions aligned with the main app (env validation, logging, client usage) where applicable. Each microservice directory must have its own `pnpm-lock.yaml`.
+- **Services**: `app/server/services/` (e.g. JwtService, ForecastEngine, PlaidSyncService). Use for domain logic and orchestration.
+- **Clients**: `app/server/clients/` for Prisma, Redis, NATS, Postmark, queue facade. Access DB through the shared Prisma client; do not create ad-hoc Prisma instances.
+- **Microservice**: `microservice/` is a separate h3 app with its own Prisma, Redis, BullMQ. Keep its conventions aligned with the main app (env validation, logging, client usage) where applicable.
 
 ## Validation
 
-- Validate request body, query, and params with Zod. Use schemas from `schema/zod.ts` and `schema/plaid.ts`. Call `schema.parse()` or `schema.safeParse()` at the start of handlers; on failure, `handleApiError` will translate Zod errors to 400 responses.
+- Validate request body, query, and params with Zod. Use schemas from `app/schema/zod.ts` and `app/schema/plaid.ts`. Call `schema.parse()` or `schema.safeParse()` at the start of handlers; on failure, `handleApiError` will translate Zod errors to 400 responses.

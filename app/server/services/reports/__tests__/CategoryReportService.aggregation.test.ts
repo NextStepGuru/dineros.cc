@@ -13,7 +13,9 @@ const UNCATEGORIZED_ID = "__uncategorized__";
 function metaFromRows(
   rows: Array<{ id: string; name: string; subCategoryId: string | null }>,
 ): CategoryMetaMap {
-  return new Map(rows.map((r) => [r.id, { name: r.name, subCategoryId: r.subCategoryId }]));
+  return new Map(
+    rows.map((r) => [r.id, { name: r.name, subCategoryId: r.subCategoryId }]),
+  );
 }
 
 describe("rootCategoryId", () => {
@@ -150,14 +152,7 @@ describe("buildTableGroups", () => {
       ["root", { total: 10, count: 1 }],
       [UNCATEGORIZED_ID, { total: -5, count: 1 }],
     ]);
-    const groups = buildTableGroups(
-      ["root"],
-      rollup,
-      buckets,
-      meta,
-      false,
-      15,
-    );
+    const groups = buildTableGroups(["root"], rollup, buckets, meta, false, 15);
     expect(groups).toHaveLength(2);
     expect(groups[1].parent.name).toBe("Uncategorized");
     expect(groups[1].parent.categoryId).toBeNull();

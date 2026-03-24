@@ -4,6 +4,7 @@ import {
   postmarkClient,
 } from "~/server/clients/postmarkClient";
 import env from "~/server/env";
+import { buildAppUrl } from "~/server/lib/appUrl";
 import { log } from "~/server/logger";
 import { dateTimeService } from "./forecast/DateTimeService";
 
@@ -105,8 +106,7 @@ export async function sendPlaidSyncSummaryEmail({
     return;
   }
 
-  const baseUrl = env?.NUXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
-  const registersUrl = `${baseUrl}/account-registers`;
+  const registersUrl = buildAppUrl("/account-registers");
   const greeting = user.firstName?.trim() ? `${user.firstName},` : "Hi,";
 
   const rowsHtml = registers
@@ -129,7 +129,7 @@ ${itemNote}
 <thead><tr><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;">Account</th><th style="text-align:right;padding:8px 12px;border-bottom:2px solid #ccc;">New</th><th style="text-align:right;padding:8px 12px;border-bottom:2px solid #ccc;">Updated</th></tr></thead>
 <tbody>${rowsHtml}</tbody>
 </table>
-<p><a href="${registersUrl}">Open account registers</a></p>
+${registersUrl ? `<p><a href="${registersUrl}">Open account registers</a></p>` : "<p>Open Dineros and visit Account registers.</p>"}
 <br>
 Regards,<br>
 &nbsp;&nbsp;Mr. Pepe &amp; The Dineros Team
@@ -199,15 +199,14 @@ export async function sendPlaidConnectionIssueEmailIfEligible({
     return false;
   }
 
-  const baseUrl = env?.NUXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
-  const syncAccountsUrl = `${baseUrl}/edit-profile/sync-accounts`;
+  const syncAccountsUrl = buildAppUrl("/edit-profile/sync-accounts");
   const greeting = user.firstName?.trim() ? `${user.firstName},` : "Hi,";
   const codeLine = escapeHtml(webhookCode);
 
   const html = `${greeting}<br><br>
 Your bank connection in Dineros needs attention. Plaid reported: <strong>${codeLine}</strong>.<br><br>
 Please reconnect your bank in Dineros so we can keep importing transactions.<br><br>
-<p><a href="${syncAccountsUrl}">Open Sync accounts</a></p>
+${syncAccountsUrl ? `<p><a href="${syncAccountsUrl}">Open Sync accounts</a></p>` : "<p>Open Dineros and reconnect your bank from Sync accounts.</p>"}
 <br>
 Regards,<br>
 &nbsp;&nbsp;Mr. Pepe &amp; The Dineros Team

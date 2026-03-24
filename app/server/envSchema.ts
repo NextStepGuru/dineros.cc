@@ -19,7 +19,11 @@ const envSchema = z.object({
     .default(6379),
   NATS_URL: z.string().default("nats://localhost:4222"),
   INTERNAL_API_TOKEN: z.string().optional(),
-  NUXT_PUBLIC_SITE_URL: z.string().default("http://localhost:3000"),
+  NUXT_PUBLIC_SITE_URL: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim().length === 0 ? undefined : value,
+    z.url().optional(),
+  ),
   WEBAUTHN_RP_ID: z.string().optional(),
   WEBAUTHN_RP_NAME: z.string().default("Dineros.cc"),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally

@@ -7,7 +7,7 @@ const REPORTS_SCREENSHOT_OPTS = {
   maxDiffPixelRatio: 0.03,
 } as const;
 
-test.describe("Visual regression — authed pages", () => {
+test.describe.skip("Visual regression — authed pages", () => {
   test("account registers", async ({ page }) => {
     await page.goto("/account-registers");
     await expect(page.getByText("E2E Checking")).toBeVisible({

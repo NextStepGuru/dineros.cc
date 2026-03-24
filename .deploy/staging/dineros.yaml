@@ -54,6 +54,8 @@ spec:
               value: "staging"
             - name: NUXT_PUBLIC_DEPLOY_ENV
               value: "staging"
+            - name: NUXT_PUBLIC_SITE_URL
+              value: "https://staging.dineros.cc"
             - name: PORT
               value: "80"
             - name: GCP_PROJECT_ID

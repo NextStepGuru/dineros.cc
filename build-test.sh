@@ -43,7 +43,7 @@ build_main_project() {
     log "Building main project Dockerfile..."
 
     # Build the image
-    docker build -t dineros-main:test .
+    docker build -f app/Dockerfile -t dineros-main:test .
 
     if [ $? -eq 0 ]; then
         success "Main project Docker image built successfully"
@@ -91,17 +91,16 @@ build_main_project() {
 build_microservice() {
     log "Building microservice Dockerfile..."
 
-    # Change to microservice directory
-    cd microservice
+    # Ensure microservice has synced Prisma + shared redis client
+    (cd microservice && ./copy-files.sh)
 
     # Build the image
-    docker build -t dineros-microservice:test .
+    docker build -f microservice/Dockerfile -t dineros-microservice:test .
 
     if [ $? -eq 0 ]; then
         success "Microservice Docker image built successfully"
     else
         error "Failed to build microservice Docker image"
-        cd ..
         return 1
     fi
 
@@ -126,17 +125,13 @@ build_microservice() {
             success "Microservice container stopped"
         else
             error "Microservice container failed to stay running"
-            cd ..
             return 1
         fi
     else
         error "Failed to start microservice container"
-        cd ..
         return 1
     fi
 
-    # Return to original directory
-    cd ..
 }
 
 # Function to clean up test images

@@ -9,26 +9,26 @@ Official reference: [Nuxt 4 — Testing](https://nuxt.com/docs/4.x/getting-start
 
 ## Commands and config files
 
-- **`pnpm test`** uses **`vitest.config.ts`** (`TZ=UTC vitest --run --config vitest.config.ts`).
-- **`pnpm test:crypto`** runs **`vitest.crypto.config.ts`**: Hash/Jwt/Rsa service tests listed in **`vitestSlowTestExcludes`** (slow bcrypt work; not part of default `pnpm test`).
-- **`vitest.config.all.ts`** only re-exports `vitest.config.ts` for backwards compatibility; prefer **`vitest.config.ts`** for new references.
-- Coverage: **`vitest.config.coverage.ts`** (same project split + coverage reporters/options).
+- **`pnpm test`** (from repo root) delegates to the app package and uses **`app/vitest.config.ts`** (`TZ=UTC vitest --run --config vitest.config.ts` inside `app/`).
+- **`pnpm test:crypto`** delegates to **`app/vitest.crypto.config.ts`**: Hash/Jwt/Rsa service tests listed in **`vitestSlowTestExcludes`** (slow bcrypt work; not part of default `pnpm test`).
+- **`app/vitest.config.all.ts`** only re-exports `app/vitest.config.ts` for backwards compatibility; prefer **`app/vitest.config.ts`** for new references.
+- Coverage config lives at **`app/vitest.config.coverage.ts`** (same project split + coverage reporters/options).
 
 ## Vitest projects (required pattern here)
 
 Do **not** set global `test.environment: 'nuxt'` for the entire suite (slow; hybrid-env pitfalls per Nuxt docs).
 
-- **`node`** project: `environment: 'node'`. Include/exclude globs: **`vitest.test-globs.ts`** (`vitestNodeTestIncludes`, `vitestNodeProjectExcludes`). The node project **excludes** `tests/nuxt/**` and `**/*.nuxt.{test,spec}.ts` so those files run only under the Nuxt project.
-- **`nuxt`** project: built with **`defineVitestProject`** from `@nuxt/test-utils/config`. Includes **`tests/nuxt/**/*.test.ts`** and **`**/*.nuxt.{test,spec}.ts`** — use for composables/pages/plugins that need **`useNuxtApp`**, auto-imports, or full Nuxt pipeline.
+- **`node`** project: `environment: 'node'`. Include/exclude globs: **`app/vitest.test-globs.ts`** (`vitestNodeTestIncludes`, `vitestNodeProjectExcludes`). The node project **excludes** `tests/nuxt/**` and `**/*.nuxt.{test,spec}.ts` so those files run only under the Nuxt project.
+- **`nuxt`** project: built with **`defineVitestProject`** from `@nuxt/test-utils/config`. Includes **`app/tests/nuxt/**/_.test.ts`** and **`\*\*/_.nuxt.{test,spec}.ts`** — use for composables/pages/plugins that need **`useNuxtApp`\*\*, auto-imports, or full Nuxt pipeline.
 
 ## `~/` resolution in Vitest
 
-Aliases are centralized in **`vitest.resolve-aliases.ts`** (`vitestResolveAliases`, **`vitestAliasLayer`**). Each Vitest subproject merges **`vitestAliasLayer`** via **`mergeConfig` from `vite`** — root-level `resolve.alias` alone is **not** reliably applied to multi-project runs.
+Aliases are centralized in **`app/vitest.resolve-aliases.ts`** (`vitestResolveAliases`, **`vitestAliasLayer`**). Each Vitest subproject merges **`vitestAliasLayer`** via **`mergeConfig` from `vite`** — root-level `resolve.alias` alone is **not** reliably applied to multi-project runs.
 
-## Nuxt app (`nuxt.config.ts`)
+## Nuxt app (`app/nuxt.config.ts`)
 
 - **`@nuxt/test-utils/module`** is registered in **`modules`** (DevTools Vitest integration when DevTools are enabled).
-- **`typescript.tsConfig.include`** includes paths for **`tests/nuxt`** (relative to generated `.nuxt/tsconfig.json`, per Nuxt docs) so TS/editor resolve Nuxt test dirs.
+- **`typescript.tsConfig.include`** includes paths for **`app/tests/nuxt`** (relative to generated `.nuxt/tsconfig.json`, per Nuxt docs) so TS/editor resolve Nuxt test dirs.
 
 ## Package versions
 

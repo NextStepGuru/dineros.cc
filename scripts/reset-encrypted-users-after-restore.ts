@@ -11,16 +11,14 @@
  * Otherwise (fallback): nulls Plaid columns, then overwrites User, AccountRegister,
  * RegisterEntry, and Reoccurrence with fun common placeholder names.
  */
-import dotenv from "dotenv";
-import prismaPkg from "@prisma/client";
+import * as dotenv from "dotenv";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
-import { normalizePrismaDmmfForFieldEncryption } from "../lib/normalizePrismaDmmf";
-import { migrate } from "../prisma/reencrypt";
-import HashService from "../server/services/HashService";
-
-const { PrismaClient, Prisma } = prismaPkg;
+import { normalizePrismaDmmfForFieldEncryption } from "../app/lib/normalizePrismaDmmf";
+import { migrate } from "../app/prisma/reencrypt";
+import HashService from "../app/server/services/HashService";
 
 dotenv.config();
 

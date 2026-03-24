@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const rootSchemaPath = resolve(process.cwd(), "prisma/schema.prisma");
+const rootSchemaPath = resolve(process.cwd(), "app/prisma/schema.prisma");
 const microSchemaPath = resolve(
   process.cwd(),
   "microservice/prisma/schema.prisma",

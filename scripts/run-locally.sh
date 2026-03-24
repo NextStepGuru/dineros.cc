@@ -22,7 +22,9 @@ fi
 
 # Build Docker image with environment variables (Artifact Registry)
 IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$PROJECT_NAME:$PROJECT_VERSION
+cd microservice && ./copy-files.sh && cd ..
 docker build -t $IMAGE \
+    --file microservice/Dockerfile \
     --build-arg DEPLOY_ENV=${DEPLOY_ENV} \
     --build-arg NODE_ENV=${NODE_ENV:-production} \
     --platform linux/amd64 . || exit 1

@@ -1,8 +1,11 @@
 # Build outputs
 .nuxt
 .output
+app/.nuxt
+app/.output
 node_modules
-microservice
+app/node_modules
+microservice/node_modules
 node-compile-cache
 dist
 build
@@ -51,7 +54,6 @@ README.md
 
 # Scripts and utilities
 *.sh
-Dockerfile
 docker-compose*.yml
 docker-compose*.yaml
 
@@ -96,9 +98,6 @@ jest.config.*
 tmp/
 temp/
 .docker-build-cache/
-
-# Microservice specific (if not needed in main image)
-microservice/
 
 # Workspace files
 *.code-workspace

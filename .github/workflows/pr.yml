@@ -46,7 +46,7 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: npx prisma generate
+      - run: pnpm --filter dineros-app exec prisma generate
       - run: pnpm test
 
   pre-commit-security:
@@ -91,7 +91,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./app/Dockerfile
           push: true
           tags: |
             us-central1-docker.pkg.dev/nextstepguru/dineros/dineros:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
@@ -131,7 +131,7 @@ jobs:
       - name: Build and push microservice (staging)
         uses: docker/build-push-action@v6
         with:
-          context: ./microservice/
+          context: .
           file: ./microservice/Dockerfile
           push: true
           tags: |
@@ -228,7 +228,7 @@ jobs:
           echo "staging URL did not become ready" >&2
           exit 1
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter dineros-app exec playwright install --with-deps chromium
       - name: E2E against staging
         run: set -o pipefail && pnpm test:e2e 2>&1 | tee ./output.txt
       - name: Upload Playwright HTML report
@@ -249,5 +249,5 @@ jobs:
         with:
           name: visual-snapshots-linux
           path: |
-            tests/e2e/specs/authed/visual.spec.ts-snapshots/
-            tests/e2e/specs/public/visual.spec.ts-snapshots/
+            app/tests/e2e/specs/authed/visual.spec.ts-snapshots/
+            app/tests/e2e/specs/public/visual.spec.ts-snapshots/
