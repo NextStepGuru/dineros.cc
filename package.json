@@ -1,0 +1,46 @@
+{
+  "name": "dineros-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter dineros-app build",
+    "dev": "pnpm --filter dineros-app dev",
+    "lint": "pnpm --filter dineros-app lint",
+    "lint-fix": "pnpm --filter dineros-app lint-fix",
+    "test": "pnpm --filter dineros-app test",
+    "test:coverage": "pnpm --filter dineros-app test:coverage",
+    "test:e2e": "pnpm --filter dineros-app test:e2e",
+    "test:e2e:update-snapshots": "pnpm --filter dineros-app test:e2e:update-snapshots",
+    "test:e2e:update-snapshots:staging": "pnpm --filter dineros-app test:e2e:update-snapshots:staging",
+    "test:e2e:update-snapshots:staging:visual": "pnpm --filter dineros-app test:e2e:update-snapshots:staging:visual",
+    "test:e2e:full": "pnpm --filter dineros-app test:e2e:full",
+    "test:e2e:mobile": "pnpm --filter dineros-app test:e2e:mobile",
+    "test:e2e:webkit": "pnpm --filter dineros-app test:e2e:webkit",
+    "test:e2e:staging": "pnpm --filter dineros-app test:e2e:staging",
+    "test:e2e:ui": "pnpm --filter dineros-app test:e2e:ui",
+    "test:e2e:debug": "pnpm --filter dineros-app test:e2e:debug",
+    "test:e2e:install": "pnpm --filter dineros-app test:e2e:install",
+    "typecheck": "pnpm --filter dineros-app typecheck",
+    "postinstall": "pnpm --filter dineros-app postinstall",
+    "ci:local": "pnpm --filter dineros-app ci:local",
+    "ci:local:lint": "pnpm --filter dineros-app ci:local:lint",
+    "ci:local:test": "pnpm --filter dineros-app ci:local:test",
+    "ci:local:pre-commit": "pnpm --filter dineros-app ci:local:pre-commit"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma",
+      "@parcel/watcher",
+      "esbuild",
+      "msgpackr-extract",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver",
+      "vue-demi"
+    ]
+  },
+  "engines": {
+    "node": ">=24.14.0 <25.0.0"
+  }
+}

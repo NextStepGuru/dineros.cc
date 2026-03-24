@@ -38,6 +38,7 @@ output.txt
 # Test coverage reports
 coverage/
 *.json
+!/package.json
 playwright-report/index.html
 
 # Playwright E2E (generated state + reports)
