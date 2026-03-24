@@ -1,16 +1,8 @@
 {
   "folders": [
     {
-      "name": "Root",
+      "name": "Dineros",
       "path": ".",
-    },
-    {
-      "name": "Website",
-      "path": "app",
-    },
-    {
-      "name": "Microservice",
-      "path": "microservice",
     },
   ],
   "settings": {
