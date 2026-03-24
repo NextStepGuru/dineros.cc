@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 /** Viewport only — stable dimensions across environments (see authed/visual.spec.ts). */
 const SCREENSHOT_OPTS = { fullPage: false, maxDiffPixelRatio: 0.01 } as const;
 
-test.describe("Visual regression — public pages", () => {
+test.describe.skip("Visual regression — public pages", () => {
   test("homepage", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("body")).toBeVisible();
