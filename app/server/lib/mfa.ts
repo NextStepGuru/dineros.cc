@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { getCookie, setCookie } from "h3";
 import { sharedRedisConnection } from "~/server/clients/redisClient";
 import env from "~/server/env";
+import { getConfiguredAppBaseUrl } from "~/server/lib/appUrl";
 import { dateTimeService } from "~/server/services/forecast/DateTimeService";
 
 export const PENDING_MFA_COOKIE = "pendingMfaSession";
@@ -286,8 +287,12 @@ export async function verifyEmailOtpForSession(
 }
 
 export function getWebAuthnConfig() {
-  const siteUrl = env?.NUXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const origin = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
+  const origin = getConfiguredAppBaseUrl();
+  if (!origin) {
+    throw new Error(
+      "NUXT_PUBLIC_SITE_URL is required for WebAuthn in non-local environments.",
+    );
+  }
   const rpID = env?.WEBAUTHN_RP_ID || new URL(origin).hostname;
   const rpName = env?.WEBAUTHN_RP_NAME || "Dineros.cc";
 

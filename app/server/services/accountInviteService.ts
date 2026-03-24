@@ -10,6 +10,7 @@ import { dateTimeService } from "~/server/services/forecast";
 import { log } from "~/server/logger";
 import { postmarkClient, hasPostmarkToken } from "~/server/clients/postmarkClient";
 import env from "~/server/env";
+import { buildAppUrl } from "~/server/lib/appUrl";
 
 export const INVITE_EXPIRY_DAYS = 7;
 const MAX_PENDING_INVITES_PER_ACCOUNT = 50;
@@ -28,28 +29,32 @@ export function normalizeInviteEmail(email: string): string {
 }
 
 function buildInviteUrl(rawToken: string): string {
-  const base = (env?.NUXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
-    /\/$/,
-    "",
+  const inviteUrl = buildAppUrl(
+    `/accept-invite?token=${encodeURIComponent(rawToken)}`,
   );
-  return `${base}/accept-invite?token=${encodeURIComponent(rawToken)}`;
+  if (inviteUrl) {
+    return inviteUrl;
+  }
+  throw createError({
+    statusCode: 500,
+    statusMessage: "Invite URL is not configured for this environment.",
+  });
 }
 
 async function sendInviteEmail(params: {
   toEmail: string;
   accountName: string;
   inviterDisplayName: string;
-  rawToken: string;
+  inviteUrl: string;
   expiresAt: Date;
 }) {
-  const { toEmail, accountName, inviterDisplayName, rawToken, expiresAt } =
+  const { toEmail, accountName, inviterDisplayName, inviteUrl, expiresAt } =
     params;
-  const link = buildInviteUrl(rawToken);
   const isLocal = env?.DEPLOY_ENV === "local";
   const html = `${inviterDisplayName} invited you to collaborate on the Dineros account <strong>${escapeHtml(
     accountName,
   )}</strong>.<br><br>
-<a href="${link}">Accept invitation</a><br><br>
+<a href="${inviteUrl}">Accept invitation</a><br><br>
 This link expires on ${expiresAt.toUTCString()}.<br><br>
 If you did not expect this email, you can ignore it.`;
 
@@ -64,7 +69,7 @@ If you did not expect this email, you can ignore it.`;
     log({
       message: "[ACCOUNT_INVITE] Email not sent (local or no Postmark token)",
       level: "info",
-      data: { toEmail, inviteUrl: link },
+      data: { toEmail, inviteUrl },
     });
   }
 }
@@ -151,6 +156,7 @@ export async function createAccountInvite(params: {
   });
 
   const rawToken = generateInviteToken();
+  const inviteUrl = buildInviteUrl(rawToken);
   const tokenHash = hashInviteToken(rawToken);
   const expiresAt = dateTimeService.add(INVITE_EXPIRY_DAYS, "day").toDate();
 
@@ -182,7 +188,7 @@ export async function createAccountInvite(params: {
     toEmail: email,
     accountName: account.name,
     inviterDisplayName,
-    rawToken,
+    inviteUrl,
     expiresAt: row.expiresAt,
   });
 

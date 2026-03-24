@@ -2,6 +2,7 @@ import { PlaidApi, Products, CountryCode } from "plaid";
 import { getUser } from "../lib/getUser";
 import { configuration } from "../lib/getPlaidClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { buildAppUrl } from "~/server/lib/appUrl";
 import env from "~/server/env";
 
 export default defineEventHandler(async (event) => {
@@ -10,9 +11,8 @@ export default defineEventHandler(async (event) => {
   try {
     const client = new PlaidApi(configuration);
 
-    const baseUrl = env?.NUXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
     const webhookUrl =
-      env?.PLAID_WEBHOOK_URL ?? (baseUrl ? `${baseUrl}/api/webhook/plaid` : undefined);
+      env?.PLAID_WEBHOOK_URL ?? buildAppUrl("/api/webhook/plaid") ?? undefined;
 
     const createTokenResponse = await client.linkTokenCreate({
       user: {
