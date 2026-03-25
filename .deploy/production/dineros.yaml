@@ -141,7 +141,7 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: production-chat-gpt
+                  name: dineros-secrets
                   key: OPENAI_API_KEY
             - name: JWT_SECRET
               valueFrom:
