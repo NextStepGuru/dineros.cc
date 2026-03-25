@@ -22,11 +22,9 @@ type PeriodSummary = {
 };
 
 const openPeriods = ref<PeriodSummary[]>([]);
-const loading = ref(false);
 
 async function loadOpenPeriods() {
   if (!authStore.getBudgetId) return;
-  loading.value = true;
   try {
     openPeriods.value = await ($api as typeof $fetch)<PeriodSummary[]>(
       "/api/reconciliation/periods/open",
@@ -34,8 +32,6 @@ async function loadOpenPeriods() {
     );
   } catch {
     openPeriods.value = [];
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -73,8 +69,7 @@ section(class="px-3 sm:px-4 py-4 max-w-4xl mx-auto space-y-6")
         .flex.items-center.justify-between.gap-3
           div
             p(class="font-medium") {{ reg.name }}
-            p(class="text-xs frog-text-muted")
-              | Register #{{ reg.id }}
+            p(class="text-xs frog-text-muted") {{ `Register #${reg.id}` }}
           div(class="flex items-center gap-2")
             UBadge(
               v-if="getOpenPeriod(reg.id)"
