@@ -124,7 +124,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: staging-chat-gpt
-                  key: CHAT_GPT_API
+                  key: OPENAI_API_KEY
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
