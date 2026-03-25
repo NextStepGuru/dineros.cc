@@ -111,12 +111,7 @@ const items = computed(() => {
       },
       {
         label: "Reconciliation",
-        to: `${
-          listStore.getAccountRegisters.length
-            ? "/reconciliation/" +
-              formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
-            : "/account-registers?onboarding=1"
-        }`,
+        to: "/reconciliation",
         active: route.path.startsWith("/reconciliation"),
       },
       {

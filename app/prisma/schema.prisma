@@ -657,6 +657,7 @@ model ReconciliationPeriod {
   status                   ReconciliationPeriodStatus @default(OPEN)
   startDate                DateTime                   @map("start_date")
   endDate                  DateTime                   @map("end_date")
+  statementOpeningBalance  Decimal                    @default(0) @map("statement_opening_balance") @db.Decimal(19, 2)
   statementEndingBalance   Decimal                    @map("statement_ending_balance") @db.Decimal(19, 2)
   ledgerClearedBalance     Decimal?                   @map("ledger_cleared_balance") @db.Decimal(19, 2)
   differenceAmount         Decimal?                   @map("difference_amount") @db.Decimal(19, 2)

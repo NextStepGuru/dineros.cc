@@ -7,6 +7,7 @@
     "dev": "pnpm --filter dineros-app dev",
     "lint": "pnpm --filter dineros-app lint",
     "lint-fix": "pnpm --filter dineros-app lint-fix",
+    "reset-encrypted-users": "pnpm --filter dineros-app reset-encrypted-users",
     "test": "pnpm --filter dineros-app test",
     "test:coverage": "pnpm --filter dineros-app test:coverage",
     "test:e2e": "pnpm --filter dineros-app test:e2e",

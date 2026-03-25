@@ -17,6 +17,7 @@ type ReconciliationPeriodRow = {
   status: ReconciliationPeriodStatus;
   startDate: Date;
   endDate: Date;
+  statementOpeningBalance: number;
   statementEndingBalance: number;
   ledgerClearedBalance: number | null;
   differenceAmount: number | null;
@@ -109,6 +110,7 @@ export async function openReconciliationPeriod(params: {
   accountRegisterId: number;
   startDate: string;
   endDate: string;
+  statementOpeningBalance: number;
   statementEndingBalance: number;
 }) {
   await assertBudgetAccess(params.userId, params.budgetId);
@@ -140,6 +142,7 @@ export async function openReconciliationPeriod(params: {
       status: "OPEN",
       startDate,
       endDate,
+      statementOpeningBalance: params.statementOpeningBalance,
       statementEndingBalance: params.statementEndingBalance,
     },
     include: {
@@ -242,6 +245,7 @@ export async function getReconciliationPeriodWorkspace(params: {
   return {
     period: {
       ...period,
+      statementOpeningBalance: Number(period.statementOpeningBalance),
       statementEndingBalance: Number(period.statementEndingBalance),
       ledgerClearedBalance: clearedTotal,
       differenceAmount: difference,

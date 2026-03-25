@@ -8,6 +8,7 @@ const bodySchema = z.object({
   accountRegisterId: z.coerce.number().int().positive(),
   startDate: z.string().min(10),
   endDate: z.string().min(10),
+  statementOpeningBalance: z.coerce.number().default(0),
   statementEndingBalance: z.coerce.number(),
 });
 
@@ -21,6 +22,7 @@ export default defineEventHandler(async (event) => {
       accountRegisterId: body.accountRegisterId,
       startDate: body.startDate,
       endDate: body.endDate,
+      statementOpeningBalance: body.statementOpeningBalance,
       statementEndingBalance: body.statementEndingBalance,
     });
   } catch (error) {
