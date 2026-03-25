@@ -1,4 +1,5 @@
 import QueueManager, { type QueueRegistryConfig } from "../lib/queueManager";
+import type { JobsOptions } from "bullmq";
 import type { BackupJob } from "../queues/backupQueue";
 import backup from "../queues/backupQueue";
 import type { RecalculateJob } from "../queues/recalculateQueue";
@@ -48,7 +49,7 @@ export const addRecalculateJob = (data: RecalculateJob) =>
     keepLogs: 4,
   });
 
-export const addPlaidSyncJob = (data: PlaidSyncJob) =>
+export const addPlaidSyncJob = (data: PlaidSyncJob, opts?: JobsOptions) =>
   queueManager.addJob(plaidSync.queueName, data, {
     attempts: 0,
     delay: 30 * 60 * 1000, // 30 minutes
@@ -58,6 +59,7 @@ export const addPlaidSyncJob = (data: PlaidSyncJob) =>
     removeOnComplete: true,
     removeOnFail: false,
     keepLogs: 4,
+    ...opts,
   });
 
 export const addPlaidBalanceSyncJob = (data: PlaidSyncBalanceJob) =>

@@ -1,18 +1,22 @@
+import { addPlaidSyncJob } from "~/server/clients/queuesClient";
 import { log } from "~/server/logger";
-import PlaidSyncService from "../../services/PlaidSyncService";
+import { dateTimeService } from "~/server/services/forecast/DateTimeService";
 
 export default defineEventHandler(async () => {
-  const plaidSyncService = new PlaidSyncService();
-
-  await plaidSyncService.getAndSyncPlaidAccounts({
-    accountRegisterId: 1,
-    resetSyncDates: true,
-  });
+  await addPlaidSyncJob(
+    {
+      name: "Force Plaid sync from admin task",
+    },
+    {
+      delay: 0,
+      jobId: `force-plaid-sync-${dateTimeService.nowDate().getTime()}`,
+    },
+  );
 
   log({
-    message: "Plaid accounts synchronized successfully",
-    level: "debug",
+    message: "Plaid sync job enqueued from admin task",
+    level: "info",
   });
 
-  return true;
+  return { message: "Plaid sync job queued." };
 });

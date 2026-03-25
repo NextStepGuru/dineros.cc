@@ -322,7 +322,7 @@ UHeader(
           color="error"
           variant="solid"
           size="xs"
-          class="absolute -top-1 -right-1 min-w-4 h-4 px-1 leading-none flex items-center justify-center")
+          class="notification-indicator absolute -top-1 -right-1 min-w-4 h-4 px-1 leading-none flex items-center justify-center")
           | {{ notificationCount > 99 ? '99+' : notificationCount }}
       template(#content="{ close }")
         .flex.flex-col.p-1.min-w-64.max-w-80
@@ -374,7 +374,8 @@ UHeader(
               v-if="notificationCount > 0"
               color="error"
               variant="solid"
-              size="xs")
+              size="xs"
+              class="notification-indicator")
               | {{ notificationCount > 99 ? '99+' : notificationCount }}
           UButton(
             to="/help"
@@ -449,7 +450,8 @@ UHeader(
               v-if="notificationCount > 0"
               color="error"
               variant="solid"
-              size="xs")
+              size="xs"
+              class="notification-indicator")
               | {{ notificationCount > 99 ? '99+' : notificationCount }}
           UButton(
             to="/help"
@@ -604,5 +606,15 @@ UHeader(
 .toolbar-icon-button :deep(svg) {
   width: 1.25rem;
   height: 1.25rem;
+}
+
+.notification-indicator {
+  background-color: rgb(185 28 28);
+  color: rgb(255 255 255);
+}
+
+:global(.dark) .notification-indicator {
+  background-color: rgb(220 38 38);
+  color: rgb(255 255 255);
 }
 </style>

@@ -18,5 +18,5 @@ useHead({
 AdminPageShell(
   title="OpenAI logs"
   description="Review OpenAI request volume, latency, and failures.")
-  OpenAiLogsTab
+  ProfileOpenAiLogsTab
 </template>

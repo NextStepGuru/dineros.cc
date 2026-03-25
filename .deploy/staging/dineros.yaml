@@ -123,8 +123,8 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: staging-chat-gpt
-                  key: CHAT_GPT_API
+                  name: dineros-staging-secrets
+                  key: OPENAI_API_KEY
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
