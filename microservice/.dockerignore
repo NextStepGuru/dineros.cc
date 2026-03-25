@@ -1,0 +1,78 @@
+# Dependencies
+node_modules
+
+# Development and build files
+*.log
+*.tmp
+*.temp
+.cache/
+.temp/
+tmp/
+temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Scripts and utilities (keep only essential ones)
+run-locally.sh
+copy-files.sh
+exec.sh
+
+# Development configs
+tsconfig.json
+*.d.ts
+
+# Documentation
+*.md
+README.md
+
+# Git
+.git/
+.gitignore
+
+# Environment files (if any)
+.env
+.env.*
+!.env.project
+!.env.vault
+
+# Docker files
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+
+# Test files (if any exist)
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+tests/
+coverage/
+
+# Additional optimizations for faster builds
+*.tar.gz
+*.zip
+*.rar
+backup/
+backups/
+logs/
+log/
+*.sqlite
+*.db
+database/
+*.pem
+*.key

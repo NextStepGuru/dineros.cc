@@ -1,0 +1,16 @@
+.env
+.eslintrc.js
+.gcloudignore
+.git
+.github/
+.gitignore
+.history/
+.husky/
+.vscode/
+backup/
+coverage/
+knexfile.js
+mysql_scripts/
+node_modules/
+test
+!dist

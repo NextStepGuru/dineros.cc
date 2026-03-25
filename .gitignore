@@ -1,0 +1,57 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+.dumps
+dist
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files (never commit real secrets)
+.env
+.env.*
+!.env.example
+!.env.project
+!.env.vault
+# Explicitly ignore nested service env files
+**/.env
+**/.env.*
+# Local test files that may contain paste of secrets
+test.txt
+
+*.csv
+/temp
+/prisma/backup
+/microservice/prisma/backup
+app/prisma/backup
+output.txt
+
+# Test coverage reports
+coverage/
+*.json
+!/package.json
+playwright-report/index.html
+
+# Playwright E2E (generated state + reports)
+.auth/
+tests/e2e/.e2e-context.json
+test-results/
+playwright-report/
+/.docker-build-cache
+/.pnpm-store
+/node-compile-cache
+/prisma/reencrypt
+dineros-secrets.yml
+microservice/.env

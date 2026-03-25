@@ -1,0 +1,136 @@
+import {
+  ForecastEngineFactory,
+  dateTimeService,
+} from "~/server/services/forecast";
+import { prisma } from "~/server/clients/prismaClient";
+import { MAX_YEARS } from "~/consts";
+
+export default defineEventHandler(async (event) => {
+  // Get accountId from query params for single account processing
+  const query = getQuery(event);
+  const singleAccountId = query.accountId as string;
+
+  let accountsToProcess: { accountId: string }[];
+
+  if (singleAccountId) {
+    // Process single account if specified
+    const accountExists = await prisma.accountRegister.findFirst({
+      where: { accountId: singleAccountId, isArchived: false },
+    });
+
+    if (!accountExists) {
+      return {
+        success: false,
+        message: `Account ${singleAccountId} not found in database.`,
+        entriesCalculated: 0,
+        accountRegisters: 0,
+      };
+    }
+
+    accountsToProcess = [{ accountId: singleAccountId }];
+  } else {
+    // Get all unique accounts with non-archived registers
+    accountsToProcess = await prisma.accountRegister.findMany({
+      where: { isArchived: false, account: { isArchived: false } },
+      select: { accountId: true },
+      distinct: ["accountId"],
+    });
+
+    if (accountsToProcess.length === 0) {
+      return {
+        success: false,
+        message:
+          "No accounts found in database. Please create an account first.",
+        entriesCalculated: 0,
+        accountRegisters: 0,
+      };
+    }
+  }
+
+  const results = [];
+  let totalEntries = 0;
+  let totalAccountRegisters = 0;
+  const failedAccounts = [];
+
+  const fixedNow = (query.fixedNow as string) ?? undefined;
+  const timezone = (query.timezone as string) ?? "UTC";
+  const startDateParam = (query.startDate as string) ?? undefined;
+  const endDateParam = (query.endDate as string) ?? undefined;
+
+  const buildContext = (accountId: string) => ({
+    accountId,
+    startDate:
+      startDateParam != null && startDateParam !== ""
+        ? dateTimeService.toDate(dateTimeService.parseInput(startDateParam))
+        : dateTimeService.now().startOf("month").toDate(),
+    endDate:
+      endDateParam != null && endDateParam !== ""
+        ? dateTimeService.toDate(dateTimeService.parseInput(endDateParam))
+        : dateTimeService.now().add(MAX_YEARS, "years").toDate(),
+    logging: { enabled: false },
+  });
+
+  for (const account of accountsToProcess) {
+    try {
+      const engine = ForecastEngineFactory.create(prisma);
+
+      const runRecalc = async () => {
+        const context = buildContext(account.accountId);
+        return engine.recalculate(context);
+      };
+
+      const result =
+        fixedNow != null && fixedNow !== ""
+          ? await dateTimeService.withRunContext(
+              { fixedNow, timezone },
+              runRecalc,
+            )
+          : await runRecalc();
+
+      if (result.isSuccess) {
+        // Calculate entry breakdowns
+        const entriesProjected = result.registerEntries.filter(
+          (entry) => entry.isProjected
+        ).length;
+        const entriesHistorical = result.registerEntries.filter(
+          (entry) => !entry.isProjected && !entry.isBalanceEntry
+        ).length;
+        const entriesBalance = result.registerEntries.filter(
+          (entry) => entry.isBalanceEntry
+        ).length;
+
+        results.push({
+          accountId: account.accountId,
+          success: true,
+          entriesCalculated: result.registerEntries.length,
+          entriesProjected,
+          entriesHistorical,
+          entriesBalance,
+          accountRegisters: result.accountRegisters.length,
+        });
+
+        totalEntries += result.registerEntries.length;
+        totalAccountRegisters += result.accountRegisters.length;
+      } else {
+        failedAccounts.push({
+          accountId: account.accountId,
+          errors: result.errors || ["Unknown error"],
+        });
+      }
+    } catch (error) {
+      failedAccounts.push({
+        accountId: account.accountId,
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+      });
+    }
+  }
+
+  return {
+    success: true,
+    processedAccounts: results.length,
+    totalEntriesCalculated: totalEntries,
+    totalAccountRegisters: totalAccountRegisters,
+    failedAccounts: failedAccounts.length > 0 ? failedAccounts : undefined,
+    results: singleAccountId ? results[0] : results,
+  };
+});

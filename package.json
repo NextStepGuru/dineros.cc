@@ -1,0 +1,67 @@
+{
+  "name": "dineros-monorepo",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter dineros-app build",
+    "dev": "pnpm --filter dineros-app dev",
+    "lint": "pnpm --filter dineros-app lint",
+    "lint-fix": "pnpm --filter dineros-app lint-fix",
+    "reset-encrypted-users": "pnpm --filter dineros-app reset-encrypted-users",
+    "test": "pnpm --filter dineros-app test",
+    "test:coverage": "pnpm --filter dineros-app test:coverage",
+    "test:e2e": "pnpm --filter dineros-app test:e2e",
+    "test:e2e:update-snapshots": "pnpm --filter dineros-app test:e2e:update-snapshots",
+    "test:e2e:update-snapshots:staging": "pnpm --filter dineros-app test:e2e:update-snapshots:staging",
+    "test:e2e:update-snapshots:staging:visual": "pnpm --filter dineros-app test:e2e:update-snapshots:staging:visual",
+    "test:e2e:full": "pnpm --filter dineros-app test:e2e:full",
+    "test:e2e:mobile": "pnpm --filter dineros-app test:e2e:mobile",
+    "test:e2e:webkit": "pnpm --filter dineros-app test:e2e:webkit",
+    "test:e2e:staging": "pnpm --filter dineros-app test:e2e:staging",
+    "test:e2e:ui": "pnpm --filter dineros-app test:e2e:ui",
+    "test:e2e:debug": "pnpm --filter dineros-app test:e2e:debug",
+    "test:e2e:install": "pnpm --filter dineros-app test:e2e:install",
+    "typecheck": "pnpm --filter dineros-app typecheck",
+    "ci:local": "pnpm --filter dineros-app ci:local",
+    "ci:local:lint": "pnpm --filter dineros-app ci:local:lint",
+    "ci:local:test": "pnpm --filter dineros-app ci:local:test",
+    "ci:local:pre-commit": "pnpm --filter dineros-app ci:local:pre-commit"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "^1.19.10",
+      "@tootallnate/once": "^3.0.1",
+      "effect": "^3.20.0",
+      "fast-xml-parser": "^5.5.7",
+      "flatted": "^3.4.2",
+      "h3": "^1.15.9",
+      "happy-dom": "^20.0.0",
+      "hono": "^4.12.7",
+      "@nuxt/test-utils>h3-next": "npm:h3@2.0.1-rc.18",
+      "lodash@<4.17.23": "4.17.23",
+      "serialize-javascript": "^7.0.3",
+      "yaml": "^2.8.3",
+      "h3@>=2.0.0-beta.0 <2.0.1-rc.18": "2.0.1-rc.18",
+      "picomatch@<2.3.2": "2.3.2",
+      "picomatch@>=4.0.0 <4.0.4": "4.0.4"
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma",
+      "@parcel/watcher",
+      "esbuild",
+      "msgpackr-extract",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver",
+      "vue-demi"
+    ]
+  },
+  "engines": {
+    "node": ">=24.14.0 <25.0.0"
+  },
+  "dependencies": {
+    "@47ng/cloak": "^1.2.0"
+  }
+}

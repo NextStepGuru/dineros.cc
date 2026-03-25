@@ -1,0 +1,12 @@
+# Hide specific files from Cursor
+# Add file paths here, one per line
+
+# Example patterns:
+# *.log
+# temp/
+# build/
+# dist/
+# coverage/
+# .env.local
+# Nuxt regenerates .nuxt/tsconfig.json; root tsconfig only extends it
+tsconfig.json

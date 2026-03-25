@@ -1,0 +1,64 @@
+# Node modules and build artifacts
+node_modules
+.nuxt
+.output
+dist
+build
+
+# Coverage and test files
+coverage
+
+# Playwright E2E local output (session storage, HTML report; not committed)
+\.auth/
+playwright-report/
+test-results/
+
+
+# Pre-commit and detector config (patterns could self-match)
+.pre-commit-config.yaml
+.trufflehog-detectors.yaml
+
+# Environment files (already in .gitignore)
+.env
+!.env.example
+
+# Log files
+output.txt
+
+# Temporary files
+temp
+tmp
+
+# IDE and editor files
+.vscode
+.idea
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git
+
+# Known safe files with false positives
+vitest.setup.ts
+production-dineros-secrets.yaml
+google-service-account-secret.yaml
+
+service-account.json
+
+.test.ts
+
+# Node modules and dependencies
+.pnpm
+
+# K8s manifests (reference secret names via secretKeyRef, no inline values)
+\.deploy/
+# Docs with example env vars (remove to scan README)
+README\.md
+
+# Backup files with test keys that are not in git
+prisma/backup
+app/prisma/backup
+microservice/prisma/backup
+\.dumps/

@@ -1,0 +1,30 @@
+---
+description: Frontend architecture, Nuxt structure, routing, and API usage
+globs: **/{pages,components,composables,plugins,layouts,middleware,lib}/**/*.{vue,ts}
+alwaysApply: false
+---
+
+# Frontend Functionality
+
+## Nuxt Structure
+
+- **Pages**: File-based routing under `pages/`. Use `definePageMeta({ middleware: "auth" })` for routes that require authentication.
+- **Layout**: Default layout is `layouts/default.vue`; shared shell uses `XHeader`, `XFooter`, `XLogo`.
+- **Components**: Auto-imported. Use **folder structure plus filename** for component names (e.g. `ProfileEditProfileTab`, `ModalsEditRegisterEntry`). Place feature-specific components in subfolders: `components/profile/`, `components/modals/`.
+
+## API Access
+
+- **Composables**: Use `useAPI<T>(url, options?)` for reactive data fetching. It uses `$api` under the hood, defaults to `server: false`, and generates unique keys to avoid unwanted caching.
+- **Imperative calls**: Use `$api` from the plugin (e.g. in actions or submit handlers) for one-off mutations. The plugin attaches the auth token and handles 401 (logout + redirect).
+- **Consistency**: Prefer one pattern per flow: `useAPI` for reads/list loading, `$api` for mutations. Handle errors the same way: check `error.value` for `useAPI`, use try/catch or response checks for `$api`, and surface errors via toast (see frontend-ux-and-state).
+
+## Auth and Route Access
+
+- **Client auth**: `authStore` (Pinia) holds `isLoggedIn`, `token`, `user`, `budgetId`. Use getters: `getIsUserLoggedIn`, `getToken`, `getUser`, `getBudgetId`.
+- **Public routes**: Keep the allowlist in sync in both `middleware/auth.ts` and `plugins/api.ts` (login, signup, forgot-password, reset-password-with-code, `/`). Prefer a single shared constant in the future to avoid drift.
+- **Protected pages**: Always set `definePageMeta({ middleware: "auth" })` on pages that require a logged-in user.
+
+## Validation and Types
+
+- Use Zod schemas from `schema/zod.ts` for form validation and for parsing API responses when needed. Use typed generics with `useAPI<T>` and `$api` return types where possible.
+- Domain types live in `types/types.d.ts`; use them for store state and component props.

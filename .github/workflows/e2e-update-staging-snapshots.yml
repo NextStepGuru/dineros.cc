@@ -1,0 +1,52 @@
+# Manual only: regenerate Linux PNG baselines against https://staging.dineros.cc (same URL as PR staging-e2e).
+# Local `pnpm test:e2e:update-snapshots` uses localhost — heights differ; use this workflow (or test:e2e:update-snapshots:staging on Mac + merge linux from here).
+name: E2E — update staging visual snapshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-snapshots:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      E2E: "1"
+      TZ: UTC
+      PLAYWRIGHT_BASE_URL: "https://staging.dineros.cc"
+      E2E_SEED_TOKEN: ${{ secrets.E2E_SEED_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: "10.32.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm --filter dineros-app exec playwright install --with-deps chromium
+      - name: Regenerate visual snapshots vs staging (Linux)
+        run: set -o pipefail && pnpm test:e2e:update-snapshots:staging:visual 2>&1 | tee ./output.txt
+      - name: Upload Linux snapshot PNGs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-staging-linux
+          path: |
+            app/tests/e2e/specs/authed/visual.spec.ts-snapshots/
+            app/tests/e2e/specs/public/visual.spec.ts-snapshots/
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            app/playwright-report/
+            app/test-results/
+      - name: Upload console log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-staging-snapshots-output
+          path: output.txt

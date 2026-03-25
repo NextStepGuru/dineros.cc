@@ -1,0 +1,27 @@
+---
+description: Backend auth surface, cookies, env, and deployment
+globs: app/server/**/*.ts
+alwaysApply: false
+---
+
+# Backend Security and Operations
+
+## Auth Surface
+
+- **Middleware**: `app/server/middleware/auth.ts` runs on `/api` and exempts specific routes via `ignoredRoutes`. Do not broaden exemptions (e.g. entire `/api/tasks/*` or `/api/webhook/*`) without explicit security review. Task and webhook endpoints should require either internal/auth token or signed webhook verification.
+- **Webhooks**: Implement proper verification (e.g. signature, secret) for webhook handlers. Do not leave placeholder handlers that only log payloads; either implement verification and logic or document as WIP and restrict access.
+- **Admin/debug**: Endpoints like migrate, sync-all, debug-_, test-_ should be gated (e.g. admin role, internal-only, or feature flag). Do not expose them as public unauthenticated routes.
+
+## Cookies and Tokens
+
+- Prefer `httpOnly` and `secure` for auth cookies in production. If the project currently sets auth token with `httpOnly: false` for client-side use, document the tradeoff and avoid expanding token exposure; do not add new JS-accessible auth tokens without justification.
+
+## Environment and Runtime
+
+- **Env**: Validate environment with Zod in `app/server/envSchema.ts`. In `app/server/env.ts`, ensure `safeParse` result is checked before exporting; do not export `parsedEnv.data` when `parsedEnv.success` is false. Microservice should use the same pattern.
+- **Node version**: Both the main app and `microservice/` use the same `engines.node` range (e.g. `>=24.14.0 <25.0.0` in root and `microservice/package.json`). Align Dockerfiles and CI with that range to avoid runtime drift.
+
+## Deployment and Observability
+
+- Health endpoints: `app/server/api/_ah/liveness.ts` and `app/server/api/_ah/readiness.ts` are used for probes; keep them lightweight and dependency-aware.
+- Do not mutate deployment manifests (e.g. with `sed` on image tags) in a way that leaves the repo in an inconsistent state; prefer parameterized or generated manifests for CI.

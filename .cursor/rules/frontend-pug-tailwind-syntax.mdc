@@ -1,0 +1,24 @@
+---
+description: Prevent Pug syntax errors from Tailwind variant classes in Vue templates
+globs: **/*.vue
+alwaysApply: false
+---
+
+# Pug + Tailwind Variant Class Safety
+
+- In `template lang="pug"`, do **not** use dot-shorthand when a class contains `:` (like `md:`, `sm:`, `hover:`).
+- Dot-shorthand is only safe for plain class names without special characters.
+- For Tailwind variant classes, always use `class="..."` (or `:class="..."`) on the element.
+
+```pug
+// ❌ BAD (Pug parse error)
+.grid.grid-cols-1.md:grid-cols-3.gap-3
+
+// ✅ GOOD
+div(class="grid grid-cols-1 md:grid-cols-3 gap-3")
+
+// ✅ GOOD (mixed)
+.grid.gap-3(class="grid-cols-1 md:grid-cols-3")
+```
+
+- Before finishing a Vue/Pug edit, quickly scan for `.[^\\s]*:` patterns and rewrite them to `class="..."`.

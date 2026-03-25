@@ -1,0 +1,57 @@
+# Accessibility — WCAG 2.2 AA
+
+Target: **WCAG 2.2 AA** across all routes, components, modals, and form workflows.
+
+## Headings
+
+- Every page MUST render exactly one `<h1>`. Auth pages delegate to `AuthFormCard` (renders `<h1>` from its `title` prop). App pages add their own `<h1>`.
+- Headings follow strict hierarchy: `h1 > h2 > h3`. Never skip levels.
+
+## Icon-only controls
+
+- `BaseIconButton` renders a square `UButton` with no visible text. Every usage MUST include `aria-label` (or bind `:aria-label`).
+- Standalone `UButton` with `icon` + `square` and no visible label text MUST also include `aria-label`.
+
+## Forms
+
+- Every `UInput` / `USelect` / `USelectMenu` MUST be associated with a label — either a wrapping `UFormField` with `label` + `for` pointing to the input `id`, or an `aria-label` on the input itself.
+- Validation errors surface via `UForm`/`UFormField` error state; the error text is associated to the input automatically by Nuxt UI.
+- Placeholders are NOT a substitute for labels.
+
+## Modals and focus
+
+- Modals opened via `useOverlay` use Nuxt UI's `UModal` / `UCard` which trap focus automatically. Ensure the first interactive element receives focus when the modal opens.
+- On close, focus MUST return to the element that triggered the modal (Nuxt UI handles this by default; do not break it).
+
+## Live regions
+
+- Status messages (recalc results, async operations) use `aria-live="polite"` + `aria-atomic="true"` in a dedicated `.sr-only` container.
+- Toast messages (via `useToast()`) are handled by Nuxt UI's toast component which already uses `role="status"`.
+
+## Landmarks
+
+- The default layout provides: skip-link, `<header>` (via `UHeader`), `<main>` (via `UMain#main-content`), and `<footer>` (via `UFooter`).
+- Navigation menus inside `UHeader` render `<nav>` automatically. Avoid duplicate unlabeled `<nav>` landmarks — use `aria-label` when multiple navs exist.
+
+## Tables
+
+- Data tables (`<table>`) MUST have `<caption>` (visible or `.sr-only`) describing the table's purpose.
+- Header cells use `<th scope="col">` (column) or `<th scope="row">` (row).
+- Sortable columns expose sort state via `aria-sort`.
+
+## Color and contrast
+
+- Do not convey information by color alone (WCAG 1.4.1). Supplement with icons, text, or patterns.
+- Nuxt UI's theme manages most contrast; custom colors (e.g. `.frog-*`) must meet 4.5:1 for normal text and 3:1 for large text.
+
+## Keyboard
+
+- All interactive elements must be operable with keyboard.
+- Visible focus indicator is required (Nuxt UI provides `:focus-visible` ring by default).
+- Custom widgets (tabs, toolbars, drag-and-drop) implement appropriate ARIA patterns and keyboard interaction.
+
+## Images and decorative content
+
+- Informative images need descriptive `alt` text.
+- Decorative images use `alt=""` or `aria-hidden="true"`.
+- SVG icons inside buttons are hidden from AT when the button has an accessible name.

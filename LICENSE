@@ -1,0 +1,78 @@
+Custom Non-Commercial License (Dineros)
+Version 1.0
+
+Copyright (c) 2026 Jeremy DeYoung
+All rights reserved.
+
+1. Definitions
+
+"Code" means the Dineros project source code, documentation, and related files
+distributed in this repository.
+
+"Non-Commercial Use" means use that is not intended for or directed toward
+commercial advantage or monetary compensation.
+
+"Commercial Use" includes, without limitation:
+- selling, licensing, or sublicensing the Code or a derivative work;
+- offering the Code as part of a paid product or service (including SaaS);
+- using the Code in connection with a for-profit business operation;
+- using the Code internally within a for-profit organization.
+
+"You" means an individual or entity exercising permissions under this License.
+
+2. Ownership
+
+Jeremy DeYoung retains all right, title, and interest in and to the Code.
+No ownership rights are transferred under this License.
+
+3. Grant of Rights
+
+Subject to the terms of this License, You are granted a worldwide,
+royalty-free, non-exclusive, revocable license to:
+- use, copy, modify, and create derivative works of the Code;
+- reproduce and distribute the original or modified Code;
+
+only for personal, educational, research, charitable, or other
+Non-Commercial Use.
+
+4. Conditions of Use and Distribution
+
+If You use, copy, modify, or distribute the Code, You must:
+- retain this License text in all copies or substantial portions;
+- provide clear attribution to Jeremy DeYoung and the Dineros project;
+- include a link to the original repository when reasonably possible;
+- document material modifications when redistributing modified versions.
+
+For public or redistributed derivative works, contribution back to the project
+is required in the form of at least one of the following:
+- a pull request with relevant improvements, fixes, or documentation updates; or
+- an issue describing changes and suggestions so the community can benefit.
+
+5. Commercial Use Prohibited
+
+Commercial Use is prohibited without a separate written commercial license
+granted by Jeremy DeYoung.
+
+6. Trademark and Branding
+
+This License does not grant rights to use the names "Dineros" or "Dineros.cc",
+or any related logos, marks, or branding, except for reasonable attribution.
+
+7. Termination
+
+Any use that does not comply with this License automatically terminates the
+rights granted above. Rights may be reinstated solely at the discretion of
+Jeremy DeYoung through explicit written permission.
+
+8. Disclaimer of Warranty
+
+THE CODE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+9. Limitation of Liability
+
+IN NO EVENT SHALL JEREMY DEYOUNG BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE CODE OR THE USE OR OTHER DEALINGS IN THE CODE.
+

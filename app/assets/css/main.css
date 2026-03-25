@@ -1,0 +1,390 @@
+@import "tailwindcss" theme(static);
+@import "@nuxt/ui";
+
+/* Reka UI modals lock body scroll; without a stable gutter the viewport width changes when the scrollbar is toggled and the layout jumps (often read as a vertical shift). */
+html {
+  scrollbar-gutter: stable;
+}
+
+:root {
+  --frog-primary: #2f8f46;
+  --frog-primary-soft: #5aac6b;
+  --frog-accent: #2f7b78;
+  --frog-surface: #edf4e8;
+  --frog-surface-elevated: #f6faef;
+  --frog-text: #1e2f23;
+  --frog-text-muted: #4f6558;
+  --frog-border: #c9d8c8;
+  --frog-ring: rgba(47, 143, 70, 0.35);
+  --frog-status-positive: #2f8f46;
+  --frog-status-warning: #b57a1b;
+  --frog-status-negative: #b53a3a;
+  --frog-status-info: #2f7b78;
+  --frog-hero-bg-start: #dbeed6;
+  --frog-hero-bg-mid: #98c893;
+  --frog-hero-bg-end: #3e6e4f;
+  --frog-hero-text: #0f1f16;
+  --frog-hero-subtext: #1b2f22;
+  --frog-features-bg-start: #3e6e4f;
+  --frog-features-bg-end: #edf4e8;
+  --frog-features-card-bg: rgba(245, 255, 241, 0.82);
+  --frog-features-card-border: rgba(74, 110, 87, 0.35);
+  --frog-features-card-bg-hover: rgba(245, 255, 241, 0.92);
+  --frog-features-card-border-hover: rgba(74, 110, 87, 0.5);
+  --frog-features-icon-bg: rgba(47, 143, 70, 0.15);
+  --frog-features-icon-color: #2f8f46;
+  --frog-cta-text: #f6fff4;
+}
+
+.dark {
+  --frog-primary: #5fd778;
+  --frog-primary-soft: #86e59a;
+  --frog-accent: #4bb4aa;
+  --frog-surface: #10211a;
+  --frog-surface-elevated: #182a22;
+  --frog-text: #edf6ea;
+  --frog-text-muted: #b8cdbd;
+  --frog-border: #355245;
+  --frog-ring: rgba(95, 215, 120, 0.4);
+  --frog-status-positive: #77e18d;
+  --frog-status-warning: #e2c06a;
+  --frog-status-negative: #f08c8c;
+  --frog-status-info: #72d8cc;
+  --frog-hero-bg-start: #0f1f16;
+  --frog-hero-bg-mid: #1b3f2e;
+  --frog-hero-bg-end: #14312a;
+  --frog-hero-text: #f3fff1;
+  --frog-hero-subtext: rgba(227, 248, 229, 0.9);
+  --frog-features-bg-start: #14312a;
+  --frog-features-bg-end: #10211a;
+  --frog-features-card-bg: rgba(246, 255, 244, 0.08);
+  --frog-features-card-border: rgba(201, 216, 200, 0.3);
+  --frog-features-card-bg-hover: rgba(246, 255, 244, 0.14);
+  --frog-features-card-border-hover: rgba(201, 216, 200, 0.45);
+  --frog-features-icon-bg: rgba(95, 215, 120, 0.2);
+  --frog-features-icon-color: #95f5aa;
+  --frog-cta-text: #f6fff4;
+}
+
+.ui-main {
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/** Same app chrome as `.ui-main` pages but allows vertical document scroll (e.g. reports). */
+.ui-main-scroll {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.frog-surface {
+  background-color: var(--frog-surface);
+}
+
+.frog-surface-elevated {
+  background-color: var(--frog-surface-elevated);
+}
+
+.frog-text {
+  color: var(--frog-text);
+}
+
+.frog-text-muted {
+  color: var(--frog-text-muted);
+}
+
+.frog-border {
+  border-color: var(--frog-border);
+}
+
+.frog-primary-text {
+  color: var(--frog-primary);
+}
+
+.frog-primary-bg {
+  background-color: var(--frog-primary);
+}
+
+.frog-link {
+  color: var(--frog-primary);
+  transition: color 150ms ease;
+}
+
+.frog-link:hover {
+  color: var(--frog-primary-soft);
+}
+
+.frog-status-positive {
+  color: var(--frog-status-positive);
+}
+
+.frog-status-warning {
+  color: var(--frog-status-warning);
+}
+
+.frog-status-negative {
+  color: var(--frog-status-negative);
+}
+
+.frog-status-info {
+  color: var(--frog-status-info);
+}
+
+.frog-logo-ring {
+  --tw-ring-color: var(--frog-ring);
+}
+
+.auth-page {
+  background-color: var(--frog-surface);
+  min-height: calc(100vh - var(--ui-header-height));
+}
+
+.auth-card {
+  background-color: var(--frog-surface-elevated);
+  border: 1px solid var(--frog-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.dark .auth-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.auth-card__header {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-form > :last-child {
+  margin-top: 0.5rem;
+}
+
+.page-home .frog-hero {
+  background: linear-gradient(
+    160deg,
+    var(--frog-hero-bg-start) 0%,
+    var(--frog-hero-bg-mid) 45%,
+    var(--frog-hero-bg-end) 100%
+  );
+  color: var(--frog-hero-text);
+}
+
+.page-home .frog-features {
+  background: linear-gradient(
+    160deg,
+    var(--frog-features-bg-start) 0%,
+    var(--frog-features-bg-end) 100%
+  );
+}
+
+.page-home .frog-heading {
+  color: var(--frog-hero-text);
+}
+
+.page-home .frog-subheading {
+  color: var(--frog-hero-subtext);
+}
+
+.page-home .frog-feature-card {
+  background-color: var(--frog-features-card-bg);
+  border: 1px solid var(--frog-features-card-border);
+}
+
+.page-home .frog-feature-card:hover {
+  background-color: var(--frog-features-card-bg-hover);
+  border-color: var(--frog-features-card-border-hover);
+}
+
+.page-home .frog-feature-icon {
+  background-color: var(--frog-features-icon-bg);
+}
+
+.page-home .frog-icon {
+  color: var(--frog-features-icon-color);
+}
+
+.page-home .frog-cta {
+  color: var(--frog-cta-text);
+}
+
+.document-page {
+  background-color: var(--frog-surface);
+  color: var(--frog-text);
+}
+
+.document-page__header {
+  background: linear-gradient(
+    135deg,
+    var(--frog-primary) 0%,
+    var(--frog-accent) 100%
+  );
+  color: #f8fff6;
+}
+
+.document-page__card {
+  background-color: var(--frog-surface-elevated);
+  border: 1px solid var(--frog-border);
+}
+
+.document-page__section-title {
+  border-bottom: 1px solid var(--frog-border);
+}
+
+.document-page .border-gray-300 {
+  border-color: var(--frog-border) !important;
+}
+
+.document-page h1,
+.document-page h2,
+.document-page h3,
+.document-page p,
+.document-page li {
+  color: var(--frog-text);
+}
+
+/* Legal document theme: black & white, no dark mode. Links in color. */
+.legal-document {
+  background-color: #fff;
+  color: #1a1a1a;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.legal-document a {
+  color: #2f8f46;
+  text-decoration: underline;
+}
+
+.legal-document a:hover {
+  color: #267338;
+}
+
+.legal-document__header {
+  background-color: #1a1a1a;
+  color: #fff;
+  padding: 2.5rem 1.5rem;
+  margin: -2rem -1.5rem 0;
+  text-align: center;
+  border-bottom: 3px solid #333;
+}
+
+.legal-document__header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+  color: inherit;
+}
+
+.legal-document__meta {
+  font-size: 0.8125rem;
+  margin-top: 0.75rem;
+  opacity: 0.9;
+}
+
+.legal-document__effective {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.legal-document section {
+  margin-bottom: 2rem;
+}
+
+.legal-document section:last-of-type {
+  margin-bottom: 0;
+}
+
+.legal-document h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #ccc;
+}
+
+.legal-document h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  color: #1a1a1a;
+}
+
+.legal-document p {
+  margin: 0 0 1rem;
+  color: #1a1a1a;
+  text-align: justify;
+}
+
+.legal-document p + p {
+  margin-top: -0.25rem;
+}
+
+.legal-document ul {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+}
+
+.legal-document li {
+  margin-bottom: 0.35rem;
+  color: #1a1a1a;
+}
+
+.legal-document .legal-document__all-caps {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.9375rem;
+  color: #1a1a1a;
+}
+
+.legal-document .legal-document__contact-block {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #ccc;
+  font-size: 0.9375rem;
+}
+
+.legal-document .legal-document__contact-block ul {
+  margin-bottom: 0;
+  list-style: none;
+  padding-left: 0;
+}
+
+.legal-document .legal-document__contact-block li {
+  margin-bottom: 0.25rem;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px transparent inset !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+/* Shared Nuxt UI UModal mobile fullscreen (matches Tailwind max-sm / 639px) */
+@media (width < 40rem) {
+  .modal-mobile-fullscreen {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+}

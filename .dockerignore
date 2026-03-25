@@ -1,0 +1,152 @@
+# Build outputs
+.nuxt
+.output
+app/.nuxt
+app/.output
+node_modules
+app/node_modules
+microservice/node_modules
+node-compile-cache
+dist
+build
+
+# Development tools and configs
+.vscode
+.idea
+*.log
+*.tmp
+*.temp
+.pnpm-store
+
+# Environment files
+.env
+.env.me
+.env.vault
+.env*
+.flaskenv*
+
+# Keep specific env files if needed
+!.env.project
+!.env.vault
+
+# Test files and directories
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.test.tsx
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.js
+**/*.spec.tsx
+**/*.spec.jsx
+tests/
+e2e/
+coverage/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Documentation
+docs/
+*.md
+README.md
+
+# Scripts and utilities
+*.sh
+docker-compose*.yml
+docker-compose*.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Cursor / agent / local tooling (not needed in image)
+.cursor/
+.pre-commit-config.yaml
+.nvmrc
+scripts/
+
+# Development dependencies and configs
+.eslintrc*
+.prettierrc*
+.editorconfig
+vitest.config.*
+jest.config.*
+
+# Temporary and cache files
+.cache/
+**/.cache/
+.temp/
+tmp/
+temp/
+.docker-build-cache/
+
+# Workspace files
+*.code-workspace
+
+# Additional optimizations for faster builds
+.github/
+.deployment/
+.deploy/
+.gcloudignore
+*.tar.gz
+*.zip
+*.rar
+backup/
+backups/
+logs/
+log/
+*.sqlite
+*.db
+database/
+*.pem
+*.key
+service-account-*.json
+runner.yaml
+linearbudget/
+
+# Turbo / tool caches
+.turbo/
+.parcel-cache/
+
+# Deploy / hosting config (not used at build time)
+.vercel/
+.netlify/
+
+# Ignore lists (only affect local tooling)
+.cursorignore
+.prettierignore
+.eslintignore
+
+# Git hooks
+.husky/
+
+# Local overrides
+*.local
+
+# E2E / Playwright artifacts
+playwright-report/
+test-results/
+.playwright/
+
+# Storybook (if present)
+.storybook/
+storybook-static/

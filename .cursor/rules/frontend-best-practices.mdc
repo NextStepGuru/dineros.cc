@@ -1,0 +1,29 @@
+---
+description: Frontend patterns, forms, watchers, and lifecycle
+globs: **/{pages,components,composables,plugins,lib}/**/*.{vue,ts}
+alwaysApply: false
+---
+
+# Frontend Best Practices
+
+## Forms
+
+- Use Nuxt UI form primitives (e.g. `UForm`) with schema-based validation (Zod). Use `handleError` from `lib/utils.ts` to map validation/errors to toast and focus.
+- For submit flows: use a single `isLoading` or `isSaving` flag, guard double-submit, and show success/error via toast. For toasts vs native dialogs and confirmations, see `frontend-ux-and-state.mdc`.
+
+## State and Watchers
+
+- **Pinia**: Domain lists and auth live in `authStore` and `listStore`. Use getters for derived data (e.g. `getAccountRegisters` filtered by `getBudgetId`).
+- **Watchers**: Prefer granular watch sources (e.g. `() => authStore.getBudgetId`) instead of watching the whole store object to avoid unnecessary reruns and loops.
+
+## Lifecycle and Cleanup
+
+- For intervals, observers, or pollers: start in `onMounted` and clear in `onBeforeUnmount`. Ensure the stop condition is correct (e.g. call `stop()` when the watcher/poller exists, not when it does not).
+
+## Utilities and Predicates
+
+- Use `lib/utils.ts` for formatting and labels (e.g. `getIntervalLabel`, `getAccountTypeLabel`, `formatDate`). In `.find()` callbacks use strict equality (`===`) or a proper predicate; never use assignment (`=`) in a predicate (e.g. `(r) => r.id === id`, not `(r) => (r.id = id)`).
+
+## Styling
+
+- Use Tailwind utility classes and Nuxt UI Pro components. Prefer Pug templates (`<template lang="pug">`) where the project already uses them. Avoid adding component-scoped `<style>` blocks unless necessary; use `assets/css/main.css` for global overrides (e.g. input autofill).

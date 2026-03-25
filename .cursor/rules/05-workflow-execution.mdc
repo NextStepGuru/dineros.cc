@@ -1,0 +1,36 @@
+---
+description: Command execution, logging, and test policy for Dineros
+alwaysApply: true
+---
+
+# Workflow and Execution Rules
+
+## Logging and Debugging
+
+- Prefer **asking for logs** instead of running commands when the user reports an issue. Do not assume you should run the app or tests to reproduce.
+- When running commands that produce console output, **log all console output to `./output.txt`** (e.g. redirect or tee) so the user can inspect it.
+
+## Test Policy
+
+- **Do not** add, modify, or run tests unless the user directly asks you to.
+- **Vitest layout** (node vs Nuxt projects, `app/vitest.config.ts`, aliases, upgrade notes): see **`testing-vitest-nuxt.mdc`**.
+- When the user does request tests:
+  - For **fast tests** (e.g. under ~300ms or a single focused suite), use: `pnpm test` or the specific script they need (e.g. `pnpm test:forecast:unit`).
+- For **all tests** including full Vitest run: use `pnpm test` (uses **`app/vitest.config.ts`** through the app package).
+- For **forecast engine only** (unit + integration + runner): use `pnpm test:forecast:all`.
+- There is no `test:all` script in this repo; use `pnpm test` for the full test suite and `pnpm test:forecast:all` for forecast-only.
+
+## Date/Time Test Conventions
+
+- Prefer UTC instants in tests: `new Date("YYYY-MM-DDT00:00:00.000Z")` over date-only parsing.
+- In server tests that depend on current time, use `dateTimeService.setNowOverride(...)` and always clear in `afterEach` or `finally`.
+- Prefer date assertions by epoch/ISO (`getTime()` or `toISOString()`) instead of comparing ambiguous date-only constructors.
+- Test scripts should run with `TZ=UTC` for consistent behavior across environments.
+
+## Backup and Cloud Tooling
+
+- Use **Google Cloud SDK (gcloud CLI)** for backup and cloud operations. Do not use AWS CLI for backup scripts or cloud storage unless the user explicitly requests AWS.
+
+## Response Style
+
+- Be direct and use minimal text. Proposed fixes should be concise. Avoid repetition and filler.
