@@ -66,7 +66,18 @@ jobs:
       - name: Install pre-commit
         run: pip install pre-commit
       - name: Run pre-commit hooks
-        run: pre-commit run --all-files --verbose
+        run: |
+          set +e
+          pre-commit run --all-files --verbose
+          first_exit=$?
+          set -e
+
+          if [ "$first_exit" -ne 0 ] && [ -n "$(git status --porcelain)" ]; then
+            echo "pre-commit modified files; re-running hooks..."
+            pre-commit run --all-files --verbose
+          else
+            exit "$first_exit"
+          fi
 
   staging-build-main-site:
     if: github.event.pull_request.head.repo.full_name == github.repository
