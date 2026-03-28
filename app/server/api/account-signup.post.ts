@@ -7,6 +7,7 @@ import { postmarkClient } from "../clients/postmarkClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
 import env from "~/server/env";
+import { ADMIN_EMAIL } from "~/server/lib/adminConfig";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -117,10 +118,11 @@ export default defineEventHandler(async (event) => {
     });
 
     const signupNotificationEmail = env?.SIGNUP_NOTIFICATION_EMAIL?.trim();
-    if (signupNotificationEmail) {
+    const notificationEmail = signupNotificationEmail || ADMIN_EMAIL;
+    if (notificationEmail) {
       await postmarkClient.sendEmail({
         From: "Mr. Pepe Dineros <pepe@dineros.cc>",
-        To: signupNotificationEmail,
+        To: notificationEmail,
         Subject: "New User Registration on Dineros.cc",
         HtmlBody: `A new user has signed up on Dineros.cc:<br>
         <br>

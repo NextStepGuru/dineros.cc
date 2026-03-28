@@ -2,7 +2,6 @@
 import type { FormSubmitEvent } from "@nuxt/ui";
 import {
   handleError,
-  formatAccountRegisters,
   formatCurrencyOptions,
 } from "~/lib/utils";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
@@ -114,6 +113,20 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function toNullableDate(value: unknown): Date | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toDateInputString(value: unknown): string {
+  const parsed = toNullableDate(value);
+  if (!parsed) return "";
+  return parsed.toISOString().split("T")[0];
+}
+
 function normalizeAccountRegisterState(
   accountRegister: AccountRegister,
 ): AccountRegister {
@@ -127,16 +140,21 @@ function normalizeAccountRegisterState(
     balance: toNullableNumber(accountRegister.balance) ?? 0,
     latestBalance: toNullableNumber(accountRegister.latestBalance) ?? 0,
     minPayment: toNullableNumber(accountRegister.minPayment),
+    statementAt: toNullableDate(accountRegister.statementAt) ?? today.value,
     statementIntervalId: toNullableNumber(accountRegister.statementIntervalId),
     apr1: toNullableNumber(accountRegister.apr1),
+    apr1StartAt: toNullableDate(accountRegister.apr1StartAt),
     apr2: toNullableNumber(accountRegister.apr2),
+    apr2StartAt: toNullableDate(accountRegister.apr2StartAt),
     apr3: toNullableNumber(accountRegister.apr3),
+    apr3StartAt: toNullableDate(accountRegister.apr3StartAt),
     targetAccountRegisterId: toNullableNumber(
       accountRegister.targetAccountRegisterId,
     ),
     collateralAssetRegisterId: toNullableNumber(
       accountRegister.collateralAssetRegisterId,
     ),
+    loanStartAt: toNullableDate(accountRegister.loanStartAt),
     loanPaymentsPerYear: toNullableNumber(accountRegister.loanPaymentsPerYear),
     loanTotalYears: toNullableNumber(accountRegister.loanTotalYears),
     loanOriginalAmount: toNullableNumber(accountRegister.loanOriginalAmount),
@@ -153,10 +171,7 @@ function normalizeAccountRegisterState(
     assetOriginalValue: toNullableNumber(accountRegister.assetOriginalValue),
     assetResidualValue: toNullableNumber(accountRegister.assetResidualValue),
     assetUsefulLifeYears: toNullableNumber(accountRegister.assetUsefulLifeYears),
-    assetStartAt:
-      accountRegister.assetStartAt != null
-        ? new Date(accountRegister.assetStartAt)
-        : null,
+    assetStartAt: toNullableDate(accountRegister.assetStartAt),
     paymentCategoryId: accountRegister.paymentCategoryId ?? null,
     interestCategoryId: accountRegister.interestCategoryId ?? null,
     vehicleDetails: parseVehicleDetails(
@@ -200,6 +215,10 @@ const isSelectedAccountTypeSavings = computed(() => {
   return selectedAccountType.value?.id === 2;
 });
 
+const isSelectedAccountTypeMortgage = computed(() => {
+  return selectedAccountType.value?.type === "mortgage";
+});
+
 const isSelectedAccountTypeWithInterest = computed(() => {
   return (
     isSelectedAccountTypeCredit.value ||
@@ -232,22 +251,72 @@ const estimateRangeLabel = computed(() => {
 });
 
 const depreciationRatePercent = computed({
-  get: () =>
-    formState.value.depreciationRate != null
-      ? formState.value.depreciationRate * 100
-      : null,
+  get: () => {
+    if (formState.value.depreciationRate == null) {
+      return null;
+    }
+    return formState.value.depreciationRate * 100;
+  },
   set: (v: number | null) => {
-    formState.value.depreciationRate =
-      v != null && Number.isFinite(v) ? v / 100 : null;
+    if (v == null || !Number.isFinite(v)) {
+      formState.value.depreciationRate = null;
+      return;
+    }
+    formState.value.depreciationRate = v / 100;
+  },
+});
+
+const apr1Percent = computed({
+  get: () => {
+    if (formState.value.apr1 == null) {
+      return null;
+    }
+    return formState.value.apr1 * 100;
+  },
+  set: (value: number | null) => {
+    if (value == null || !Number.isFinite(value)) {
+      formState.value.apr1 = null;
+      return;
+    }
+    formState.value.apr1 = value / 100;
+  },
+});
+
+const apr2Percent = computed({
+  get: () => {
+    if (formState.value.apr2 == null) {
+      return null;
+    }
+    return formState.value.apr2 * 100;
+  },
+  set: (value: number | null) => {
+    if (value == null || !Number.isFinite(value)) {
+      formState.value.apr2 = null;
+      return;
+    }
+    formState.value.apr2 = value / 100;
+  },
+});
+
+const apr3Percent = computed({
+  get: () => {
+    if (formState.value.apr3 == null) {
+      return null;
+    }
+    return formState.value.apr3 * 100;
+  },
+  set: (value: number | null) => {
+    if (value == null || !Number.isFinite(value)) {
+      formState.value.apr3 = null;
+      return;
+    }
+    formState.value.apr3 = value / 100;
   },
 });
 
 const assetStartAtString = computed({
   get: () => {
-    const d = formState.value.assetStartAt;
-    if (!d) return "";
-    const date = d instanceof Date ? d : new Date(d);
-    return date.toISOString().split("T")[0];
+    return toDateInputString(formState.value.assetStartAt);
   },
   set: (value: string) => {
     formState.value.assetStartAt = value ? new Date(value) : null;
@@ -290,9 +359,7 @@ const interestRateHint = computed(() => {
 // Convert statementAt Date to string for date input
 const statementAtString = computed({
   get: () => {
-    if (!formState.value.statementAt) return "";
-    const date = new Date(formState.value.statementAt);
-    return date.toISOString().split("T")[0];
+    return toDateInputString(formState.value.statementAt);
   },
   set: (value: string) => {
     if (value) {
@@ -302,6 +369,42 @@ const statementAtString = computed({
     }
   },
 });
+
+const apr1StartAtString = computed({
+  get: () => toDateInputString(formState.value.apr1StartAt),
+  set: (value: string) => {
+    formState.value.apr1StartAt = value ? new Date(value) : null;
+  },
+});
+
+const apr2StartAtString = computed({
+  get: () => toDateInputString(formState.value.apr2StartAt),
+  set: (value: string) => {
+    formState.value.apr2StartAt = value ? new Date(value) : null;
+  },
+});
+
+const apr3StartAtString = computed({
+  get: () => toDateInputString(formState.value.apr3StartAt),
+  set: (value: string) => {
+    formState.value.apr3StartAt = value ? new Date(value) : null;
+  },
+});
+
+const loanStartAtString = computed({
+  get: () => toDateInputString(formState.value.loanStartAt),
+  set: (value: string) => {
+    formState.value.loanStartAt = value ? new Date(value) : null;
+  },
+});
+
+const loanPaymentsPerYearItems = [
+  { id: null, name: "None" },
+  { id: 12, name: "12 (Monthly)" },
+  { id: 24, name: "24 (Semi-monthly)" },
+  { id: 26, name: "26 (Bi-weekly)" },
+  { id: 52, name: "52 (Weekly)" },
+];
 
 watch(props, () => {
   formState.value = normalizeAccountRegisterState(props.accountRegister);
@@ -410,11 +513,27 @@ function applyEstimateToOriginal() {
 
 watch(
   () => formState.value.typeId,
-  () => {
+  (_, oldTypeId) => {
     if (!isSelectedAccountTypeCredit.value) {
       formState.value.collateralAssetRegisterId = null;
       formState.value.targetAccountRegisterId = null;
       formState.value.paymentCategoryId = null;
+    }
+
+    const previousType = listStore.getAccountTypes.find(
+      (type) => type.id === oldTypeId,
+    );
+    const wasMortgage = previousType?.type === "mortgage";
+    if (wasMortgage && !isSelectedAccountTypeMortgage.value) {
+      formState.value.apr2 = null;
+      formState.value.apr2StartAt = null;
+      formState.value.apr3 = null;
+      formState.value.apr3StartAt = null;
+      formState.value.loanStartAt = null;
+      formState.value.loanPaymentsPerYear = null;
+      formState.value.loanTotalYears = null;
+      formState.value.loanOriginalAmount = null;
+      formState.value.allowExtraPayment = false;
     }
   },
 );
@@ -551,16 +670,7 @@ async function archiveAccountRegister() {
     },
   }).catch((error) => handleError(error, toast));
 
-  if (!result) {
-    isSaving.value = false;
-    showArchiveConfirm.value = false;
-    toast.add({
-      color: "error",
-      description: "Failed to archive account register.",
-    });
-
-    return;
-  } else {
+  if (result) {
     toast.add({
       color: "success",
       description: "Account archived. It will no longer appear in lists or dropdowns.",
@@ -570,6 +680,14 @@ async function archiveAccountRegister() {
     isDeleting.value = false;
     showArchiveConfirm.value = false;
     props.cancel();
+  } else {
+    isSaving.value = false;
+    showArchiveConfirm.value = false;
+    toast.add({
+      color: "error",
+      description: "Failed to archive account register.",
+    });
+    isDeleting.value = false;
   }
 }
 
@@ -581,12 +699,20 @@ function cancelArchiveConfirmation() {
   showArchiveConfirm.value = false;
 }
 
-// ESC key handler to close modal
+function triggerPrimaryAction() {
+  if (isSaving.value || isDeleting.value || showArchiveConfirm.value) return;
+  form.value?.submit?.();
+}
+
 defineShortcuts({
+  enter: () => triggerPrimaryAction(),
   escape: () => {
-    if (!isSaving.value && !isDeleting.value) {
-      props.cancel();
+    if (isSaving.value || isDeleting.value) return;
+    if (showArchiveConfirm.value) {
+      cancelArchiveConfirmation();
+      return;
     }
+    props.cancel();
   },
 });
 </script>
@@ -682,12 +808,85 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
       UFormField(:label="interestRateLabel" name="apr1" v-if="isSelectedAccountTypeWithInterest" :hint="interestRateHint")
         div(class="relative")
           UInputNumber(
-            v-model="formState.apr1"
+            v-model="apr1Percent"
             :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
             :step="0.001"
             :min="0"
             :max="100"
             class="w-full")
+
+      div(v-if="isSelectedAccountTypeMortgage" class="space-y-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800")
+        h3(class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2") Mortgage details
+
+        UFormField(label="APR 1 start date" name="apr1StartAt" hint="Optional date when APR 1 schedule starts")
+          UInput(
+            v-model="apr1StartAtString"
+            type="date"
+            class="w-full")
+
+        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+          UFormField(label="APR 2 (%)" name="apr2" hint="Optional future APR")
+            UInputNumber(
+              v-model="apr2Percent"
+              :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+              :step="0.001"
+              :min="0"
+              :max="100"
+              class="w-full")
+          UFormField(label="APR 2 start date" name="apr2StartAt")
+            UInput(
+              v-model="apr2StartAtString"
+              type="date"
+              class="w-full")
+
+        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+          UFormField(label="APR 3 (%)" name="apr3" hint="Optional additional APR tier")
+            UInputNumber(
+              v-model="apr3Percent"
+              :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+              :step="0.001"
+              :min="0"
+              :max="100"
+              class="w-full")
+          UFormField(label="APR 3 start date" name="apr3StartAt")
+            UInput(
+              v-model="apr3StartAtString"
+              type="date"
+              class="w-full")
+
+        UFormField(label="Loan start date" name="loanStartAt" hint="Optional origination / amortization start date")
+          UInput(
+            v-model="loanStartAtString"
+            type="date"
+            class="w-full")
+
+        UFormField(label="Original loan amount" name="loanOriginalAmount")
+          UInputNumber(
+            v-model="formState.loanOriginalAmount"
+            :format-options="formatCurrencyOptions"
+            :step="0.01"
+            class="w-full")
+
+        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+          UFormField(label="Loan term (years)" name="loanTotalYears")
+            UInputNumber(
+              v-model="formState.loanTotalYears"
+              :step="1"
+              :min="1"
+              :max="100"
+              class="w-full")
+          UFormField(label="Payments per year" name="loanPaymentsPerYear")
+            USelect(
+              v-model="formState.loanPaymentsPerYear"
+              class="w-full"
+              :items="loanPaymentsPerYearItems"
+              valueKey="id"
+              labelKey="name"
+              placeholder="None")
+
+        UFormField(label="Allow extra payment" name="allowExtraPayment" hint="When enabled, forecast can pay more than the minimum payment")
+          .flex.items-center(class="h-8")
+            USwitch(v-model="formState.allowExtraPayment")
 
       UFormField(label="Interest category" name="interestCategoryId" v-if="isSelectedAccountTypeWithInterest")
         USelectMenu(
@@ -832,33 +1031,36 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
         v-if="showArchiveConfirm"
         class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
         p(class="mb-2") Archive this account? It will be hidden from your account list and from dropdowns.
-        div(class="flex gap-2")
+        div(class="modal-action-group")
           UButton(
             color="error"
             @click="archiveAccountRegister"
             :loading="isDeleting"
             :disabled="isSaving || isDeleting"
+            class="modal-action-button"
           ) Confirm archive
           UButton(
             color="neutral"
             @click="cancelArchiveConfirmation"
             :disabled="isDeleting"
+            class="modal-action-button"
           ) Cancel
-      .flex.justify-between.w-full
-      UButton(
-        color="primary"
-        @click.prevent="form?.submit()"
-        :loading="isSaving"
-        :disabled="isSaving || isDeleting"
-      ) Save
-
-      UButton(
-        color="error"
-        v-if="formState.id"
-        @click="confirmArchive"
-        :loading="isDeleting"
-        :disabled="isSaving || isDeleting || showArchiveConfirm"
-      ) Archive
-
-      UButton(@click="cancel" color="neutral" :disabled="isSaving || isDeleting") Close
+      .modal-action-bar.modal-action-bar--between
+        .modal-action-group
+          UButton(
+            color="primary"
+            @click.prevent="form?.submit()"
+            :loading="isSaving"
+            :disabled="isSaving || isDeleting"
+            class="modal-action-button"
+          ) Save
+          UButton(
+            color="error"
+            v-if="formState.id"
+            @click="confirmArchive"
+            :loading="isDeleting"
+            :disabled="isSaving || isDeleting || showArchiveConfirm"
+            class="modal-action-button"
+          ) Archive
+        UButton(@click="cancel" color="neutral" :disabled="isSaving || isDeleting" class="modal-action-button") Close
 </template>

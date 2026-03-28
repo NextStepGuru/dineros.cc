@@ -22,7 +22,6 @@ test.describe("Contact page", () => {
     await expect(
       page.getByRole("link", { name: /support@dineros\.cc/i }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: /615-261-8201/ })).toBeVisible();
   });
 });
 

@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   const baseURL =
-    process.env.PLAYWRIGHT_BASE_URL?.trim() || "http://localhost:3000";
+    process.env.PLAYWRIGHT_BASE_URL?.trim() || "http://localhost:4300";
   const token = process.env.E2E_SEED_TOKEN?.trim();
   if (!token) {
     throw new Error(

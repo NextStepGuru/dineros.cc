@@ -78,7 +78,7 @@ describe("Integration Regression Tests", () => {
         apr1: new Decimal("0.05"), // 5% APR
         apr2: null,
         apr3: null,
-        apr1StartAt: null,
+        apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
         apr2StartAt: null,
         apr3StartAt: null,
         targetAccountRegisterId: 1, // Auto-pay from checking
@@ -109,7 +109,7 @@ describe("Integration Regression Tests", () => {
         apr1: null,
         apr2: null,
         apr3: null,
-        apr1StartAt: null,
+        apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
         apr2StartAt: null,
         apr3StartAt: null,
         targetAccountRegisterId: null,
@@ -170,7 +170,7 @@ describe("Integration Regression Tests", () => {
       expect(result.isSuccess).toBe(true);
 
       const gmEntries = (result.registerEntries || []).filter(
-        (entry: any) => entry.accountRegisterId === 8
+        (entry: any) => entry.accountRegisterId === 8,
       );
 
       // Bug #1: Balance arithmetic should be correct (not concatenated)
@@ -183,14 +183,14 @@ describe("Integration Regression Tests", () => {
 
       // Bug #2: Interest should be calculated exactly once per month
       const interestEntries = gmEntries.filter((entry: any) =>
-        entry.description?.toLowerCase().includes("interest")
+        entry.description?.toLowerCase().includes("interest"),
       );
       expect(interestEntries.length).toBeGreaterThanOrEqual(3);
       expect(interestEntries.length).toBeLessThanOrEqual(4);
 
       const interestDates = interestEntries
         .map((entry: any) =>
-          dateTimeService.format("YYYY-MM-DD", new Date(entry.createdAt))
+          dateTimeService.format("YYYY-MM-DD", new Date(entry.createdAt)),
         )
         .sort((a: string, b: string) => a.localeCompare(b));
       for (let i = 1; i < interestDates.length; i++) {
@@ -204,10 +204,10 @@ describe("Integration Regression Tests", () => {
       expect(result.datesProcessed).toBeGreaterThan(100);
 
       const latestEntryDate = Math.max(
-        ...gmEntries.map((entry: any) => new Date(entry.createdAt).getTime())
+        ...gmEntries.map((entry: any) => new Date(entry.createdAt).getTime()),
       );
       expect(new Date(latestEntryDate).getTime()).toBeGreaterThan(
-        new Date("2025-11-01T00:00:00.000Z").getTime()
+        new Date("2025-11-01T00:00:00.000Z").getTime(),
       );
     });
   });
@@ -231,7 +231,7 @@ describe("Integration Regression Tests", () => {
           apr1: new Decimal("0.1899"), // High APR
           apr2: null,
           apr3: null,
-          apr1StartAt: null,
+          apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
           apr2StartAt: null,
           apr3StartAt: null,
           targetAccountRegisterId: 12,
@@ -262,7 +262,7 @@ describe("Integration Regression Tests", () => {
           apr1: new Decimal("0.045"), // 4.5% APR
           apr2: null,
           apr3: null,
-          apr1StartAt: null,
+          apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
           apr2StartAt: null,
           apr3StartAt: null,
           targetAccountRegisterId: null,
@@ -293,7 +293,7 @@ describe("Integration Regression Tests", () => {
           apr1: null,
           apr2: null,
           apr3: null,
-          apr1StartAt: null,
+          apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
           apr2StartAt: null,
           apr3StartAt: null,
           targetAccountRegisterId: null,
@@ -324,7 +324,7 @@ describe("Integration Regression Tests", () => {
           apr1: new Decimal("0.0329"), // 3.29% APR
           apr2: null,
           apr3: null,
-          apr1StartAt: null,
+          apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
           apr2StartAt: null,
           apr3StartAt: null,
           targetAccountRegisterId: 12,
@@ -394,7 +394,7 @@ describe("Integration Regression Tests", () => {
           const rows = Array.isArray(data.data) ? data.data : [data.data];
           allCreatedEntries.push(...rows);
           return Promise.resolve({});
-        }
+        },
       );
 
       // Act: Run comprehensive 6-month forecast
@@ -422,10 +422,10 @@ describe("Integration Regression Tests", () => {
       // Bug #2: Interest should be calculated correctly for each account
       for (const account of accounts.filter((a) => a.apr1)) {
         const accountEntries = allCreatedEntries.filter(
-          (e) => e.accountRegisterId === account.id
+          (e) => e.accountRegisterId === account.id,
         );
         const interestEntries = accountEntries.filter((e) =>
-          e.description?.toLowerCase().includes("interest")
+          e.description?.toLowerCase().includes("interest"),
         );
 
         if (interestEntries.length > 1) {
@@ -434,10 +434,7 @@ describe("Integration Regression Tests", () => {
             .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
             .sort((a: string, b: string) => a.localeCompare(b));
           for (let i = 1; i < dates.length; i++) {
-            const daysDiff = dt(dates[i]).diff(
-              dt(dates[i - 1]),
-              "days"
-            );
+            const daysDiff = dt(dates[i]).diff(dt(dates[i - 1]), "days");
             if (account.statementIntervalId === 2) {
               // Weekly
               expect(daysDiff).toBeGreaterThan(5); // At least 6 days apart
@@ -454,7 +451,7 @@ describe("Integration Regression Tests", () => {
 
       // Monthly recurrence: when persistence captures recurrence entries, expect 7 monthly occurrences
       const monthlyRecurrenceEntries = allCreatedEntries.filter(
-        (e) => e.description === "Monthly Savings Transfer"
+        (e) => e.description === "Monthly Savings Transfer",
       );
       expect(monthlyRecurrenceEntries.length).toBeGreaterThanOrEqual(0);
       if (monthlyRecurrenceEntries.length >= 7) {
@@ -462,8 +459,13 @@ describe("Integration Regression Tests", () => {
           .map((e) => dt(e.createdAt).format("YYYY-MM-DD"))
           .sort((a: string, b: string) => a.localeCompare(b));
         expect(monthlyDates).toEqual([
-          "2025-01-01", "2025-02-01", "2025-03-01", "2025-04-01",
-          "2025-05-01", "2025-06-01", "2025-07-01",
+          "2025-01-01",
+          "2025-02-01",
+          "2025-03-01",
+          "2025-04-01",
+          "2025-05-01",
+          "2025-06-01",
+          "2025-07-01",
         ]);
       }
 
@@ -475,17 +477,17 @@ describe("Integration Regression Tests", () => {
       // Each account should have entries throughout the timeline
       for (const account of accounts) {
         const accountEntries = resultEntries.filter(
-          (e) => e.accountRegisterId === account.id
+          (e) => e.accountRegisterId === account.id,
         );
         expect(accountEntries.length).toBeGreaterThan(0);
 
         // Should have entries beyond the first month
         const latestEntry = Math.max(
-          ...accountEntries.map((e) => new Date(e.createdAt).getTime())
+          ...accountEntries.map((e) => new Date(e.createdAt).getTime()),
         );
         expect(Number.isFinite(latestEntry)).toBe(true);
         expect(new Date(latestEntry).getTime()).toBeGreaterThan(
-          new Date("2025-03-01T00:00:00.000Z").getTime()
+          new Date("2025-03-01T00:00:00.000Z").getTime(),
         );
       }
     });
@@ -508,7 +510,7 @@ describe("Integration Regression Tests", () => {
         apr1: new Decimal("0.10"), // 10% APR
         apr2: null,
         apr3: null,
-        apr1StartAt: null,
+        apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
         apr2StartAt: null,
         apr3StartAt: null,
         targetAccountRegisterId: null,
@@ -574,7 +576,7 @@ describe("Integration Regression Tests", () => {
           const rows = Array.isArray(data.data) ? data.data : [data.data];
           allCreatedEntries.push(...rows);
           return Promise.resolve({});
-        }
+        },
       );
 
       // Act: Process through month-end and leap year boundary
@@ -601,7 +603,7 @@ describe("Integration Regression Tests", () => {
       const interestEntries = allCreatedEntries.filter(
         (entry) =>
           entry.accountRegisterId === edgeCaseAccount.id &&
-          entry.description?.toLowerCase().includes("interest")
+          entry.description?.toLowerCase().includes("interest"),
       );
       if (interestEntries.length > 1) {
         const dates = interestEntries
@@ -639,7 +641,7 @@ describe("Integration Regression Tests", () => {
         apr1: new Decimal("0.08"), // 8% APR
         apr2: null,
         apr3: null,
-        apr1StartAt: null,
+        apr1StartAt: dateTimeService.create("2000-01-01T00:00:00.000Z"),
         apr2StartAt: null,
         apr3StartAt: null,
         targetAccountRegisterId: null,
@@ -677,10 +679,10 @@ describe("Integration Regression Tests", () => {
 
       const accountId = 100;
       const allEntries = (result.registerEntries || []).filter(
-        (e: any) => e.accountRegisterId === accountId
+        (e: any) => e.accountRegisterId === accountId,
       );
       const interestEntries = allEntries.filter((entry: any) =>
-        entry.description?.toLowerCase().includes("interest")
+        entry.description?.toLowerCase().includes("interest"),
       );
       expect(interestEntries.length).toBeGreaterThanOrEqual(48);
       expect(interestEntries.length).toBeLessThanOrEqual(65);

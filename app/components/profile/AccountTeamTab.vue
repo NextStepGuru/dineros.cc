@@ -19,6 +19,7 @@ const $api = useNuxtApp().$api as typeof $fetch;
 
 const accountId = ref<string>("");
 const inviteEmail = ref("");
+const inviteError = ref("");
 const isSending = ref(false);
 const isLoading = ref(true);
 const invites = ref<InviteRow[]>([]);
@@ -64,11 +65,9 @@ async function loadInvites() {
 }
 
 async function sendInvite() {
+  inviteError.value = "";
   if (!accountId.value || !inviteEmail.value.trim()) {
-    toast.add({
-      color: "error",
-      description: "Choose an account and enter an email address.",
-    });
+    inviteError.value = "Choose an account and enter an email address.";
     return;
   }
   isSending.value = true;
@@ -81,6 +80,7 @@ async function sendInvite() {
     inviteEmail.value = "";
     await loadInvites();
   } catch (e) {
+    inviteError.value = "We could not send the invitation. Check the email and try again.";
     handleError(e instanceof Error ? e : new Error(String(e)), toast);
   } finally {
     isSending.value = false;
@@ -120,6 +120,10 @@ div
   )
 
   .max-w-xl.mx-auto.space-y-4(v-else)
+    ul(v-if="inviteError" class="space-y-2")
+      li(role="alert" class="rounded-md border border-error/30 bg-error/10 px-3 py-2 text-sm text-error")
+        | {{ inviteError }}
+
     UFormField(label="Account" name="accountId")
       USelect(
         v-model="accountId"
@@ -137,6 +141,7 @@ div
         autocomplete="email"
         placeholder="colleague@example.com"
         class="w-full"
+        @input="inviteError = ''"
       )
 
     UButton(

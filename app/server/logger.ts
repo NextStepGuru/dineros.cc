@@ -54,8 +54,7 @@ transports.push(
 
         // Try to parse and colorize JSON if the message is a JSON string
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let parsedMessage = data as any;
+          let parsedMessage: unknown = data;
 
           if (data instanceof Error) {
             parsedMessage = {
@@ -93,10 +92,10 @@ const serializeError = (error: unknown): string => {
       stack: error.stack, // Stack trace (optional)
       // Optionally include custom properties if the error is extended
       ...Object.keys(error).reduce((acc, key) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (acc as any)[key] = (error as any)[key];
+        const errorRecord = error as Record<string, unknown>;
+        acc[key] = errorRecord[key];
         return acc;
-      }, {}),
+      }, {} as Record<string, unknown>),
     };
     return JSON.stringify(serializedError);
   }

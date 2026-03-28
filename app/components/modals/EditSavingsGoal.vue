@@ -25,6 +25,7 @@ const { $api } = useNuxtApp();
 const isCreate = computed(() => props.goal == null);
 const isSubmitting = ref(false);
 const showDeleteConfirm = ref(false);
+const form = ref<{ submit?: () => void } | null>(null);
 
 const formState = ref({
   name: "",
@@ -198,7 +199,16 @@ async function handleDelete() {
 }
 
 defineShortcuts({
+  enter: () => {
+    if (isSubmitting.value || showDeleteConfirm.value) return;
+    form.value?.submit?.();
+  },
   escape: () => {
+    if (isSubmitting.value) return;
+    if (showDeleteConfirm.value) {
+      showDeleteConfirm.value = false;
+      return;
+    }
     props.cancel();
   },
 });
@@ -213,6 +223,7 @@ defineShortcuts({
 
     <template #body>
       <UForm
+        ref="form"
         :schema="schema"
         :state="formState"
         class="space-y-5"
@@ -294,7 +305,21 @@ defineShortcuts({
           />
         </UFormField>
 
-        <div class="flex flex-wrap gap-2 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
+      </UForm>
+    </template>
+    <template #footer>
+      <div class="modal-action-bar modal-action-bar--between">
+        <div class="modal-action-group">
+          <UButton
+            type="button"
+            color="primary"
+            :loading="isSubmitting"
+            :disabled="isSubmitting"
+            class="modal-action-button"
+            @click="form?.submit?.()"
+          >
+            {{ isCreate ? "Create" : "Save" }}
+          </UButton>
           <UButton
             v-if="!isCreate"
             type="button"
@@ -302,23 +327,22 @@ defineShortcuts({
             variant="soft"
             :loading="isSubmitting"
             :disabled="isSubmitting"
+            class="modal-action-button"
             @click="showDeleteConfirm = true"
           >
             Archive
           </UButton>
-          <UButton type="button" variant="soft" @click="props.cancel()">
-            Cancel
-          </UButton>
-          <UButton
-            type="submit"
-            color="primary"
-            :loading="isSubmitting"
-            :disabled="isSubmitting"
-          >
-            {{ isCreate ? "Create" : "Save" }}
-          </UButton>
         </div>
-      </UForm>
+        <UButton
+          type="button"
+          variant="soft"
+          :disabled="isSubmitting"
+          class="modal-action-button"
+          @click="props.cancel()"
+        >
+          Cancel
+        </UButton>
+      </div>
     </template>
   </UModal>
 
@@ -328,8 +352,10 @@ defineShortcuts({
       <p class="text-sm">This goal will be archived. You can add a new goal anytime.</p>
     </template>
     <template #footer>
-      <UButton variant="soft" @click="showDeleteConfirm = false">Cancel</UButton>
-      <UButton color="error" @click="handleDelete">Archive</UButton>
+      <div class="modal-action-bar">
+        <UButton variant="soft" class="modal-action-button" @click="showDeleteConfirm = false">Cancel</UButton>
+        <UButton color="error" class="modal-action-button" @click="handleDelete">Archive</UButton>
+      </div>
     </template>
   </UModal>
   </div>

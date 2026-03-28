@@ -25,29 +25,6 @@ spec:
     spec:
       serviceAccountName: dineros
       containers:
-        - name: cloud-sql-proxy
-          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
-          args:
-            - "--structured-logs"
-            - "--address=0.0.0.0"
-            - "--port=3306"
-            - "${GCP_PROJECT_ID}:${GCP_REGION}:${CLOUDSQL_INSTANCE}"
-          env:
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /etc/google-service-account/service-account.json
-          volumeMounts:
-            - name: service-account-volume
-              mountPath: /etc/google-service-account
-              readOnly: true
-          securityContext:
-            runAsNonRoot: true
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "1"
         - name: dineros-microservice-production-container
           image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPO}/dineros-microservice:latest
           imagePullPolicy: Always
@@ -75,6 +52,11 @@ spec:
               value: "6379"
             - name: REDIS_HOST
               value: "redis-master.redis.svc.cluster.local"
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dineros-secrets
+                  key: INTERNAL_API_TOKEN
             - name: DB_DECRYPTION_KEY_1
               valueFrom:
                 secretKeyRef:

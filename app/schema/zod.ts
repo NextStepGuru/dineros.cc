@@ -421,10 +421,25 @@ export const reoccurrenceSchema = z
         path: ["amountAdjustmentDirection"],
       });
     }
-    if (data.amountAdjustmentValue == null || data.amountAdjustmentValue <= 0) {
+    if (data.amountAdjustmentMode === "PERCENT") {
+      if (
+        data.amountAdjustmentValue == null ||
+        data.amountAdjustmentValue <= 0 ||
+        data.amountAdjustmentValue > 1
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Percent adjustment must be greater than 0% and at most 100%.",
+          path: ["amountAdjustmentValue"],
+        });
+      }
+    } else if (
+      data.amountAdjustmentValue == null ||
+      data.amountAdjustmentValue <= 0
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "Adjustment value must be greater than zero.",
+        message: "Fixed adjustment value must be greater than zero.",
         path: ["amountAdjustmentValue"],
       });
     }
@@ -455,11 +470,11 @@ export const reoccurrenceSplitSchema = z
       if (
         !Number.isFinite(data.amount) ||
         data.amount <= 0 ||
-        data.amount > 100
+        data.amount > 1
       ) {
         ctx.addIssue({
           code: "custom",
-          message: "Split percentage must be greater than 0 and at most 100.",
+          message: "Split percentage must be greater than 0% and at most 100%.",
           path: ["amount"],
         });
       }

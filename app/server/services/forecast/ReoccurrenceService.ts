@@ -1,6 +1,9 @@
 import type { PrismaClient, Reoccurrence } from "@prisma/client";
 import type { IReoccurrenceService } from "./types";
-import type { CacheReoccurrence, ModernCacheService  } from "./ModernCacheService";
+import type {
+  CacheReoccurrence,
+  ModernCacheService,
+} from "./ModernCacheService";
 import type { RegisterEntryService } from "./RegisterEntryService";
 import type { TransferService } from "./TransferService";
 import { forecastLogger } from "./logger";
@@ -17,9 +20,9 @@ import {
 export class ReoccurrenceService implements IReoccurrenceService {
   /** Pre-scheduled reoccurrences by ISO date string (YYYY-MM-DD). Built once at timeline start; O(1) lookup per day. */
   private _scheduleByDate: Map<string, CacheReoccurrence[]> = new Map();
-  private cache: ModernCacheService;
-  private entryService: RegisterEntryService;
-  private transferService: TransferService;
+  private readonly cache: ModernCacheService;
+  private readonly entryService: RegisterEntryService;
+  private readonly transferService: TransferService;
 
   constructor(
     _db: PrismaClient,
@@ -73,187 +76,19 @@ export class ReoccurrenceService implements IReoccurrenceService {
         nextAt,
       )} to ${dateTimeService.format("YYYY-MM-DD", endDate)}`,
     );
-
-    // Process all due occurrences up to endDate
-    while (
-      nextAt &&
-      dateTimeService.isSameOrBefore(nextAt, dateTimeService.createUTC(endDate))
-    ) {
-      // Apply weekend adjustment to the current occurrence date if enabled
-      let adjustedLastAt = dateTimeService.clone(nextAt);
-      if (reoccurrence.adjustBeforeIfOnWeekend) {
-        adjustedLastAt = this.adjustDateIfWeekendOrHoliday(adjustedLastAt);
-      }
-
-      // endAt boundary is evaluated against the effective (possibly adjusted) occurrence date
-      if (
-        reoccurrence.endAt &&
-        dateTimeService.isAfter(adjustedLastAt, reoccurrence.endAt)
-      ) {
-        break;
-      }
-
-      occurrenceCount++;
-
-      // Create a reoccurrence object with the adjusted date for entry creation
-      const reoccurrenceForEntry = {
-        ...reoccurrence,
-        lastAt: dateTimeService.toDate(adjustedLastAt),
-      };
-
-      const storedBaseAmount = Number(reoccurrence.amount);
-      let effectiveAmount = this.applyStoredAmountAdjustments(
+    const endMoment = dateTimeService.createUTC(endDate);
+    while (nextAt && dateTimeService.isSameOrBefore(nextAt, endMoment)) {
+      const processed = this.processSingleOccurrence(
         reoccurrence,
-        dateTimeService.toDate(adjustedLastAt),
+        nextAt,
         anchorScheduleLastAt,
       );
-      const splitRatio =
-        storedBaseAmount === 0 ? 1 : effectiveAmount / storedBaseAmount;
-
-      // For debt accounts, cap payment to current balance so payments never exceed balance
-      let skipBecauseDebtPaidOff = false;
-      const targetAccountForCap = this.cache.accountRegister?.findOne?.({
-        id: reoccurrence.accountRegisterId,
-      });
-      if (
-        targetAccountForCap &&
-        [3, 4, 5, 99].includes(targetAccountForCap.typeId)
-      ) {
-        const amountOwed = Math.abs(+targetAccountForCap.balance);
-        if (amountOwed <= 0.005) {
-          effectiveAmount = 0;
-          skipBecauseDebtPaidOff = true; // Skip: debt already paid off
-        } else if (effectiveAmount > amountOwed) {
-          effectiveAmount = amountOwed;
-        }
+      if (processed.stop) {
+        break;
       }
-      if (skipBecauseDebtPaidOff) {
-        // Advance to next occurrence without creating an entry
-        const processedNominalDate = dateTimeService.toDate(nextAt);
-        const nextDate = this.calculateNextOccurrence({
-          ...reoccurrence,
-          lastAt: processedNominalDate,
-        });
-        if (!nextDate) break;
-        nextAt = dateTimeService.createUTC(nextDate);
-        const nowDate = dateTimeService.nowDate();
-        const cachedReoccurrence = this.cache.reoccurrence.findOne({
-          id: reoccurrence.id,
-        });
-        if (cachedReoccurrence) {
-          cachedReoccurrence.lastAt = processedNominalDate;
-          if (
-            dateTimeService.isSameOrBefore(
-              adjustedLastAt,
-              dateTimeService.createUTC(nowDate),
-            )
-          ) {
-            cachedReoccurrence.lastRunAt =
-              dateTimeService.toDate(adjustedLastAt);
-          }
-          this.cache.reoccurrence.update(cachedReoccurrence);
-        }
-        if (occurrenceCount > 1000) break;
-        continue;
-      }
-
-      // Create the entry for this occurrence
-      const occurrenceDescription = this.getOccurrenceDescription(
-        reoccurrence.description,
-        reoccurrence.intervalId,
-        (reoccurrence as { intervalName?: string }).intervalName,
-        dateTimeService.toDate(nextAt),
-      );
-      const recurrenceCategoryId = reoccurrence.categoryId ?? null;
-
-      if (reoccurrence.transferAccountRegisterId) {
-        this.transferService.transferBetweenAccounts({
-          targetAccountRegisterId: reoccurrence.transferAccountRegisterId,
-          sourceAccountRegisterId: reoccurrence.accountRegisterId,
-          amount: effectiveAmount,
-          description: occurrenceDescription,
-          reoccurrence: reoccurrenceForEntry,
-          categoryId: recurrenceCategoryId,
-        });
-      } else {
-        this.entryService.createEntry({
-          accountRegisterId: reoccurrence.accountRegisterId,
-          description: occurrenceDescription,
-          amount: effectiveAmount,
-          reoccurrence: reoccurrenceForEntry,
-          typeId: 9, // Reoccurrence Entry
-          categoryId: recurrenceCategoryId,
-        });
-      }
-
-      const splitEntries = (this.cache.reoccurrenceSplit
-        ?.find({ reoccurrenceId: reoccurrence.id }) ?? [])
-        .sort((a, b) => {
-          if (a.sortOrder !== b.sortOrder) {
-            return a.sortOrder - b.sortOrder;
-          }
-          return a.id - b.id;
-        });
-
-      for (const splitEntry of splitEntries) {
-        if (splitEntry.transferAccountRegisterId === reoccurrence.accountRegisterId) {
-          continue;
-        }
-
-        const splitDescription = splitEntry.description?.trim()
-          ? `${occurrenceDescription} - ${splitEntry.description.trim()}`
-          : `${occurrenceDescription} - Split`;
-
-        const splitMode = splitEntry.amountMode ?? "FIXED";
-        const splitAmount =
-          splitMode === "PERCENT"
-            ? effectiveAmount * (Number(splitEntry.amount) / 100)
-            : Number(splitEntry.amount) * splitRatio;
-
-        this.transferService.transferBetweenAccounts({
-          targetAccountRegisterId: splitEntry.transferAccountRegisterId,
-          sourceAccountRegisterId: reoccurrence.accountRegisterId,
-          amount: splitAmount,
-          description: splitDescription,
-          reoccurrence: reoccurrenceForEntry,
-          categoryId:
-            splitEntry.categoryId ?? recurrenceCategoryId,
-        });
-      }
-
-      // Advance to next occurrence
-      const processedNominalDate = dateTimeService.toDate(nextAt);
-      const nextDate = this.calculateNextOccurrence({
-        ...reoccurrence,
-        lastAt: processedNominalDate,
-      });
-      if (!nextDate) break;
-      nextAt = dateTimeService.createUTC(nextDate);
-
-      // Update the reoccurrence in cache so timeline advances (forecasting can go into future)
-      const nowDate = dateTimeService.nowDate();
-      const cachedReoccurrence = this.cache.reoccurrence.findOne({
-        id: reoccurrence.id,
-      });
-      if (cachedReoccurrence) {
-        cachedReoccurrence.lastAt = processedNominalDate;
-        if (
-          dateTimeService.isSameOrBefore(
-            adjustedLastAt,
-            dateTimeService.createUTC(nowDate),
-          )
-        ) {
-          cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
-        }
-        this.cache.reoccurrence.update(cachedReoccurrence);
-      }
-
-      // Safety check to prevent infinite loops
-      if (occurrenceCount > 1000) {
-        forecastLogger.error(
-          "ReoccurrenceService",
-          `Too many occurrences for reoccurrence ${reoccurrence.id}, stopping`,
-        );
+      occurrenceCount++;
+      nextAt = processed.nextAt;
+      if (this.hasExceededSafetyLimit(reoccurrence.id, occurrenceCount)) {
         break;
       }
     }
@@ -264,6 +99,240 @@ export class ReoccurrenceService implements IReoccurrenceService {
     );
   }
 
+  private processSingleOccurrence(
+    reoccurrence: Reoccurrence,
+    nextAt: any,
+    anchorScheduleLastAt: Date | null,
+  ): { stop: boolean; nextAt: any } {
+    const adjustedLastAt = this.getAdjustedOccurrenceDate(
+      nextAt,
+      reoccurrence.adjustBeforeIfOnWeekend,
+    );
+    if (this.isOccurrenceAfterEndAt(reoccurrence, adjustedLastAt)) {
+      return { stop: true, nextAt: null };
+    }
+
+    const processedNominalDate = dateTimeService.toDate(nextAt);
+    const amountContext = this.resolveOccurrenceAmountContext(
+      reoccurrence,
+      dateTimeService.toDate(adjustedLastAt),
+      anchorScheduleLastAt,
+    );
+
+    if (amountContext.skipBecauseDebtPaidOff) {
+      const next = this.advanceNextOccurrence(reoccurrence, processedNominalDate);
+      this.updateCachedReoccurrenceAfterProcessing(
+        reoccurrence.id,
+        processedNominalDate,
+        adjustedLastAt,
+      );
+      return { stop: next == null, nextAt: next };
+    }
+
+    const reoccurrenceForEntry = {
+      ...reoccurrence,
+      lastAt: dateTimeService.toDate(adjustedLastAt),
+    };
+    this.createOccurrenceEntries(
+      reoccurrence,
+      reoccurrenceForEntry,
+      processedNominalDate,
+      amountContext.effectiveAmount,
+      amountContext.splitRatio,
+    );
+    const next = this.advanceNextOccurrence(reoccurrence, processedNominalDate);
+    this.updateCachedReoccurrenceAfterProcessing(
+      reoccurrence.id,
+      processedNominalDate,
+      adjustedLastAt,
+    );
+    return { stop: next == null, nextAt: next };
+  }
+
+  private getAdjustedOccurrenceDate(nextAt: any, adjustBeforeIfOnWeekend: boolean): any {
+    if (!adjustBeforeIfOnWeekend) {
+      return dateTimeService.clone(nextAt);
+    }
+    return this.adjustDateIfWeekendOrHoliday(dateTimeService.clone(nextAt));
+  }
+
+  private isOccurrenceAfterEndAt(
+    reoccurrence: Reoccurrence,
+    adjustedLastAt: any,
+  ): boolean {
+    if (!reoccurrence.endAt) return false;
+    return dateTimeService.isAfter(adjustedLastAt, reoccurrence.endAt);
+  }
+
+  private resolveOccurrenceAmountContext(
+    reoccurrence: Reoccurrence,
+    adjustedOccurrenceDate: Date,
+    anchorScheduleLastAt: Date | null,
+  ): { effectiveAmount: number; splitRatio: number; skipBecauseDebtPaidOff: boolean } {
+    const storedBaseAmount = Number(reoccurrence.amount);
+    let effectiveAmount = this.applyStoredAmountAdjustments(
+      reoccurrence,
+      adjustedOccurrenceDate,
+      anchorScheduleLastAt,
+    );
+    const splitRatio =
+      storedBaseAmount === 0 ? 1 : effectiveAmount / storedBaseAmount;
+
+    let skipBecauseDebtPaidOff = false;
+    const targetAccountForCap = this.cache.accountRegister?.findOne?.({
+      id: reoccurrence.accountRegisterId,
+    });
+    if (targetAccountForCap && [3, 4, 5, 99].includes(targetAccountForCap.typeId)) {
+      const amountOwed = Math.abs(+targetAccountForCap.balance);
+      if (amountOwed <= 0.005) {
+        effectiveAmount = 0;
+        skipBecauseDebtPaidOff = true;
+      } else if (effectiveAmount > amountOwed) {
+        effectiveAmount = amountOwed;
+      }
+    }
+
+    return { effectiveAmount, splitRatio, skipBecauseDebtPaidOff };
+  }
+
+  private createOccurrenceEntries(
+    reoccurrence: Reoccurrence,
+    reoccurrenceForEntry: Reoccurrence,
+    nominalDate: Date,
+    effectiveAmount: number,
+    splitRatio: number,
+  ): void {
+    const occurrenceDescription = this.getOccurrenceDescription(
+      reoccurrence.description,
+      reoccurrence.intervalId,
+      (reoccurrence as { intervalName?: string }).intervalName,
+      nominalDate,
+    );
+    const recurrenceCategoryId = reoccurrence.categoryId ?? null;
+
+    if (reoccurrence.transferAccountRegisterId) {
+      this.transferService.transferBetweenAccounts({
+        targetAccountRegisterId: reoccurrence.transferAccountRegisterId,
+        sourceAccountRegisterId: reoccurrence.accountRegisterId,
+        amount: effectiveAmount,
+        description: occurrenceDescription,
+        reoccurrence: reoccurrenceForEntry,
+        categoryId: recurrenceCategoryId,
+      });
+    } else {
+      this.entryService.createEntry({
+        accountRegisterId: reoccurrence.accountRegisterId,
+        description: occurrenceDescription,
+        amount: effectiveAmount,
+        reoccurrence: reoccurrenceForEntry,
+        typeId: 9, // Reoccurrence Entry
+        categoryId: recurrenceCategoryId,
+      });
+    }
+
+    this.createSplitTransfers(
+      reoccurrence,
+      reoccurrenceForEntry,
+      occurrenceDescription,
+      recurrenceCategoryId,
+      effectiveAmount,
+      splitRatio,
+    );
+  }
+
+  private createSplitTransfers(
+    reoccurrence: Reoccurrence,
+    reoccurrenceForEntry: Reoccurrence,
+    occurrenceDescription: string,
+    recurrenceCategoryId: string | null,
+    effectiveAmount: number,
+    splitRatio: number,
+  ): void {
+    const splitEntries = (
+      this.cache.reoccurrenceSplit?.find({
+        reoccurrenceId: reoccurrence.id,
+      }) ?? []
+    ).sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      return a.id - b.id;
+    });
+
+    for (const splitEntry of splitEntries) {
+      if (
+        splitEntry.transferAccountRegisterId ===
+        reoccurrence.accountRegisterId
+      ) {
+        continue;
+      }
+      const splitDescription = splitEntry.description?.trim()
+        ? `${occurrenceDescription} - ${splitEntry.description.trim()}`
+        : `${occurrenceDescription} - Split`;
+      const splitMode = splitEntry.amountMode ?? "FIXED";
+      const splitAmount =
+        splitMode === "PERCENT"
+          ? effectiveAmount * this.normalizeSplitPercent(splitEntry.amount)
+          : Number(splitEntry.amount) * splitRatio;
+
+      this.transferService.transferBetweenAccounts({
+        targetAccountRegisterId: splitEntry.transferAccountRegisterId,
+        sourceAccountRegisterId: reoccurrence.accountRegisterId,
+        amount: splitAmount,
+        description: splitDescription,
+        reoccurrence: reoccurrenceForEntry,
+        categoryId: splitEntry.categoryId ?? recurrenceCategoryId,
+      });
+    }
+  }
+
+  private advanceNextOccurrence(
+    reoccurrence: Reoccurrence,
+    processedNominalDate: Date,
+  ): unknown {
+    const nextDate = this.calculateNextOccurrence({
+      ...reoccurrence,
+      lastAt: processedNominalDate,
+    });
+    if (!nextDate) return null;
+    return dateTimeService.createUTC(nextDate);
+  }
+
+  private updateCachedReoccurrenceAfterProcessing(
+    reoccurrenceId: number,
+    processedNominalDate: Date,
+    adjustedLastAt: any,
+  ): void {
+    const nowDate = dateTimeService.nowDate();
+    const cachedReoccurrence = this.cache.reoccurrence.findOne({
+      id: reoccurrenceId,
+    });
+    if (!cachedReoccurrence) return;
+
+    cachedReoccurrence.lastAt = processedNominalDate;
+    if (
+      dateTimeService.isSameOrBefore(
+        adjustedLastAt,
+        dateTimeService.createUTC(nowDate),
+      )
+    ) {
+      cachedReoccurrence.lastRunAt = dateTimeService.toDate(adjustedLastAt);
+    }
+    this.cache.reoccurrence.update(cachedReoccurrence);
+  }
+
+  private hasExceededSafetyLimit(
+    reoccurrenceId: number,
+    occurrenceCount: number,
+  ): boolean {
+    if (occurrenceCount <= 1000) return false;
+    forecastLogger.error(
+      "ReoccurrenceService",
+      `Too many occurrences for reoccurrence ${reoccurrenceId}, stopping`,
+    );
+    return true;
+  }
+
   private applyStoredAmountAdjustments(
     reoccurrence: Reoccurrence,
     occurrenceDate: Date,
@@ -271,7 +340,8 @@ export class ReoccurrenceService implements IReoccurrenceService {
   ): number {
     const cached = this.cache.reoccurrence.findOne({ id: reoccurrence.id });
     const mode =
-      (reoccurrence as { amountAdjustmentMode?: string }).amountAdjustmentMode ??
+      (reoccurrence as { amountAdjustmentMode?: string })
+        .amountAdjustmentMode ??
       cached?.amountAdjustmentMode ??
       "NONE";
     if (mode === "NONE") {
@@ -280,12 +350,10 @@ export class ReoccurrenceService implements IReoccurrenceService {
     const direction =
       (reoccurrence as { amountAdjustmentDirection?: string | null })
         .amountAdjustmentDirection ?? cached?.amountAdjustmentDirection;
-    const rawVal =
-      (reoccurrence as { amountAdjustmentValue?: unknown }).amountAdjustmentValue;
+    const rawVal = (reoccurrence as { amountAdjustmentValue?: unknown })
+      .amountAdjustmentValue;
     const value =
-      rawVal != null
-        ? Number(rawVal)
-        : cached?.amountAdjustmentValue ?? null;
+      rawVal == null ? (cached?.amountAdjustmentValue ?? null) : Number(rawVal);
     const adjIntervalId =
       (reoccurrence as { amountAdjustmentIntervalId?: number | null })
         .amountAdjustmentIntervalId ?? cached?.amountAdjustmentIntervalId;
@@ -374,7 +442,9 @@ export class ReoccurrenceService implements IReoccurrenceService {
     while (true) {
       const dayOfWeek = adjusted.day(); // 0 = Sunday, 6 = Saturday
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const isHoliday = holidayService.isHoliday(dateTimeService.toDate(adjusted));
+      const isHoliday = holidayService.isHoliday(
+        dateTimeService.toDate(adjusted),
+      );
       if (!isWeekend && !isHoliday) {
         return adjusted;
       }
@@ -394,6 +464,13 @@ export class ReoccurrenceService implements IReoccurrenceService {
     const dayOfMonth = dateTimeService.date(nominalDate);
     const suffix = dayOfMonth === 15 ? "#1" : "#2";
     return `${baseDescription} ${suffix}`;
+  }
+
+  private normalizeSplitPercent(rawAmount: unknown): number {
+    const n = Number(rawAmount);
+    if (!Number.isFinite(n)) return 0;
+    const abs = Math.abs(n);
+    return abs > 1 ? n / 100 : n;
   }
 
   /**

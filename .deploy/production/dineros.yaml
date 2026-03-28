@@ -25,31 +25,6 @@ spec:
     spec:
       serviceAccountName: dineros
       containers:
-        # Cloud SQL Auth Proxy sidecar: connects to Cloud SQL with SSL; app uses 127.0.0.1:3306
-        # Replace INSTANCE_NAME with your Cloud SQL instance ID if different (gcloud sql instances list)
-        - name: cloud-sql-proxy
-          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
-          args:
-            - "--structured-logs"
-            - "--address=0.0.0.0"
-            - "--port=3306"
-            - "${GCP_PROJECT_ID}:${GCP_REGION}:${CLOUDSQL_INSTANCE}"
-          env:
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /etc/google-service-account/service-account.json
-          volumeMounts:
-            - name: service-account-volume
-              mountPath: /etc/google-service-account
-              readOnly: true
-          securityContext:
-            runAsNonRoot: true
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "1"
         - name: dineros-production-container
           image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPO}/dineros:latest
           imagePullPolicy: Always
@@ -62,7 +37,6 @@ spec:
               containerPort: 80
               protocol: TCP
           env:
-            # Must be mysql://USER:PASSWORD@127.0.0.1:3306/production-dineros (proxy in same pod)
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
