@@ -62,7 +62,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: Install TruffleHog
-        run: GOBIN=/usr/local/bin go install github.com/trufflesecurity/trufflehog/v3/cmd/trufflehog@v3.90.7
+        run: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
       - name: Install pre-commit
         run: pip install pre-commit
       - name: Run pre-commit hooks
@@ -71,6 +71,10 @@ jobs:
   staging-build-main-site:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test
+      - pre-commit-security
     permissions:
       contents: read
       id-token: write
@@ -108,6 +112,10 @@ jobs:
   staging-build-microservice:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test
+      - pre-commit-security
     permissions:
       contents: read
       id-token: write
