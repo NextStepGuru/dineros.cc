@@ -9,12 +9,7 @@ export {
 
 /** Same OR filter as `server/api/register.ts` for `direction: "future"`. */
 export const futureRegisterEntryWhere = {
-  OR: [
-    { isCleared: false, isProjected: true },
-    { isProjected: false, isCleared: false, isPending: true },
-    { isBalanceEntry: true, isCleared: false },
-    { isProjected: false, isManualEntry: true, isCleared: false },
-  ],
+  OR: [{ isCleared: false, isReconciled: false }],
 };
 
 export async function createAccountSnapshot(accountId: string) {
@@ -48,9 +43,7 @@ export async function createAccountSnapshot(accountId: string) {
         orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
       });
 
-      const toAmount = (
-        entry: (typeof entries)[number],
-      ): number => {
+      const toAmount = (entry: (typeof entries)[number]): number => {
         const n = Number(entry.amount);
         const isLegacyInterest =
           reg.type.isCredit &&
@@ -73,12 +66,10 @@ export async function createAccountSnapshot(accountId: string) {
       });
 
       if (reg.type.isCredit) {
-        balanceUpdated = balanceUpdated.map(
-          (entry: { balance: number; [k: string]: unknown }) => ({
-            ...entry,
-            balance: Number(entry.balance) > 0 ? 0 : entry.balance,
-          }),
-        ) as typeof balanceUpdated;
+        balanceUpdated = balanceUpdated.map((entry) => ({
+          ...entry,
+          balance: Number(entry.balance) > 0 ? 0 : entry.balance,
+        }));
       }
 
       const ars = await tx.accountRegisterSnapshot.create({

@@ -1,7 +1,8 @@
 /**
- * Future-register tab: slice sorted entries starting at the balance (or first projected) row.
- * Extends the first page when the default window would end before the first loan/debt transfer
- * (many budget transfers sort earlier; loan rows use peer register ids or description patterns).
+ * Future-register tab: paginate the full sorted ledger from index 0 so pending / pre-balance
+ * rows are visible ahead of the balance line.
+ * Extends the window when it would end before the first loan/debt transfer *after* the balance
+ * (scan starts at balance so type-6 noise above the anchor is ignored).
  */
 
 export type FutureRegisterPaginationRow = {
@@ -40,16 +41,18 @@ export function paginateFutureRegisterWindow<T extends FutureRegisterPaginationR
 ): { paginated: T[]; hasMore: boolean } {
   const balanceIdx = entries.findIndex((e) => e.isBalanceEntry);
   const projectedIdx = entries.findIndex((e) => e.isProjected);
-  let anchorStart = 0;
+  // Only scan for loan/debt payment rows at or after the register anchor — not type-6 rows
+  // that might appear above the balance in pathological sort orders.
+  let loanScanStart = 0;
   if (balanceIdx >= 0) {
-    anchorStart = balanceIdx;
+    loanScanStart = balanceIdx;
   } else if (projectedIdx >= 0) {
-    anchorStart = projectedIdx;
+    loanScanStart = projectedIdx;
   }
-  const sliceStart = anchorStart + pageSkip;
+  const sliceStart = pageSkip;
 
   let transferAnchorIdx = -1;
-  for (let i = anchorStart; i < entries.length; i++) {
+  for (let i = loanScanStart; i < entries.length; i++) {
     const entry = entries[i];
     if (entry !== undefined && isLoanOrDebtPaymentType6(entry, loanTransferPeerIds)) {
       transferAnchorIdx = i;

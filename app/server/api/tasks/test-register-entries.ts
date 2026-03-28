@@ -2,12 +2,12 @@ import { prisma } from "~/server/clients/prismaClient";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
-  const accountRegisterId = query.accountRegisterId as string || "62";
+  const accountRegisterId = (query.accountRegisterId as string) || "62";
 
   if (!accountRegisterId) {
     throw createError({
       statusCode: 400,
-      statusMessage: "accountRegisterId is required"
+      statusMessage: "accountRegisterId is required",
     });
   }
 
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     // Get all entries for this account register
     const allEntries = await prisma.registerEntry.findMany({
       where: {
-        accountRegisterId: parseInt(accountRegisterId),
+        accountRegisterId: Number.parseInt(accountRegisterId, 10),
       },
       select: {
         id: true,
@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
         amount: true,
         balance: true,
         isCleared: true,
+        isReconciled: true,
         isProjected: true,
         isPending: true,
         isManualEntry: true,
@@ -35,23 +36,18 @@ export default defineEventHandler(async (event) => {
     });
 
     // Filter entries as the register API does for future direction
-    const futureEntries = allEntries.filter(entry => {
-      return (
-        (entry.isCleared === false && entry.isProjected === true) ||
-        (entry.isProjected === false && entry.isCleared === false && entry.isPending === true) ||
-        (entry.isBalanceEntry === true && entry.isCleared === false) ||
-        (entry.isProjected === false && entry.isManualEntry === true && entry.isCleared === false)
-      );
+    const futureEntries = allEntries.filter((entry) => {
+      return entry.isCleared === false && entry.isReconciled === false;
     });
 
     // Count by type
-    const clearedEntries = allEntries.filter(e => e.isCleared);
-    const activeEntries = allEntries.filter(e => !e.isCleared);
-    const balanceEntries = allEntries.filter(e => e.isBalanceEntry);
-    const clearedBalanceEntries = balanceEntries.filter(e => e.isCleared);
+    const clearedEntries = allEntries.filter((e) => e.isCleared);
+    const activeEntries = allEntries.filter((e) => !e.isCleared);
+    const balanceEntries = allEntries.filter((e) => e.isBalanceEntry);
+    const clearedBalanceEntries = balanceEntries.filter((e) => e.isCleared);
 
     return {
-      accountRegisterId: parseInt(accountRegisterId),
+      accountRegisterId: Number.parseInt(accountRegisterId, 10),
       totalEntries: allEntries.length,
       activeEntries: activeEntries.length,
       clearedEntries: clearedEntries.length,
@@ -64,7 +60,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     throw createError({
       statusCode: 500,
-      statusMessage: error instanceof Error ? error.message : "Unknown error"
+      statusMessage: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
