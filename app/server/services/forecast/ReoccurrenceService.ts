@@ -207,7 +207,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         const splitMode = splitEntry.amountMode ?? "FIXED";
         const splitAmount =
           splitMode === "PERCENT"
-            ? effectiveAmount * (Number(splitEntry.amount) / 100)
+            ? effectiveAmount * Number(splitEntry.amount)
             : Number(splitEntry.amount) * splitRatio;
 
         this.transferService.transferBetweenAccounts({
@@ -282,10 +282,9 @@ export class ReoccurrenceService implements IReoccurrenceService {
         .amountAdjustmentDirection ?? cached?.amountAdjustmentDirection;
     const rawVal =
       (reoccurrence as { amountAdjustmentValue?: unknown }).amountAdjustmentValue;
-    const value =
-      rawVal != null
-        ? Number(rawVal)
-        : cached?.amountAdjustmentValue ?? null;
+    const value = rawVal == null
+      ? cached?.amountAdjustmentValue ?? null
+      : Number(rawVal);
     const adjIntervalId =
       (reoccurrence as { amountAdjustmentIntervalId?: number | null })
         .amountAdjustmentIntervalId ?? cached?.amountAdjustmentIntervalId;

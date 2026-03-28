@@ -388,3 +388,43 @@ input:-webkit-autofill:active {
     border-radius: 0 !important;
   }
 }
+
+/* Shared modal footer action layout and interaction affordances */
+.modal-action-bar {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.modal-action-bar--between {
+  justify-content: space-between;
+}
+
+.modal-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+}
+
+.modal-action-button {
+  min-height: 2.5rem;
+  padding-inline: 1rem;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+}
+
+.modal-action-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.14);
+  filter: saturate(1.06);
+}
+
+.modal-action-button:active:not(:disabled) {
+  transform: translateY(0);
+}

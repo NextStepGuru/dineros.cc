@@ -145,7 +145,38 @@ const description = computed(() => {
   }
 });
 
+function triggerPrimaryAction() {
+  if (isSubmitting.value) return;
+
+  if (props.mode === "create") {
+    if (!createName.value.trim()) return;
+    void handleCreate();
+    return;
+  }
+
+  if (props.mode === "rename") {
+    if (!renameName.value.trim() || renameName.value === props.budget?.name) {
+      return;
+    }
+    void handleRename();
+    return;
+  }
+
+  if (props.mode === "reset") {
+    void handleReset();
+    return;
+  }
+
+  if (props.mode === "delete") {
+    void handleDelete();
+  }
+}
+
 defineShortcuts({
+  enter: {
+    usingInput: true,
+    handler: () => triggerPrimaryAction(),
+  },
   escape: () => props.cancel(),
 });
 </script>
@@ -187,12 +218,13 @@ UModal(
           | "{{ budget.name }}" will be archived and removed from your list.
 
   template(#footer)
-    .flex.gap-2.justify-end
+    .modal-action-bar
       UButton(
         v-if="mode === 'create'"
         color="primary"
         :loading="isSubmitting"
         :disabled="!createName?.trim() || isSubmitting"
+        class="modal-action-button"
         @click="handleCreate"
       ) Create
       UButton(
@@ -200,6 +232,7 @@ UModal(
         color="primary"
         :loading="isSubmitting"
         :disabled="!renameName?.trim() || renameName === budget?.name || isSubmitting"
+        class="modal-action-button"
         @click="handleRename"
       ) Rename
       UButton(
@@ -207,6 +240,7 @@ UModal(
         color="warning"
         :loading="isSubmitting"
         :disabled="isSubmitting"
+        class="modal-action-button"
         @click="handleReset"
       ) Reset from default
       UButton(
@@ -214,7 +248,8 @@ UModal(
         color="error"
         :loading="isSubmitting"
         :disabled="isSubmitting"
+        class="modal-action-button"
         @click="handleDelete"
       ) Delete
-      UButton(@click="cancel" color="neutral" variant="ghost") Cancel
+      UButton(@click="cancel" color="neutral" variant="ghost" class="modal-action-button") Cancel
 </template>

@@ -421,7 +421,9 @@ describe("ForecastEngine Integration Tests", () => {
         expect(result.isSuccess).toBe(false);
         expect(result.errors).toBeDefined();
         expect((result.errors ?? []).length).toBeGreaterThan(0);
-        expect((result.errors ?? [])[0]).toContain("Database connection failed");
+        expect((result.errors ?? [])[0]).toContain(
+          "Database connection failed",
+        );
       } finally {
         // Restore forecastLogger.error
         forecastLogger.error = originalError;

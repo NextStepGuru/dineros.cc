@@ -69,6 +69,165 @@ function baseRegister(overrides: Record<string, unknown>) {
   };
 }
 
+function assertBalanceRows(entries: RegisterEntry[]) {
+  const balanceRows = entries.filter((e) => e.isBalanceEntry);
+  expect(balanceRows).toHaveLength(3);
+  const balAmounts = balanceRows
+    .map((e) => Number(e.amount))
+    .sort((a, b) => a - b);
+  expect(balAmounts).toEqual([0, 0, 0]);
+}
+
+function assertRecurringEntries(
+  entries: RegisterEntry[],
+  checkingId: number,
+  savingsId: number,
+) {
+  const salary = entries.filter(
+    (e) =>
+      e.description === "Golden Salary" && e.accountRegisterId === checkingId,
+  );
+  const rent = entries.filter(
+    (e) =>
+      e.description === "Golden Rent" && e.accountRegisterId === checkingId,
+  );
+  const xferOut = entries.filter(
+    (e) =>
+      e.accountRegisterId === checkingId &&
+      e.typeId === 6 &&
+      e.description?.includes("Golden Savings xfer") &&
+      Number(e.amount) === -150,
+  );
+  const xferIn = entries.filter(
+    (e) =>
+      e.accountRegisterId === savingsId &&
+      e.description === "Golden Savings xfer" &&
+      Number(e.amount) === 150,
+  );
+
+  expect(salary.length).toBe(3);
+  expect(rent.length).toBe(3);
+  expect(xferOut.length).toBe(3);
+  expect(xferIn.length).toBe(3);
+  expect(
+    salary.every((e) => e.amount === 3_000 && e.reoccurrenceId != null),
+  ).toBe(true);
+}
+
+function assertLoanEntries(
+  entries: RegisterEntry[],
+  loanId: number,
+  checkingId: number,
+) {
+  const interestOnLoan = entries.filter(
+    (e) =>
+      e.accountRegisterId === loanId &&
+      e.description === "Interest Charge" &&
+      e.typeId === 2,
+  );
+  expect(interestOnLoan.length).toBeGreaterThanOrEqual(1);
+  const firstInterest = interestOnLoan[0];
+  if (!firstInterest)
+    throw new Error("Expected at least one loan interest entry");
+  expect(firstInterest.amount).toBeCloseTo(-39.55, 2);
+
+  const type6Pairs = entries.filter(
+    (e) =>
+      e.typeId === 6 &&
+      ((e.accountRegisterId === loanId &&
+        e.sourceAccountRegisterId === checkingId) ||
+        (e.accountRegisterId === checkingId &&
+          e.sourceAccountRegisterId === loanId)),
+  );
+  expect(type6Pairs.length).toBeGreaterThanOrEqual(2);
+  expect(
+    type6Pairs.every((e) => e.reoccurrenceId == null || e.reoccurrenceId !== 0),
+  ).toBe(true);
+
+  const paymentToLoan = entries.filter(
+    (e) =>
+      e.typeId === 6 &&
+      e.accountRegisterId === loanId &&
+      e.description.includes("Payment to"),
+  );
+  const transferForPayment = entries.filter(
+    (e) =>
+      e.typeId === 6 &&
+      e.accountRegisterId === checkingId &&
+      e.description.includes("Transfer for Payment"),
+  );
+  expect(paymentToLoan.length).toBeGreaterThanOrEqual(1);
+  expect(transferForPayment.length).toBeGreaterThanOrEqual(1);
+  const firstPaymentToLoan = paymentToLoan[0];
+  if (!firstPaymentToLoan) {
+    throw new Error("Expected at least one payment-to-loan entry");
+  }
+  expect(firstPaymentToLoan.amount).toBeCloseTo(119.91, 2);
+}
+
+function assertType6DailyZeroSum(entries: RegisterEntry[]) {
+  const type6ByDay = new Map<string, number>();
+  for (const e of entries.filter((x) => x.typeId === 6)) {
+    const d = e.createdAt.slice(0, 10);
+    type6ByDay.set(d, (type6ByDay.get(d) ?? 0) + Number(e.amount));
+  }
+  for (const sum of type6ByDay.values()) {
+    expect(Math.abs(r2(sum))).toBeLessThanOrEqual(0.02);
+  }
+}
+
+function assertRunningBalances(
+  entries: RegisterEntry[],
+  registerIds: number[],
+) {
+  const byReg = (id: number) =>
+    entries.filter((e) => e.accountRegisterId === id);
+  for (const regId of registerIds) {
+    const sorted = byReg(regId).sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    let prev: (typeof sorted)[number] | undefined;
+    for (const row of sorted) {
+      if (row.isBalanceEntry) {
+        expect(row.balance).toBe(row.amount);
+        prev = row;
+        continue;
+      }
+      if (prev) {
+        expect(r2(Number(row.balance))).toBe(
+          r2(Number(prev.balance) + Number(row.amount)),
+        );
+      }
+      prev = row;
+    }
+  }
+}
+
+function assertFinalBalanceConsistency(
+  entries: RegisterEntry[],
+  registerIds: number[],
+) {
+  const byReg = (id: number) =>
+    entries.filter((e) => e.accountRegisterId === id);
+  for (const regId of registerIds) {
+    const sorted = byReg(regId).sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const balEntry = sorted.find((e) => e.isBalanceEntry);
+    expect(balEntry).toBeDefined();
+    if (!balEntry) throw new Error("Expected balance entry");
+    const opening = Number(balEntry.amount);
+    const nonBal = sorted.filter((e) => !e.isBalanceEntry);
+    const sumAmt = nonBal.reduce((s, e) => s + Number(e.amount), 0);
+    const last = sorted.at(-1);
+    expect(last).toBeDefined();
+    if (!last) throw new Error("Expected at least one entry");
+    expect(r2(Number(last.balance))).toBe(r2(opening + sumAmt));
+  }
+}
+
 describe("threeMonthLoanAndReoccurrence forecast golden", () => {
   let db: any;
   let engine: ForecastEngine;
@@ -181,131 +340,12 @@ describe("threeMonthLoanAndReoccurrence forecast golden", () => {
 
     const entries = result.registerEntries;
 
-    const byReg = (id: number) =>
-      entries.filter((e) => e.accountRegisterId === id);
-
-    const balanceRows = entries.filter((e) => e.isBalanceEntry);
-    expect(balanceRows).toHaveLength(3);
-    // In-memory mock does not propagate opening balances to DataLoader; balance entry amounts are 0.
-    const balAmounts = balanceRows
-      .map((e) => Number(e.amount))
-      .sort((a, b) => a - b);
-    expect(balAmounts).toEqual([0, 0, 0]);
-
-    const salary = entries.filter(
-      (e) =>
-        e.description === "Golden Salary" &&
-        e.accountRegisterId === checking.id,
-    );
-    const rent = entries.filter(
-      (e) =>
-        e.description === "Golden Rent" && e.accountRegisterId === checking.id,
-    );
-    const xferOut = entries.filter(
-      (e) =>
-        e.accountRegisterId === checking.id &&
-        e.typeId === 6 &&
-        e.description?.includes("Golden Savings xfer") &&
-        Number(e.amount) === -150,
-    );
-    const xferIn = entries.filter(
-      (e) =>
-        e.accountRegisterId === savings.id &&
-        e.description === "Golden Savings xfer" &&
-        Number(e.amount) === 150,
-    );
-
-    // Monthly from Jan anchors → Feb, Mar, Apr occurrences inside window
-    expect(salary.length).toBe(3);
-    expect(rent.length).toBe(3);
-    expect(xferOut.length).toBe(3);
-    expect(xferIn.length).toBe(3);
-    expect(
-      salary.every((e) => e.amount === 3_000 && e.reoccurrenceId != null),
-    ).toBe(true);
-
-    const interestOnLoan = entries.filter(
-      (e) =>
-        e.accountRegisterId === loan.id &&
-        e.description === "Interest Charge" &&
-        e.typeId === 2,
-    );
-    expect(interestOnLoan.length).toBeGreaterThanOrEqual(1);
-
-    const type6Pairs = entries.filter(
-      (e) =>
-        e.typeId === 6 &&
-        ((e.accountRegisterId === loan.id &&
-          e.sourceAccountRegisterId === checking.id) ||
-          (e.accountRegisterId === checking.id &&
-            e.sourceAccountRegisterId === loan.id)),
-    );
-    expect(type6Pairs.length).toBeGreaterThanOrEqual(2);
-    expect(
-      type6Pairs.every(
-        (e) => e.reoccurrenceId == null || e.reoccurrenceId !== 0,
-      ),
-    ).toBe(true);
-
-    const paymentToLoan = entries.filter(
-      (e) =>
-        e.typeId === 6 &&
-        e.accountRegisterId === loan.id &&
-        e.description.includes("Payment to"),
-    );
-    const transferForPayment = entries.filter(
-      (e) =>
-        e.typeId === 6 &&
-        e.accountRegisterId === checking.id &&
-        e.description.includes("Transfer for Payment"),
-    );
-    expect(paymentToLoan.length).toBeGreaterThanOrEqual(1);
-    expect(transferForPayment.length).toBeGreaterThanOrEqual(1);
-
-    const type6ByDay = new Map<string, number>();
-    for (const e of entries.filter((x) => x.typeId === 6)) {
-      const d = e.createdAt.slice(0, 10);
-      type6ByDay.set(d, (type6ByDay.get(d) ?? 0) + Number(e.amount));
-    }
-    for (const sum of type6ByDay.values()) {
-      expect(Math.abs(r2(sum))).toBeLessThanOrEqual(0.02);
-    }
-
-    for (const regId of [checking.id, loan.id, savings.id] as number[]) {
-      const sorted = byReg(regId).sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
-      let prev: (typeof sorted)[number] | undefined;
-      for (const row of sorted) {
-        if (row.isBalanceEntry) {
-          expect(row.balance).toBe(row.amount);
-          prev = row;
-          continue;
-        }
-        if (prev) {
-          expect(r2(Number(row.balance))).toBe(
-            r2(Number(prev.balance) + Number(row.amount)),
-          );
-        }
-        prev = row;
-      }
-    }
-
-    for (const regId of [checking.id, loan.id, savings.id] as number[]) {
-      const sorted = byReg(regId).sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
-      const balEntry = sorted.find((e) => e.isBalanceEntry);
-      expect(balEntry).toBeDefined();
-      const opening = Number(balEntry!.amount);
-      const nonBal = sorted.filter((e) => !e.isBalanceEntry);
-      const sumAmt = nonBal.reduce((s, e) => s + Number(e.amount), 0);
-      const last = sorted.at(-1);
-      expect(last).toBeDefined();
-      expect(r2(Number(last!.balance))).toBe(r2(opening + sumAmt));
-    }
+    assertBalanceRows(entries);
+    assertRecurringEntries(entries, checking.id, savings.id);
+    assertLoanEntries(entries, loan.id, checking.id);
+    assertType6DailyZeroSum(entries);
+    assertRunningBalances(entries, [checking.id, loan.id, savings.id]);
+    assertFinalBalanceConsistency(entries, [checking.id, loan.id, savings.id]);
 
     expect(normalizeForSnapshot(entries)).toMatchSnapshot();
   });

@@ -23,6 +23,8 @@ process.env.DB_DECRYPTION_KEYS = dbDecryptionKeyValues.join(",");
 
 const parsedEnv = envSchema.safeParse(process.env);
 
+console.log(parsedEnv?.data?.DB_DECRYPTION_KEYS);
+
 if (!parsedEnv.success) {
   throw new Error("Environment variable validation failed");
 }

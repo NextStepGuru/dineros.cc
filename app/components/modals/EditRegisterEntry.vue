@@ -447,12 +447,42 @@ async function skipRegisterEntry() {
   state.isSkipping = false;
 }
 
-// ESC key handler to close modal
+function canSubmitRegularEdit(): boolean {
+  if (isDisabled.value || isPlaidTabActive.value || showDeleteConfirm.value) {
+    return false;
+  }
+  if (state.isTransferMode && isNewEntry.value && !selectedTransferAccountRegisterId.value) {
+    return false;
+  }
+  return true;
+}
+
 defineShortcuts({
-  escape: () => {
-    if (!isDisabled.value) {
-      props.cancel();
+  enter: () => {
+    if (state.showApplySelection) {
+      if (
+        state.isApplying ||
+        !selectedApplyAccountRegisterId.value
+      ) {
+        return;
+      }
+      void markAsApplied();
+      return;
     }
+    if (!canSubmitRegularEdit()) return;
+    form.value?.submit?.();
+  },
+  escape: () => {
+    if (isDisabled.value) return;
+    if (showDeleteConfirm.value) {
+      cancelDeleteConfirmation();
+      return;
+    }
+    if (state.showApplySelection) {
+      cancelApplySelection();
+      return;
+    }
+    props.cancel();
   },
 });
 
@@ -614,20 +644,19 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
 
   template(#footer)
     // Apply Selection Footer
-    div(v-if="state.showApplySelection" class="flex justify-between w-full")
+    div(v-if="state.showApplySelection" class="modal-action-bar modal-action-bar--between")
       UButton(
         color="primary"
         @click="markAsApplied"
         :loading="state.isApplying"
         :disabled="!selectedApplyAccountRegisterId || state.isApplying"
-        class="cursor-pointer"
+        class="modal-action-button"
       ) Confirm Apply
-
       UButton(
         @click="cancelApplySelection"
         color="neutral"
         :disabled="state.isApplying"
-        class="cursor-pointer"
+        class="modal-action-button"
       ) Cancel
 
     // Regular Action Footer
@@ -636,64 +665,60 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         v-if="showDeleteConfirm"
         class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
         p(class="mb-2") Are you sure you want to delete this register entry? This action cannot be undone.
-        div(class="flex gap-2")
+        div(class="modal-action-group")
           UButton(
             color="error"
             @click="deleteRegisterEntry"
             :loading="state.isDeleting"
             :disabled="isDisabled || isPlaidTabActive"
-            class="cursor-pointer"
+            class="modal-action-button"
           ) Confirm delete
           UButton(
             color="neutral"
             @click="cancelDeleteConfirmation"
             :disabled="state.isDeleting"
-            class="cursor-pointer"
+            class="modal-action-button"
           ) Cancel
-      div(class="flex justify-between w-full")
-      UButton(
-        color="primary"
-        @click.prevent="form?.submit()"
-        :loading="state.isSaving"
-        :disabled="isDisabled || isPlaidTabActive || (state.isTransferMode && isNewEntry && !selectedTransferAccountRegisterId)"
-        class="cursor-pointer"
-      ) {{ state.isTransferMode && isNewEntry ? 'Create Transfer' : 'Save' }}
-
-      UButton(
-        color="info"
-        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
-        @click="markAsCleared"
-        :loading="state.isClearing"
-        :disabled="isDisabled || isPlaidTabActive"
-        class="cursor-pointer"
-      ) Clear
-
-      UButton(
-        color="info"
-        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
-        @click="initiateApply"
-        :loading="state.isApplying"
-        :disabled="isDisabled || isPlaidTabActive"
-        class="cursor-pointer"
-      ) Apply
-
-      UButton(
-        color="error"
-        @click="confirmDelete"
-        :loading="state.isDeleting"
-        :disabled="isDisabled || isPlaidTabActive || showDeleteConfirm"
-        v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
-        class="cursor-pointer"
-      ) Delete
-
-      UButton(
-        color="error"
-        @click="skipRegisterEntry"
-        :loading="state.isSkipping"
-        :disabled="isDisabled || isPlaidTabActive"
-        class="cursor-pointer"
-        v-if="formState.id && formState.reoccurrenceId && formState.isProjected"
-      ) Skip Reoccurrence
-
-      UButton(@click="cancel" color="neutral" :disabled="isDisabled" class="cursor-pointer") Close
+      div(class="modal-action-bar modal-action-bar--between")
+        div(class="modal-action-group")
+          UButton(
+            color="primary"
+            @click.prevent="form?.submit()"
+            :loading="state.isSaving"
+            :disabled="isDisabled || isPlaidTabActive || (state.isTransferMode && isNewEntry && !selectedTransferAccountRegisterId)"
+            class="modal-action-button"
+          ) {{ state.isTransferMode && isNewEntry ? 'Create Transfer' : 'Save' }}
+          UButton(
+            color="info"
+            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            @click="markAsCleared"
+            :loading="state.isClearing"
+            :disabled="isDisabled || isPlaidTabActive"
+            class="modal-action-button"
+          ) Clear
+          UButton(
+            color="info"
+            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            @click="initiateApply"
+            :loading="state.isApplying"
+            :disabled="isDisabled || isPlaidTabActive"
+            class="modal-action-button"
+          ) Apply
+          UButton(
+            color="error"
+            @click="confirmDelete"
+            :loading="state.isDeleting"
+            :disabled="isDisabled || isPlaidTabActive || showDeleteConfirm"
+            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            class="modal-action-button"
+          ) Delete
+          UButton(
+            color="error"
+            @click="skipRegisterEntry"
+            :loading="state.isSkipping"
+            :disabled="isDisabled || isPlaidTabActive"
+            class="modal-action-button"
+            v-if="formState.id && formState.reoccurrenceId && formState.isProjected"
+          ) Skip Reoccurrence
+        UButton(@click="cancel" color="neutral" :disabled="isDisabled" class="modal-action-button") Close
 </template>

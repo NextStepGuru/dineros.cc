@@ -186,7 +186,7 @@ export function applyReoccurrenceAmountAdjustment(
   const v = value ?? 0;
   const dir = direction ?? "INCREASE";
   if (mode === "PERCENT") {
-    const factor = dir === "INCREASE" ? 1 + v / 100 : 1 - v / 100;
+    const factor = dir === "INCREASE" ? 1 + v : 1 - v;
     return roundCents(baseAmount * Math.pow(factor, completedSteps));
   }
   const sign = baseAmount >= 0 ? 1 : -1;

@@ -12,7 +12,7 @@ services:
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     ports:
-      - "127.0.0.1:3306:3306"
+      - "3309:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/conf.d:/etc/mysql/conf.d:ro
@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro

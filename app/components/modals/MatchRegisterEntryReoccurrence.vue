@@ -76,6 +76,14 @@ async function confirmMatch() {
 }
 
 defineShortcuts({
+  enter: {
+    usingInput: true,
+    handler: () => {
+      if (isSaving.value) return;
+      if (selectedId.value == null || !filteredRecurrences.value.length) return;
+      void confirmMatch();
+    },
+  },
   escape: () => {
     if (!isSaving.value) props.cancel();
   },
@@ -120,11 +128,12 @@ UModal(title="Match to existing recurrence" class="modal-mobile-fullscreen max-w
       p.text-sm.frog-text-muted.py-4.text-center(v-else) No results. Try another search.
 
   template(#footer)
-    .flex.justify-end.gap-2.w-full.flex-wrap
-      UButton(color="neutral" variant="soft" :disabled="isSaving" @click="cancel") Cancel
+    .modal-action-bar
+      UButton(color="neutral" variant="soft" :disabled="isSaving" @click="cancel" class="modal-action-button") Cancel
       UButton(
         color="primary"
         :loading="isSaving"
         :disabled="isSaving || selectedId == null || !filteredRecurrences.length"
+        class="modal-action-button"
         @click="confirmMatch") Match
 </template>

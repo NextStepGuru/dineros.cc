@@ -5,6 +5,10 @@
 
 set -e
 
+# Default remote sources (can be overridden with exported env vars)
+: "${DINEROS_PRODUCTION_DATABASE_URL:=empty}"
+: "${DINEROS_PRODUCTION_DATABASE_NAME:=production-dineros}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,14 +33,16 @@ parse_mysql_url() {
     local url=$1
     # Remove mysql:// prefix
     url=${url#mysql://}
+    # Strip query string if present
+    local connection_part=${url%%\?*}
 
     # Extract user:password@host:port/database
-    if [[ $url =~ ^([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/(.+)$ ]]; then
+    if [[ $connection_part =~ ^([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?(/(.+))?$ ]]; then
         DB_USER="${BASH_REMATCH[1]}"
         DB_PASS="${BASH_REMATCH[2]}"
         DB_HOST="${BASH_REMATCH[3]}"
         DB_PORT="${BASH_REMATCH[5]:-3306}"
-        DB_NAME="${BASH_REMATCH[6]}"
+        DB_NAME="${BASH_REMATCH[7]}"
 
         # URL decode the password only if it contains encoded characters
         if [[ "$DB_PASS" =~ % ]]; then
@@ -88,7 +94,7 @@ dump_database() {
 
     echo -e "${YELLOW}💾 Dumping $env database ($DB_NAME) from $DB_HOST:$DB_PORT...${NC}" >&2
 
-    # Build mysqldump command with SSL support for production databases
+    # Build mysqldump command
     local mysqldump_cmd=(
         mysqldump
         -h "$DB_HOST"
@@ -102,47 +108,12 @@ dump_database() {
         --databases "$DB_NAME"
     )
 
-    # Add SSL options for remote connections (Google Cloud SQL requires SSL)
-    local ssl_ca="${MYSQL_SSL_CA:-$HOME/mysql-server/server-ca.pem}"
-    local ssl_cert="${MYSQL_SSL_CERT:-$HOME/mysql-server/client-cert.pem}"
-    local ssl_key="${MYSQL_SSL_KEY:-$HOME/mysql-server/client-key.pem}"
-
-    if [ "$env" = "production" ] || [ "$env" = "staging" ]; then
-        # Use SSL certificates if available
-        if [ -f "$ssl_ca" ]; then
-            mysqldump_cmd+=(--ssl-mode=VERIFY_CA)
-            mysqldump_cmd+=(--ssl-ca="$ssl_ca")
-            if [ -f "$ssl_cert" ]; then
-                mysqldump_cmd+=(--ssl-cert="$ssl_cert")
-            fi
-            if [ -f "$ssl_key" ]; then
-                mysqldump_cmd+=(--ssl-key="$ssl_key")
-            fi
-        else
-            # Fallback to REQUIRED without verification if certs not found
-            mysqldump_cmd+=(--ssl-mode=REQUIRED)
-            mysqldump_cmd+=(--ssl-ca=)
-        fi
-    fi
-
     # Test connection first
     echo -e "${BLUE}🔍 Testing connection...${NC}" >&2
     local test_output
     # Use MYSQL_PWD to avoid password in command line
     export MYSQL_PWD="$DB_PASS"
-    local ssl_opts=""
-    if [ "$env" = "production" ] || [ "$env" = "staging" ]; then
-        if [ -f "$ssl_ca" ]; then
-            ssl_opts="--ssl-mode=VERIFY_CA --ssl-ca=$ssl_ca"
-            [ -f "$ssl_cert" ] && ssl_opts="$ssl_opts --ssl-cert=$ssl_cert"
-            [ -f "$ssl_key" ] && ssl_opts="$ssl_opts --ssl-key=$ssl_key"
-        else
-            ssl_opts="--ssl-mode=REQUIRED --ssl-ca="
-        fi
-    else
-        ssl_opts="--ssl-mode=PREFERRED"
-    fi
-    test_output=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" $ssl_opts -e "SELECT 1" 2>&1)
+    test_output=$(mysql --protocol=TCP -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -e "SELECT 1" 2>&1)
     local test_exit=$?
     unset MYSQL_PWD
 
@@ -204,7 +175,7 @@ restore_database() {
 
     # Local database configuration (from docker-compose defaults)
     local LOCAL_HOST="${MYSQL_HOST:-localhost}"
-    local LOCAL_PORT="${MYSQL_PORT:-3306}"
+    local LOCAL_PORT="${MYSQL_PORT:-3309}"
     local LOCAL_USER="${MYSQL_USER:-dineros}"
     local LOCAL_PASS="${MYSQL_PASSWORD:-dineros}"
     local LOCAL_DB="${MYSQL_DATABASE:-dineros}"
@@ -280,6 +251,14 @@ env_upper=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
 url_var="DINEROS_${env_upper}_DATABASE_URL"
 url="${!url_var}"
 parse_mysql_url "$url"
+if [ -z "$DB_NAME" ]; then
+    db_name_var="DINEROS_${env_upper}_DATABASE_NAME"
+    DB_NAME="${!db_name_var}"
+fi
+if [ -z "$DB_NAME" ]; then
+    echo -e "${RED}❌ Missing database name in $url_var. Set DINEROS_${env_upper}_DATABASE_NAME.${NC}"
+    exit 1
+fi
 SOURCE_DB_NAME="$DB_NAME"
 
 SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

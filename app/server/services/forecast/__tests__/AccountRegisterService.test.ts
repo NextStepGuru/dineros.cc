@@ -195,7 +195,9 @@ describe("AccountRegisterService", () => {
       ).toHaveBeenCalledWith(account1, 0); // Should include projected balance parameter
       expect(mockLoanCalculator.calculatePaymentAmount).toHaveBeenCalledWith(
         account1,
-        50,
+        -50,
+        0,
+        expect.any(Date),
       );
       expect(mockEntryService.createEntry).toHaveBeenCalled();
     });
@@ -485,12 +487,13 @@ describe("AccountRegisterService", () => {
 
       await (service as any).processAccountInterestCharge(account);
 
-      const paymentCalls = vi.mocked(mockEntryService.createEntry).mock.calls.filter(
-        (c: unknown[]) =>
+      const paymentCalls = vi
+        .mocked(mockEntryService.createEntry)
+        .mock.calls.filter((c: unknown[]) =>
           (c[0] as { description?: string }).description?.startsWith(
             "Payment for ",
           ),
-      );
+        );
       expect(paymentCalls).toHaveLength(1);
       expect(paymentCalls[0]![0]).toMatchObject({
         categoryId: PAYMENT_CAT,

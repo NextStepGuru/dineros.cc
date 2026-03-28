@@ -44,6 +44,17 @@ const splitsRef = ref<NonNullable<Schema["splits"]>>(
   })),
 );
 const isExternal = ref(true);
+
+function toPercentDisplay(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value * 100;
+}
+
+function toDecimalStorage(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value / 100;
+}
+
 const accountRegisterOptions = computed(() =>
   formatAccountRegisters(listStore.getAccountRegisters),
 );
@@ -150,6 +161,33 @@ const splitTargetOptions = computed(() =>
   ),
 );
 
+const amountAdjustmentValueDisplay = computed({
+  get: () => {
+    if (formState.amountAdjustmentMode === "PERCENT") {
+      return toPercentDisplay(formState.amountAdjustmentValue ?? null);
+    }
+    return formState.amountAdjustmentValue ?? null;
+  },
+  set: (value: number | null) => {
+    if (formState.amountAdjustmentMode === "PERCENT") {
+      formState.amountAdjustmentValue = toDecimalStorage(value);
+      return;
+    }
+    formState.amountAdjustmentValue =
+      value != null && Number.isFinite(value) ? value : null;
+  },
+});
+
+function getSplitPercentDisplay(split: NonNullable<Schema["splits"]>[number]): number | null {
+  return toPercentDisplay(Number(split.amount));
+}
+
+function setSplitPercentDisplay(index: number, value: number | null): void {
+  const split = splitsRef.value[index];
+  if (!split) return;
+  split.amount = toDecimalStorage(value) ?? 0;
+}
+
 async function handleSubmit({ data: formData }: FormSubmitEvent<Schema>) {
   try {
     isSaving.value = true;
@@ -225,16 +263,7 @@ async function deleteReoccurrence() {
     },
   });
 
-  if (!deleteReoccurrence) {
-    isSaving.value = false;
-    showDeleteConfirm.value = false;
-    toast.add({
-      color: "error",
-      description: "Failed to delete reoccurrence.",
-    });
-
-    return;
-  } else {
+  if (deleteReoccurrence) {
     toast.add({
       color: "success",
       description: "Deleted reoccurrence successfully.",
@@ -245,6 +274,14 @@ async function deleteReoccurrence() {
     isDeleting.value = false;
     showDeleteConfirm.value = false;
     props.cancel();
+  } else {
+    isSaving.value = false;
+    showDeleteConfirm.value = false;
+    toast.add({
+      color: "error",
+      description: "Failed to delete reoccurrence.",
+    });
+    isDeleting.value = false;
   }
 }
 
@@ -261,12 +298,20 @@ const splitCountLabel = computed(() => {
   return `${count} split${count === 1 ? "" : "s"}`;
 });
 
-// ESC key handler to close modal
+function triggerPrimaryAction() {
+  if (isSaving.value || isDeleting.value || showDeleteConfirm.value) return;
+  form.value?.submit?.();
+}
+
 defineShortcuts({
+  enter: () => triggerPrimaryAction(),
   escape: () => {
-    if (!isSaving.value && !isDeleting.value) {
-      props.cancel();
+    if (isSaving.value || isDeleting.value) return;
+    if (showDeleteConfirm.value) {
+      cancelDeleteConfirmation();
+      return;
     }
+    props.cancel();
   },
 });
 </script>
@@ -343,7 +388,7 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
               name="amountAdjustmentValue"
               :hint="formState.amountAdjustmentMode === 'PERCENT' ? 'Percent per adjustment period (compounded)' : 'Dollars added per adjustment period'")
                 UInputNumber(
-                  v-model="formState.amountAdjustmentValue"
+                  v-model="amountAdjustmentValueDisplay"
                   :step="formState.amountAdjustmentMode === 'PERCENT' ? 0.1 : 0.01"
                   class="w-full min-w-32")
           .flex.space-x-4
@@ -386,7 +431,13 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
               UFormField(label="Amount type" class="flex-none min-w-36")
                 USelect(v-model="split.amountMode" class="w-full" :items="[{ id: 'FIXED', name: 'Fixed ($)' }, { id: 'PERCENT', name: 'Percent (%)' }]" valueKey="id" labelKey="name")
               UFormField(v-if="split.amountMode === 'PERCENT'" label="Percent" hint="% of occurrence amount (after any amount adjustment)" class="flex-1 min-w-32")
-                UInputNumber(v-model="split.amount" :min="0.01" :max="100" :step="0.1" class="w-full")
+                UInputNumber(
+                  :model-value="getSplitPercentDisplay(split)"
+                  @update:model-value="setSplitPercentDisplay(index, $event)"
+                  :min="0.01"
+                  :max="100"
+                  :step="0.1"
+                  class="w-full")
               UFormField(v-else label="Amount" class="flex-1 min-w-32")
                 UInputNumber(v-model="split.amount" :format-options="formatCurrencyOptions" :step="0.01" class="w-full")
               UFormField(label="Transfer into Account" class="flex-1 min-w-40")
@@ -412,33 +463,36 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         v-if="showDeleteConfirm"
         class="mb-3 p-3 rounded-md border border-error/30 bg-error/10 text-sm")
         p(class="mb-2") Are you sure you want to delete this reoccurrence? This action cannot be undone.
-        div(class="flex gap-2")
+        div(class="modal-action-group")
           UButton(
             color="error"
             @click="deleteReoccurrence"
             :loading="isDeleting"
             :disabled="isSaving || isDeleting"
+            class="modal-action-button"
           ) Confirm delete
           UButton(
             color="neutral"
             @click="cancelDeleteConfirmation"
             :disabled="isDeleting"
+            class="modal-action-button"
           ) Cancel
-      .flex.justify-between.w-full
-      UButton(
-        color="primary"
-        @click.prevent="form?.submit()"
-        :loading="isSaving"
-        :disabled="isSaving || isDeleting"
-      ) Save
-
-      UButton(
-        color="error"
-        v-if="formState.id"
-        @click="confirmDelete"
-        :loading="isDeleting"
-        :disabled="isSaving || isDeleting || showDeleteConfirm"
-      ) Delete
-
-      UButton(color="neutral" @click="cancel" :disabled="isSaving || isDeleting") Close
+      .modal-action-bar.modal-action-bar--between
+        .modal-action-group
+          UButton(
+            color="primary"
+            @click.prevent="form?.submit()"
+            :loading="isSaving"
+            :disabled="isSaving || isDeleting"
+            class="modal-action-button"
+          ) Save
+          UButton(
+            color="error"
+            v-if="formState.id"
+            @click="confirmDelete"
+            :loading="isDeleting"
+            :disabled="isSaving || isDeleting || showDeleteConfirm"
+            class="modal-action-button"
+          ) Delete
+        UButton(color="neutral" @click="cancel" :disabled="isSaving || isDeleting" class="modal-action-button") Close
 </template>

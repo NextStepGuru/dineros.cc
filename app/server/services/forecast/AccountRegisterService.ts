@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IAccountRegisterService } from "./types";
-import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
+import type {
+  CacheAccountRegister,
+  ModernCacheService,
+} from "./ModernCacheService";
 import prismaPkg from "@prisma/client";
 import type { LoanCalculatorService } from "./LoanCalculatorService";
 import type { RegisterEntryService } from "./RegisterEntryService";
@@ -13,19 +16,18 @@ const { Prisma } = prismaPkg;
 
 export class AccountRegisterService implements IAccountRegisterService {
   private _pendingStatementAtUpdates: { id: number; statementAt: Date }[] = [];
-  private cache: ModernCacheService;
-  private loanCalculator: LoanCalculatorService;
-  private entryService: RegisterEntryService;
-  private transferService: TransferService;
+  private readonly cache: ModernCacheService;
+  private readonly loanCalculator: LoanCalculatorService;
+  private readonly entryService: RegisterEntryService;
+  private readonly transferService: TransferService;
 
   constructor(
-    db: PrismaClient,
+    _db: PrismaClient,
     cache: ModernCacheService,
     loanCalculator: LoanCalculatorService,
     entryService: RegisterEntryService,
     transferService: TransferService,
   ) {
-    void db;
     this.cache = cache;
     this.loanCalculator = loanCalculator;
     this.entryService = entryService;
@@ -59,7 +61,8 @@ export class AccountRegisterService implements IAccountRegisterService {
       if (!ar.statementAt || ar.isArchived) continue;
       const interestEligible =
         absoluteMoney(ar.balance) > 0.005 &&
-        (ar.targetAccountRegisterId !== null || ar.accruesBalanceGrowth === true);
+        (ar.targetAccountRegisterId !== null ||
+          ar.accruesBalanceGrowth === true);
       if (!interestEligible) continue;
 
       let st = dateTimeService.toDate(
@@ -187,6 +190,12 @@ export class AccountRegisterService implements IAccountRegisterService {
         updatedAt: dateTimeService.nowDate(),
         adjustBeforeIfOnWeekend: false,
         categoryId: null,
+        amountAdjustmentMode: "NONE",
+        amountAdjustmentDirection: null,
+        amountAdjustmentValue: null,
+        amountAdjustmentIntervalId: null,
+        amountAdjustmentIntervalCount: 1,
+        amountAdjustmentAnchorAt: null,
       },
     });
 
@@ -197,7 +206,9 @@ export class AccountRegisterService implements IAccountRegisterService {
     if (accountRegister.targetAccountRegisterId) {
       const paymentAmount = this.loanCalculator.calculatePaymentAmount(
         accountRegister,
-        Math.abs(interest),
+        interest,
+        projectedBalance,
+        accrualDate,
       );
 
       if (paymentAmount > 0) {
@@ -224,6 +235,12 @@ export class AccountRegisterService implements IAccountRegisterService {
             updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
             categoryId: null,
+            amountAdjustmentMode: "NONE",
+            amountAdjustmentDirection: null,
+            amountAdjustmentValue: null,
+            amountAdjustmentIntervalId: null,
+            amountAdjustmentIntervalCount: 1,
+            amountAdjustmentAnchorAt: null,
           },
         });
       }
@@ -231,7 +248,9 @@ export class AccountRegisterService implements IAccountRegisterService {
       // If there's no target account, create a direct payment entry
       const paymentAmount = this.loanCalculator.calculatePaymentAmount(
         accountRegister,
-        Math.abs(interest),
+        interest,
+        projectedBalance,
+        accrualDate,
       );
 
       if (paymentAmount > 0) {
@@ -258,6 +277,12 @@ export class AccountRegisterService implements IAccountRegisterService {
             updatedAt: dateTimeService.nowDate(),
             adjustBeforeIfOnWeekend: false,
             categoryId: null,
+            amountAdjustmentMode: "NONE",
+            amountAdjustmentDirection: null,
+            amountAdjustmentValue: null,
+            amountAdjustmentIntervalId: null,
+            amountAdjustmentIntervalCount: 1,
+            amountAdjustmentAnchorAt: null,
           },
         });
       }
@@ -272,9 +297,9 @@ export class AccountRegisterService implements IAccountRegisterService {
     forecastDate?: any,
   ): Promise<void> {
     // Add a simple flag to track if method is called
-    (global as any).updateStatementDatesCalled = true;
-    (global as any).updateStatementDatesCallCount =
-      ((global as any).updateStatementDatesCallCount || 0) + 1;
+    (globalThis as any).updateStatementDatesCalled = true;
+    (globalThis as any).updateStatementDatesCallCount =
+      ((globalThis as any).updateStatementDatesCallCount || 0) + 1;
     for (const account of accounts) {
       await this.updateStatementDate(account, forecastDate);
     }
@@ -346,146 +371,115 @@ export class AccountRegisterService implements IAccountRegisterService {
   ): any {
     switch (statementIntervalId) {
       case 1: {
-        // Day
-        // Use DateTime add method directly.
-        const dailyMoment = dateTimeService.create(currentStatementAt);
-        const dailyNextDay = dailyMoment.add(1, "day");
-
-        return dailyNextDay;
+        return dateTimeService.create(currentStatementAt).add(1, "day");
       }
       case 2: {
-        // Week
-        // Use DateTime add method directly.
-        const weeklyMoment = dateTimeService.create(currentStatementAt);
-        const weeklyNextDay = weeklyMoment.add(1, "week");
-
-        return weeklyNextDay;
+        return dateTimeService.create(currentStatementAt).add(1, "week");
       }
       case 3: {
-        // Month
-        // For monthly, manually construct the next month's date
-        // Ensure we work in UTC to avoid timezone issues
-        const currentMoment = dateTimeService.createUTC(currentStatementAt);
-        const currentDay = currentMoment.date() as number;
-        const currentMonth = currentMoment.month() as number;
-        const currentYear = currentMoment.year() as number;
-
-        // Calculate next month and year
-        let nextMonth = currentMonth + 1;
-        let nextYear = currentYear;
-        if (nextMonth > 11) {
-          nextMonth = 0;
-          nextYear++;
-        }
-
-        // Create the next month's date with the same day (in UTC)
-        const nextMonthMoment = dateTimeService
-          .createUTC()
-          .setYear(nextYear)
-          .setMonth(nextMonth);
-
-        // Check if the target day exists in the next month
-        const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
-
-        let targetDay: number;
-        let targetMonth = nextMonth;
-        let targetYear = nextYear;
-
-        if (currentDay > daysInNextMonth) {
-          // Day doesn't exist in next month
-          // Special case: If current day is 31 and next month is February, skip to March 1
-          // This handles Jan 31 -> Mar 1 (not Feb 29)
-          if (currentDay === 31 && nextMonth === 1) {
-            targetMonth = 2; // March
-            targetDay = 1;
-            if (targetMonth > 11) {
-              targetMonth = 0;
-              targetYear++;
-            }
-          } else {
-            // Otherwise, clamp to last day of next month
-            targetDay = daysInNextMonth;
-          }
-        } else {
-          targetDay = currentDay;
-        }
-
-        const resultMoment = dateTimeService
-          .createUTC()
-          .setYear(targetYear)
-          .setMonth(targetMonth)
-          .setDate(targetDay);
-
-        return dateTimeService.toDate(resultMoment);
+        return this.calculateMonthlyNextStatementDate(currentStatementAt);
       }
       case 4: {
-        // Year
-        // Ensure we work in UTC to avoid timezone issues
-        const yearlyMoment = dateTimeService.createUTC(currentStatementAt);
-        const currentDay = yearlyMoment.date() as number;
-        const currentMonth = yearlyMoment.month() as number;
-        const currentYear = yearlyMoment.year() as number;
-
-        // Add one year
-        const nextYear = currentYear + 1;
-
-        // Handle Feb 29 -> Mar 1 in non-leap years
-        if (currentMonth === 1 && currentDay === 29) {
-          // Check if next year is a leap year by checking days in February
-          const nextYearFeb = dateTimeService
-            .createUTC()
-            .setYear(nextYear)
-            .setMonth(1);
-          const daysInFeb = dateTimeService.daysInMonth(nextYearFeb);
-
-          if (daysInFeb < 29) {
-            // Next year is not a leap year, move to Mar 1
-            return dateTimeService.toDate(
-              dateTimeService
-                .createUTC()
-                .setYear(nextYear)
-                .setMonth(2)
-                .setDate(1),
-            );
-          }
-        }
-
-        // For other dates, add one year normally
-        const yearlyNextDay = yearlyMoment.add(1, "year");
-        return yearlyNextDay;
+        return this.calculateYearlyNextStatementDate(currentStatementAt);
       }
       case 5: {
-        // Once (one-time)
-        // Use DateTime add method directly.
-        const onceMoment = dateTimeService.create(currentStatementAt);
-        const onceNextDay = onceMoment.add(1, "year"); // Default to yearly for one-time
-
-        return onceNextDay;
+        return dateTimeService.create(currentStatementAt).add(1, "year");
       }
       default: {
-        // For monthly, manually construct the next month's date
-        const currentMomentDefault = dateTimeService.create(currentStatementAt);
-        const currentDayDefault = currentMomentDefault.date() as number;
-        const currentMonthDefault = currentMomentDefault.month() as number;
-        const currentYearDefault = currentMomentDefault.year() as number;
-
-        // Calculate next month and year
-        let nextMonthDefault = currentMonthDefault + 1;
-        let nextYearDefault = currentYearDefault;
-        if (nextMonthDefault > 11) {
-          nextMonthDefault = 0;
-          nextYearDefault++;
-        }
-
-        // Create the next month's date with the same day
-        const nextMonthMomentDefault = dateTimeService
-          .create()
-          .setYear(nextYearDefault)
-          .setMonth(nextMonthDefault)
-          .setDate(currentDayDefault);
-        return dateTimeService.toDate(nextMonthMomentDefault);
+        return this.calculateDefaultMonthlyStatementDate(currentStatementAt);
       }
     }
+  }
+
+  private getNextMonthYear(
+    month: number,
+    year: number,
+  ): {
+    month: number;
+    year: number;
+  } {
+    const nextMonth = month + 1;
+    if (nextMonth > 11) {
+      return { month: 0, year: year + 1 };
+    }
+    return { month: nextMonth, year };
+  }
+
+  private calculateMonthlyNextStatementDate(currentStatementAt: any): Date {
+    const currentMoment = dateTimeService.createUTC(currentStatementAt);
+    const currentDay = currentMoment.date() as number;
+    const currentMonth = currentMoment.month() as number;
+    const currentYear = currentMoment.year() as number;
+
+    const next = this.getNextMonthYear(currentMonth, currentYear);
+    const nextMonthMoment = dateTimeService
+      .createUTC()
+      .setYear(next.year)
+      .setMonth(next.month);
+    const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
+
+    let targetMonth = next.month;
+    let targetYear = next.year;
+    let targetDay = currentDay;
+
+    if (currentDay > daysInNextMonth) {
+      if (currentDay === 31 && next.month === 1) {
+        const march = this.getNextMonthYear(next.month, next.year);
+        targetMonth = march.month;
+        targetYear = march.year;
+        targetDay = 1;
+      } else {
+        targetDay = daysInNextMonth;
+      }
+    }
+
+    return dateTimeService.toDate(
+      dateTimeService
+        .createUTC()
+        .setYear(targetYear)
+        .setMonth(targetMonth)
+        .setDate(targetDay),
+    );
+  }
+
+  private calculateYearlyNextStatementDate(currentStatementAt: any): any {
+    const yearlyMoment = dateTimeService.createUTC(currentStatementAt);
+    const currentDay = yearlyMoment.date() as number;
+    const currentMonth = yearlyMoment.month() as number;
+    const currentYear = yearlyMoment.year() as number;
+    const nextYear = currentYear + 1;
+
+    if (currentMonth === 1 && currentDay === 29) {
+      const nextYearFeb = dateTimeService
+        .createUTC()
+        .setYear(nextYear)
+        .setMonth(1);
+      const daysInFeb = dateTimeService.daysInMonth(nextYearFeb);
+
+      if (daysInFeb < 29) {
+        return dateTimeService.toDate(
+          dateTimeService.createUTC().setYear(nextYear).setMonth(2).setDate(1),
+        );
+      }
+    }
+
+    return yearlyMoment.add(1, "year");
+  }
+
+  private calculateDefaultMonthlyStatementDate(currentStatementAt: any): Date {
+    const currentMoment = dateTimeService.create(currentStatementAt);
+    const currentDay = currentMoment.date() as number;
+    const currentMonth = currentMoment.month() as number;
+    const currentYear = currentMoment.year() as number;
+    const next = this.getNextMonthYear(currentMonth, currentYear);
+
+    return dateTimeService.toDate(
+      dateTimeService
+        .create()
+        .setYear(next.year)
+        .setMonth(next.month)
+        .setDate(currentDay),
+    );
   }
 
   /** Cached at timeline start to avoid full account scans every day. */

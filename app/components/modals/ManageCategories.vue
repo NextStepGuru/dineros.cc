@@ -131,7 +131,19 @@ async function archiveCategory(id: string) {
   }
 }
 
+function triggerPrimaryAction() {
+  if (savingId.value || isAdding.value) return;
+  if (editingId.value) {
+    void saveEdit();
+    return;
+  }
+  if (newName.value.trim()) {
+    void addCategory();
+  }
+}
+
 defineShortcuts({
+  enter: () => triggerPrimaryAction(),
   escape: () => {
     if (editingId.value) cancelEdit();
     else props.cancel();
@@ -215,5 +227,6 @@ UModal(
         | No categories yet. Add one above.
 
   template(#footer)
-    UButton(@click="cancel" color="neutral") Close
+    .modal-action-bar
+      UButton(@click="cancel" color="neutral" class="modal-action-button") Close
 </template>
