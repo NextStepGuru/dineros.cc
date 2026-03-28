@@ -44,4 +44,3 @@ body:
           required: true
         - label: This request does not include secrets or private data.
           required: true
-

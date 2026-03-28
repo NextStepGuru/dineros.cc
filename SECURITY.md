@@ -41,4 +41,3 @@ Older commits and forks are not guaranteed to receive patches.
 
 This repository is actively moving toward stronger public-repo safeguards,
 including secret hygiene and key exposure review.
-

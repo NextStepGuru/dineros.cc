@@ -4,6 +4,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
+    "prepare": "husky",
     "build": "pnpm --filter dineros-app build",
     "dev": "pnpm --filter dineros-app dev",
     "lint": "pnpm --filter dineros-app lint",
@@ -62,6 +63,10 @@
     "node": ">=24.14.0"
   },
   "dependencies": {
-    "@47ng/cloak": "^1.2.0"
+    "@47ng/cloak": "^1.2.0",
+    "npm-check-updates": "^19.6.6"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
   }
 }
