@@ -223,12 +223,12 @@ defineShortcuts({
 
     <template #body>
       <UForm
+        ref="form"
         :schema="schema"
         :state="formState"
         class="space-y-5"
         @submit="handleSubmit"
         @error="handleFormError"
-        ref="form"
       >
         <UFormField label="Name" name="name" for="goal-name" required>
           <UInput

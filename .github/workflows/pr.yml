@@ -62,7 +62,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: Install TruffleHog
-        run: GOBIN=/usr/local/bin go install github.com/trufflesecurity/trufflehog/v3@v3.90.7
+        run: GOBIN=/usr/local/bin go install github.com/trufflesecurity/trufflehog/v3/cmd/trufflehog@v3.90.7
       - name: Install pre-commit
         run: pip install pre-commit
       - name: Run pre-commit hooks
