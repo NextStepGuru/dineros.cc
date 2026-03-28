@@ -2,6 +2,54 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import { ForecastEngineFactory } from "../index";
 import { dateTimeService } from "../DateTimeService";
 import { forecastLogger } from "../logger";
+import { recalculateRunningBalanceAndSort } from "~/lib/sort";
+
+/**
+ * ForecastEngine passes `0` into `calculateRunningBalances` (anchor comes from the balance row
+ * after sort mutates it — same as `recalculateRunningBalanceAndSort(..., balance: 0, ...)`).
+ */
+type SortFlagOverrides = Map<
+  string,
+  { isManualEntry?: boolean; isMatched?: boolean }
+>;
+
+function expectBalancesMatchLedgerSort(
+  entries: any[],
+  sortInitialBalance: number,
+  type: "debit" | "credit",
+  sortFlagOverrides?: SortFlagOverrides,
+): void {
+  const forSort = entries.map((e) => {
+    const o = sortFlagOverrides?.get(String(e.id));
+    return {
+      ...e,
+      amount: Number(e.amount),
+      balance: Number(e.balance),
+      isBalanceEntry: Boolean(e.isBalanceEntry),
+      isPending: Boolean(e.isPending),
+      isCleared: Boolean(e.isCleared),
+      isProjected: Boolean(e.isProjected),
+      isManualEntry: Boolean(o?.isManualEntry ?? e.isManualEntry),
+      isMatched: Boolean(o?.isMatched ?? e.isMatched),
+      createdAt:
+        typeof e.createdAt?.toDate === "function"
+          ? e.createdAt.toDate()
+          : e.createdAt,
+    };
+  });
+  const sorted = recalculateRunningBalanceAndSort({
+    registerEntries: forSort,
+    balance: sortInitialBalance,
+    type,
+  });
+  const byId = new Map(sorted.map((e) => [String((e as { id: unknown }).id), e]));
+  for (const entry of entries) {
+    const id = String(entry.id);
+    const row = byId.get(id);
+    expect(row, `entry ${id} missing from sort output`).toBeDefined();
+    expect(Number(entry.balance)).toBeCloseTo(Number(row!.balance), 5);
+  }
+}
 
 describe("Balance Arithmetic Regression Tests", () => {
   let mockPrisma: any;
@@ -277,16 +325,13 @@ describe("Balance Arithmetic Regression Tests", () => {
       const balanceEntries = entries.filter((e: any) => e.isBalanceEntry);
       expect(balanceEntries.length).toBeGreaterThan(0);
 
-      // Check that running balances are calculated correctly
-      let runningBalance = 0;
-      for (const entry of entries) {
-        if (entry.isBalanceEntry) {
-          runningBalance = entry.amount;
-        } else {
-          runningBalance += entry.amount;
-        }
-        expect(entry.balance).toBe(runningBalance);
-      }
+      // ForecastEngine `convertToFinalFormat` omits `isManualEntry`; seed rows need flags for sort parity.
+      expectBalancesMatchLedgerSort(
+        entries,
+        0,
+        "debit",
+        new Map([["entry-1", { isManualEntry: true }]]),
+      );
     } finally {
       forecastLogger.debug = originalDebug;
       forecastLogger.info = originalInfo;
@@ -398,16 +443,7 @@ describe("Balance Arithmetic Regression Tests", () => {
     const balanceEntries = entries.filter((e: any) => e.isBalanceEntry);
     expect(balanceEntries.length).toBeGreaterThan(0);
 
-    // Check that running balances are calculated correctly for credit account
-    let runningBalance = 0;
-    for (const entry of entries) {
-      if (entry.isBalanceEntry) {
-        runningBalance = entry.amount;
-      } else {
-        runningBalance += entry.amount;
-      }
-      expect(entry.balance).toBe(runningBalance);
-    }
+    expectBalancesMatchLedgerSort(entries, 0, "credit");
   });
 
   it("should handle complex balance scenarios", async () => {
@@ -526,15 +562,6 @@ describe("Balance Arithmetic Regression Tests", () => {
     const balanceEntries = entries.filter((e: any) => e.isBalanceEntry);
     expect(balanceEntries.length).toBeGreaterThan(0);
 
-    // Check that running balances are calculated correctly
-    let runningBalance = 0;
-    for (const entry of entries) {
-      if (entry.isBalanceEntry) {
-        runningBalance = entry.amount;
-      } else {
-        runningBalance += entry.amount;
-      }
-      expect(entry.balance).toBe(runningBalance);
-    }
+    expectBalancesMatchLedgerSort(entries, 0, "debit");
   });
 });

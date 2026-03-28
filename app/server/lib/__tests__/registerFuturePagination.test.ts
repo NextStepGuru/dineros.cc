@@ -41,7 +41,7 @@ describe("paginateFutureRegisterWindow", () => {
     expect(hasMore).toBe(false);
   });
 
-  it("does not anchor on a loan-looking row before the balance row (scan starts at anchorStart)", () => {
+  it("does not use a loan-looking row before the balance as the loan-extension anchor", () => {
     const peers = new Set([8]);
     const rows: Row[] = [
       t6("Transfer for Payment to Old", 8),
@@ -67,9 +67,10 @@ describe("paginateFutureRegisterWindow", () => {
         (e) => e.description === "Transfer for Payment to Loan",
       ),
     ).toBe(true);
+    // First page starts at ledger index 0, so pre-balance rows (including the decoy loan) appear.
     expect(
       paginated.some((e) => e.description === "Transfer for Payment to Old"),
-    ).toBe(false);
+    ).toBe(true);
     expect(hasMore).toBe(false);
   });
 

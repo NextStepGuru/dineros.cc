@@ -6,12 +6,13 @@ import { calculateAdjustedBalance } from "~/lib/calculateAdjustedBalance";
 import { dateTimeService } from "~/server/services/forecast";
 import type { PrismaClient } from "@prisma/client";
 
-/** Same OR filter as `server/api/register.ts` for `direction: "future"`. */
+/**
+ * Same OR filter as `server/api/register.ts` for `direction: "future"`.
+ * All uncleared (non-reconciled) ledger rows stay on Future until the user clears them;
+ * reconciled rows are Past-only so they are not duplicated across tabs.
+ */
 export const futureRegisterEntryOr = [
-  { isCleared: false, isProjected: true },
-  { isProjected: false, isCleared: false, isPending: true },
-  { isBalanceEntry: true },
-  { isProjected: false, isManualEntry: true, isCleared: false },
+  { isCleared: false, isReconciled: false },
 ] as const;
 
 export function registerBelongsToUserAccountWhere(
@@ -73,7 +74,11 @@ export function stripRegisterEntryPlaidJson<T extends { plaidJson?: unknown }>(
 
 /** Legacy credit interest sign fix — same as register API. */
 export function toAmountForRegisterEntry(
-  entry: { amount: unknown; typeId?: number | null; description?: string | null },
+  entry: {
+    amount: unknown;
+    typeId?: number | null;
+    description?: string | null;
+  },
   isCredit: boolean,
 ): number {
   const n = Number(entry.amount);
@@ -141,7 +146,9 @@ export function futureBalanceAtOrBeforeAsOf(
 }
 
 /** Projected register balance at end of day on `asOf` (e.g. month end), same rules as future register API. */
-export function forecastBalanceAtMonthEnd<T extends LedgerSortableEntry>(params: {
+export function forecastBalanceAtMonthEnd<
+  T extends LedgerSortableEntry,
+>(params: {
   registerEntriesWithoutPlaidJson: T[];
   latestBalance: unknown;
   pocketBalances: Array<{ balance: unknown }>;

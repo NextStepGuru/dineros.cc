@@ -1,15 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
+
+type RegisterTestGlobal = typeof globalThis & {
+  defineEventHandler: Mock;
+  getQuery: Mock;
+  readMultipartFormData: Mock;
+};
+
+function registerTestGlobal(): RegisterTestGlobal {
+  return globalThis as RegisterTestGlobal;
+}
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
-  (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
-  (globalThis as any).getQuery = vi.fn();
-  (globalThis as any).readMultipartFormData = vi.fn();
+  const g = registerTestGlobal();
+  g.defineEventHandler = vi.fn((handler) => handler);
+  g.getQuery = vi.fn();
+  g.readMultipartFormData = vi.fn();
 });
 
 // Make H3 functions globally available
-(globalThis as any).getQuery = vi.fn();
-(globalThis as any).readMultipartFormData = vi.fn();
+{
+  const g = registerTestGlobal();
+  g.getQuery = vi.fn();
+  g.readMultipartFormData = vi.fn();
+}
 
 // Mock H3/Nuxt utilities before any imports
 vi.mock("h3", () => ({
@@ -18,7 +33,10 @@ vi.mock("h3", () => ({
     const statusCode = error.statusCode || 500;
     const message = error.statusMessage || error.message || "Unknown error";
     const fullMessage = `HTTP ${statusCode}: ${message}`;
-    const err = new Error(fullMessage) as any;
+    const err = new Error(fullMessage) as Error & {
+      statusCode: number;
+      statusMessage: string;
+    };
     err.statusCode = statusCode;
     err.statusMessage = message;
     throw err;
@@ -78,8 +96,9 @@ describe("Register and File Upload API Endpoints", () => {
     vi.clearAllMocks();
 
     // Properly set up the global mock functions
-    (globalThis as any).getQuery = vi.fn();
-    (globalThis as any).readMultipartFormData = vi.fn();
+    const g = registerTestGlobal();
+    g.getQuery = vi.fn();
+    g.readMultipartFormData = vi.fn();
   });
 
   describe("GET /api/register", () => {
@@ -140,16 +159,16 @@ describe("Register and File Upload API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
 
-      (globalThis as any).getQuery.mockReturnValue(mockQuery);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
+      registerTestGlobal().getQuery.mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
-      (prisma.registerEntry.count as any).mockResolvedValue(2);
-      (prisma.registerEntry.findMany as any).mockResolvedValue(
+      vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(2);
+      vi.mocked(prisma.registerEntry.findMany as Mock).mockResolvedValue(
         mockRegisterEntries,
       );
-      (prisma.accountRegister.findMany as any).mockImplementation(
+      vi.mocked(prisma.accountRegister.findMany as Mock).mockImplementation(
         (args: { where?: Record<string, unknown> }) => {
           const w = args?.where ?? {};
           if ("subAccountRegisterId" in w) {
@@ -161,13 +180,13 @@ describe("Register and File Upload API Endpoints", () => {
           return Promise.resolve([]);
         },
       );
-      (recalculateRunningBalanceAndSort as any).mockReturnValue(
+      vi.mocked(recalculateRunningBalanceAndSort as Mock).mockReturnValue(
         mockBalanceUpdated,
       );
 
       const result = await registerHandler(mockEvent);
 
-      expect((globalThis as any).getQuery).toHaveBeenCalledWith(mockEvent);
+      expect(registerTestGlobal().getQuery).toHaveBeenCalledWith(mockEvent);
       expect(getUser).toHaveBeenCalledWith(mockEvent);
       expect(prisma.accountRegister.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -191,12 +210,7 @@ describe("Register and File Upload API Endpoints", () => {
       expect(prisma.registerEntry.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           accountRegisterId: 1,
-          OR: [
-            { isCleared: false, isProjected: true },
-            { isProjected: false, isCleared: false, isPending: true },
-            { isBalanceEntry: true },
-            { isProjected: false, isManualEntry: true, isCleared: false },
-          ],
+          OR: [{ isCleared: false, isReconciled: false }],
           register: {
             account: {
               is: {
@@ -256,13 +270,13 @@ describe("Register and File Upload API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
 
-      (globalThis as any).getQuery.mockReturnValue(mockQuery);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
+      registerTestGlobal().getQuery.mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
-      (prisma.registerEntry.count as any).mockResolvedValue(1);
-      (prisma.registerEntry.findMany as any).mockResolvedValue([
+      vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(1);
+      vi.mocked(prisma.registerEntry.findMany as Mock).mockResolvedValue([
         {
           id: "e1",
           description: "Bal",
@@ -278,7 +292,7 @@ describe("Register and File Upload API Endpoints", () => {
           sourceAccountRegisterId: null,
         },
       ]);
-      (prisma.accountRegister.findMany as any).mockImplementation(
+      vi.mocked(prisma.accountRegister.findMany as Mock).mockImplementation(
         (args: { where?: Record<string, unknown> }) => {
           const w = args?.where ?? {};
           if ("subAccountRegisterId" in w) {
@@ -292,7 +306,7 @@ describe("Register and File Upload API Endpoints", () => {
           return Promise.resolve([]);
         },
       );
-      (recalculateRunningBalanceAndSort as any).mockImplementation(
+      vi.mocked(recalculateRunningBalanceAndSort as Mock).mockImplementation(
         (x: { registerEntries: unknown[] }) => x.registerEntries,
       );
 
@@ -383,14 +397,14 @@ describe("Register and File Upload API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
 
-      (globalThis as any).getQuery.mockReturnValue(mockQuery);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
+      registerTestGlobal().getQuery.mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
-      (prisma.registerEntry.count as any).mockResolvedValue(fromDb.length);
-      (prisma.registerEntry.findMany as any).mockResolvedValue(fromDb);
-      (prisma.accountRegister.findMany as any).mockImplementation(
+      vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(fromDb.length);
+      vi.mocked(prisma.registerEntry.findMany as Mock).mockResolvedValue(fromDb);
+      vi.mocked(prisma.accountRegister.findMany as Mock).mockImplementation(
         (args: { where?: Record<string, unknown> }) => {
           const w = args?.where ?? {};
           if ("subAccountRegisterId" in w) {
@@ -402,7 +416,7 @@ describe("Register and File Upload API Endpoints", () => {
           return Promise.resolve([]);
         },
       );
-      (recalculateRunningBalanceAndSort as any).mockReturnValue(sorted);
+      vi.mocked(recalculateRunningBalanceAndSort as Mock).mockReturnValue(sorted);
 
       const result = await registerHandler(mockEvent);
 
@@ -416,214 +430,193 @@ describe("Register and File Upload API Endpoints", () => {
       expect(result.hasMore).toBe(false);
     });
 
-    it(
-      "should successfully return register entries in quick mode",
-      async () => {
-        const mockEvent = {};
-        const mockQuery = {
-          accountId: "account-123",
-          accountRegisterId: "1",
-          focusedAt: "2024-01-01",
-          skip: "0",
-          take: "100", // Test with higher take to see Math.min behavior
-          direction: "future",
-          loadMode: "quick",
-        };
+    it("should successfully return register entries in quick mode", async () => {
+      const mockEvent = {};
+      const mockQuery = {
+        accountId: "account-123",
+        accountRegisterId: "1",
+        focusedAt: "2024-01-01",
+        skip: "0",
+        take: "100", // Test with higher take to see Math.min behavior
+        direction: "future",
+        loadMode: "quick",
+      };
 
-        const mockAccountRegister = {
-          id: 1,
-          balance: 1000,
-          latestBalance: 1500,
-          targetAccountRegisterId: null as number | null,
-          type: { isCredit: true },
-        };
+      const mockAccountRegister = {
+        id: 1,
+        balance: 1000,
+        latestBalance: 1500,
+        targetAccountRegisterId: null as number | null,
+        type: { isCredit: true },
+      };
 
-        const mockRegisterEntries = [
-          {
-            id: "entry-1",
-            description: "Test Entry",
-            amount: 100,
-            balance: 1100,
-            seq: 1,
-          },
-        ];
+      const mockRegisterEntries = [
+        {
+          id: "entry-1",
+          description: "Test Entry",
+          amount: 100,
+          balance: 1100,
+          seq: 1,
+        },
+      ];
 
-        const mockBalanceUpdated = [
-          { ...mockRegisterEntries[0], balance: 1500 },
-        ];
+      const mockBalanceUpdated = [{ ...mockRegisterEntries[0], balance: 1500 }];
 
-        const { getQuery } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
-        const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { recalculateRunningBalanceAndSort } = await import("~/lib/sort");
 
-        (getQuery as any).mockReturnValue(mockQuery);
-        (globalThis as any).getQuery.mockReturnValue(mockQuery);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
-          mockAccountRegister,
-        );
-        (prisma.registerEntry.count as any).mockResolvedValue(2);
-        (prisma.registerEntry.findMany as any).mockResolvedValue(
-          mockRegisterEntries,
-        );
-        (prisma.accountRegister.findMany as any).mockImplementation(
-          (args: { where?: Record<string, unknown> }) => {
-            const w = args?.where ?? {};
-            if ("subAccountRegisterId" in w) {
-              return Promise.resolve([]);
-            }
-            if ("targetAccountRegisterId" in w && "accountId" in w) {
-              return Promise.resolve([]);
-            }
+      vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
+      registerTestGlobal().getQuery.mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+        mockAccountRegister,
+      );
+      vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(2);
+      vi.mocked(prisma.registerEntry.findMany as Mock).mockResolvedValue(
+        mockRegisterEntries,
+      );
+      vi.mocked(prisma.accountRegister.findMany as Mock).mockImplementation(
+        (args: { where?: Record<string, unknown> }) => {
+          const w = args?.where ?? {};
+          if ("subAccountRegisterId" in w) {
             return Promise.resolve([]);
-          },
-        );
-        (recalculateRunningBalanceAndSort as any).mockReturnValue(
-          mockBalanceUpdated,
-        );
+          }
+          if ("targetAccountRegisterId" in w && "accountId" in w) {
+            return Promise.resolve([]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+      vi.mocked(recalculateRunningBalanceAndSort as Mock).mockReturnValue(
+        mockBalanceUpdated,
+      );
 
-        const result = await registerHandler(mockEvent);
+      const result = await registerHandler(mockEvent);
 
-        expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            take: 2,
-            orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
-            where: expect.objectContaining({
-              accountRegisterId: 1,
-              OR: [
-                { isCleared: false, isProjected: true },
-                { isProjected: false, isCleared: false, isPending: true },
-                { isBalanceEntry: true },
-                { isProjected: false, isManualEntry: true, isCleared: false },
-              ],
-              register: {
-                account: {
-                  is: {
-                    id: "account-123",
-                    userAccounts: {
-                      some: { userId: 123 },
-                    },
+      expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 2,
+          orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
+          where: expect.objectContaining({
+            accountRegisterId: 1,
+            OR: [{ isCleared: false, isReconciled: false }],
+            register: {
+              account: {
+                is: {
+                  id: "account-123",
+                  userAccounts: {
+                    some: { userId: 123 },
                   },
                 },
               },
-            }),
+            },
           }),
-        );
-        expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
-          registerEntries: mockRegisterEntries,
-          balance: 1500, // latestBalance - 0 (null pocket balances)
-          type: "credit",
-        });
-        // Credit register API caps running balance at 0 (never show positive when payments exceed)
-        const expectedEntries = [
-          { ...mockBalanceUpdated[0], balance: 0 },
-        ];
-        expect(result).toEqual({
-          entries: expectedEntries,
-          lowest: expectedEntries[0],
-          highest: expectedEntries[0],
-          skip: 0,
-          focusedAt: expect.any(Date),
-          take: 50,
-          loadMode: "quick",
-          isPartialLoad: true,
-          hasMore: false,
-          totalCount: 2,
-        });
-      }
-    );
+        }),
+      );
+      expect(recalculateRunningBalanceAndSort).toHaveBeenCalledWith({
+        registerEntries: mockRegisterEntries,
+        balance: 1500, // latestBalance - 0 (null pocket balances)
+        type: "credit",
+      });
+      // Credit register API caps running balance at 0 (never show positive when payments exceed)
+      const expectedEntries = [{ ...mockBalanceUpdated[0], balance: 0 }];
+      expect(result).toEqual({
+        entries: expectedEntries,
+        lowest: expectedEntries[0],
+        highest: expectedEntries[0],
+        skip: 0,
+        focusedAt: expect.any(Date),
+        take: 50,
+        loadMode: "quick",
+        isPartialLoad: true,
+        hasMore: false,
+        totalCount: 2,
+      });
+    });
 
-    it(
-      "should handle past direction with correct filter conditions",
-      async () => {
-        const mockEvent = {};
-        const mockQuery = {
-          accountId: "account-123",
-          accountRegisterId: "1",
-          focusedAt: "2024-01-01",
-          skip: "0",
-          take: "100",
-          direction: "past",
-          loadMode: "full",
-        };
+    it("should handle past direction with correct filter conditions", async () => {
+      const mockEvent = {};
+      const mockQuery = {
+        accountId: "account-123",
+        accountRegisterId: "1",
+        focusedAt: "2024-01-01",
+        skip: "0",
+        take: "100",
+        direction: "past",
+        loadMode: "full",
+      };
 
-        const mockAccountRegister = {
-          id: 1,
-          balance: 1000,
-          latestBalance: 1500,
-          targetAccountRegisterId: null as number | null,
-          type: { isCredit: false },
-        };
+      const mockAccountRegister = {
+        id: 1,
+        balance: 1000,
+        latestBalance: 1500,
+        targetAccountRegisterId: null as number | null,
+        type: { isCredit: false },
+      };
 
-        const { getQuery } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
+      const { getQuery } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
 
-        (getQuery as any).mockReturnValue(mockQuery);
-        (globalThis as any).getQuery.mockReturnValue(mockQuery);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue(
-          mockAccountRegister,
-        );
-        (prisma.registerEntry.count as any).mockResolvedValue(0);
-        (prisma.registerEntry.findMany as any).mockResolvedValue([]);
-        (prisma.accountRegister.findMany as any).mockImplementation(
-          (args: { where?: Record<string, unknown> }) => {
-            const w = args?.where ?? {};
-            if ("subAccountRegisterId" in w) {
-              return Promise.resolve([]);
-            }
+      vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
+      registerTestGlobal().getQuery.mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+        mockAccountRegister,
+      );
+      vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(0);
+      vi.mocked(prisma.registerEntry.findMany as Mock).mockResolvedValue([]);
+      vi.mocked(prisma.accountRegister.findMany as Mock).mockImplementation(
+        (args: { where?: Record<string, unknown> }) => {
+          const w = args?.where ?? {};
+          if ("subAccountRegisterId" in w) {
             return Promise.resolve([]);
-          },
-        );
+          }
+          return Promise.resolve([]);
+        },
+      );
 
-        await registerHandler(mockEvent);
+      await registerHandler(mockEvent);
 
-        const peerLoanCalls = (prisma.accountRegister.findMany as any).mock.calls.filter(
-          (call: unknown[]) => {
-            const arg = call[0] as { where?: Record<string, unknown> } | undefined;
-            return arg?.where && "targetAccountRegisterId" in arg.where;
-          },
-        );
-        expect(peerLoanCalls.length).toBe(0);
+      const peerLoanCalls = vi
+        .mocked(prisma.accountRegister.findMany)
+        .mock.calls.filter((call: unknown[]) => {
+          const arg = call[0] as
+            | { where?: Record<string, unknown> }
+            | undefined;
+          return arg?.where && "targetAccountRegisterId" in arg.where;
+        });
+      expect(peerLoanCalls.length).toBe(0);
 
-        expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            take: 100,
-            orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
-            where: expect.objectContaining({
-              accountRegisterId: 1,
-              OR: [
-                { isCleared: true },
-                { isBalanceEntry: true },
-                { isReconciled: true },
-                {
-                  isPending: false,
-                  isProjected: false,
-                  isCleared: false,
-                  createdAt: {
-                    lte: new Date("2024-01-01T00:00:00.000Z"),
-                  },
-                },
-              ],
-              register: {
-                account: {
-                  is: {
-                    id: "account-123",
-                    userAccounts: {
-                      some: {
-                        userId: 123,
-                      },
+      expect(prisma.registerEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 100,
+          orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
+          where: expect.objectContaining({
+            accountRegisterId: 1,
+            OR: [
+              { isCleared: true },
+              { isBalanceEntry: true },
+              { isReconciled: true },
+            ],
+            register: {
+              account: {
+                is: {
+                  id: "account-123",
+                  userAccounts: {
+                    some: {
+                      userId: 123,
                     },
                   },
                 },
               },
-            }),
-          })
-        );
-      }
-    );
+            },
+          }),
+        }),
+      );
+    });
 
     it("should handle unauthorized access", async () => {
       const mockEvent = {};
@@ -634,12 +627,12 @@ describe("Register and File Upload API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getQuery as any).mockReturnValue(mockQuery);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findUniqueOrThrow as any).mockRejectedValue(
-        new Error("Account register not found")
+      vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockRejectedValue(
+        new Error("Account register not found"),
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      vi.mocked(handleApiError as Mock).mockImplementation((error: any) => {
         throw error;
       });
 
@@ -655,9 +648,9 @@ describe("Register and File Upload API Endpoints", () => {
       const { getUser } = await import("~/server/lib/getUser");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getQuery as any).mockReturnValue(mockQuery);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (handleApiError as any).mockImplementation((error: any) => {
+      vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(handleApiError as Mock).mockImplementation((error: any) => {
         throw error;
       });
 
@@ -674,230 +667,215 @@ describe("Register and File Upload API Endpoints", () => {
       uploadFileHandler = module.default;
     });
 
-    it(
-      "should successfully process CSV file upload",
-      async () => {
-        const mockEvent = {};
-        const mockFormData = [
+    it("should successfully process CSV file upload", async () => {
+      const mockEvent = {};
+      const mockFormData = [
+        {
+          name: "accountRegisterId",
+          data: Buffer.from("1"),
+        },
+        {
+          name: "fileData",
+          data: Buffer.from(
+            "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food",
+          ),
+        },
+      ];
+
+      const mockCsvData = {
+        data: [
           {
-            name: "accountRegisterId",
-            data: Buffer.from("1"),
+            Date: "2024-01-01",
+            Description: "Test Transaction",
+            Amount: "100.00",
+            Note: "Test Note",
+            "Check Number": "",
+            Category: "Food",
           },
+        ],
+      };
+
+      const mockAccountRegister = {
+        id: 1,
+        account: {
+          userAccounts: [{ userId: 123 }],
+        },
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const papaparse = await import("papaparse");
+      const { createId } = await import("@paralleldrive/cuid2");
+
+      registerTestGlobal().readMultipartFormData.mockResolvedValue(
+        mockFormData,
+      );
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue({
+        accountId: mockAccountRegister.id,
+      });
+      vi.mocked(papaparse.default.parse as Mock).mockReturnValue(mockCsvData);
+      vi.mocked(prisma.registerEntry.findFirst as Mock).mockResolvedValue(null); // No duplicates found
+      vi.mocked(prisma.category.findMany as Mock).mockResolvedValue([]);
+      vi.mocked(createId as Mock).mockReturnValue("entry-123");
+      vi.mocked(prisma.registerEntry.create as Mock).mockResolvedValue({
+        id: "entry-123",
+        description: "Test Transaction",
+        amount: 100,
+      });
+      vi.mocked(prisma.registerEntry.createMany as Mock).mockResolvedValue({
+        count: 1,
+      });
+
+      const result = await uploadFileHandler(mockEvent);
+
+      expect(registerTestGlobal().readMultipartFormData).toHaveBeenCalledWith(
+        mockEvent,
+      );
+      expect(getUser).toHaveBeenCalledWith(mockEvent);
+      expect(papaparse.default.parse).toHaveBeenCalledWith(
+        "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food",
+        { header: true },
+      );
+      expect(prisma.registerEntry.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            accountRegisterId: 1,
+            description: "Test Transaction",
+            amount: 100,
+            isCleared: true,
+            isProjected: false,
+            createdAt: new Date("2024-01-01T00:00:00.000Z"),
+          }),
+        ]),
+      });
+      expect(result).toEqual(123); // Upload endpoint returns userId
+    });
+
+    it("should handle missing form data", async () => {
+      const mockEvent = {};
+
+      const { readMultipartFormData } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+
+      vi.mocked(readMultipartFormData as Mock).mockResolvedValue(null); // No form data
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+
+      const result = await uploadFileHandler(mockEvent);
+
+      expect(result).toEqual(123); // Upload endpoint returns userId when no form data
+    });
+
+    it("should handle invalid CSV data", async () => {
+      const mockEvent = {};
+      const mockFormData = [
+        {
+          name: "accountRegisterId",
+          data: Buffer.from("1"),
+        },
+        {
+          name: "fileData",
+          data: Buffer.from("invalid,csv,data"),
+        },
+      ];
+
+      const mockCsvData = {
+        data: [], // Empty data
+      };
+
+      const { readMultipartFormData } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const papaparse = await import("papaparse");
+
+      vi.mocked(readMultipartFormData as Mock).mockResolvedValue(mockFormData);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(papaparse.default.parse as Mock).mockReturnValue(mockCsvData);
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue({
+        id: 1,
+        account: { userAccounts: [{ userId: 123 }] },
+      });
+
+      const result = await uploadFileHandler(mockEvent);
+
+      expect(result).toEqual(123); // Upload endpoint returns userId
+    });
+
+    it("should handle unauthorized account register access", async () => {
+      const mockEvent = {};
+      const mockFormData = [
+        {
+          name: "accountRegisterId",
+          data: Buffer.from("1"),
+        },
+        {
+          name: "fileData",
+          data: Buffer.from("Date,Description,Amount\n2024-01-01,Test,100"),
+        },
+      ];
+
+      const mockCsvData = {
+        data: [
           {
-            name: "fileData",
-            data: Buffer.from(
-              "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food"
-            ),
+            Date: "2024-01-01",
+            Description: "Test",
+            Amount: "100",
           },
-        ];
+        ],
+      };
 
-        const mockCsvData = {
-          data: [
-            {
-              Date: "2024-01-01",
-              Description: "Test Transaction",
-              Amount: "100.00",
-              Note: "Test Note",
-              "Check Number": "",
-              Category: "Food",
-            },
-          ],
-        };
+      const { readMultipartFormData } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const papaparse = await import("papaparse");
 
-        const mockAccountRegister = {
-          id: 1,
-          account: {
-            userAccounts: [{ userId: 123 }],
-          },
-        };
+      vi.mocked(readMultipartFormData as Mock).mockResolvedValue(mockFormData);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(papaparse.default.parse as Mock).mockReturnValue(mockCsvData);
+      vi.mocked(prisma.registerEntry.findFirst as Mock).mockResolvedValue(null); // No duplicates
 
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
-        const papaparse = await import("papaparse");
-        const { createId } = await import("@paralleldrive/cuid2");
+      const result = await uploadFileHandler(mockEvent);
 
-        (globalThis as any).readMultipartFormData.mockResolvedValue(
-          mockFormData
-        );
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (prisma.accountRegister.findUniqueOrThrow as any).mockResolvedValue({
-          accountId: mockAccountRegister.id,
-        });
-        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
-        (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates found
-        (prisma.category.findMany as any).mockResolvedValue([]);
-        (createId as any).mockReturnValue("entry-123");
-        (prisma.registerEntry.create as any).mockResolvedValue({
-          id: "entry-123",
-          description: "Test Transaction",
-          amount: 100,
-        });
-        (prisma.registerEntry.createMany as any).mockResolvedValue({
-          count: 1,
-        });
+      expect(result).toEqual(123); // Upload endpoint returns userId
+    });
 
-        const result = await uploadFileHandler(mockEvent);
+    it("should handle schema validation errors", async () => {
+      const mockEvent = {};
+      const mockFormData = [
+        {
+          name: "accountRegisterId",
+          data: Buffer.from("1"), // Valid numeric value
+        },
+        {
+          name: "fileData",
+          data: Buffer.from("Date,Description,Amount\n2024-01-01,Test,100"),
+        },
+      ];
 
-        expect((globalThis as any).readMultipartFormData).toHaveBeenCalledWith(
-          mockEvent
-        );
-        expect(getUser).toHaveBeenCalledWith(mockEvent);
-        expect(papaparse.default.parse).toHaveBeenCalledWith(
-          "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food",
-          { header: true }
-        );
-        expect(prisma.registerEntry.createMany).toHaveBeenCalledWith({
-          data: expect.arrayContaining([
-            expect.objectContaining({
-              accountRegisterId: 1,
-              description: "Test Transaction",
-              amount: 100,
-              isCleared: true,
-              isProjected: false,
-              createdAt: new Date("2024-01-01T00:00:00.000Z"),
-            }),
-          ]),
-        });
-        expect(result).toEqual(123); // Upload endpoint returns userId
-      }
-    );
-
-    it(
-      "should handle missing form data",
-      async () => {
-        const mockEvent = {};
-
-        const { readMultipartFormData } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-
-        (readMultipartFormData as any).mockResolvedValue(null); // No form data
-        (getUser as any).mockReturnValue({ userId: 123 });
-
-        const result = await uploadFileHandler(mockEvent);
-
-        expect(result).toEqual(123); // Upload endpoint returns userId when no form data
-      }
-    );
-
-    it(
-      "should handle invalid CSV data",
-      async () => {
-        const mockEvent = {};
-        const mockFormData = [
+      const mockCsvData = {
+        data: [
           {
-            name: "accountRegisterId",
-            data: Buffer.from("1"),
+            Date: "2024-01-01",
+            Description: "Test",
+            Amount: "100",
           },
-          {
-            name: "fileData",
-            data: Buffer.from("invalid,csv,data"),
-          },
-        ];
+        ],
+      };
 
-        const mockCsvData = {
-          data: [], // Empty data
-        };
+      const { readMultipartFormData } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const papaparse = await import("papaparse");
 
-        const { readMultipartFormData } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
-        const papaparse = await import("papaparse");
+      vi.mocked(readMultipartFormData as Mock).mockResolvedValue(mockFormData);
+      vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
+      vi.mocked(papaparse.default.parse as Mock).mockReturnValue(mockCsvData);
+      vi.mocked(prisma.registerEntry.findFirst as Mock).mockResolvedValue(null); // No duplicates
 
-        (readMultipartFormData as any).mockResolvedValue(mockFormData);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
-        (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue({
-          id: 1,
-          account: { userAccounts: [{ userId: 123 }] },
-        });
+      const result = await uploadFileHandler(mockEvent);
 
-        const result = await uploadFileHandler(mockEvent);
-
-        expect(result).toEqual(123); // Upload endpoint returns userId
-      }
-    );
-
-    it(
-      "should handle unauthorized account register access",
-      async () => {
-        const mockEvent = {};
-        const mockFormData = [
-          {
-            name: "accountRegisterId",
-            data: Buffer.from("1"),
-          },
-          {
-            name: "fileData",
-            data: Buffer.from("Date,Description,Amount\n2024-01-01,Test,100"),
-          },
-        ];
-
-        const mockCsvData = {
-          data: [
-            {
-              Date: "2024-01-01",
-              Description: "Test",
-              Amount: "100",
-            },
-          ],
-        };
-
-        const { readMultipartFormData } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
-        const papaparse = await import("papaparse");
-
-        (readMultipartFormData as any).mockResolvedValue(mockFormData);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
-        (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates
-
-        const result = await uploadFileHandler(mockEvent);
-
-        expect(result).toEqual(123); // Upload endpoint returns userId
-      }
-    );
-
-    it(
-      "should handle schema validation errors",
-      async () => {
-        const mockEvent = {};
-        const mockFormData = [
-          {
-            name: "accountRegisterId",
-            data: Buffer.from("1"), // Valid numeric value
-          },
-          {
-            name: "fileData",
-            data: Buffer.from("Date,Description,Amount\n2024-01-01,Test,100"),
-          },
-        ];
-
-        const mockCsvData = {
-          data: [
-            {
-              Date: "2024-01-01",
-              Description: "Test",
-              Amount: "100",
-            },
-          ],
-        };
-
-        const { readMultipartFormData } = await import("h3");
-        const { getUser } = await import("~/server/lib/getUser");
-        const { prisma } = await import("~/server/clients/prismaClient");
-        const papaparse = await import("papaparse");
-
-        (readMultipartFormData as any).mockResolvedValue(mockFormData);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (papaparse.default.parse as any).mockReturnValue(mockCsvData);
-        (prisma.registerEntry.findFirst as any).mockResolvedValue(null); // No duplicates
-
-        const result = await uploadFileHandler(mockEvent);
-
-        expect(result).toEqual(123); // Upload endpoint returns userId
-      }
-    );
+      expect(result).toEqual(123); // Upload endpoint returns userId
+    });
   });
 
   describe("Cross-endpoint Integration", () => {

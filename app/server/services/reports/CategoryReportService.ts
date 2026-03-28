@@ -38,10 +38,7 @@ export function rootCategoryId(meta: CategoryMetaMap, id: string): string {
 }
 
 /** Root → … → leaf names (for donut / full path label). */
-export function categoryPathNames(
-  meta: CategoryMetaMap,
-  id: string,
-): string[] {
+export function categoryPathNames(meta: CategoryMetaMap, id: string): string[] {
   const names: string[] = [];
   let cur: string | null = id;
   const seen = new Set<string>();
@@ -58,9 +55,7 @@ export function categoryPathNames(
 function applyShareOfAbs(rows: CategoryReportRow[], sumAbs: number): void {
   for (const row of rows) {
     row.shareOfAbs =
-      sumAbs > 0
-        ? Math.round((Math.abs(row.total) / sumAbs) * 10000) / 100
-        : 0;
+      sumAbs > 0 ? Math.round((Math.abs(row.total) / sumAbs) * 10000) / 100 : 0;
   }
 }
 
@@ -74,8 +69,7 @@ function buildDetailRow(
   const pid = m?.subCategoryId ?? null;
   const pName = pid ? (meta.get(pid)?.name ?? null) : null;
   const pathNames = categoryPathNames(meta, key);
-  const segmentLabel =
-    pathNames.length > 1 ? pathNames.join(" › ") : leafName;
+  const segmentLabel = pathNames.length > 1 ? pathNames.join(" › ") : leafName;
   return {
     categoryId: key,
     parentCategoryId: pid,
@@ -267,28 +261,15 @@ function toAmount(
   return n;
 }
 
-function pastDirectionFilter(focusedAt: Date) {
+function pastDirectionFilter() {
   return {
-    OR: [
-      { isCleared: true },
-      { isReconciled: true },
-      {
-        isPending: false,
-        isProjected: false,
-        isCleared: false,
-        createdAt: { lte: focusedAt },
-      },
-    ],
+    OR: [{ isCleared: true }, { isReconciled: true }],
   };
 }
 
 function futureDirectionFilter() {
   return {
-    OR: [
-      { isCleared: false, isProjected: true },
-      { isProjected: false, isCleared: false, isPending: true },
-      { isProjected: false, isManualEntry: true, isCleared: false },
-    ],
+    OR: [{ isCleared: false, isReconciled: false }],
   };
 }
 
@@ -334,7 +315,7 @@ async function loadRegisterEntriesForCategoryReport(params: {
   const { start, end, mode, registerBaseWhere, includeTransfers } = params;
   const dateRange = { gte: start, lte: end };
   const directionWhere =
-    mode === "past" ? pastDirectionFilter(end) : futureDirectionFilter();
+    mode === "past" ? pastDirectionFilter() : futureDirectionFilter();
   const transferFilter = includeTransfers
     ? {}
     : {

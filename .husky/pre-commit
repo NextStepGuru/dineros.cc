@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+set -e
+cd "$(dirname "$0")/.." || exit 1
+
+node scripts/check-mixed-commit.js
+
+if ! command -v pre-commit >/dev/null 2>&1; then
+  echo "pre-commit is not installed or not on PATH. Install with: pip install pre-commit"
+  echo "TruffleHog (for the trufflehog-filesystem hook): https://github.com/trufflesecurity/trufflehog#installation"
+  exit 1
+fi
+
+pre-commit run

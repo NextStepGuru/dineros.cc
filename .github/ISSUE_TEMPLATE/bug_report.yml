@@ -72,4 +72,3 @@ body:
           required: true
         - label: I removed sensitive data from logs/screenshots.
           required: true
-

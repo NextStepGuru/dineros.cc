@@ -71,4 +71,3 @@ Contributors do not need Cursor to contribute.
 ## Reporting security issues
 
 Do not open public issues for vulnerabilities. Follow `SECURITY.md`.
-

@@ -15,16 +15,15 @@ export type PartialRegisterEntry = {
 
 // Clear helper functions to determine entry placement
 const shouldGoBeforeBalance = (entry: PartialRegisterEntry): boolean => {
-  // For manual entries, only consider the isMatched property
   if (entry.isManualEntry) {
-    return entry.isMatched === true;
+    // Matched manual lines align with the bank; pending manual lines have hit the account
+    // but are not accepted yet — same side of the anchor as matched.
+    return entry.isMatched === true || entry.isPending === true;
   }
 
-  // For non-manual entries, use the pending condition
-  // Pending entries that aren't projected (real pending transactions) go before balance
-  const pendingCondition = !entry.isProjected && entry.isPending;
-
-  return pendingCondition;
+  // Non-manual: any real (non-projected) uncleared activity is before the balance anchor,
+  // including posted imports where isPending is false but the user has not cleared yet.
+  return !entry.isProjected;
 };
 
 const isCleared = (entry: PartialRegisterEntry): boolean => {
@@ -35,24 +34,29 @@ const isBalance = (entry: PartialRegisterEntry): boolean => {
   return entry.isBalanceEntry;
 };
 
+function compareEntryCreatedAt(
+  aCreated: PartialRegisterEntry["createdAt"],
+  bCreated: PartialRegisterEntry["createdAt"],
+): number {
+  if (dateTimeService.isAfter(aCreated, bCreated)) return 1;
+  if (dateTimeService.isBefore(aCreated, bCreated)) return -1;
+  return 0;
+}
+
 // Simple chronological sort with amount tiebreaker
 const sortEntriesChronologically = <T extends PartialRegisterEntry>(
   entries: T[],
   type: "credit" | "debit",
-  direction: "oldest-first" | "newest-first" = "oldest-first"
+  direction: "oldest-first" | "newest-first" = "oldest-first",
 ): T[] => {
   return [...entries].sort((a, b) => {
-    // Date comparison
-    const aTime = dateTimeService.isAfter(a.createdAt, b.createdAt)
-      ? 1
-      : dateTimeService.isBefore(a.createdAt, b.createdAt)
-      ? -1
-      : 0;
+    const aTime = compareEntryCreatedAt(a.createdAt, b.createdAt);
 
-    if (direction === "newest-first") {
-      if (aTime !== 0) return -aTime; // Reverse chronological order
-    } else {
-      if (aTime !== 0) return aTime; // Normal chronological order
+    if (direction === "newest-first" && aTime !== 0) {
+      return -aTime;
+    }
+    if (direction === "oldest-first" && aTime !== 0) {
+      return aTime;
     }
 
     // If same date, sort by amount (different rules for credit vs debit)
@@ -70,19 +74,19 @@ const sortEntriesChronologically = <T extends PartialRegisterEntry>(
 // Calculate running balance forward from a starting point
 const calculateForwardBalance = <T extends PartialRegisterEntry>(
   entries: T[],
-  startingBalance: number
+  startingBalance: number,
 ): T[] => {
   let runningBalance = startingBalance;
-  return entries.map((entry) => ({
-    ...entry,
-    balance: (runningBalance += +entry.amount),
-  }));
+  return entries.map((entry) => {
+    runningBalance += +entry.amount;
+    return { ...entry, balance: runningBalance };
+  });
 };
 
 // Calculate running balance backward from a starting point
 const calculateBackwardBalance = <T extends PartialRegisterEntry>(
   entries: T[],
-  startingBalance: number
+  startingBalance: number,
 ): T[] => {
   let runningBalance = startingBalance;
 
@@ -100,15 +104,11 @@ const calculateBackwardBalance = <T extends PartialRegisterEntry>(
 const calculateClearedBalance = <T extends PartialRegisterEntry>(
   entries: T[],
   startingBalance: number,
-  type: "credit" | "debit"
+  type: "credit" | "debit",
 ): T[] => {
   // Cleared entries need special sorting (oldest first, but different amount rules)
   const sortedEntries = [...entries].sort((a, b) => {
-    const aTime = dateTimeService.isAfter(a.createdAt, b.createdAt)
-      ? 1
-      : dateTimeService.isBefore(a.createdAt, b.createdAt)
-      ? -1
-      : 0;
+    const aTime = compareEntryCreatedAt(a.createdAt, b.createdAt);
 
     if (aTime !== 0) return aTime; // Oldest first
 
@@ -134,7 +134,7 @@ const calculateClearedBalance = <T extends PartialRegisterEntry>(
 };
 
 export const recalculateRunningBalanceAndSort = <
-  T extends PartialRegisterEntry = PartialRegisterEntry
+  T extends PartialRegisterEntry = PartialRegisterEntry,
 >({
   registerEntries,
   balance,
@@ -157,7 +157,7 @@ export const recalculateRunningBalanceAndSort = <
     const sortedEntries = sortEntriesChronologically(
       registerEntries,
       type,
-      "oldest-first"
+      "oldest-first",
     );
     const processedEntries = calculateForwardBalance(sortedEntries, balance);
     return processedEntries.map((entry, index) => ({
@@ -166,9 +166,8 @@ export const recalculateRunningBalanceAndSort = <
     }));
   }
 
-  // Set up the starting balance
-  const startingBalance =
-    balance !== undefined ? balance : +balanceEntry.amount;
+  // Set up the starting balance (use explicit register amount when caller omits balance)
+  const startingBalance = balance ?? +balanceEntry.amount;
   balanceEntry.balance = startingBalance;
   balanceEntry.amount = startingBalance;
 
@@ -176,38 +175,38 @@ export const recalculateRunningBalanceAndSort = <
   const clearedEntries = registerEntries.filter(isCleared);
   const entriesBeforeBalance = registerEntries.filter(
     (entry) =>
-      !isCleared(entry) && !isBalance(entry) && shouldGoBeforeBalance(entry)
+      !isCleared(entry) && !isBalance(entry) && shouldGoBeforeBalance(entry),
   );
   const entriesAfterBalance = registerEntries.filter(
     (entry) =>
-      !isCleared(entry) && !isBalance(entry) && !shouldGoBeforeBalance(entry)
+      !isCleared(entry) && !isBalance(entry) && !shouldGoBeforeBalance(entry),
   );
 
   // Process each category
   const processedClearedEntries = calculateClearedBalance(
     clearedEntries,
     startingBalance,
-    type
+    type,
   );
 
   const sortedEntriesBeforeBalance = sortEntriesChronologically(
     entriesBeforeBalance,
     type,
-    "oldest-first"
+    "oldest-first",
   );
   const processedEntriesBeforeBalance = calculateBackwardBalance(
     sortedEntriesBeforeBalance,
-    startingBalance
+    startingBalance,
   );
 
   const sortedEntriesAfterBalance = sortEntriesChronologically(
     entriesAfterBalance,
     type,
-    "oldest-first"
+    "oldest-first",
   );
   const processedEntriesAfterBalance = calculateForwardBalance(
     sortedEntriesAfterBalance,
-    startingBalance
+    startingBalance,
   );
 
   // Combine everything in the correct order and add sequence numbers

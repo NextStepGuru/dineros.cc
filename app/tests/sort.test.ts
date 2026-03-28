@@ -121,7 +121,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: true,
         isProjected: false,
       },
-      // Regular pending entries that go AFTER balance
+      // Posted but uncleared (isPending false) — still before balance anchor
       {
         amount: -100,
         balance: 0,
@@ -157,7 +157,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
     expect(balanceEntryIndex).toBeGreaterThan(0); // Should not be first
 
-    // Verify order: cleared entries, pending entries before balance, balance entry, other pending entries
+    // Verify order: cleared entries, real uncleared before balance, balance entry, projected after
     const clearedEntries = result
       .slice(0, balanceEntryIndex)
       .filter((r) => r.isCleared && !r.isBalanceEntry);
@@ -171,35 +171,28 @@ describe("recalculateRunningBalanceAndSort", () => {
     expect(clearedEntries.length).toBe(1);
     expect(clearedEntries[0].amount).toBe(-100);
 
-    // Verify pending entries before balance are isProjected=0 and isPending=1
-    expect(pendingBeforeBalance.length).toBe(2);
-    expect(
-      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending),
-    ).toBe(true);
+    // Verify entries before balance are non-projected uncleared (pending + posted)
+    expect(pendingBeforeBalance.length).toBe(3);
+    expect(pendingBeforeBalance.every((r) => !r.isProjected)).toBe(true);
 
-    // Verify chronological order of pending entries before balance (older first)
+    // Verify chronological order (older first)
     expect(pendingBeforeBalance[0].amount).toBe(-50); // Jan 16 (older)
-    expect(pendingBeforeBalance[1].amount).toBe(-25); // Jan 17 (newer)
+    expect(pendingBeforeBalance[1].amount).toBe(-25); // Jan 17
+    expect(pendingBeforeBalance[2].amount).toBe(-100); // Jan 18 posted uncleared
 
     // Verify balance entry
     expect(balanceEntry.isBalanceEntry).toBe(true);
     expect(balanceEntry.balance).toBe(balance);
 
-    // Verify pending entries after balance
-    expect(pendingAfterBalance.length).toBe(2);
-    expect(pendingAfterBalance.some((r) => r.isProjected)).toBe(true); // Contains projected entry
+    expect(pendingAfterBalance.length).toBe(1);
+    expect(pendingAfterBalance[0].isProjected).toBe(true);
 
-    // Verify running balance calculations for pending entries before balance
-    // These work backwards: start from balance, process in reverse order
-    // Reverse order: Jan 17 (-25), then Jan 16 (-50)
-    // 1000 - (-25) = 1025, then 1025 - (-50) = 1075
-    expect(pendingBeforeBalance[0].balance).toBe(1075); // Jan 16: 1075
-    expect(pendingBeforeBalance[1].balance).toBe(1025); // Jan 17: 1025
+    // Backward from balance: Jan 18 (-100), Jan 17 (-25), Jan 16 (-50)
+    expect(pendingBeforeBalance[0].balance).toBe(1175); // Jan 16
+    expect(pendingBeforeBalance[1].balance).toBe(1125); // Jan 17
+    expect(pendingBeforeBalance[2].balance).toBe(1100); // Jan 18
 
-    // Verify running balance calculations for pending entries after balance
-    // These should work forwards from the balance
-    expect(pendingAfterBalance[0].balance).toBe(balance - 100); // 900 (first after balance)
-    expect(pendingAfterBalance[1].balance).toBe(balance - 100 - 200); // 700 (second after balance)
+    expect(pendingAfterBalance[0].balance).toBe(balance - 200); // 800 projected
   });
 
   it("should handle mixed pending types correctly", () => {
@@ -280,11 +273,9 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntry = result[balanceEntryIndex];
     const pendingAfterBalance = result.slice(balanceEntryIndex + 1);
 
-    // Should have 3 pending entries before balance
+    // Should have 3 real (non-projected) uncleared rows before balance
     expect(pendingBeforeBalance.length).toBe(3);
-    expect(
-      pendingBeforeBalance.every((r) => !r.isProjected && r.isPending),
-    ).toBe(true);
+    expect(pendingBeforeBalance.every((r) => !r.isProjected)).toBe(true);
 
     // Verify chronological order (older first)
     expect(pendingBeforeBalance[0].amount).toBe(50); // Jan 16 (oldest)
@@ -324,7 +315,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Only pending entries that go after balance
+      // Posted uncleared — sorts before the balance anchor
       {
         amount: -100,
         balance: 0,
@@ -345,14 +336,17 @@ describe("recalculateRunningBalanceAndSort", () => {
     });
 
     const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
-    expect(balanceEntryIndex).toBe(0); // Balance should be first when no pending entries before it
+    expect(balanceEntryIndex).toBe(1);
 
+    const beforeBalance = result.slice(0, balanceEntryIndex);
     const balanceEntry = result[balanceEntryIndex];
     const pendingAfterBalance = result.slice(balanceEntryIndex + 1);
 
+    expect(beforeBalance.length).toBe(1);
+    expect(beforeBalance[0].amount).toBe(-100);
+    expect(beforeBalance[0].balance).toBe(1100);
     expect(balanceEntry.balance).toBe(balance);
-    expect(pendingAfterBalance.length).toBe(1);
-    expect(pendingAfterBalance[0].balance).toBe(balance - 100);
+    expect(pendingAfterBalance.length).toBe(0);
   });
 
   it("should handle edge case with only pending entries before balance", () => {
@@ -447,7 +441,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=false (should go after balance)
+      // Manual entry with isMatched=false (still after balance when not pending)
       {
         amount: -75,
         balance: 0,
@@ -459,7 +453,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Regular pending entry (should go after balance)
+      // Posted uncleared import (before balance)
       {
         amount: -100,
         balance: 0,
@@ -484,39 +478,27 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntry = result[balanceEntryIndex];
     const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
 
-    // Should have one manual entry before balance (isMatched=true)
-    expect(entriesBeforeBalance.length).toBe(1);
+    // Matched manual + posted import before balance (chrono)
+    expect(entriesBeforeBalance.length).toBe(2);
+    expect(entriesBeforeBalance[0].amount).toBe(-50);
     expect(entriesBeforeBalance[0].isManualEntry).toBe(true);
     expect(entriesBeforeBalance[0].isMatched).toBe(true);
-    expect(entriesBeforeBalance[0].amount).toBe(-50);
+    expect(entriesBeforeBalance[1].amount).toBe(-100);
+    expect(entriesBeforeBalance[1].isManualEntry).toBe(false);
 
-    // Balance entry should be present
     expect(balanceEntry.isBalanceEntry).toBe(true);
     expect(balanceEntry.balance).toBe(balance);
 
-    // Should have two entries after balance (manual isMatched=false + regular)
-    expect(entriesAfterBalance.length).toBe(2);
+    expect(entriesAfterBalance.length).toBe(1);
+    expect(entriesAfterBalance[0].isManualEntry).toBe(true);
+    expect(entriesAfterBalance[0].isMatched).toBe(false);
+    expect(entriesAfterBalance[0].amount).toBe(-75);
 
-    // Find the manual entry with isMatched=false
-    const manualEntryAfterBalance = entriesAfterBalance.find(
-      (r) => r.isManualEntry,
-    );
-    assert(manualEntryAfterBalance);
-    expect(manualEntryAfterBalance.isMatched).toBe(false);
-    expect(manualEntryAfterBalance.amount).toBe(-75);
+    // Backward (newest first in stack): Jan 18 -100 then Jan 16 -50 → 1100, then 1150
+    expect(entriesBeforeBalance[0].balance).toBe(1150); // Jan 16 row
+    expect(entriesBeforeBalance[1].balance).toBe(1100); // Jan 18 row
 
-    // Regular entry should also be after balance
-    const regularEntry = entriesAfterBalance.find((r) => !r.isManualEntry);
-    assert(regularEntry);
-    expect(regularEntry.amount).toBe(-100);
-
-    // Verify running balance calculations
-    // Entry before balance: 1000 - (-50) = 1050
-    expect(entriesBeforeBalance[0].balance).toBe(1050);
-
-    // Entries after balance should increment from balance
-    expect(entriesAfterBalance[0].balance).toBe(balance - 75); // 925 (manual entry)
-    expect(entriesAfterBalance[1].balance).toBe(balance - 75 - 100); // 825 (regular entry)
+    expect(entriesAfterBalance[0].balance).toBe(balance - 75);
   });
 
   it("should handle multiple manual entries with mixed isMatched values", () => {
@@ -877,8 +859,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isPending=true and isMatched=false
-      // This should go AFTER balance, not before (regression test for bug)
+      // Manual pending (unmatched) — before balance with bank-held activity
       {
         amount: -100,
         balance: 0,
@@ -886,11 +867,11 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: true,
-        isMatched: false, // FALSE = should go AFTER balance
-        isPending: true, // TRUE = this was causing the bug
+        isMatched: false,
+        isPending: true,
         isProjected: false,
       },
-      // Regular pending entry (non-manual) should still go before balance
+      // Regular pending entry (non-manual) before balance
       {
         amount: -50,
         balance: 0,
@@ -899,7 +880,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isCleared: false,
         isManualEntry: false,
         isMatched: false,
-        isPending: true, // Regular pending entries should go before balance
+        isPending: true,
         isProjected: false,
       },
     ];
@@ -910,25 +891,18 @@ describe("recalculateRunningBalanceAndSort", () => {
       type,
     });
 
-    // Find positions
     const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
     const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
     const regularPendingIndex = result.findIndex(
       (r) => !r.isManualEntry && r.isPending,
     );
 
-    // Manual entry with isPending=true but isMatched=false should STILL go AFTER balance
-    expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
-    expect(result[manualEntryIndex].isMatched).toBe(false);
+    expect(manualEntryIndex).toBeLessThan(balanceIndex);
+    expect(regularPendingIndex).toBeLessThan(balanceIndex);
     expect(result[manualEntryIndex].isPending).toBe(true);
     expect(result[manualEntryIndex].isManualEntry).toBe(true);
 
-    // Regular pending entry should go BEFORE balance
-    expect(regularPendingIndex).toBeLessThan(balanceIndex);
-    expect(result[regularPendingIndex].isPending).toBe(true);
-    expect(result[regularPendingIndex].isManualEntry).toBe(false);
-
-    // Verify the actual order: [regular pending] -> [balance] -> [manual pending unmatched]
+    expect(regularPendingIndex).toBeGreaterThan(manualEntryIndex);
     expect(result[regularPendingIndex].amount).toBe(-50);
     expect(result[balanceIndex].isBalanceEntry).toBe(true);
     expect(result[manualEntryIndex].amount).toBe(-100);

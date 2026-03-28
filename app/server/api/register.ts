@@ -74,13 +74,6 @@ export default defineEventHandler(async (event) => {
                 { isCleared: true },
                 { isBalanceEntry: true },
                 { isReconciled: true },
-                // Include historical entries that occurred in the past but aren't cleared/reconciled
-                {
-                  isPending: false,
-                  isProjected: false,
-                  isCleared: false,
-                  createdAt: { lte: focusedAt },
-                },
               ],
             }
           : {
@@ -111,7 +104,7 @@ export default defineEventHandler(async (event) => {
         ? Math.min(totalCount, FUTURE_REGISTER_FETCH_CAP)
         : skip + effectiveTake;
 
-    /** Future tab: sorted order is [pending…, balance, projected…]. Slicing from 0 hides the balance row and projected loan payments when many pending rows exist. */
+    /** Future tab: sorted order is [cleared…, pending…, balance, projected…]. Pagination slices from 0; loan-window extension still keys off the first payment after the balance row. */
     const paginateSortedEntries = <
       T extends {
         isBalanceEntry?: boolean;
@@ -148,13 +141,6 @@ export default defineEventHandler(async (event) => {
                 { isCleared: true },
                 { isBalanceEntry: true },
                 { isReconciled: true },
-                // Include historical entries that occurred in the past but aren't cleared/reconciled
-                {
-                  isPending: false,
-                  isProjected: false,
-                  isCleared: false,
-                  createdAt: { lte: focusedAt },
-                },
               ],
             }
           : {
@@ -178,9 +164,8 @@ export default defineEventHandler(async (event) => {
       take: fetchLimit,
     });
 
-    const registerEntriesWithoutPlaidJson = stripRegisterEntryPlaidJson(
-      allRegisterEntries,
-    );
+    const registerEntriesWithoutPlaidJson =
+      stripRegisterEntryPlaidJson(allRegisterEntries);
 
     const pocketBalances = await PrismaDb.accountRegister.findMany({
       where: {

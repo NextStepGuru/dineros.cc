@@ -6,6 +6,7 @@ import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { dateTimeService } from "~/server/services/forecast";
 import { log } from "../../logger";
+import { futureRegisterEntryOr } from "~/server/lib/registerLedgerFuture";
 
 // Schema for the request body
 const syncGoogleSheetSchema = z.object({
@@ -68,12 +69,7 @@ export default defineEventHandler(async (event) => {
     // Fetch register entries (same logic as the register endpoint)
     const registerEntries = await PrismaDb.registerEntry.findMany({
       where: {
-        OR: [
-          { isCleared: false, isProjected: true },
-          { isProjected: false, isCleared: false, isPending: true },
-          { isBalanceEntry: true, isCleared: false },
-          { isProjected: false, isManualEntry: true, isCleared: false },
-        ],
+        OR: [...futureRegisterEntryOr],
         accountRegisterId,
       },
       orderBy: {
