@@ -5,7 +5,6 @@ import {
   createError,
   eventHandler,
   getHeader,
-  getQuery,
   toNodeListener,
 } from "h3";
 import fg from "fast-glob";
@@ -24,12 +23,7 @@ app.use(
       });
     }
 
-    const headerToken = getHeader(event, "x-internal-token")?.trim();
-    const queryToken = (() => {
-      const token = getQuery(event).token;
-      return typeof token === "string" ? token.trim() : undefined;
-    })();
-    const suppliedInternalToken = headerToken || queryToken;
+    const suppliedInternalToken = getHeader(event, "x-internal-token")?.trim();
     if (suppliedInternalToken !== expectedInternalToken) {
       throw createError({
         statusCode: 401,

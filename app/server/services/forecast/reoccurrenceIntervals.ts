@@ -173,6 +173,18 @@ function roundCents(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Backward/forward compatible percent normalization:
+ * - Legacy storage: 5 means 5%
+ * - New decimal storage: 0.05 means 5%
+ */
+function normalizePercentRate(raw: number): number {
+  if (!Number.isFinite(raw)) return 0;
+  const abs = Math.abs(raw);
+  if (abs > 1) return raw / 100;
+  return raw;
+}
+
 export function applyReoccurrenceAmountAdjustment(
   baseAmount: number,
   mode: AmountAdjustmentModeName,
@@ -186,7 +198,8 @@ export function applyReoccurrenceAmountAdjustment(
   const v = value ?? 0;
   const dir = direction ?? "INCREASE";
   if (mode === "PERCENT") {
-    const factor = dir === "INCREASE" ? 1 + v : 1 - v;
+    const rate = normalizePercentRate(v);
+    const factor = dir === "INCREASE" ? 1 + rate : 1 - rate;
     return roundCents(baseAmount * Math.pow(factor, completedSteps));
   }
   const sign = baseAmount >= 0 ? 1 : -1;

@@ -43,6 +43,12 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     return dateTimeService.isSameOrAfter(checkDate, startAt) ? apr : null;
   }
 
+  private resolveBaseApr(aprValue: unknown): number {
+    const apr = this.toFiniteNumber(aprValue);
+    if (apr == null || apr <= 0) return 0;
+    return apr;
+  }
+
   private resolveDateForAPR(
     accountRegister: CacheAccountRegister,
     checkDate?: any,
@@ -309,7 +315,8 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     );
     if (apr1 != null) return apr1;
 
-    return 0;
+    // APR1 remains the unconditional fallback for legacy records without apr1StartAt.
+    return this.resolveBaseApr(accountRegister.apr1);
   }
 
   calculatePaymentAmount(

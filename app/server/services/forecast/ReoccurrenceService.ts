@@ -207,7 +207,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
         const splitMode = splitEntry.amountMode ?? "FIXED";
         const splitAmount =
           splitMode === "PERCENT"
-            ? effectiveAmount * Number(splitEntry.amount)
+            ? effectiveAmount * this.normalizeSplitPercent(splitEntry.amount)
             : Number(splitEntry.amount) * splitRatio;
 
         this.transferService.transferBetweenAccounts({
@@ -393,6 +393,13 @@ export class ReoccurrenceService implements IReoccurrenceService {
     const dayOfMonth = dateTimeService.date(nominalDate);
     const suffix = dayOfMonth === 15 ? "#1" : "#2";
     return `${baseDescription} ${suffix}`;
+  }
+
+  private normalizeSplitPercent(rawAmount: unknown): number {
+    const n = Number(rawAmount);
+    if (!Number.isFinite(n)) return 0;
+    const abs = Math.abs(n);
+    return abs > 1 ? n / 100 : n;
   }
 
   /**
