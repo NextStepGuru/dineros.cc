@@ -125,10 +125,14 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     return dateTimeService.nowDate();
   }
 
-  private resolveLoanStartDate(accountRegister: CacheAccountRegister): Date | null {
+  private resolveLoanStartDate(
+    accountRegister: CacheAccountRegister,
+  ): Date | null {
     if (!accountRegister.loanStartAt) return null;
     if (!dateTimeService.isValid(accountRegister.loanStartAt)) return null;
-    return dateTimeService.toDate(dateTimeService.createUTC(accountRegister.loanStartAt));
+    return dateTimeService.toDate(
+      dateTimeService.createUTC(accountRegister.loanStartAt),
+    );
   }
 
   private resolveRemainingPayments(
@@ -148,7 +152,9 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       0,
       (asOfDate.getTime() - loanStart.getTime()) / (24 * 60 * 60 * 1000),
     );
-    const elapsedPayments = Math.floor((elapsedDays / 365.25) * paymentsPerYear);
+    const elapsedPayments = Math.floor(
+      (elapsedDays / 365.25) * paymentsPerYear,
+    );
     return Math.max(1, totalPayments - Math.max(0, elapsedPayments));
   }
 
@@ -315,8 +321,19 @@ export class LoanCalculatorService implements ILoanCalculatorService {
     );
     if (apr1 != null) return apr1;
 
-    // APR1 remains the unconditional fallback for legacy records without apr1StartAt.
-    return this.resolveBaseApr(accountRegister.apr1);
+    const apr1Fallback = this.resolveBaseApr(accountRegister.apr1);
+    if (apr1Fallback <= 0) return 0;
+
+    // Preserve legacy behavior only when APR1 has no usable start date.
+    if (
+      !accountRegister.apr1StartAt ||
+      !dateTimeService.isValid(accountRegister.apr1StartAt)
+    ) {
+      return apr1Fallback;
+    }
+
+    // APR1 start exists but is not active yet.
+    return 0;
   }
 
   calculatePaymentAmount(
@@ -357,7 +374,10 @@ export class LoanCalculatorService implements ILoanCalculatorService {
       }
     }
 
-    const currentDebt = this.resolveCurrentDebt(accountRegister, projectedBalance);
+    const currentDebt = this.resolveCurrentDebt(
+      accountRegister,
+      projectedBalance,
+    );
     if (currentDebt == null) {
       return this.calculateFallbackPayment(accountRegister, interest);
     }
