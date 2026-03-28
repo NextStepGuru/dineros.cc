@@ -15,16 +15,52 @@ function isLocalPlaywrightBase(url: string): boolean {
   }
 }
 
+function resolveLocalWebServerTarget(url: string): {
+  host: string;
+  port: number;
+  origin: string;
+} {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname || "localhost";
+    const port = parsed.port ? Number(parsed.port) : 4300;
+    const protocol = parsed.protocol || "http:";
+    return { host, port, origin: `${protocol}//${host}:${port}` };
+  } catch {
+    return { host: "localhost", port: 4300, origin: "http://localhost:4300" };
+  }
+}
+
 const playwrightBaseUrlRaw = process.env.PLAYWRIGHT_BASE_URL?.trim();
 const playwrightBaseUrl =
   playwrightBaseUrlRaw && playwrightBaseUrlRaw.length > 0
     ? playwrightBaseUrlRaw
-    : "http://localhost:3000";
+    : "http://localhost:4300";
 
 const useLocalWebServer =
   !playwrightBaseUrlRaw ||
   playwrightBaseUrlRaw.length === 0 ||
   isLocalPlaywrightBase(playwrightBaseUrl);
+const localWebServerTarget = resolveLocalWebServerTarget(playwrightBaseUrl);
+const localPortOverride = Number.parseInt(
+  process.env.PLAYWRIGHT_LOCAL_PORT?.trim() ?? "",
+  10,
+);
+const localWebServerPort = Number.isFinite(localPortOverride)
+  ? localPortOverride
+  : 4300;
+const effectiveLocalTarget = {
+  host: localWebServerTarget.host,
+  port: localWebServerPort,
+  origin: `http://${localWebServerTarget.host}:${localWebServerPort}`,
+};
+const effectiveBaseUrl = useLocalWebServer
+  ? effectiveLocalTarget.origin
+  : playwrightBaseUrl;
+process.env.PLAYWRIGHT_BASE_URL = effectiveBaseUrl;
+
+const isCi =
+  process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
 
 const authStoragePath = path.join(__dirname, ".auth", "user.json");
 
@@ -33,16 +69,16 @@ export default defineConfig({
   globalSetup: path.join(__dirname, "tests/e2e/setup/global-setup.ts"),
   globalTeardown: path.join(__dirname, "tests/e2e/setup/global-teardown.ts"),
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  forbidOnly: isCi,
+  retries: isCi ? 2 : 0,
+  workers: isCi ? 1 : undefined,
   reporter: [
     ["list"],
-    ["html", { open: process.env.CI ? "never" : "on-failure" }],
+    ["html", { open: isCi ? "never" : "on-failure" }],
   ],
   outputDir: "test-results",
   use: {
-    baseURL: playwrightBaseUrl,
+    baseURL: effectiveBaseUrl,
     trace: "on-first-retry",
   },
   projects: [
@@ -98,11 +134,11 @@ export default defineConfig({
   ...(useLocalWebServer
     ? {
         webServer: {
-          command: "pnpm dev",
-          url: "http://localhost:3000",
-          reuseExistingServer: !process.env.CI,
-          // CI cold compile (Nuxt + large graph) often exceeds 3m on ubuntu-latest.
-          timeout: process.env.CI ? 360_000 : 60_000,
+          command: `pnpm dev --port ${effectiveLocalTarget.port} --host ${effectiveLocalTarget.host}`,
+          url: effectiveLocalTarget.origin,
+          reuseExistingServer: !isCi,
+          // Nuxt cold compile can exceed 60s locally; CI is typically slower.
+          timeout: isCi ? 360_000 : 180_000,
           env: {
             ...process.env,
             E2E: "1",
