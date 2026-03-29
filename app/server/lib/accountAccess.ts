@@ -23,11 +23,18 @@ export async function assertUserHasAccountAccess(
 /** Backward-compatible name used across the codebase. */
 export const assertUserOwnsAccount = assertUserHasAccountAccess;
 
-/** Budget belongs to an account the user is linked to (any collaborator). */
+/** Budget belongs to an account the user is linked to with budget visibility. */
 export function budgetWhereForAccountMember(userId: number, budgetId: number) {
   return {
     id: budgetId,
     isArchived: false,
-    account: accountWhereUserIsMember(userId),
+    account: {
+      userAccounts: {
+        some: {
+          userId,
+          canViewBudgets: true,
+        },
+      },
+    },
   };
 }

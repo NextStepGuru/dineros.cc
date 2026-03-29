@@ -9,6 +9,7 @@ import type {
   Reoccurrence,
   Account,
   SavingsGoal,
+  AccountMembershipSummary,
 } from "../types/types";
 
 export const useListStore = defineStore("listStore", {
@@ -21,6 +22,7 @@ export const useListStore = defineStore("listStore", {
     accounts: [] as Account[],
     categories: [] as Category[],
     savingsGoals: [] as SavingsGoal[],
+    memberships: [] as AccountMembershipSummary[],
     isLoading: false,
   }),
   getters: {
@@ -82,6 +84,9 @@ export const useListStore = defineStore("listStore", {
         .sort((a, b) => a.sortOrder - b.sortOrder);
     },
     getIsListsLoading: (state) => state.isLoading,
+    membershipForAccount:
+      (state) => (accountId: string) =>
+        state.memberships.find((m) => m.accountId === accountId) ?? null,
   },
   actions: {
     setReoccurrences(reoccurrences: Reoccurrence[]) {
@@ -124,6 +129,9 @@ export const useListStore = defineStore("listStore", {
     },
     setSavingsGoals(savingsGoals: SavingsGoal[]) {
       this.savingsGoals = savingsGoals;
+    },
+    setMemberships(memberships: AccountMembershipSummary[]) {
+      this.memberships = memberships;
     },
     addSavingsGoal(savingsGoal: SavingsGoal) {
       if (!this.savingsGoals.some((g) => g.id === savingsGoal.id)) {
@@ -195,6 +203,7 @@ export const useListStore = defineStore("listStore", {
           this.setAccounts(data.accounts);
           this.setCategories(data.categories);
           this.setSavingsGoals(data.savingsGoals ?? []);
+          this.setMemberships(data.memberships ?? []);
         }
       } finally {
         this.isLoading = false;
@@ -209,6 +218,7 @@ export const useListStore = defineStore("listStore", {
       this.accounts = [];
       this.categories = [];
       this.savingsGoals = [];
+      this.memberships = [];
     },
   },
 });

@@ -25,6 +25,8 @@ const envSchema = z.object({
     .default(6379),
   NATS_URL: z.string().default("nats://localhost:4222"),
   INTERNAL_API_TOKEN: z.string().optional(),
+  /** Base URL for server-to-server calls to the microservice (e.g. http://127.0.0.1:3050). */
+  MICROSERVICE_INTERNAL_URL: z.string().url().optional(),
   NUXT_PUBLIC_SITE_URL: z.preprocess(
     (value) =>
       typeof value === "string" && value.trim().length === 0

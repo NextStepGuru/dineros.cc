@@ -101,13 +101,20 @@ function exportCsv() {
   window.open(`/api/admin/integration-alerts?${params.toString()}`, "_blank");
 }
 
-watch(sourceFilter, () => {
-  load(true);
-});
+watch(
+  sourceFilter,
+  () => {
+    load(true);
+  },
+  { flush: "sync" },
+);
 
 onMounted(() => {
+  const prev = sourceFilter.value;
   applyRouteQuery();
-  load(true);
+  if (sourceFilter.value === prev) {
+    load(true);
+  }
 });
 
 function loadMore() {

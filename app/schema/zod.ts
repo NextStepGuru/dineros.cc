@@ -350,10 +350,20 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
-export const accountInviteCreateSchema = z.object({
-  accountId: z.string().min(1),
-  email: z.email("Invalid email address"),
+export const accountInvitePermissionsSchema = z.object({
+  canViewBudgets: z.boolean(),
+  canInviteUsers: z.boolean(),
+  canManageMembers: z.boolean(),
+  allowedBudgetIds: z.array(z.number().int().positive()).nullable().optional(),
 });
+
+export const accountInviteCreateSchema = z
+  .object({
+    accountIds: z.array(z.string().min(1)).min(1).max(25),
+    email: z.email("Invalid email address"),
+    permissions: accountInvitePermissionsSchema,
+  })
+  .strict();
 
 export const accountInviteAcceptSchema = z.object({
   token: z.string().min(1),

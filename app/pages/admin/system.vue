@@ -77,6 +77,30 @@ function openExternal(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+const reencryptLoading = ref(false);
+
+async function startReencryptMigrate() {
+  reencryptLoading.value = true;
+  try {
+    await $api("/api/admin/microservice-reencrypt-migrate", {
+      method: "POST",
+    });
+    toast.add({
+      color: "success",
+      description:
+        "Reencrypt migration was accepted and is running on the microservice.",
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Could not start reencrypt migration.";
+    toast.add({ color: "error", description: message });
+  } finally {
+    reencryptLoading.value = false;
+  }
+}
+
 async function searchPostmark() {
   const r = postmarkRecipient.value.trim();
   if (!r) {
@@ -144,6 +168,19 @@ AdminPageShell(
           li(class="flex items-center gap-2")
             UBadge(:color="status.checks.redis ? 'success' : 'error'" variant="subtle") Redis
             span {{ status.checks.redis ? "OK" : "Failed" }}
+
+      UCard
+        template(#header)
+          h2(class="text-base font-semibold") Microservice
+        p(class="text-sm frog-text-muted mb-3")
+          | Start field-encryption reencrypt migration on the microservice (async; configure MICROSERVICE_INTERNAL_URL on the server).
+        UButton(
+          color="primary"
+          variant="outline"
+          icon="i-lucide-play"
+          :loading="reencryptLoading"
+          :disabled="reencryptLoading"
+          @click="startReencryptMigrate") Start reencrypt migration
 
       UCard(v-if="bullLink")
         template(#header)

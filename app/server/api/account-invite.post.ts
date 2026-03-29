@@ -8,11 +8,12 @@ export default defineEventHandler(async (event) => {
   try {
     const { userId } = getUser(event);
     const body = await readBody(event);
-    const { accountId, email } = accountInviteCreateSchema.parse(body);
+    const parsed = accountInviteCreateSchema.parse(body);
     return await createAccountInvite({
       inviterUserId: userId,
-      accountId,
-      email,
+      accountIds: parsed.accountIds,
+      email: parsed.email,
+      permissions: parsed.permissions,
     });
   } catch (error) {
     handleApiError(error);

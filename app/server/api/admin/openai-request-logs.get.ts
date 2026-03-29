@@ -5,11 +5,7 @@ import { adminOpenAiRequestLogsQuerySchema } from "~/schema/zod";
 import { requireAdmin } from "~/server/lib/requireAdmin";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { parseOptionalIsoQuery } from "~/server/lib/parseOptionalIsoQuery";
-
-function csvEscape(s: string) {
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+import { csvEscape } from "~/server/lib/csvEscape";
 
 export default defineEventHandler(async (event) => {
   try {

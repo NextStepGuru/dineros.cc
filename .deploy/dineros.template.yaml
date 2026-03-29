@@ -76,6 +76,13 @@ spec:
               value: "6379"
             - name: REDIS_HOST
               value: "redis-master.redis.svc.cluster.local"
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${SECRET_APP}
+                  key: INTERNAL_API_TOKEN
+            - name: MICROSERVICE_INTERNAL_URL
+              value: "http://${MICRO_SERVICE_NAME}.${K8S_NAMESPACE}.svc.cluster.local:3050"
             - name: SHOW_BULL_MQ_ADMIN
               value: "false"
             - name: PROJECT_NAME
@@ -219,6 +226,11 @@ spec:
               value: "6379"
             - name: REDIS_HOST
               value: "redis-master.redis.svc.cluster.local"
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${SECRET_APP}
+                  key: INTERNAL_API_TOKEN
             - name: DB_DECRYPTION_KEY_1
               valueFrom:
                 secretKeyRef:
@@ -253,6 +265,23 @@ spec:
         - name: service-account-volume
           secret:
             secretName: ${SECRET_GA}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${MICRO_SERVICE_NAME}
+  labels:
+    app: ${MICRO_APP_LABEL}
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ${MICRO_APP_LABEL}
+  ports:
+    - protocol: TCP
+      port: 3050
+      targetPort: 3050
+      name: http
+  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service

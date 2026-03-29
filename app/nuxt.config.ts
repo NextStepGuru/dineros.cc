@@ -26,6 +26,8 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-01-31",
   components: true,
   runtimeConfig: {
+    /** Server-only: microservice HTTP base for internal admin actions (reencrypt migrate, etc.). */
+    microserviceInternalUrl: process.env.MICROSERVICE_INTERNAL_URL || "",
     public: {
       testDate: process.env.TEST_DATE || "",
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "https://dineros.cc",

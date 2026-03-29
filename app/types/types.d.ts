@@ -57,6 +57,14 @@ export type Category = {
 
 export type SavingsGoal = z.infer<typeof savingsGoalSchema>;
 
+export type AccountMembershipSummary = {
+  accountId: string;
+  canViewBudgets: boolean;
+  canInviteUsers: boolean;
+  canManageMembers: boolean;
+  allowedBudgetIds: number[] | null;
+};
+
 export type Lists = {
   reoccurrences: Reoccurrence[];
   intervals: Interval[];
@@ -66,6 +74,7 @@ export type Lists = {
   accounts: Account[];
   categories: Category[];
   savingsGoals: SavingsGoal[];
+  memberships?: AccountMembershipSummary[];
 };
 
 export type AccountSnapshot = {

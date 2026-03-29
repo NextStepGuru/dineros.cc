@@ -2,10 +2,8 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { createError, getRouterParam } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
-import {
-  accountWhereUserIsMember,
-  budgetWhereForAccountMember,
-} from "~/server/lib/accountAccess";
+import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
+import { assertBudgetVisibleToUser } from "~/server/lib/accountMembership";
 import { cloneBudget } from "~/server/services/budgetCloneService";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 
@@ -21,16 +19,7 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    const budget = await PrismaDb.budget.findFirst({
-      where: budgetWhereForAccountMember(user.userId, budgetId),
-      select: { id: true, accountId: true, isDefault: true },
-    });
-    if (!budget) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: "Budget not found",
-      });
-    }
+    const budget = await assertBudgetVisibleToUser(user.userId, budgetId);
     if (budget.isDefault) {
       throw createError({
         statusCode: 400,
