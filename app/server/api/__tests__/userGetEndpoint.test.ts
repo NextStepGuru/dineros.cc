@@ -37,13 +37,10 @@ vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn(),
 }));
 
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    user: {
-      findUniqueOrThrow: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/schema/zod", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/schema/zod")>();

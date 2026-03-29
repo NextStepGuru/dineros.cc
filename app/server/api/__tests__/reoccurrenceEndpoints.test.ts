@@ -25,32 +25,10 @@ vi.mock("h3", () => ({
 }));
 
 // Mock server dependencies
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    accountRegister: {
-      findFirstOrThrow: vi.fn(),
-      findMany: vi.fn(),
-    },
-    reoccurrence: {
-      findFirstOrThrow: vi.fn(),
-      upsert: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-      delete: vi.fn(),
-    },
-    reoccurrenceSplit: {
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-    },
-    category: {
-      findFirstOrThrow: vi.fn(),
-      findMany: vi.fn(),
-    },
-    registerEntry: {
-      deleteMany: vi.fn(),
-    },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),

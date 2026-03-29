@@ -48,14 +48,10 @@ vi.mock("~/server/env", () => ({
   },
 }));
 
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    user: {
-      findUniqueOrThrow: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/postmarkClient", () => ({
   postmarkClient: {

@@ -1,4 +1,9 @@
+import { strictEqual } from "node:assert";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+let mockPrisma!: ReturnType<
+  Awaited<typeof import("~/tests/helpers/prismaMock")>["createMockPrisma"]
+>;
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -66,9 +71,11 @@ vi.mock("~/server/services/forecast", () => ({
   },
 }));
 
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {},
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  mockPrisma = createMockPrisma();
+  return { prisma: mockPrisma };
+});
 
 describe("Recalculate POST API Endpoint", () => {
   let recalculatePostHandler: any;
@@ -107,7 +114,6 @@ describe("Recalculate POST API Endpoint", () => {
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
-    const { prisma } = await import("~/server/clients/prismaClient");
 
     (global as any).readBody.mockResolvedValue(mockBody);
     (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
@@ -115,7 +121,10 @@ describe("Recalculate POST API Endpoint", () => {
 
     const result = await recalculatePostHandler(mockEvent);
 
-    expect(ForecastEngineFactory.create).toHaveBeenCalledWith(prisma);
+    strictEqual(
+      (ForecastEngineFactory.create as any).mock.calls[0][0],
+      mockPrisma,
+    );
     expect(mockEngine.recalculate).toHaveBeenCalledWith({
       accountId: "account123",
       startDate: expect.any(Date),

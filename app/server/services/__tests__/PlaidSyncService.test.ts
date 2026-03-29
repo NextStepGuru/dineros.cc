@@ -9,36 +9,10 @@ import type {
 import type { Transaction } from "plaid";
 
 // Mock dependencies
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    accountRegister: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    registerEntry: {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-  globalClient: {
-    $extends: vi.fn(() => ({
-      accountRegister: {
-        findMany: vi.fn(),
-        findFirst: vi.fn(),
-        update: vi.fn(),
-        updateMany: vi.fn(),
-      },
-      registerEntry: {
-        findFirst: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-      },
-    })),
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 vi.mock("~/server/clients/queuesClient");
 vi.mock("~/server/logger");
 vi.mock("../TransactionMatchingService");

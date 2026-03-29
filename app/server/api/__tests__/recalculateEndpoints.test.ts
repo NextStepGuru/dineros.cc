@@ -1,4 +1,9 @@
+import { strictEqual } from "node:assert";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+let mockPrisma!: ReturnType<
+  Awaited<typeof import("~/tests/helpers/prismaMock")>["createMockPrisma"]
+>;
 
 // Global H3 function mocks
 (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
@@ -23,13 +28,6 @@ const mockEngineFactory = {
   create: vi.fn().mockReturnValue(mockEngine),
 };
 
-const mockPrisma = {
-  accountRegister: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-  },
-};
-
 const mockHandleApiError = vi.fn();
 
 // Mock schema
@@ -52,9 +50,11 @@ vi.mock("~/server/services/forecast", () => ({
   },
 }));
 
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: mockPrisma,
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  mockPrisma = createMockPrisma();
+  return { prisma: mockPrisma };
+});
 
 vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: mockHandleApiError,
@@ -120,7 +120,10 @@ describe("Recalculate API Endpoints", () => {
         accountRegisters: 2,
       });
 
-      expect(mockEngineFactory.create).toHaveBeenCalledWith(mockPrisma);
+      strictEqual(
+        (mockEngineFactory.create as any).mock.calls[0][0],
+        mockPrisma,
+      );
       expect(mockEngine.recalculate).toHaveBeenCalledWith({
         accountId: "account-123",
         startDate: expect.any(Date),
@@ -602,8 +605,14 @@ describe("Recalculate API Endpoints", () => {
 
       // Engine factory should be called twice (once for each account)
       expect(mockEngineFactory.create).toHaveBeenCalledTimes(2);
-      expect(mockEngineFactory.create).toHaveBeenNthCalledWith(1, mockPrisma);
-      expect(mockEngineFactory.create).toHaveBeenNthCalledWith(2, mockPrisma);
+      strictEqual(
+        (mockEngineFactory.create as any).mock.calls[0][0],
+        mockPrisma,
+      );
+      strictEqual(
+        (mockEngineFactory.create as any).mock.calls[1][0],
+        mockPrisma,
+      );
     });
 
     it("should handle database query errors for account lookup", async () => {
@@ -674,7 +683,10 @@ describe("Recalculate API Endpoints", () => {
       await taskHandler({} as any);
 
       // Both should call the same factory
-      expect(mockEngineFactory.create).toHaveBeenCalledWith(mockPrisma);
+      strictEqual(
+        (mockEngineFactory.create as any).mock.calls[0][0],
+        mockPrisma,
+      );
     });
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "~/server/clients/prismaClient";
 
 vi.hoisted(() => {
   (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
@@ -21,23 +22,10 @@ vi.mock("h3", () => ({
 
 (globalThis as any).getQuery = vi.fn();
 
-const prismaMock = vi.hoisted(() => ({
-  savingsGoal: {
-    findFirst: vi.fn(),
-    update: vi.fn(),
-  },
-  accountSnapshot: {
-    findFirst: vi.fn(),
-    delete: vi.fn(),
-  },
-  accountRegisterSnapshot: {
-    findFirst: vi.fn(),
-  },
-}));
-
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: prismaMock,
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
@@ -129,15 +117,15 @@ describe("reports / savings-goal / snapshot nested routes", () => {
 
       (getUser as any).mockReturnValue({ userId: 7 });
       (getRouterParam as any).mockReturnValue("12");
-      prismaMock.savingsGoal.findFirst.mockResolvedValue({
+      prisma.savingsGoal.findFirst.mockResolvedValue({
         id: 12,
         accountId: "acc-1",
       });
-      prismaMock.savingsGoal.update.mockResolvedValue({});
+      prisma.savingsGoal.update.mockResolvedValue({});
 
       const out = await handler({});
       expect(out).toEqual({ message: "Savings goal archived." });
-      expect(prismaMock.savingsGoal.update).toHaveBeenCalledWith({
+      expect(prisma.savingsGoal.update).toHaveBeenCalledWith({
         where: { id: 12 },
         data: { isArchived: true },
       });
@@ -156,7 +144,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
     it("returns snapshot with registers", async () => {
       const { getUser } = await import("~/server/lib/getUser");
       const created = new Date("2024-03-01T00:00:00.000Z");
-      prismaMock.accountSnapshot.findFirst.mockResolvedValue({
+      prisma.accountSnapshot.findFirst.mockResolvedValue({
         id: 1,
         accountId: "a1",
         createdAt: created,
@@ -194,8 +182,8 @@ describe("reports / savings-goal / snapshot nested routes", () => {
 
     it("deletes snapshot", async () => {
       const { getUser } = await import("~/server/lib/getUser");
-      prismaMock.accountSnapshot.findFirst.mockResolvedValue({ id: 2 });
-      prismaMock.accountSnapshot.delete.mockResolvedValue({});
+      prisma.accountSnapshot.findFirst.mockResolvedValue({ id: 2 });
+      prisma.accountSnapshot.delete.mockResolvedValue({});
       (getUser as any).mockReturnValue({ userId: 1 });
 
       const out = await handler({
@@ -203,7 +191,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
       } as any);
 
       expect(out).toEqual({ ok: true });
-      expect(prismaMock.accountSnapshot.delete).toHaveBeenCalledWith({
+      expect(prisma.accountSnapshot.delete).toHaveBeenCalledWith({
         where: { id: 2 },
       });
     });
@@ -220,7 +208,7 @@ describe("reports / savings-goal / snapshot nested routes", () => {
     it("returns register snapshot rows", async () => {
       const { getUser } = await import("~/server/lib/getUser");
       const created = new Date("2024-01-02T00:00:00.000Z");
-      prismaMock.accountRegisterSnapshot.findFirst.mockResolvedValue({
+      prisma.accountRegisterSnapshot.findFirst.mockResolvedValue({
         id: 99,
         accountRegisterId: 5,
         entries: [

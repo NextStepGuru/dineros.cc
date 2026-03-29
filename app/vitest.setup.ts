@@ -6,6 +6,8 @@ import { defineStore } from "pinia";
 // Set environment for tests
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
+// Matches CI (.github/workflows/pr.yml); avoids import-order crashes if prismaClient loads before vi.mock
+process.env.DATABASE_URL ??= "mysql://ci:ci@localhost:3306/ci";
 
 // server/env + prisma-field-encryption require Cloak-serialized keys (see build-test.sh)
 const ciCloakKey = "k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c=";

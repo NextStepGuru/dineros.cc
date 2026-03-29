@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "~/server/clients/prismaClient";
 import { dbUserForSession } from "./fixtures/dbUserForSession";
 
 vi.hoisted(() => {
@@ -97,28 +98,10 @@ vi.mock("otplib", () => ({
   verify: otplibVerify,
 }));
 
-const prismaGapMock = vi.hoisted(() => ({
-  budget: { findFirst: vi.fn() },
-  userAccount: { findFirst: vi.fn() },
-  accountRegister: { findMany: vi.fn(), findFirst: vi.fn() },
-  registerEntry: { findMany: vi.fn() },
-  openAiRequestLog: { findMany: vi.fn(), count: vi.fn() },
-  user: {
-    findUniqueOrThrow: vi.fn(),
-    findUnique: vi.fn(),
-    update: vi.fn(),
-  },
-  savingsGoal: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    update: vi.fn(),
-  },
-  $transaction: vi.fn(),
-}));
-
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: prismaGapMock,
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
@@ -211,10 +194,10 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
       rpName: "Test",
       origin: "http://localhost:3000",
     });
-    prismaGapMock.$transaction.mockImplementation(async (arg: unknown) => {
+    prisma.$transaction.mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {
-        return (arg as (_tx: typeof prismaGapMock) => Promise<unknown>)(
-          prismaGapMock,
+        return (arg as (_tx: typeof prisma) => Promise<unknown>)(
+          prisma,
         );
       }
       if (Array.isArray(arg)) {
@@ -232,11 +215,11 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         budgetId: "1",
         monthsAhead: "0",
       });
-      prismaGapMock.budget.findFirst.mockResolvedValue({ id: 1 });
-      prismaGapMock.userAccount.findFirst.mockResolvedValue({
+      prisma.budget.findFirst.mockResolvedValue({ id: 1 });
+      prisma.userAccount.findFirst.mockResolvedValue({
         accountId: "acc-1",
       });
-      prismaGapMock.accountRegister.findMany.mockResolvedValue([]);
+      prisma.accountRegister.findMany.mockResolvedValue([]);
 
       const mod = await import("../account-registers/forecast-balances.get");
       const handler = mod.default;
@@ -254,11 +237,11 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         budgetId: "1",
         monthsAhead: "0",
       });
-      prismaGapMock.budget.findFirst.mockResolvedValue({ id: 1 });
-      prismaGapMock.userAccount.findFirst.mockResolvedValue({
+      prisma.budget.findFirst.mockResolvedValue({ id: 1 });
+      prisma.userAccount.findFirst.mockResolvedValue({
         accountId: "acc-1",
       });
-      prismaGapMock.accountRegister.findMany.mockResolvedValue([
+      prisma.accountRegister.findMany.mockResolvedValue([
         {
           id: 10,
           balance: 0,
@@ -267,7 +250,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
           type: { isCredit: false },
         },
       ]);
-      prismaGapMock.registerEntry.findMany.mockResolvedValue([]);
+      prisma.registerEntry.findMany.mockResolvedValue([]);
 
       const mod = await import("../account-registers/forecast-balances.get");
       const handler = mod.default;
@@ -285,7 +268,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         budgetId: "99",
         monthsAhead: "0",
       });
-      prismaGapMock.budget.findFirst.mockResolvedValue(null);
+      prisma.budget.findFirst.mockResolvedValue(null);
 
       const mod = await import("../account-registers/forecast-balances.get");
       const handler = mod.default;
@@ -301,8 +284,8 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         budgetId: "1",
         monthsAhead: "0",
       });
-      prismaGapMock.budget.findFirst.mockResolvedValue({ id: 1 });
-      prismaGapMock.userAccount.findFirst.mockResolvedValue(null);
+      prisma.budget.findFirst.mockResolvedValue({ id: 1 });
+      prisma.userAccount.findFirst.mockResolvedValue(null);
 
       const mod = await import("../account-registers/forecast-balances.get");
       const handler = mod.default;
@@ -316,8 +299,8 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
     it("returns paginated logs", async () => {
       const { getQuery } = await import("h3");
       (getQuery as any).mockReturnValue({ limit: "10", offset: "0" });
-      prismaGapMock.openAiRequestLog.findMany.mockResolvedValue([{ id: 1 }]);
-      prismaGapMock.openAiRequestLog.count.mockResolvedValue(1);
+      prisma.openAiRequestLog.findMany.mockResolvedValue([{ id: 1 }]);
+      prisma.openAiRequestLog.count.mockResolvedValue(1);
 
       const mod = await import("../admin/openai-request-logs.get");
       const out = await mod.default({} as never);
@@ -345,7 +328,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
           plaid: { isEnabled: false },
         },
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(userRow);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(userRow);
       type SessionSettings = {
         speakeasy: { isEnabled: boolean; isVerified: boolean };
         mfa: {
@@ -356,7 +339,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         plaid: { isEnabled: boolean };
       };
       const settings = userRow.settings as SessionSettings;
-      prismaGapMock.user.update.mockResolvedValue({
+      prisma.user.update.mockResolvedValue({
         ...userRow,
         settings: {
           ...settings,
@@ -366,7 +349,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
 
       const mod = await import("../mfa/passkey/delete.post");
       await mod.default({} as never);
-      expect(prismaGapMock.user.update).toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalled();
     });
   });
 
@@ -377,7 +360,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         userId: 123,
         methods: ["passkey"],
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession(),
       );
 
@@ -400,7 +383,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
 
   describe("POST /api/mfa/passkey/register-options", () => {
     it("returns registration options", async () => {
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession(),
       );
 
@@ -416,7 +399,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
       const { readBody, setResponseStatus } = await import("h3");
       (readBody as any).mockResolvedValue({ response: {} });
       redisMock.get.mockResolvedValue(null);
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession(),
       );
 
@@ -434,14 +417,14 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         response: { response: { transports: ["usb"] } },
       });
       redisMock.get.mockResolvedValue("reg-challenge");
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession(),
       );
-      prismaGapMock.user.update.mockResolvedValue(dbUserForSession());
+      prisma.user.update.mockResolvedValue(dbUserForSession());
 
       const mod = await import("../mfa/passkey/register-verify.post");
       await mod.default({} as never);
-      expect(prismaGapMock.user.update).toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalled();
     });
 
     it("401 when registration verification fails", async () => {
@@ -452,7 +435,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         verified: false,
         registrationInfo: undefined,
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession(),
       );
 
@@ -480,7 +463,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
           },
         },
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -496,7 +479,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
 
       const mod = await import("../mfa/passkey/register-verify.post");
       await mod.default({} as never);
-      expect(prismaGapMock.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
   });
 
@@ -510,7 +493,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         methods: ["passkey"],
       });
       redisMock.get.mockResolvedValue("stored-challenge");
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -530,7 +513,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
           },
         }),
       );
-      prismaGapMock.user.update.mockResolvedValue(dbUserForSession());
+      prisma.user.update.mockResolvedValue(dbUserForSession());
 
       const mod = await import("../mfa/passkey/verify.post");
       const out = await mod.default({} as never);
@@ -563,7 +546,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         methods: ["passkey"],
       });
       redisMock.get.mockResolvedValue("stored-challenge");
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -598,7 +581,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         methods: ["passkey"],
       });
       redisMock.get.mockResolvedValue("stored-challenge");
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -647,7 +630,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         userId: 123,
         methods: ["totp"],
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -679,7 +662,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         userId: 123,
         methods: ["totp"],
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -711,7 +694,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         userId: 123,
         methods: ["totp"],
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -729,11 +712,11 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
           },
         }),
       );
-      prismaGapMock.user.update.mockResolvedValue(dbUserForSession());
+      prisma.user.update.mockResolvedValue(dbUserForSession());
 
       const mod = await import("../mfa/totp/verify.post");
       const out = await mod.default({} as never);
-      expect(prismaGapMock.user.update).toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalled();
       expect(out).toEqual({ ok: true, loggedIn: true });
     });
 
@@ -746,7 +729,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         userId: 123,
         methods: ["totp"],
       });
-      prismaGapMock.user.findUniqueOrThrow.mockResolvedValue(
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
         dbUserForSession({
           settings: {
             speakeasy: { isEnabled: false, isVerified: false },
@@ -779,12 +762,12 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
       const { readBody, getRouterParam } = await import("h3");
       (getRouterParam as any).mockReturnValue("5");
       (readBody as any).mockResolvedValue({ name: "Trip" });
-      prismaGapMock.savingsGoal.findFirst.mockResolvedValue({
+      prisma.savingsGoal.findFirst.mockResolvedValue({
         id: 5,
         budgetId: 1,
         accountId: "acc-1",
       });
-      prismaGapMock.savingsGoal.update.mockResolvedValue({
+      prisma.savingsGoal.update.mockResolvedValue({
         id: 5,
         accountId: "acc-1",
         budgetId: 1,
@@ -800,7 +783,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
 
       const mod = await import("../savings-goal/[id].patch");
       await mod.default({} as never);
-      expect(prismaGapMock.savingsGoal.update).toHaveBeenCalled();
+      expect(prisma.savingsGoal.update).toHaveBeenCalled();
     });
 
     it("400 when id invalid", async () => {
@@ -817,7 +800,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
       const { readBody, getRouterParam } = await import("h3");
       (getRouterParam as any).mockReturnValue("99");
       (readBody as any).mockResolvedValue({ name: "X" });
-      prismaGapMock.savingsGoal.findFirst.mockResolvedValue(null);
+      prisma.savingsGoal.findFirst.mockResolvedValue(null);
 
       const mod = await import("../savings-goal/[id].patch");
       await expect(mod.default({} as never)).rejects.toMatchObject({
@@ -829,12 +812,12 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
       const { readBody, getRouterParam } = await import("h3");
       (getRouterParam as any).mockReturnValue("5");
       (readBody as any).mockResolvedValue({ sourceAccountRegisterId: 999 });
-      prismaGapMock.savingsGoal.findFirst.mockResolvedValue({
+      prisma.savingsGoal.findFirst.mockResolvedValue({
         id: 5,
         budgetId: 1,
         accountId: "acc-1",
       });
-      prismaGapMock.accountRegister.findFirst.mockResolvedValue(null);
+      prisma.accountRegister.findFirst.mockResolvedValue(null);
 
       const mod = await import("../savings-goal/[id].patch");
       await expect(mod.default({} as never)).rejects.toMatchObject({
@@ -847,7 +830,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
     it("reorders goals and enqueues recalc", async () => {
       const { readBody } = await import("h3");
       (readBody as any).mockResolvedValue({ goalIds: [1, 2] });
-      prismaGapMock.savingsGoal.findMany.mockResolvedValue([
+      prisma.savingsGoal.findMany.mockResolvedValue([
         { id: 1, accountId: "acc-1" },
         { id: 2, accountId: "acc-1" },
       ]);
@@ -856,7 +839,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
         await import("~/server/clients/queuesClient");
       const mod = await import("../savings-goal/order.patch");
       await mod.default({} as never);
-      expect(prismaGapMock.$transaction).toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: "acc-1" });
     });
 
@@ -872,7 +855,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
     it("400 when a goal id is missing or not accessible", async () => {
       const { readBody } = await import("h3");
       (readBody as any).mockResolvedValue({ goalIds: [1, 2] });
-      prismaGapMock.savingsGoal.findMany.mockResolvedValue([
+      prisma.savingsGoal.findMany.mockResolvedValue([
         { id: 1, accountId: "acc-1" },
       ]);
 
