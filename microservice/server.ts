@@ -6,6 +6,7 @@ import {
   eventHandler,
   getHeader,
   toNodeListener,
+  type H3Event,
 } from "h3";
 import fg from "fast-glob";
 import env from "./env";
@@ -33,8 +34,15 @@ app.use(
   }),
 );
 
-// Load all route files dynamically
+// Load all route files dynamically. One path (e.g. /migrate) may have both .get and .post files;
+// registering them as stacked middlewares breaks method routing because the first handler runs
+// for every request and throws 405 when the method does not match (e.g. GET registered before POST).
 const routes = await fg("./routes/**/*.ts");
+
+const handlersByRoute = new Map<
+  string,
+  Map<string, (event: H3Event) => unknown>
+>();
 
 for (const file of routes) {
   const routePath = file
@@ -48,19 +56,45 @@ for (const file of routes) {
   }
 
   const module = await import(`./${file}`);
+  const handler: (event: unknown) => unknown = module.default;
 
-  const handler: any = module.default; // Use `any` to bypass type errors
+  if (!handlersByRoute.has(route)) {
+    handlersByRoute.set(route, new Map());
+  }
+  const methods = handlersByRoute.get(route)!;
+  if (methods.has(method)) {
+    log({
+      message: `Duplicate handler ${method.toUpperCase()} for /${route}, skipping ${file}`,
+      level: "warn",
+    });
+    continue;
+  }
+  methods.set(method, handler);
 
   log({
-    message: `Registering ${method.toUpperCase()} /${route}`,
+    message: `Loaded ${method.toUpperCase()} /${route} from ${file}`,
+    level: "debug",
+  });
+}
+
+for (const [route, methods] of handlersByRoute) {
+  const path = `/${route === "index" ? "" : route}`;
+  const methodList = [...methods.keys()].join(", ").toUpperCase();
+  log({
+    message: `Registering ${path} → [${methodList}]`,
     level: "debug",
   });
 
   app.use(
-    `/${route === "index" ? "" : route}`,
+    path,
     eventHandler(async (event) => {
-      if (event.method?.toLowerCase() !== method) {
-        throw createError({ statusCode: 405, message: "Method Not Allowed" });
+      const m = event.method?.toLowerCase() ?? "";
+      const handler = methods.get(m);
+      if (!handler) {
+        throw createError({
+          statusCode: 405,
+          statusMessage: "Method Not Allowed",
+        });
       }
       return handler(event);
     }),
