@@ -25,7 +25,7 @@ test.describe("Form validation — authed empty-submit", () => {
     });
 
     await page.getByRole("button", { name: /add entry/i }).first().click();
-    await expect(page.getByLabel(/description/i).first()).toBeVisible({
+    await expect(page.locator("#description")).toBeVisible({
       timeout: 15_000,
     });
 

@@ -25,6 +25,15 @@ setup("authenticate and save storage state", async ({ page }) => {
     { timeout: 60_000 },
   );
 
+  // Persisted storage state must match what register/header e2e expect (forecasting toolbar + menus).
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem("dineros_workflow_mode", "forecasting");
+    } catch {
+      /* ignore */
+    }
+  });
+
   const authDir = path.join(__dirname, "..", "..", "..", ".auth");
   mkdirSync(authDir, { recursive: true });
   const storagePath = path.join(authDir, "user.json");

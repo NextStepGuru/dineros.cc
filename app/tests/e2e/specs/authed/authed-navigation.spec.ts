@@ -63,9 +63,14 @@ test.describe("Authed shell & header navigation", () => {
       timeout: 45_000,
     });
 
+    await page.keyboard.press("Escape");
     await page.getByRole("banner").getByRole("button", { name: "Forecast menu" }).click();
     await expect(
-      page.getByRole("menuitem").filter({ hasText: /^reports$/i }).first(),
+      page
+        .locator('[role="menu"]')
+        .filter({ visible: true })
+        .last()
+        .getByText("Reports", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -75,9 +80,14 @@ test.describe("Authed shell & header navigation", () => {
       timeout: 45_000,
     });
 
+    await page.keyboard.press("Escape");
     await page.getByRole("banner").getByRole("button", { name: "Reconcile menu" }).click();
     await expect(
-      page.getByRole("menuitem").filter({ hasText: /^goals$/i }).first(),
+      page
+        .locator('[role="menu"]')
+        .filter({ visible: true })
+        .last()
+        .getByText("Goals", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
