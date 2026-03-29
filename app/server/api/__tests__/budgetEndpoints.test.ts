@@ -21,8 +21,22 @@ vi.mock("h3", () => ({
 
 vi.mock("~/server/logger", () => ({ log: vi.fn() }));
 
+const defaultUserAccountMembership = {
+  userId: 123,
+  accountId: "acc-1",
+  canViewBudgets: true,
+  canInviteUsers: true,
+  canManageMembers: true,
+  allowedBudgetIds: null,
+  allowedAccountRegisterIds: null,
+};
+
 vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
+    userAccount: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
     budget: {
       findFirst: vi.fn(),
       findFirstOrThrow: vi.fn(),
@@ -96,6 +110,9 @@ describe("Budget API Endpoints", () => {
     vi.clearAllMocks();
     const { getUser } = await import("~/server/lib/getUser");
     (getUser as any).mockReturnValue(mockUser);
+    const prisma = (await import("~/server/clients/prismaClient"))
+      .prisma as any;
+    prisma.userAccount.findFirst.mockResolvedValue(defaultUserAccountMembership);
   });
 
   describe("POST /api/budget", () => {

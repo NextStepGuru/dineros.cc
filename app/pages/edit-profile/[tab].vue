@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AccountTeamTab from "~/components/profile/AccountTeamTab.vue";
+
 definePageMeta({
   middleware: "auth",
 });
@@ -6,15 +8,13 @@ definePageMeta({
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
-const isAdminUser = computed(() => authStore.getUser?.role === "ADMIN");
+const { isAdminConsoleUser } = useAdminAccess();
+const isAdminUser = isAdminConsoleUser;
 
 // Lazy-load tab components so Plaid and other heavy deps load only when tab is selected
 const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   "/edit-profile/profile": defineAsyncComponent(
     () => import("~/components/profile/EditProfileTab.vue"),
-  ),
-  "/edit-profile/team": defineAsyncComponent(
-    () => import("~/components/profile/AccountTeamTab.vue"),
   ),
   "/edit-profile/password": defineAsyncComponent(
     () => import("~/components/profile/ChangePasswordTab.vue"),
@@ -92,42 +92,19 @@ const coreNavigationItems = computed<NavItem[]>(() => [
   },
 ]);
 
-const adminNavigationItems = computed<NavItem[]>(() => {
-  if (!isAdminUser.value) return [];
-  return [
-    {
-      label: "Admin Console",
-      to: "/admin",
-      active: route.path.startsWith("/admin"),
-    },
-    {
-      label: "Legacy Admin Tasks",
-      to: "/edit-profile/admin-settings",
-      active: route.path.startsWith("/edit-profile/admin-settings"),
-    },
-    {
-      label: "OpenAI logs",
-      to: "/edit-profile/openai-logs",
-      active: route.path.startsWith("/edit-profile/openai-logs"),
-    },
-  ];
-});
-
-const allNavigationItems = computed(() => [
-  ...coreNavigationItems.value,
-  ...adminNavigationItems.value,
-]);
-
 const tabHeadingOverrides: Record<string, string> = {
   "/edit-profile/password": "Change password",
   "/edit-profile/team": "Team & Invitations",
   "/edit-profile/two-factor-auth": "Two-Factor Authentication",
+  "/edit-profile/admin-settings": "Admin settings",
+  "/edit-profile/debug-tools": "Debug tools",
+  "/edit-profile/openai-logs": "OpenAI logs",
 };
 
 const currentTabLabel = computed(
   () =>
     tabHeadingOverrides[route.path] ??
-    allNavigationItems.value.find((item) => item.to === route.path)?.label ??
+    coreNavigationItems.value.find((item) => item.to === route.path)?.label ??
     "Profile",
 );
 
@@ -172,24 +149,17 @@ div(class="container mx-auto px-4 py-6 lg:py-8")
               :class="item.active ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-elevated text-muted hover:text-highlighted'")
               | {{ item.label }}
 
-          template(v-if="adminNavigationItems.length > 0")
-            USeparator(class="my-2")
-            p(class="px-2 py-1 text-xs font-semibold uppercase tracking-wide frog-text-muted") Admin
-            nav(class="mt-1 space-y-1")
-              NuxtLink(
-                v-for="item in adminNavigationItems"
-                :key="item.to"
-                :to="item.to"
-                class="block rounded-md px-2.5 py-2 text-sm transition-colors"
-                :class="item.active ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-elevated text-muted hover:text-highlighted'")
-                | {{ item.label }}
-
       div(class="min-w-0")
         UCard
           template(#header)
             div(class="flex items-center justify-between gap-3")
               h2(class="text-base sm:text-lg font-semibold") {{ currentTabLabel }}
-          component(:is="currentTabComponent" v-if="currentTabComponent")
+          ClientOnly(v-if="route.path === '/edit-profile/team'")
+            AccountTeamTab
+          component(
+            v-else-if="currentTabComponent"
+            :is="currentTabComponent"
+          )
           UAlert(
             v-else
             color="error"

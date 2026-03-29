@@ -46,6 +46,34 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 404, statusMessage: "Account not found" });
     }
 
+    const memberUserIds = [
+      ...new Set(account.userAccounts.map((m) => m.userId)),
+    ];
+    const plaidRows =
+      memberUserIds.length > 0
+        ? await prisma.plaidItem.findMany({
+            where: { userId: { in: memberUserIds } },
+            orderBy: { updatedAt: "desc" },
+            select: {
+              itemId: true,
+              userId: true,
+              updatedAt: true,
+            },
+          })
+        : [];
+
+    const plaidItemIds = plaidRows.map((p) => p.itemId);
+    const plaidCursors =
+      plaidItemIds.length > 0
+        ? await prisma.plaidSyncCursor.findMany({
+            where: { itemId: { in: plaidItemIds } },
+            select: { itemId: true, updatedAt: true },
+          })
+        : [];
+    const cursorAt = new Map(
+      plaidCursors.map((c) => [c.itemId, c.updatedAt]),
+    );
+
     return {
       id: account.id,
       name: account.name,
@@ -53,6 +81,12 @@ export default defineEventHandler(async (event) => {
       isDefault: account.isDefault,
       lastAccessedAt: account.lastAccessedAt,
       updatedAt: account.updatedAt,
+      plaidItems: plaidRows.map((p) => ({
+        itemId: p.itemId,
+        userId: p.userId,
+        updatedAt: p.updatedAt,
+        syncCursorUpdatedAt: cursorAt.get(p.itemId) ?? null,
+      })),
       members: account.userAccounts.map((membership) => ({
         membershipId: membership.id,
         userId: membership.userId,

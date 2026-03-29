@@ -24,11 +24,19 @@ type Validate =
   | { valid: false }
   | {
       valid: true;
+      accounts: { id: string; name: string }[];
       accountName: string;
       inviterDisplayName: string;
       expiresAt: string;
       needsPassword: boolean;
       needsName: boolean;
+      permissions: {
+        canViewBudgets: boolean;
+        canInviteUsers: boolean;
+        canManageMembers: boolean;
+        allowedBudgetIds: number[] | null;
+        allowedAccountRegisterIds: number[] | null;
+      };
     };
 
 const validation = ref<Validate | null>(null);
@@ -144,6 +152,29 @@ async function submit() {
     isSubmitting.value = false;
   }
 }
+
+function permLine(v: Extract<Validate, { valid: true }>) {
+  const p = v.permissions;
+  const bits: string[] = [];
+  bits.push(p.canViewBudgets ? "View budgets" : "No budget access");
+  bits.push(p.canInviteUsers ? "Invite users" : "Cannot invite");
+  bits.push(p.canManageMembers ? "Manage members" : "Cannot manage members");
+  if (p.allowedBudgetIds?.length) {
+    bits.push(`Budgets #${p.allowedBudgetIds.join(", ")} only`);
+  }
+  if (p.canViewBudgets) {
+    if (p.allowedAccountRegisterIds == null) {
+      bits.push("All account registers");
+    } else if (p.allowedAccountRegisterIds.length === 0) {
+      bits.push("No account registers");
+    } else {
+      bits.push(
+        `Account registers #${p.allowedAccountRegisterIds.join(", ")} only`,
+      );
+    }
+  }
+  return bits.join(" · ");
+}
 </script>
 
 <template lang="pug">
@@ -160,9 +191,10 @@ section(class="auth-page flex items-center justify-center")
     template(v-else-if="validation && validation.valid")
       p(class="text-center mb-4 text-sm")
         span(class="font-medium") {{ validation.inviterDisplayName }}
-        span  invited you to&nbsp;
-        span(class="font-medium") {{ validation.accountName }}
-        span .
+        span  invited you to:&nbsp;
+      ul(class="text-center text-sm mb-2 space-y-1")
+        li(v-for="a in validation.accounts" :key="a.id" class="font-medium") {{ a.name }}
+      p(class="text-center text-xs frog-text-muted mb-2") {{ permLine(validation) }}
       p(class="text-center text-xs frog-text-muted mb-6")
         | Expires {{ new Date(validation.expiresAt).toLocaleString() }}
       UForm(class="auth-form" @submit.prevent="submit")

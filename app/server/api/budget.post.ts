@@ -7,6 +7,7 @@ import { cloneBudget } from "~/server/services/budgetCloneService";
 import { duplicateAccountWorkspace } from "~/server/services/accountWorkspaceCloneService";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
+import { assertAccountCapability } from "~/server/lib/accountMembership";
 
 const MAX_BUDGETS = 10;
 
@@ -72,6 +73,12 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Default budget not found",
       });
     }
+
+    await assertAccountCapability(
+      user.userId,
+      defaultBudget.accountId,
+      "canViewBudgets",
+    );
 
     const result = await PrismaDb.$transaction(
       async (tx) => {

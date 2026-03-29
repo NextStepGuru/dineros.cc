@@ -2,7 +2,7 @@ import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { createError, readBody, getRouterParam } from "h3";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
-import { budgetWhereForAccountMember } from "~/server/lib/accountAccess";
+import { assertBudgetVisibleToUser } from "~/server/lib/accountMembership";
 import { renameBudgetSchema, budgetSchema } from "~/schema/zod";
 
 export default defineEventHandler(async (event) => {
@@ -17,15 +17,7 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    const budget = await PrismaDb.budget.findFirst({
-      where: budgetWhereForAccountMember(user.userId, budgetId),
-    });
-    if (!budget) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: "Budget not found",
-      });
-    }
+    const budget = await assertBudgetVisibleToUser(user.userId, budgetId);
     if (budget.isDefault) {
       throw createError({
         statusCode: 400,

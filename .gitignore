@@ -13,6 +13,7 @@ node_modules
 # Logs
 logs
 *.log
+.cursor/debug-*.log
 
 # Misc
 .DS_Store

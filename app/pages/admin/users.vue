@@ -47,6 +47,16 @@ const selectedUser = computed(
   () => items.value.find((item) => item.id === selectedUserId.value) ?? null,
 );
 
+type PlaidItemRow = {
+  itemId: string;
+  userId: number;
+  updatedAt: string;
+  syncCursorUpdatedAt: string | null;
+};
+
+const plaidItems = ref<PlaidItemRow[]>([]);
+const loadingPlaid = ref(false);
+
 const editableUser = reactive({
   firstName: "",
   lastName: "",
@@ -170,6 +180,34 @@ function selectUser(user: AdminUserRow) {
   editableUser.isDaylightSaving = user.isDaylightSaving ?? false;
   editableUser.isArchived = user.isArchived;
 }
+
+async function loadPlaidForSelectedUser() {
+  const id = selectedUserId.value;
+  if (!id) {
+    plaidItems.value = [];
+    return;
+  }
+  loadingPlaid.value = true;
+  try {
+    const res = await $api<{ items: PlaidItemRow[] }>(
+      `/api/admin/users/${id}/plaid`,
+    );
+    plaidItems.value = res.items;
+  } catch (error) {
+    plaidItems.value = [];
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to load Plaid items.";
+    toast.add({ color: "error", description: message });
+  } finally {
+    loadingPlaid.value = false;
+  }
+}
+
+watch(selectedUserId, () => {
+  void loadPlaidForSelectedUser();
+});
 
 async function saveUser() {
   if (!selectedUserId.value) return;
@@ -313,6 +351,12 @@ AdminPageShell(
             td(class="p-2")
               div(class="font-medium") {{ [user.firstName, user.lastName].filter(Boolean).join(" ") || `User #${user.id}` }}
               div(class="text-xs frog-text-muted") ID {{ user.id }}
+              UBadge(
+                v-if="user.isArchived"
+                class="mt-1"
+                color="warning"
+                variant="subtle"
+                size="xs") Archived
             td(class="p-2") {{ user.email }}
             td(class="p-2")
               UBadge(:color="user.role === 'ADMIN' ? 'warning' : 'neutral'" variant="subtle") {{ user.role }}
@@ -334,69 +378,109 @@ AdminPageShell(
       description="Choose a row above to edit details or reset password."
     )
 
-    div(v-else class="grid gap-4 lg:grid-cols-2")
+    div(v-else class="space-y-4")
       UCard
         template(#header)
-          h2(class="text-base font-semibold") Edit user
-        div(class="space-y-3")
-          UFormField(label="First name")
-            UInput(v-model="editableUser.firstName")
-          UFormField(label="Last name")
-            UInput(v-model="editableUser.lastName")
-          UFormField(label="Email")
-            UInput(v-model="editableUser.email" type="email")
-          UFormField(label="Role")
-            USelect(
-              v-model="editableUser.role"
-              :items="roleOptions"
-              value-key="value"
-              label-key="label")
-          UFormField(label="Country")
-            USelect(
-              v-model="editableUser.countryId"
-              :items="countryOptions"
-              value-key="value"
-              label-key="label"
-              :placeholder="isLoadingCountries ? 'Loading countries...' : 'Select country'"
-              :disabled="isLoadingCountries")
-          UFormField(label="Timezone")
-            USelectMenu(
-              v-model="editableUser.timezoneOffset"
-              :items="timezoneOptions"
-              value-key="value"
-              label-key="label"
-              placeholder="Select timezone")
-          UCheckbox(
-            v-model="editableUser.isDaylightSaving"
-            label="Daylight saving enabled")
-          UCheckbox(
-            v-model="editableUser.isArchived"
-            label="Archived user")
-          UButton(
-            color="primary"
-            :loading="saving"
-            :disabled="saving"
-            @click="saveUser") Save changes
+          h2(class="text-base font-semibold") Related logs
+        div(class="flex flex-wrap gap-x-4 gap-y-2 text-sm")
+          NuxtLink(
+            class="text-primary underline"
+            :to="`/admin/notification-events?userId=${selectedUser.id}`") Notification events
+          NuxtLink(
+            class="text-primary underline"
+            to="/admin/openai-logs") OpenAI logs
+          NuxtLink(
+            class="text-primary underline"
+            to="/admin/integration-alerts") Integration alerts
+          NuxtLink(
+            class="text-primary underline"
+            :to="`/admin/audit-logs?targetUserId=${selectedUser.id}`") Audit log
+
+      div(class="grid gap-4 lg:grid-cols-2")
+        UCard
+          template(#header)
+            h2(class="text-base font-semibold") Edit user
+          div(class="space-y-3")
+            UFormField(label="First name")
+              UInput(v-model="editableUser.firstName")
+            UFormField(label="Last name")
+              UInput(v-model="editableUser.lastName")
+            UFormField(label="Email")
+              UInput(v-model="editableUser.email" type="email")
+            UFormField(label="Role")
+              USelect(
+                v-model="editableUser.role"
+                :items="roleOptions"
+                value-key="value"
+                label-key="label")
+            UFormField(label="Country")
+              USelect(
+                v-model="editableUser.countryId"
+                :items="countryOptions"
+                value-key="value"
+                label-key="label"
+                :placeholder="isLoadingCountries ? 'Loading countries...' : 'Select country'"
+                :disabled="isLoadingCountries")
+            UFormField(label="Timezone")
+              USelectMenu(
+                v-model="editableUser.timezoneOffset"
+                :items="timezoneOptions"
+                value-key="value"
+                label-key="label"
+                placeholder="Select timezone")
+            UCheckbox(
+              v-model="editableUser.isDaylightSaving"
+              label="Daylight saving enabled")
+            UCheckbox(
+              v-model="editableUser.isArchived"
+              label="Archived user")
+            UButton(
+              color="primary"
+              :loading="saving"
+              :disabled="saving"
+              @click="saveUser") Save changes
+
+        UCard
+          template(#header)
+            h2(class="text-base font-semibold") Reset password
+          div(class="space-y-3")
+            p(class="text-sm frog-text-muted")
+              | Set a temporary password for this user.
+            UFormField(label="Temporary password")
+              UInput(
+                v-model="resetPasswordForm.newPassword"
+                type="password"
+                autocomplete="new-password")
+            UFormField(label="Confirm password")
+              UInput(
+                v-model="resetPasswordForm.confirmPassword"
+                type="password"
+                autocomplete="new-password")
+            UButton(
+              color="warning"
+              :loading="resettingPassword"
+              :disabled="resettingPassword"
+              @click="resetPassword") Set temporary password
 
       UCard
         template(#header)
-          h2(class="text-base font-semibold") Reset password
-        div(class="space-y-3")
-          p(class="text-sm frog-text-muted")
-            | Set a temporary password for this user.
-          UFormField(label="Temporary password")
-            UInput(
-              v-model="resetPasswordForm.newPassword"
-              type="password"
-              autocomplete="new-password")
-          UFormField(label="Confirm password")
-            UInput(
-              v-model="resetPasswordForm.confirmPassword"
-              type="password"
-              autocomplete="new-password")
-          UButton(
-            color="warning"
-            :loading="resettingPassword"
-            :disabled="resettingPassword"
-            @click="resetPassword") Set temporary password
+          h2(class="text-base font-semibold") Plaid connections
+        div(v-if="loadingPlaid" class="text-sm frog-text-muted") Loading…
+        div(v-else-if="plaidItems.length === 0" class="text-sm frog-text-muted")
+          | No Plaid items for this user.
+        div(v-else class="overflow-x-auto rounded-lg border border-default")
+          table(class="w-full text-sm")
+            thead(class="bg-elevated")
+              tr
+                th(class="p-2 text-left") Item ID
+                th(class="p-2 text-left") Item updated
+                th(class="p-2 text-left") Sync cursor
+            tbody
+              tr(
+                v-for="row in plaidItems"
+                :key="row.itemId"
+                class="border-t border-default")
+                td(class="p-2 font-mono text-xs break-all") {{ row.itemId }}
+                td(class="p-2") {{ new Date(row.updatedAt).toLocaleString() }}
+                td(class="p-2") {{ row.syncCursorUpdatedAt ? new Date(row.syncCursorUpdatedAt).toLocaleString() : '—' }}
 </template>

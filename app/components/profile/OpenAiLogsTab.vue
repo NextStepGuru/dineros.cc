@@ -1,8 +1,9 @@
 <script setup lang="ts">
 const toast = useToast();
-const authStore = useAuthStore();
+const route = useRoute();
+const { isAdminConsoleUser } = useAdminAccess();
 
-if (authStore.getUser?.role !== "ADMIN") {
+if (!isAdminConsoleUser.value) {
   throw createError({
     statusCode: 403,
     statusMessage: "Access Denied",
@@ -32,6 +33,37 @@ const items = ref<LogRow[]>([]);
 const loading = ref(false);
 const expandedId = ref<string | null>(null);
 
+const filters = reactive({
+  purpose: "",
+  success: "all" as "all" | "true" | "false",
+  from: "",
+  to: "",
+});
+
+function applyRouteQuery() {
+  const p = route.query.purpose;
+  if (typeof p === "string") filters.purpose = p;
+  const s = route.query.success;
+  if (s === "true" || s === "false" || s === "all") filters.success = s;
+  const f = route.query.from;
+  if (typeof f === "string") filters.from = f;
+  const t = route.query.to;
+  if (typeof t === "string") filters.to = t;
+}
+
+function buildQuery(resetOffset: boolean) {
+  const q: Record<string, string | number> = {
+    limit,
+    offset: resetOffset ? 0 : offset.value,
+    success: filters.success,
+    format: "json",
+  };
+  if (filters.purpose.trim()) q.purpose = filters.purpose.trim();
+  if (filters.from.trim()) q.from = filters.from.trim();
+  if (filters.to.trim()) q.to = filters.to.trim();
+  return q;
+}
+
 async function load(reset: boolean) {
   if (reset) {
     offset.value = 0;
@@ -45,7 +77,7 @@ async function load(reset: boolean) {
       limit: number;
       offset: number;
     }>("/api/admin/openai-request-logs", {
-      query: { limit, offset: offset.value },
+      query: buildQuery(reset),
     });
     if (error.value) {
       toast.add({
@@ -67,7 +99,22 @@ async function load(reset: boolean) {
   }
 }
 
+function applyFilters() {
+  load(true);
+}
+
+function exportCsv() {
+  const params = new URLSearchParams();
+  params.set("format", "csv");
+  params.set("success", filters.success);
+  if (filters.purpose.trim()) params.set("purpose", filters.purpose.trim());
+  if (filters.from.trim()) params.set("from", filters.from.trim());
+  if (filters.to.trim()) params.set("to", filters.to.trim());
+  window.open(`/api/admin/openai-request-logs?${params.toString()}`, "_blank");
+}
+
 onMounted(() => {
+  applyRouteQuery();
   load(true);
 });
 
@@ -91,6 +138,25 @@ function formatJson(meta: unknown) {
 
 <template lang="pug">
 div(class="max-w-5xl mx-auto px-2")
+
+  div(class="flex flex-wrap items-end gap-3 mb-4")
+    UFormField(label="Purpose contains" for="oai-purpose")
+      UInput#oai-purpose(v-model="filters.purpose" class="min-w-[140px]")
+    UFormField(label="Success" for="oai-success")
+      select#oai-success(
+        v-model="filters.success"
+        autocomplete="off"
+        class="block min-w-[140px] rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+      )
+        option(value="all") All
+        option(value="true") Yes
+        option(value="false") No
+    UFormField(label="From (ISO)" for="oai-from")
+      UInput#oai-from(v-model="filters.from" class="min-w-[180px]")
+    UFormField(label="To (ISO)" for="oai-to")
+      UInput#oai-to(v-model="filters.to" class="min-w-[180px]")
+    UButton(color="primary" :loading="loading" @click="applyFilters") Apply
+    UButton(variant="outline" @click="exportCsv") Export CSV
 
   p(class="text-sm text-gray-500 mb-4")
     | Usage rows from Plaid enrichment and other logged completions. Showing {{ items.length }} of {{ total }}.

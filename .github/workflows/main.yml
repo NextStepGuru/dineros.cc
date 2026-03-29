@@ -1,11 +1,12 @@
 # Build and deploy only. PR checks (lint, test, build, pre-commit) run in .github/workflows/pr.yml; staging E2E + manual snapshot workflows are separate.
 #
-# GCP setup (Artifact Registry):
+# Container images: Docker Buildx on GitHub Actions, pushed to Google Container Registry (gcr.io/PROJECT/IMAGE), then GKE.
+#
+# GCP setup (GCR push from CI):
 # 0. Workload Identity: gcloud iam service-accounts add-iam-policy-binding github-service-account@your-gcp-project-id.iam.gserviceaccount.com \
 #      --project=your-gcp-project-id --role=roles/iam.workloadIdentityUser \
 #      --member="principalSet://iam.googleapis.com/projects/000000000000/locations/global/workloadIdentityPools/github-pool/attribute.repository/your-org/your-repo"
-# 1. Artifact Registry: gcloud artifacts repositories create dineros --repository-format=docker --location=us-central1
-# 2. SA: roles/artifactregistry.writer, roles/container.developer. GKE node SA: roles/artifactregistry.reader
+# 1. CI service account: roles/storage.admin (legacy GCR) or roles/artifactregistry.writer where applicable; GKE node SA can pull gcr.io images in same project.
 name: Build & Deploy
 
 on:
@@ -31,37 +32,13 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
-      - name: Build and push main site
-        uses: docker/build-push-action@v6
+      - uses: ./.github/actions/build-push-gcr
         with:
+          dockerfile: ./app/Dockerfile
           context: .
-          file: ./app/Dockerfile
-          push: true
           tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/dineros:latest
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/dineros:${{ github.sha }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: true
-          sbom: true
-        env:
-          CI: true
-      - name: Check Docker build cache effectiveness
-        run: |
-          echo "=== DOCKER BUILD CACHE CHECK (MAIN) ==="
-          echo "✅ Build completed successfully"
-          echo "📊 Build cache status:"
-          echo "   - GHA cache used: type=gha"
-          echo "   - Cache layers saved for next run"
-          echo "   - Build time should improve on subsequent runs"
-          echo "💡 Look for 'CACHED' in build logs above for cache hits"
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros:latest
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros:${{ github.sha }}
 
   Build2:
     runs-on: ubuntu-latest
@@ -78,41 +55,14 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      - id: "pre-configure-microservice"
-        run: |
-          cd microservice
-          ./copy-files.sh
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
-      - name: Build and push microservice
-        uses: docker/build-push-action@v6
+      - uses: ./.github/actions/build-push-gcr
         with:
+          dockerfile: ./microservice/Dockerfile
           context: .
-          file: ./microservice/Dockerfile
-          push: true
+          pre_build_command: cd microservice && ./copy-files.sh
           tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/dineros-microservice:latest
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPO }}/dineros-microservice:${{ github.sha }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: true
-          sbom: true
-        env:
-          CI: true
-      - name: Check Docker build cache effectiveness
-        run: |
-          echo "=== DOCKER BUILD CACHE CHECK (MICROSERVICE) ==="
-          echo "✅ Build completed successfully"
-          echo "📊 Build cache status:"
-          echo "   - GHA cache used: type=gha"
-          echo "   - Cache layers saved for next run"
-          echo "   - Build time should improve on subsequent runs"
-          echo "💡 Look for 'CACHED' in build logs above for cache hits"
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:latest
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:${{ github.sha }}
 
   Deploy:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
@@ -136,15 +86,9 @@ jobs:
         with:
           cluster_name: ${{ secrets.GKE_CLUSTER }}
           location: ${{ secrets.GKE_LOCATION }}
-      - id: "update-and-deploy"
+      - uses: ./.github/actions/deploy-dineros-gke
+        with:
+          profile: production
+          image_tag: ${{ github.sha }}
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ secrets.GCP_REGION }}
-          GCP_ARTIFACT_REPO: ${{ secrets.GCP_ARTIFACT_REPO }}
-          CLOUDSQL_INSTANCE: ${{ secrets.CLOUDSQL_INSTANCE }}
-        run: |
-          RENDERED_MANIFEST=/tmp/dineros.rendered.yaml
-          envsubst < ./.deploy/production/dineros.yaml > "$RENDERED_MANIFEST"
-          sed -i 's|dineros:latest|dineros:${{ github.sha }}|g' "$RENDERED_MANIFEST"
-          sed -i 's|dineros-microservice:latest|dineros-microservice:${{ github.sha }}|g' "$RENDERED_MANIFEST"
-          kubectl apply -f "$RENDERED_MANIFEST"

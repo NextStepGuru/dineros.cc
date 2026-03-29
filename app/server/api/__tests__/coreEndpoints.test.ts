@@ -46,6 +46,9 @@ vi.mock("~/server/logger", () => ({
 // Mock the dependencies
 vi.mock("~/server/clients/prismaClient", () => ({
   prisma: {
+    userAccount: {
+      findMany: vi.fn(),
+    },
     user: {
       findUniqueOrThrow: vi.fn(),
     },
@@ -193,6 +196,20 @@ describe("Core API Endpoints", () => {
   describe("GET /api/lists", () => {
     let listsHandler: any;
 
+    const listAccountId = "acc-list-1";
+
+    function fullMembership(userId: number, accountId: string) {
+      return {
+        userId,
+        accountId,
+        canViewBudgets: true,
+        canInviteUsers: true,
+        canManageMembers: true,
+        allowedBudgetIds: null,
+        allowedAccountRegisterIds: null,
+      };
+    }
+
     beforeEach(async () => {
       const module = await import("../lists");
       listsHandler = module.default;
@@ -207,6 +224,8 @@ describe("Core API Endpoints", () => {
           description: "Monthly Salary",
           amount: 5000,
           lastAt: new Date("2023-01-01"),
+          accountId: listAccountId,
+          accountRegisterId: 1,
         },
       ];
 
@@ -216,6 +235,7 @@ describe("Core API Endpoints", () => {
           name: "Personal Budget",
           userId: 123,
           isArchived: false,
+          accountId: listAccountId,
         },
       ];
 
@@ -236,12 +256,14 @@ describe("Core API Endpoints", () => {
           balance: 1000,
           sortOrder: 1,
           isArchived: false,
+          accountId: listAccountId,
+          budgetId: 1,
         },
       ];
 
       const mockAccounts = [
         {
-          id: 1,
+          id: listAccountId,
           name: "Primary Account",
           userId: 123,
         },
@@ -253,6 +275,9 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.userAccount.findMany as any).mockResolvedValue([
+        fullMembership(123, listAccountId),
+      ]);
       (prisma.reoccurrence.findMany as any).mockResolvedValue(
         mockReoccurrences,
       );
@@ -277,6 +302,16 @@ describe("Core API Endpoints", () => {
         accounts: mockAccounts,
         categories: mockCategories,
         savingsGoals: [],
+        memberships: [
+          {
+            accountId: listAccountId,
+            canViewBudgets: true,
+            canInviteUsers: true,
+            canManageMembers: true,
+            allowedBudgetIds: null,
+            allowedAccountRegisterIds: null,
+          },
+        ],
       });
 
       expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith({
@@ -305,6 +340,19 @@ describe("Core API Endpoints", () => {
           },
         },
       });
+
+      expect(prisma.userAccount.findMany).toHaveBeenCalledWith({
+        where: { userId: 123 },
+        select: {
+          userId: true,
+          accountId: true,
+          canViewBudgets: true,
+          canInviteUsers: true,
+          canManageMembers: true,
+          allowedBudgetIds: true,
+          allowedAccountRegisterIds: true,
+        },
+      });
     });
 
     it("should filter results by user access permissions", async () => {
@@ -314,6 +362,7 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 456 });
+      (prisma.userAccount.findMany as any).mockResolvedValue([]);
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);
@@ -342,6 +391,11 @@ describe("Core API Endpoints", () => {
           },
         },
       });
+
+      expect(prisma.userAccount.findMany).toHaveBeenCalledWith({
+        where: { userId: 456 },
+        select: expect.any(Object),
+      });
     });
 
     it("should handle empty results gracefully", async () => {
@@ -351,6 +405,7 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.userAccount.findMany as any).mockResolvedValue([]);
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);
@@ -371,6 +426,7 @@ describe("Core API Endpoints", () => {
         accounts: [],
         categories: [],
         savingsGoals: [],
+        memberships: [],
       });
     });
 
@@ -384,6 +440,9 @@ describe("Core API Endpoints", () => {
       (getUser as any).mockReturnValue({ userId: 123 });
 
       const dbError = new Error("Database connection failed");
+      (prisma.userAccount.findMany as any).mockResolvedValue([
+        fullMembership(123, listAccountId),
+      ]);
       (prisma.reoccurrence.findMany as any).mockRejectedValue(dbError);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);
@@ -407,6 +466,7 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.userAccount.findMany as any).mockResolvedValue([]);
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);
@@ -452,6 +512,7 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
+      (prisma.userAccount.findMany as any).mockResolvedValue([]);
       (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
       (prisma.budget.findMany as any).mockResolvedValue([]);
       (prisma.interval.findMany as any).mockResolvedValue([]);

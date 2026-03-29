@@ -72,7 +72,7 @@ model Account {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
   userAccounts          UserAccount[]
-  accountInvites        AccountInvite[]
+  accountInviteAccounts AccountInviteAccount[]
   reoccurrences         Reoccurrence[]
   registers             AccountRegister[]
   budgets               Budget[]
@@ -140,10 +140,15 @@ model PlaidSyncCursor {
 }
 
 model UserAccount {
-  id        Int      @id @default(autoincrement()) @db.UnsignedInt
-  userId    Int      @map("user_id") @db.UnsignedInt
-  accountId String   @map("account_id")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  id                 Int      @id @default(autoincrement()) @db.UnsignedInt
+  userId             Int      @map("user_id") @db.UnsignedInt
+  accountId          String   @map("account_id")
+  canViewBudgets     Boolean  @default(true) @map("can_view_budgets")
+  canInviteUsers     Boolean  @default(true) @map("can_invite_users")
+  canManageMembers   Boolean  @default(true) @map("can_manage_members")
+  allowedBudgetIds   Json?    @map("allowed_budget_ids")
+  allowedAccountRegisterIds Json? @map("allowed_account_register_ids")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 
   user    User    @relation(fields: [userId], references: [id])
   account Account @relation(fields: [accountId], references: [id])
@@ -155,7 +160,6 @@ model UserAccount {
 
 model AccountInvite {
   id              Int       @id @default(autoincrement()) @db.UnsignedInt
-  accountId       String    @map("account_id")
   email           String    @db.VarChar(500)
   invitedByUserId Int       @map("invited_by_user_id") @db.UnsignedInt
   tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
@@ -164,12 +168,29 @@ model AccountInvite {
   revokedAt       DateTime? @map("revoked_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  invitedBy User    @relation("AccountInviteInvitedBy", fields: [invitedByUserId], references: [id])
+  invitedBy      User                   @relation("AccountInviteInvitedBy", fields: [invitedByUserId], references: [id])
+  inviteAccounts AccountInviteAccount[]
 
-  @@index([accountId, email])
   @@index([invitedByUserId])
   @@map("account_invite")
+}
+
+model AccountInviteAccount {
+  id                 Int      @id @default(autoincrement()) @db.UnsignedInt
+  inviteId           Int      @map("invite_id") @db.UnsignedInt
+  accountId          String   @map("account_id")
+  canViewBudgets     Boolean  @default(true) @map("can_view_budgets")
+  canInviteUsers     Boolean  @default(true) @map("can_invite_users")
+  canManageMembers   Boolean  @default(true) @map("can_manage_members")
+  allowedBudgetIds   Json?    @map("allowed_budget_ids")
+  allowedAccountRegisterIds Json? @map("allowed_account_register_ids")
+
+  invite  AccountInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  account Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([inviteId, accountId], map: "account_invite_account_invite_id_account_id_key")
+  @@index([accountId])
+  @@map("account_invite_account")
 }
 
 model UserSocial {
@@ -754,4 +775,49 @@ model OpenAiRequestLog {
   @@index([createdAt])
   @@index([purpose])
   @@map("openai_request_log")
+}
+
+model IntegrationAlert {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  source     String   @db.VarChar(32)
+  kind       String   @db.VarChar(32)
+  message    String   @db.Text
+  httpStatus Int?     @map("http_status")
+  details    Json?
+  dedupeKey  String?  @map("dedupe_key") @db.VarChar(191)
+
+  @@index([createdAt])
+  @@index([source])
+  @@index([kind])
+  @@map("integration_alert")
+}
+
+model AdminAuditLog {
+  id              Int      @id @default(autoincrement()) @db.UnsignedInt
+  adminUserId     Int      @map("admin_user_id") @db.UnsignedInt
+  action          String   @db.VarChar(64)
+  targetUserId    Int?     @map("target_user_id") @db.UnsignedInt
+  targetAccountId String?  @map("target_account_id") @db.VarChar(36)
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([adminUserId])
+  @@index([createdAt])
+  @@map("admin_audit_log")
+}
+
+model IntegrationJobLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  source    String   @db.VarChar(32)
+  queueName String   @map("queue_name") @db.VarChar(64)
+  jobId     String?  @map("job_id") @db.VarChar(191)
+  message   String   @db.Text
+  itemId    String?  @map("item_id") @db.VarChar(191)
+  metadata  Json?
+
+  @@index([createdAt])
+  @@index([source])
+  @@map("integration_job_log")
 }

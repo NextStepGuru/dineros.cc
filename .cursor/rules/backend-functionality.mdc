@@ -8,7 +8,8 @@ alwaysApply: false
 
 ## API Routes
 
-- **Location**: `app/server/api/`. Use Nitro file-based routing. Method-specific files: `*.get.ts`, `*.post.ts`, `*.patch.ts`, `*.delete.ts`. Sub-routes: `app/server/api/tasks/`, `app/server/api/webhook/`, `app/server/api/_ah/`.
+- **Location**: `app/server/api/`. Use Nitro file-based routing. Method-specific files: `*.get.ts`, `*.post.ts`, `*.patch.ts`, `*.delete.ts`. Sub-routes: `app/server/api/tasks/`, `app/server/api/webhook/`, `app/server/api/_ah/`, `app/server/api/account/` (team membership under `[accountId]/`: members list, patch, delete).
+- **Lists**: `app/server/api/lists.ts` may filter returned aggregates by `UserAccount` membership using `filterListsByMembership`—keep client and server expectations aligned when adding new list-shaped data.
 - **Handlers**: Prefer wrapping handlers with `withErrorHandler(handler)` from `app/server/lib/withErrorHandler.ts`. For `handleApiError` behavior, try/catch patterns, and edge cases, see **Error Handling** in `backend-best-practices.mdc`.
 - **Thin routes**: Keep route handlers thin. Put business logic in `app/server/services/` and data access via `app/server/clients/` (Prisma, Redis, etc.). Use `getUser(event)` from `app/server/lib/getUser` to get `userId` for authenticated routes.
 

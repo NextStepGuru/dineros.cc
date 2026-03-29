@@ -1,9 +1,10 @@
 import { createError, getRouterParam, readBody } from "h3";
 import { prisma } from "~/server/clients/prismaClient";
 import HashService from "~/server/services/HashService";
-import { adminUserPasswordResetSchema } from "~/schema/zod";
+import { ADMIN_AUDIT_ACTIONS, adminUserPasswordResetSchema } from "~/schema/zod";
 import { requireAdmin } from "~/server/lib/requireAdmin";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { recordAdminAudit } from "~/server/lib/recordAdminAudit";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -22,6 +23,11 @@ export default defineEventHandler(async (event) => {
       where: { id: userId },
       data: { password },
       select: { id: true },
+    });
+
+    await recordAdminAudit(event, {
+      action: ADMIN_AUDIT_ACTIONS.USER_PASSWORD_RESET,
+      targetUserId: userId,
     });
 
     return { message: "Password reset successfully." };

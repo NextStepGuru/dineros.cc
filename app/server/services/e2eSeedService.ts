@@ -121,7 +121,9 @@ export async function deleteE2EUserByEmail(
     });
 
     await tx.accountInvite.deleteMany({
-      where: { accountId: { in: accountIds } },
+      where: {
+        inviteAccounts: { some: { accountId: { in: accountIds } } },
+      },
     });
 
     await tx.userAccount.deleteMany({

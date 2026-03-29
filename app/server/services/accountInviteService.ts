@@ -2,7 +2,6 @@ import { createHash, randomBytes } from "node:crypto";
 import { createError } from "h3";
 import type { H3Event } from "h3";
 import { prisma } from "~/server/clients/prismaClient";
-import { assertUserHasAccountAccess } from "~/server/lib/accountAccess";
 import { findUserByEmail } from "~/server/lib/findUserByEmail";
 import { completeLogin } from "~/server/lib/completeLogin";
 import HashService from "~/server/services/HashService";
@@ -11,10 +10,25 @@ import { log } from "~/server/logger";
 import { postmarkClient, hasPostmarkToken } from "~/server/clients/postmarkClient";
 import env from "~/server/env";
 import { buildAppUrl } from "~/server/lib/appUrl";
+import {
+  accountRegisterVisibleForMembership,
+  assertAccountCapability,
+  parseAllowedAccountRegisterIds,
+  parseAllowedBudgetIds,
+} from "~/server/lib/accountMembership";
+import type { Prisma } from "@prisma/client";
 
 export const INVITE_EXPIRY_DAYS = 7;
 const MAX_PENDING_INVITES_PER_ACCOUNT = 50;
 const MAX_INVITES_PER_HOUR_PER_USER = 30;
+
+export type InvitePermissionInput = {
+  canViewBudgets: boolean;
+  canInviteUsers: boolean;
+  canManageMembers: boolean;
+  allowedBudgetIds?: number[] | null;
+  allowedAccountRegisterIds?: number[] | null;
+};
 
 export function hashInviteToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
@@ -43,16 +57,20 @@ function buildInviteUrl(rawToken: string): string {
 
 async function sendInviteEmail(params: {
   toEmail: string;
-  accountName: string;
+  accountNames: string[];
   inviterDisplayName: string;
   inviteUrl: string;
   expiresAt: Date;
 }) {
-  const { toEmail, accountName, inviterDisplayName, inviteUrl, expiresAt } =
+  const { toEmail, accountNames, inviterDisplayName, inviteUrl, expiresAt } =
     params;
   const isLocal = env?.DEPLOY_ENV === "local";
-  const html = `${inviterDisplayName} invited you to collaborate on the Dineros account <strong>${escapeHtml(
-    accountName,
+  const namesLabel =
+    accountNames.length === 1
+      ? accountNames[0]
+      : `${accountNames.length} accounts (${accountNames.join(", ")})`;
+  const html = `${inviterDisplayName} invited you to collaborate on ${accountNames.length === 1 ? "the Dineros account" : "these Dineros accounts"} <strong>${escapeHtml(
+    namesLabel,
   )}</strong>.<br><br>
 <a href="${inviteUrl}">Accept invitation</a><br><br>
 This link expires on ${expiresAt.toUTCString()}.<br><br>
@@ -62,7 +80,10 @@ If you did not expect this email, you can ignore it.`;
     await postmarkClient.sendEmail({
       From: "Mr. Pepe Dineros <pepe@dineros.cc>",
       To: toEmail,
-      Subject: `You're invited to ${accountName} on Dineros`,
+      Subject:
+        accountNames.length === 1
+          ? `You're invited to ${accountNames[0]} on Dineros`
+          : `You're invited to ${accountNames.length} accounts on Dineros`,
       HtmlBody: html,
     });
   } else {
@@ -74,7 +95,7 @@ If you did not expect this email, you can ignore it.`;
   }
 }
 
-function escapeHtml(s: string): string {
+function escapeHtml(s: string) {
   return s
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -82,19 +103,77 @@ function escapeHtml(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
+/** Ensures each register id belongs to an account and the user may grant visibility to it. */
+export async function assertUserCanAssignRegisterScopeForAccounts(
+  userId: number,
+  accountIds: string[],
+  allowedRegisterIds: number[] | null | undefined,
+): Promise<void> {
+  if (allowedRegisterIds == null || allowedRegisterIds.length === 0) return;
+  const inviterRows = await prisma.userAccount.findMany({
+    where: { userId, accountId: { in: accountIds } },
+  });
+  const map = new Map(inviterRows.map((r) => [r.accountId, r]));
+  const regs = await prisma.accountRegister.findMany({
+    where: { id: { in: allowedRegisterIds }, isArchived: false },
+    select: { id: true, accountId: true, budgetId: true },
+  });
+  if (regs.length !== allowedRegisterIds.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "One or more account registers are invalid.",
+    });
+  }
+  for (const reg of regs) {
+    if (!accountIds.includes(reg.accountId)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Register does not belong to selected accounts.",
+      });
+    }
+    const m = map.get(reg.accountId);
+    if (!m) {
+      throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+    }
+    if (
+      !accountRegisterVisibleForMembership(
+        {
+          canViewBudgets: m.canViewBudgets,
+          allowedBudgetIds: m.allowedBudgetIds,
+          allowedAccountRegisterIds: m.allowedAccountRegisterIds,
+        },
+        reg,
+      )
+    ) {
+      throw createError({
+        statusCode: 403,
+        statusMessage:
+          "You cannot grant access to registers you cannot see yourself.",
+      });
+    }
+  }
+}
+
 export async function createAccountInvite(params: {
   inviterUserId: number;
-  accountId: string;
+  accountIds: string[];
   email: string;
+  permissions: InvitePermissionInput;
 }) {
-  const { inviterUserId, accountId } = params;
+  const { inviterUserId, permissions } = params;
   const email = normalizeInviteEmail(params.email);
+  const accountIds = [...new Set(params.accountIds)];
 
   if (!email.includes("@")) {
     throw createError({ statusCode: 400, statusMessage: "Invalid email" });
   }
+  if (accountIds.length === 0) {
+    throw createError({ statusCode: 400, statusMessage: "No accounts selected." });
+  }
 
-  await assertUserHasAccountAccess(inviterUserId, accountId);
+  for (const accountId of accountIds) {
+    await assertAccountCapability(inviterUserId, accountId, "canInviteUsers");
+  }
 
   const inviter = await prisma.user.findUniqueOrThrow({
     where: { id: inviterUserId },
@@ -110,25 +189,36 @@ export async function createAccountInvite(params: {
 
   const inviteeUser = await findUserByEmail(email);
   if (inviteeUser) {
-    const link = await prisma.userAccount.findFirst({
-      where: { userId: inviteeUser.id, accountId },
-    });
-    if (link) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: "This user already has access to the account.",
+    for (const accountId of accountIds) {
+      const link = await prisma.userAccount.findFirst({
+        where: { userId: inviteeUser.id, accountId },
       });
+      if (link) {
+        throw createError({
+          statusCode: 409,
+          statusMessage: `This user already has access to an account you selected.`,
+        });
+      }
     }
   }
 
-  const pendingCount = await prisma.accountInvite.count({
-    where: { accountId, acceptedAt: null, revokedAt: null },
-  });
-  if (pendingCount >= MAX_PENDING_INVITES_PER_ACCOUNT) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: "Too many pending invites for this account. Revoke some first.",
+  const now = dateTimeService.nowDate();
+  for (const accountId of accountIds) {
+    const pendingCount = await prisma.accountInvite.count({
+      where: {
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: now },
+        inviteAccounts: { some: { accountId } },
+      },
     });
+    if (pendingCount >= MAX_PENDING_INVITES_PER_ACCOUNT) {
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          "Too many pending invites for one of the selected accounts. Revoke some first.",
+      });
+    }
   }
 
   const oneHourAgo = dateTimeService.add(-1, "hour").toDate();
@@ -145,37 +235,73 @@ export async function createAccountInvite(params: {
     });
   }
 
-  await prisma.accountInvite.updateMany({
+  const overlapping = await prisma.accountInvite.findMany({
     where: {
-      accountId,
       email,
       acceptedAt: null,
       revokedAt: null,
+      inviteAccounts: { some: { accountId: { in: accountIds } } },
     },
-    data: { revokedAt: dateTimeService.nowDate() },
+    select: { id: true },
   });
+  if (overlapping.length > 0) {
+    await prisma.accountInvite.updateMany({
+      where: { id: { in: overlapping.map((o) => o.id) } },
+      data: { revokedAt: dateTimeService.nowDate() },
+    });
+  }
 
   const rawToken = generateInviteToken();
   const inviteUrl = buildInviteUrl(rawToken);
   const tokenHash = hashInviteToken(rawToken);
   const expiresAt = dateTimeService.add(INVITE_EXPIRY_DAYS, "day").toDate();
 
-  const account = await prisma.account.findUniqueOrThrow({
-    where: { id: accountId },
-    select: { name: true },
+  const accounts = await prisma.account.findMany({
+    where: { id: { in: accountIds } },
+    select: { id: true, name: true },
   });
+  if (accounts.length !== accountIds.length) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid account id." });
+  }
+
+  await assertUserCanAssignRegisterScopeForAccounts(
+    inviterUserId,
+    accountIds,
+    permissions.allowedAccountRegisterIds,
+  );
 
   const inviterDisplayName =
     [inviter.firstName, inviter.lastName].filter(Boolean).join(" ") ||
     "A teammate";
 
+  const abForDb: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+    permissions.allowedBudgetIds === undefined ||
+    permissions.allowedBudgetIds === null
+      ? Prisma.JsonNull
+      : (permissions.allowedBudgetIds as Prisma.InputJsonValue);
+
+  const arForDb: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+    permissions.allowedAccountRegisterIds === undefined ||
+    permissions.allowedAccountRegisterIds === null
+      ? Prisma.JsonNull
+      : (permissions.allowedAccountRegisterIds as Prisma.InputJsonValue);
+
   const row = await prisma.accountInvite.create({
     data: {
-      accountId,
       email,
       invitedByUserId: inviterUserId,
       tokenHash,
       expiresAt,
+      inviteAccounts: {
+        create: accountIds.map((accountId) => ({
+          accountId,
+          canViewBudgets: permissions.canViewBudgets,
+          canInviteUsers: permissions.canInviteUsers,
+          canManageMembers: permissions.canManageMembers,
+          allowedBudgetIds: abForDb,
+          allowedAccountRegisterIds: arForDb,
+        })),
+      },
     },
     select: {
       id: true,
@@ -186,7 +312,7 @@ export async function createAccountInvite(params: {
 
   await sendInviteEmail({
     toEmail: email,
-    accountName: account.name,
+    accountNames: accounts.map((a) => a.name),
     inviterDisplayName,
     inviteUrl,
     expiresAt: row.expiresAt,
@@ -200,26 +326,46 @@ export async function listPendingInvitesForAccount(params: {
   accountId: string;
 }) {
   const { userId, accountId } = params;
-  await assertUserHasAccountAccess(userId, accountId);
+  await assertAccountCapability(userId, accountId, "canInviteUsers");
   const now = dateTimeService.nowDate();
-  return prisma.accountInvite.findMany({
+  const rows = await prisma.accountInvite.findMany({
     where: {
-      accountId,
       acceptedAt: null,
       revokedAt: null,
       expiresAt: { gt: now },
+      inviteAccounts: { some: { accountId } },
     },
     select: {
       id: true,
       email: true,
       expiresAt: true,
       createdAt: true,
+      inviteAccounts: {
+        select: {
+          account: { select: { id: true, name: true } },
+          canViewBudgets: true,
+          canInviteUsers: true,
+          canManageMembers: true,
+          allowedBudgetIds: true,
+          allowedAccountRegisterIds: true,
+        },
+      },
       invitedBy: {
         select: { firstName: true, lastName: true, email: true },
       },
     },
     orderBy: { createdAt: "desc" },
   });
+  return rows.map((r) => ({
+    ...r,
+    inviteAccounts: r.inviteAccounts.map((ia) => ({
+      ...ia,
+      allowedBudgetIds: parseAllowedBudgetIds(ia.allowedBudgetIds),
+      allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+        ia.allowedAccountRegisterIds,
+      ),
+    })),
+  }));
 }
 
 export async function revokeAccountInvite(params: {
@@ -229,11 +375,14 @@ export async function revokeAccountInvite(params: {
   const { userId, inviteId } = params;
   const invite = await prisma.accountInvite.findFirst({
     where: { id: inviteId },
+    include: { inviteAccounts: { select: { accountId: true } } },
   });
   if (!invite) {
     throw createError({ statusCode: 404, statusMessage: "Invite not found" });
   }
-  await assertUserHasAccountAccess(userId, invite.accountId);
+  for (const ia of invite.inviteAccounts) {
+    await assertAccountCapability(userId, ia.accountId, "canInviteUsers");
+  }
   if (invite.acceptedAt || invite.revokedAt) {
     throw createError({
       statusCode: 400,
@@ -252,7 +401,9 @@ export async function getInviteValidationPayload(token: string) {
   const invite = await prisma.accountInvite.findFirst({
     where: { tokenHash: th },
     include: {
-      account: { select: { name: true } },
+      inviteAccounts: {
+        include: { account: { select: { name: true, id: true } } },
+      },
       invitedBy: { select: { firstName: true, lastName: true } },
     },
   });
@@ -261,7 +412,8 @@ export async function getInviteValidationPayload(token: string) {
     !invite ||
     invite.revokedAt ||
     invite.acceptedAt ||
-    invite.expiresAt < now
+    invite.expiresAt < now ||
+    invite.inviteAccounts.length === 0
   ) {
     return { valid: false as const };
   }
@@ -270,9 +422,20 @@ export async function getInviteValidationPayload(token: string) {
   const needsPassword = !u || !u.password;
   const needsName = !u;
 
+  const first = invite.inviteAccounts[0]!;
+  const accounts = invite.inviteAccounts.map((ia) => ({
+    id: ia.account.id,
+    name: ia.account.name,
+  }));
+  const accountNameLabel =
+    accounts.length === 1
+      ? accounts[0]!.name
+      : `${accounts.length} accounts`;
+
   return {
     valid: true as const,
-    accountName: invite.account.name,
+    accounts,
+    accountName: accountNameLabel,
     inviterDisplayName:
       [invite.invitedBy.firstName, invite.invitedBy.lastName]
         .filter(Boolean)
@@ -280,6 +443,15 @@ export async function getInviteValidationPayload(token: string) {
     expiresAt: invite.expiresAt.toISOString(),
     needsPassword,
     needsName,
+    permissions: {
+      canViewBudgets: first.canViewBudgets,
+      canInviteUsers: first.canInviteUsers,
+      canManageMembers: first.canManageMembers,
+      allowedBudgetIds: parseAllowedBudgetIds(first.allowedBudgetIds),
+      allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+        first.allowedAccountRegisterIds,
+      ),
+    },
   };
 }
 
@@ -302,7 +474,7 @@ export async function acceptAccountInvite(
   const invite = await prisma.accountInvite.findFirst({
     where: { tokenHash },
     include: {
-      account: { select: { id: true, name: true } },
+      inviteAccounts: true,
     },
   });
 
@@ -399,13 +571,37 @@ export async function acceptAccountInvite(
   const userId = user.id;
 
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.userAccount.findFirst({
-      where: { userId, accountId: invite.accountId },
-    });
-    if (!existing) {
-      await tx.userAccount.create({
-        data: { userId, accountId: invite.accountId },
+    for (const target of invite.inviteAccounts) {
+      const existing = await tx.userAccount.findFirst({
+        where: { userId, accountId: target.accountId },
       });
+      const data = {
+        canViewBudgets: target.canViewBudgets,
+        canInviteUsers: target.canInviteUsers,
+        canManageMembers: target.canManageMembers,
+        allowedBudgetIds:
+          target.allowedBudgetIds == null
+            ? Prisma.JsonNull
+            : (target.allowedBudgetIds as Prisma.InputJsonValue),
+        allowedAccountRegisterIds:
+          target.allowedAccountRegisterIds == null
+            ? Prisma.JsonNull
+            : (target.allowedAccountRegisterIds as Prisma.InputJsonValue),
+      };
+      if (!existing) {
+        await tx.userAccount.create({
+          data: {
+            userId,
+            accountId: target.accountId,
+            ...data,
+          },
+        });
+      } else {
+        await tx.userAccount.update({
+          where: { id: existing.id },
+          data,
+        });
+      }
     }
     await tx.accountInvite.update({
       where: { id: invite.id },

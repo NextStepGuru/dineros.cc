@@ -1,11 +1,23 @@
 export default defineNuxtRouteMiddleware(() => {
   const authStore = useAuthStore();
+  const config = useRuntimeConfig();
 
   if (!authStore.getIsUserLoggedIn) {
     return navigateTo("/login");
   }
 
-  if (authStore.getUser?.role !== "ADMIN") {
+  const user = authStore.getUser;
+  const isRoleAdmin = user?.role === "ADMIN";
+  const adminEmail = String(config.public.adminEmail ?? "")
+    .trim()
+    .toLowerCase();
+  const isEmailAdmin =
+    !!adminEmail &&
+    String(user?.email ?? "")
+      .trim()
+      .toLowerCase() === adminEmail;
+
+  if (!isRoleAdmin && !isEmailAdmin) {
     if (import.meta.client) {
       useToast().add({
         color: "error",

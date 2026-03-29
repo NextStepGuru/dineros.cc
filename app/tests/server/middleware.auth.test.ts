@@ -6,6 +6,8 @@ const mockSetResponseStatus = vi.fn();
 
 vi.mock("h3", () => ({
   defineEventHandler: (handler: (_e: any) => any) => handler,
+  getRequestURL: (event: { node: { req: { url: string } } }) =>
+    new URL(event.node.req.url, "http://localhost"),
   getHeader: (event: any, name: string) => mockGetHeader(event, name),
   getCookie: (event: any, name: string) => mockGetCookie(event, name),
   setResponseStatus: (event: any, code: number) =>
@@ -58,6 +60,16 @@ describe("auth middleware", () => {
 
   it("should not run auth for ignored exact route POST /api/account-signup", async () => {
     const event = createEvent("/api/account-signup", "POST");
+    const result = await authHandler(event);
+    expect(result).toBeUndefined();
+    expect(mockGetHeader).not.toHaveBeenCalled();
+  });
+
+  it("should not run auth for GET /api/account-invite/validate with query string (pathname match)", async () => {
+    const event = createEvent(
+      "/api/account-invite/validate?token=abc123",
+      "GET",
+    );
     const result = await authHandler(event);
     expect(result).toBeUndefined();
     expect(mockGetHeader).not.toHaveBeenCalled();

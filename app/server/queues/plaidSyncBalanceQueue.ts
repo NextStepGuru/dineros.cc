@@ -76,11 +76,17 @@ export default {
       return;
     }
 
-    const accounts =
-      await plaidSyncService.getAllAccountsByAccessTokenAndUpdateBalance({
-        accessToken: lookupPlaidAccessToken.plaidAccessToken,
-        plaidAccountIds,
-      });
+    let accounts;
+    try {
+      accounts =
+        await plaidSyncService.getAllAccountsByAccessTokenAndUpdateBalance({
+          accessToken: lookupPlaidAccessToken.plaidAccessToken,
+          plaidAccountIds,
+        });
+    } catch (err) {
+      console.error("[PLAID_BALANCE_SYNC_ERROR]", String(err));
+      throw err;
+    }
 
     log({
       message: `Completed PlaidSyncBalanceJob ${job.id} in ${

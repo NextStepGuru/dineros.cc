@@ -1,7 +1,8 @@
 import {
   defineEventHandler,
-  getHeader,
   getCookie,
+  getHeader,
+  getRequestURL,
   setResponseStatus,
 } from "h3";
 import JwtService from "../services/JwtService";
@@ -32,17 +33,20 @@ const ignoredRoutes = [
 ];
 
 export default defineEventHandler(async (event) => {
-  const { url, method } = event.node.req;
-  const isTaskRoute = !!url?.startsWith("/api/tasks/");
+  const { method } = event.node.req;
+  // Use pathname only: req.url includes ?query so e.g. /api/account-invite/validate?token=…
+  // would never match ignored "exact" routes and would incorrectly require JWT.
+  const pathname = getRequestURL(event).pathname;
+  const isTaskRoute = pathname.startsWith("/api/tasks/");
 
   if (
-    !url?.startsWith("/api") ||
+    !pathname.startsWith("/api") ||
     ignoredRoutes.some((route) => {
       if (route.method !== method) return false;
       if (route.type === "exact") {
-        return route.path === url;
+        return route.path === pathname;
       } else if (route.type === "regex" && typeof route.path !== "string") {
-        return route.path.test(url);
+        return route.path.test(pathname);
       } else if (route.type === "regex" && typeof route.path === "string") {
         throw new Error(`Invalid route path type: ${route.path}`);
       }

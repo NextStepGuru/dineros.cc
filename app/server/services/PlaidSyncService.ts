@@ -20,6 +20,11 @@ import {
   sendPlaidSyncSummaryEmail,
   type RegisterSyncStatsRow,
 } from "./PlaidSyncNotificationService";
+import {
+  extractPlaidErrorInfo,
+  isPlaidCredentialClassError,
+} from "~/server/lib/plaidApiError";
+import { notifyIntegrationAlert } from "~/server/services/integrationOpsAlert";
 
 const DAYS_REQUESTED = 3;
 
@@ -60,6 +65,26 @@ class PlaidSyncService {
     this.client = new PlaidApi(configuration);
     this.transactionMatcher = new TransactionMatchingService(db);
     this.plaidEnrichment = new PlaidTransactionEnrichmentService(db);
+  }
+
+  private async maybeAlertPlaidCredentialError(
+    err: unknown,
+    context: Record<string, unknown>,
+  ): Promise<void> {
+    const info = extractPlaidErrorInfo(err);
+    if (!isPlaidCredentialClassError(info)) return;
+    await notifyIntegrationAlert({
+      source: "plaid",
+      kind: "credential",
+      message: info.message,
+      httpStatus: info.httpStatus,
+      details: {
+        ...context,
+        errorCode: info.errorCode,
+        errorType: info.errorType,
+      },
+      dedupeKey: `plaid:credential:${info.errorCode ?? String(info.httpStatus ?? "unknown")}`,
+    });
   }
 
   /**
@@ -280,23 +305,28 @@ class PlaidSyncService {
     accessToken: string;
     plaidAccountIds: string[];
   }): Promise<AccountBase[]> {
-    const [accountsResponse, accountRegisters] = await Promise.all([
-      this.client.accountsGet({
+    let accountsResponse;
+    try {
+      accountsResponse = await this.client.accountsGet({
         access_token: accessToken,
         options: { account_ids: [...plaidAccountIds] },
-      }),
-      this.db.accountRegister.findMany({
-        where: {
-          plaidId: { in: plaidAccountIds },
-          plaidAccessToken: accessToken,
-        },
-        select: {
-          id: true,
-          plaidId: true,
-          type: { select: { isCredit: true } },
-        },
-      }),
-    ]);
+      });
+    } catch (err) {
+      await this.maybeAlertPlaidCredentialError(err, { path: "accountsGet" });
+      throw err;
+    }
+
+    const accountRegisters = await this.db.accountRegister.findMany({
+      where: {
+        plaidId: { in: plaidAccountIds },
+        plaidAccessToken: accessToken,
+      },
+      select: {
+        id: true,
+        plaidId: true,
+        type: { select: { isCredit: true } },
+      },
+    });
 
     const accountList = accountsResponse.data.accounts;
     const registerByPlaidId = new Map(
@@ -343,14 +373,24 @@ class PlaidSyncService {
     startDate: string;
     endDate: string;
   }): Promise<Transaction[]> {
-    const transactions = await this.client.transactionsGet({
-      access_token: accessToken,
-      start_date: startDate,
-      end_date: endDate,
-      options: {
-        account_ids: plaidAccountIds,
-      },
-    });
+    let transactions;
+    try {
+      transactions = await this.client.transactionsGet({
+        access_token: accessToken,
+        start_date: startDate,
+        end_date: endDate,
+        options: {
+          account_ids: plaidAccountIds,
+        },
+      });
+    } catch (err) {
+      await this.maybeAlertPlaidCredentialError(err, {
+        path: "transactionsGet",
+        startDate,
+        endDate,
+      });
+      throw err;
+    }
 
     return transactions.data.transactions;
   }
@@ -554,10 +594,19 @@ class PlaidSyncService {
 
     let hasMore = true;
     while (hasMore) {
-      const response = await this.client.transactionsSync({
-        access_token: accessToken,
-        cursor: cursor || undefined,
-      });
+      let response;
+      try {
+        response = await this.client.transactionsSync({
+          access_token: accessToken,
+          cursor: cursor || undefined,
+        });
+      } catch (err) {
+        await this.maybeAlertPlaidCredentialError(err, {
+          path: "transactionsSync",
+          itemId,
+        });
+        throw err;
+      }
       const data = response.data as {
         added: Transaction[];
         modified: Transaction[];
@@ -852,6 +901,7 @@ class PlaidSyncService {
           });
         }
       } catch (error) {
+        console.error("[PLAID_SYNC_ERROR]", String(error));
         log({
           message: "error fetching account transactions",
           data: { error },
