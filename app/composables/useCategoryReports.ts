@@ -44,8 +44,7 @@ export function useCategoryReports() {
       return;
     }
     const cur = accountRegisterScope.value;
-    const idInBudget =
-      cur !== "all" && sorted.some((r) => r.id === cur);
+    const idInBudget = cur !== "all" && sorted.some((r) => r.id === cur);
     if (cur !== "all" && !idInBudget) {
       accountRegisterScope.value = first;
       return;
@@ -110,11 +109,7 @@ export function useCategoryReports() {
       if (oldKey != null) {
         const ni = newKey.indexOf(":");
         const oi = oldKey.indexOf(":");
-        if (
-          ni > 0 &&
-          oi > 0 &&
-          newKey.slice(0, ni) !== oldKey.slice(0, oi)
-        ) {
+        if (ni > 0 && oi > 0 && newKey.slice(0, ni) !== oldKey.slice(0, oi)) {
           userChoseAllRegisters.value = false;
         }
       }

@@ -4,6 +4,10 @@ import type { ChatCompletion } from "openai/resources/chat/completions";
 import { prisma } from "~/server/clients/prismaClient";
 import { dateTimeService } from "~/server/services/forecast";
 import { log } from "~/server/logger";
+import {
+  isOpenAiCredentialFailure,
+  notifyIntegrationAlert,
+} from "~/server/services/integrationOpsAlert";
 
 const ERROR_MESSAGE_MAX = 8000;
 
@@ -93,10 +97,11 @@ export async function loggedChatCompletion(params: {
           ? err
           : String(err);
     let httpStatus: number | null = null;
-    if (err && typeof err === "object" && "status" in err) {
-      const s = (err as { status?: number }).status;
-      if (typeof s === "number") {
-        httpStatus = s;
+    if (err && typeof err === "object") {
+      const o = err as { status?: number; response?: { status?: number } };
+      if (typeof o.status === "number") httpStatus = o.status;
+      else if (typeof o.response?.status === "number") {
+        httpStatus = o.response.status;
       }
     }
 
@@ -126,11 +131,33 @@ export async function loggedChatCompletion(params: {
       });
     }
 
+    console.error(
+      "[OPENAI_REQUEST_FAILED]",
+      JSON.stringify({
+        purpose,
+        durationMs,
+        httpStatus,
+        error: message.slice(0, 2000),
+      }),
+    );
+
+    const credential = isOpenAiCredentialFailure(httpStatus, message);
     log({
       message: "OpenAI chat completion failed",
       data: { purpose, durationMs, httpStatus, error: message },
-      level: "warn",
+      level: credential ? "error" : "warn",
     });
+
+    if (credential) {
+      await notifyIntegrationAlert({
+        source: "openai",
+        kind: "credential",
+        message: message.slice(0, ERROR_MESSAGE_MAX),
+        httpStatus,
+        details: { purpose, metadata: metadata ?? null },
+        dedupeKey: `openai:credential:${purpose}`,
+      });
+    }
 
     throw err;
   }

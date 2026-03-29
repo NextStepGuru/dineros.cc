@@ -1,22 +1,23 @@
-# Staging manifest mirrors .deploy/production/dineros.yaml (main app + microservice + service + ingress).
-# Differences: Namespace dineros-staging, staging secrets/hosts/replicas, in-cluster MySQL URL via dineros-staging-mysql.
+# Render with: source .deploy/profiles/<profile>.env && export GCP_PROJECT_ID IMAGE_TAG && envsubst < .deploy/dineros.template.yaml
+# Required env: profile exports + GCP_PROJECT_ID, IMAGE_TAG (CI also sets GCP_PROJECT_ID for the GCP_PROJECT_ID env var in containers).
+# Image URLs: Google Container Registry gcr.io/PROJECT/IMAGE:tag
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dineros-staging
+  name: ${K8S_NAMESPACE}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dineros-staging-deployment
+  name: ${MAIN_DEPLOYMENT_NAME}
   labels:
-    app: dineros-staging
-  namespace: dineros-staging
+    app: ${APP_LABEL}
+  namespace: ${K8S_NAMESPACE}
 spec:
   selector:
     matchLabels:
-      app: dineros-staging
-  replicas: 1
+      app: ${APP_LABEL}
+  replicas: ${MAIN_REPLICAS}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -28,12 +29,12 @@ spec:
       annotations:
         kubernetes.io/change-cause: "Updated at $(date +%s)"
       labels:
-        app: dineros-staging
+        app: ${APP_LABEL}
     spec:
-      serviceAccountName: dineros-staging
+      serviceAccountName: ${SERVICE_ACCOUNT_K8S}
       containers:
-        - name: dineros-staging-container
-          image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPO}/dineros:latest
+        - name: ${MAIN_CONTAINER_NAME}
+          image: gcr.io/${GCP_PROJECT_ID}/dineros:${IMAGE_TAG}
           imagePullPolicy: Always
           volumeMounts:
             - name: service-account-volume
@@ -47,16 +48,14 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-mysql
+                  name: ${SECRET_DATABASE_MAIN}
                   key: DATABASE_URL
             - name: NATS_URL
               value: "nats://nats.nats.svc.cluster.local:4222"
             - name: DEPLOY_ENV
-              value: "staging"
-            - name: NUXT_PUBLIC_DEPLOY_ENV
-              value: "staging"
+              value: "${DEPLOY_ENV_VALUE}"
             - name: NUXT_PUBLIC_SITE_URL
-              value: "https://staging.dineros.cc"
+              value: "${NUXT_PUBLIC_SITE_URL}"
             - name: PORT
               value: "80"
             - name: GCP_PROJECT_ID
@@ -64,12 +63,12 @@ spec:
             - name: TWILIO_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: TWILIO_AUTH_TOKEN
             - name: TWILIO_ACCOUNT_SID
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: TWILIO_ACCOUNT_SID
             - name: NODE_ENV
               value: "production"
@@ -84,71 +83,67 @@ spec:
             - name: POSTMARK_SERVER_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: POSTMARK_SERVER_TOKEN
             - name: POSTMARK_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: POSTMARK_WEBHOOK_SECRET
             - name: DB_DECRYPTION_KEY_1
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_1
             - name: DB_DECRYPTION_KEY_2
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_2
             - name: DB_DECRYPTION_KEY_3
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_3
             - name: DB_DECRYPTION_KEY_4
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_4
             - name: DB_DECRYPTION_KEY_5
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_5
             - name: DB_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_ENCRYPTION_KEY
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: OPENAI_API_KEY
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: staging-gs-secrets
+                  name: ${SECRET_JWT}
                   key: DINEROS_JWT_SECRET
             - name: GCLOUD_KEY_NAME
               value: "./cloud-logging.json"
             - name: PLAID_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: PLAID_CLIENT_ID
             - name: PLAID_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-secrets
+                  name: ${SECRET_APP}
                   key: PLAID_SECRET
-            - name: E2E_SEED_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: dineros-staging-secrets
-                  key: E2E_SEED_TOKEN
-                  optional: true
+${OPTIONAL_NUXT_PUBLIC_DEPLOY_ENV_ENTRY}
+${OPTIONAL_E2E_SEED_ENTRY}
             - name: DEBUG
               value: "dineros:error"
             - name: GOOGLE_APPLICATION_CREDENTIALS
@@ -168,19 +163,19 @@ spec:
       volumes:
         - name: service-account-volume
           secret:
-            secretName: google-service-account-staging
+            secretName: ${SECRET_GA}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dineros-microservice-staging-deployment
+  name: ${MICRO_DEPLOYMENT_NAME}
   labels:
-    app: dineros-microservice-staging
-  namespace: dineros-staging
+    app: ${MICRO_APP_LABEL}
+  namespace: ${K8S_NAMESPACE}
 spec:
   selector:
     matchLabels:
-      app: dineros-microservice-staging
+      app: ${MICRO_APP_LABEL}
   replicas: 1
   strategy:
     type: RollingUpdate
@@ -193,12 +188,12 @@ spec:
       annotations:
         kubernetes.io/change-cause: "Updated at $(date +%s)"
       labels:
-        app: dineros-microservice-staging
+        app: ${MICRO_APP_LABEL}
     spec:
-      serviceAccountName: dineros-staging
+      serviceAccountName: ${SERVICE_ACCOUNT_K8S}
       containers:
-        - name: dineros-microservice-staging-container
-          image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPO}/dineros-microservice:latest
+        - name: ${MICRO_CONTAINER_NAME}
+          image: gcr.io/${GCP_PROJECT_ID}/dineros-microservice:${IMAGE_TAG}
           imagePullPolicy: Always
           volumeMounts:
             - name: service-account-volume
@@ -212,10 +207,10 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: dineros-staging-mysql
+                  name: ${SECRET_DATABASE_MICRO}
                   key: DATABASE_URL
             - name: DEPLOY_ENV
-              value: "staging"
+              value: "${DEPLOY_ENV_VALUE}"
             - name: PORT
               value: "3050"
             - name: NODE_ENV
@@ -227,48 +222,48 @@ spec:
             - name: DB_DECRYPTION_KEY_1
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_1
             - name: DB_DECRYPTION_KEY_2
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_2
             - name: DB_DECRYPTION_KEY_3
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_3
             - name: DB_DECRYPTION_KEY_4
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_4
             - name: DB_DECRYPTION_KEY_5
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_DECRYPTION_KEY_5
             - name: DB_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: staging-db-secrets
+                  name: ${SECRET_DB}
                   key: DB_ENCRYPTION_KEY
       volumes:
         - name: service-account-volume
           secret:
-            secretName: google-service-account-staging
+            secretName: ${SECRET_GA}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: dineros-staging-service
+  name: ${SERVICE_NAME}
   labels:
-    app: dineros-staging
-  namespace: dineros-staging
+    app: ${APP_LABEL}
+  namespace: ${K8S_NAMESPACE}
 spec:
   selector:
-    app: dineros-staging
+    app: ${APP_LABEL}
   ports:
     - protocol: TCP
       port: 80
@@ -286,24 +281,24 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-  generation: 1
   labels:
-    app: dineros-staging
-  name: dineros-staging-ingress
-  namespace: dineros-staging
+    app: ${APP_LABEL}
+  name: ${INGRESS_NAME}
+  namespace: ${K8S_NAMESPACE}
 spec:
   rules:
-    - host: staging.dineros.cc
+    - host: ${PRIMARY_HOST}
       http:
         paths:
           - backend:
               service:
-                name: dineros-staging-service
+                name: ${SERVICE_NAME}
                 port:
                   name: http
             path: /
             pathType: ImplementationSpecific
+${SECONDARY_INGRESS_RULE}
   tls:
     - hosts:
-        - staging.dineros.cc
-      secretName: dineros-staging-tls
+${TLS_HOSTS_LIST}
+      secretName: ${INGRESS_TLS_SECRET_NAME}

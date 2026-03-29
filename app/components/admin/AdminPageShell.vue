@@ -38,6 +38,31 @@ const navItems = computed<NavItem[]>(() => [
     to: "/admin/openai-logs",
     active: route.path.startsWith("/admin/openai-logs"),
   },
+  {
+    label: "Notifications",
+    to: "/admin/notification-events",
+    active: route.path.startsWith("/admin/notification-events"),
+  },
+  {
+    label: "Audit log",
+    to: "/admin/audit-logs",
+    active: route.path.startsWith("/admin/audit-logs"),
+  },
+  {
+    label: "System status",
+    to: "/admin/system",
+    active: route.path.startsWith("/admin/system"),
+  },
+  {
+    label: "Job logs",
+    to: "/admin/integration-job-logs",
+    active: route.path.startsWith("/admin/integration-job-logs"),
+  },
+  {
+    label: "Integration alerts",
+    to: "/admin/integration-alerts",
+    active: route.path.startsWith("/admin/integration-alerts"),
+  },
 ]);
 </script>
 

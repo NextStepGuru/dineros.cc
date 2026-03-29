@@ -77,9 +77,37 @@ AdminPageShell(
         template(#header)
           h2(class="text-base font-semibold") Account operations
         p(class="text-sm frog-text-muted")
-          | Search accounts and inspect account membership details.
+          | Search accounts, inspect membership, Plaid health, and scoped jobs.
         div(class="mt-4")
           UButton(to="/admin/accounts" color="primary") Go to Accounts
+      UCard
+        template(#header)
+          h2(class="text-base font-semibold") Notification events
+        p(class="text-sm frog-text-muted")
+          | In-app forecast and reoccurrence notifications per user/budget.
+        div(class="mt-4")
+          UButton(to="/admin/notification-events" color="neutral" variant="soft") View notifications
+      UCard
+        template(#header)
+          h2(class="text-base font-semibold") Audit log
+        p(class="text-sm frog-text-muted")
+          | Review admin actions (updates, password resets, account jobs).
+        div(class="mt-4")
+          UButton(to="/admin/audit-logs" color="neutral" variant="soft") View audit log
+      UCard
+        template(#header)
+          h2(class="text-base font-semibold") System status
+        p(class="text-sm frog-text-muted")
+          | Database / Redis checks, build info, Bull Board, Postmark search, ops links.
+        div(class="mt-4")
+          UButton(to="/admin/system" color="neutral" variant="soft") Open system status
+      UCard
+        template(#header)
+          h2(class="text-base font-semibold") Integration job logs
+        p(class="text-sm frog-text-muted")
+          | Queue failures (e.g. Plaid sync errors) persisted for support.
+        div(class="mt-4")
+          UButton(to="/admin/integration-job-logs" color="neutral" variant="soft") View job logs
     UCard
       template(#header)
         h2(class="text-base font-semibold") Operations

@@ -33,3 +33,12 @@ Canonical pattern for API routes:
 ## Logging
 
 - Use the structured `log({ message, data, level })` from `app/server/logger.ts`. Do not use `console.log` or `console.error` in server code; use `log()` with appropriate level and context (e.g. request URL, user id, job id).
+
+## Date and time (server-only ESLint)
+
+`app/eslint.config.mjs` restricts **`new Date(...)`** and **`Date.now()`** under `app/server/**/*.ts` (exceptions: `DateTime.ts`, `DateTimeService.ts`, and test paths). Agents must not introduce these patterns in new server code.
+
+- **Current time**: `dateTimeService.now()`, `dateTimeService.nowDate()`, or other methods on `dateTimeService` from `~/server/services/forecast/DateTimeService` (or `~/server/services/forecast` re-exports).
+- **Parsing query/body ISO strings** (admin filters, optional bounds): use `parseOptionalIsoQuery` from `~/server/lib/parseOptionalIsoQuery.ts`, which delegates to `dateTimeService.parseInput` and returns `undefined` when invalid. Do not reimplement with `new Date(string)`.
+- **Structured parsing** when you need errors surfaced: `dateTimeService.parseInput(trimmed)` (requires explicit offset for full datetimes; date-only `YYYY-MM-DD` is allowed with timezone rules documented on `DateTimeService`).
+- If you touch server date logic, run `pnpm lint` from `app/` before finishing so `no-restricted-syntax` does not regress.

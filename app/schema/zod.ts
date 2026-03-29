@@ -249,9 +249,89 @@ export const adminUserUpdateSchema = z
 
 export const adminUserPasswordResetSchema = passwordSchema;
 
+/** Admin audit log actions (server constants; not exhaustive). */
+export const ADMIN_AUDIT_ACTIONS = {
+  USER_UPDATE: "user.update",
+  USER_PASSWORD_RESET: "user.password_reset",
+  ACCOUNT_RECALCULATE_QUEUED: "account.recalculate_queued",
+  ACCOUNT_PLAID_SYNC_QUEUED: "account.plaid_sync_queued",
+  ACCOUNT_BALANCE_ENTRIES_CLEANUP: "account.balance_entries_cleanup",
+} as const;
+
 export const adminAccountsQuerySchema = z.object({
   q: z.string().trim().max(255).optional().default(""),
   limit: z.coerce.number().int().min(1).max(100).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const adminAuditLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  action: z.string().trim().max(64).optional(),
+  format: z.enum(["json", "csv"]).optional().default("json"),
+  adminUserId: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v === "") return undefined;
+      const n = typeof v === "number" ? v : Number.parseInt(String(v), 10);
+      return Number.isInteger(n) && n > 0 ? n : undefined;
+    }),
+  targetUserId: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v === "") return undefined;
+      const n = typeof v === "number" ? v : Number.parseInt(String(v), 10);
+      return Number.isInteger(n) && n > 0 ? n : undefined;
+    }),
+});
+
+/** Matches Prisma `NotificationKind`. */
+export const adminNotificationKindSchema = z.enum([
+  "FORECAST_RISK",
+  "REOCCURRENCE_HEALTH",
+]);
+
+export const adminNotificationEventsQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  budgetId: z.coerce.number().int().positive().optional(),
+  kind: adminNotificationKindSchema.optional(),
+  isActive: z.enum(["all", "true", "false"]).optional().default("all"),
+  from: z.string().trim().max(40).optional(),
+  to: z.string().trim().max(40).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const adminOpenAiRequestLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  purpose: z.string().trim().max(191).optional(),
+  success: z.enum(["all", "true", "false"]).optional().default("all"),
+  from: z.string().trim().max(40).optional(),
+  to: z.string().trim().max(40).optional(),
+  format: z.enum(["json", "csv"]).optional().default("json"),
+});
+
+export const adminIntegrationAlertsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  source: z.enum(["plaid", "openai", "all"]).default("all"),
+  kind: z.string().trim().max(32).optional(),
+  from: z.string().trim().max(40).optional(),
+  to: z.string().trim().max(40).optional(),
+  format: z.enum(["json", "csv"]).optional().default("json"),
+});
+
+export const adminPostmarkMessagesQuerySchema = z.object({
+  recipient: z.string().email().max(500),
+  count: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const adminIntegrationJobLogsQuerySchema = z.object({
+  source: z.string().trim().max(32).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
 

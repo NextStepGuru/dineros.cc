@@ -1,9 +1,10 @@
 import { createError, getRouterParam, readBody } from "h3";
 import { prisma } from "~/server/clients/prismaClient";
-import { adminUserUpdateSchema } from "~/schema/zod";
+import { ADMIN_AUDIT_ACTIONS, adminUserUpdateSchema } from "~/schema/zod";
 import { requireAdmin } from "~/server/lib/requireAdmin";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { isAdminEmail } from "~/server/lib/adminConfig";
+import { recordAdminAudit } from "~/server/lib/recordAdminAudit";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -32,6 +33,12 @@ export default defineEventHandler(async (event) => {
         isDaylightSaving: true,
         updatedAt: true,
       } as any,
+    });
+
+    await recordAdminAudit(event, {
+      action: ADMIN_AUDIT_ACTIONS.USER_UPDATE,
+      targetUserId: userId,
+      metadata: { fields: Object.keys(data) },
     });
 
     return {

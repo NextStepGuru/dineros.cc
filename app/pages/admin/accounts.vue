@@ -28,6 +28,13 @@ type AccountMember = {
   };
 };
 
+type PlaidItemRow = {
+  itemId: string;
+  userId: number;
+  updatedAt: string;
+  syncCursorUpdatedAt: string | null;
+};
+
 type AdminAccountDetail = {
   id: string;
   name: string;
@@ -35,6 +42,7 @@ type AdminAccountDetail = {
   isDefault: boolean;
   lastAccessedAt: string | null;
   updatedAt: string;
+  plaidItems: PlaidItemRow[];
   members: AccountMember[];
 };
 
@@ -47,6 +55,10 @@ const loadingDetail = ref(false);
 const items = ref<AdminAccountRow[]>([]);
 const selectedAccountId = ref<string | null>(null);
 const selectedAccount = ref<AdminAccountDetail | null>(null);
+const accountAction = ref<
+  "recalculate" | "sync-plaid" | "cleanup-balance" | null
+>(null);
+const cleanupModalOpen = ref(false);
 
 async function loadAccounts(reset: boolean) {
   loading.value = true;
@@ -117,6 +129,78 @@ function loadMore() {
 function clearSearch() {
   query.value = "";
   loadAccounts(true);
+}
+
+async function runAccountRecalculate() {
+  if (!selectedAccountId.value) return;
+  accountAction.value = "recalculate";
+  try {
+    await $api(`/api/admin/accounts/${selectedAccountId.value}/recalculate`, {
+      method: "POST",
+    });
+    toast.add({
+      color: "success",
+      description: "Recalculate job queued for this account.",
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to queue recalculate.";
+    toast.add({ color: "error", description: message });
+  } finally {
+    accountAction.value = null;
+  }
+}
+
+async function runAccountPlaidSync() {
+  if (!selectedAccountId.value) return;
+  accountAction.value = "sync-plaid";
+  try {
+    const res = await $api<{ message: string; queued: number }>(
+      `/api/admin/accounts/${selectedAccountId.value}/sync-plaid`,
+      { method: "POST" },
+    );
+    toast.add({
+      color: "success",
+      description: res.message,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to queue Plaid sync.";
+    toast.add({ color: "error", description: message });
+  } finally {
+    accountAction.value = null;
+  }
+}
+
+async function runAccountCleanupBalance() {
+  if (!selectedAccountId.value) return;
+  accountAction.value = "cleanup-balance";
+  cleanupModalOpen.value = false;
+  try {
+    const res = await $api<{ deletedCount: number; message: string }>(
+      `/api/admin/accounts/${selectedAccountId.value}/cleanup-balance-entries`,
+      { method: "POST" },
+    );
+    toast.add({
+      color: "success",
+      description: `${res.message} (${res.deletedCount} removed)`,
+    });
+    if (selectedAccountId.value) {
+      await selectAccount(selectedAccountId.value);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Cleanup failed.";
+    toast.add({ color: "error", description: message });
+  } finally {
+    accountAction.value = null;
+  }
 }
 
 onMounted(() => {
@@ -237,4 +321,63 @@ AdminPageShell(
                 td(class="p-2")
                   UBadge(:color="member.user.isArchived ? 'warning' : 'success'" variant="subtle")
                     | {{ member.user.isArchived ? 'Archived' : 'Active' }}
+
+        div(v-if="selectedAccount.plaidItems.length > 0")
+          h3(class="text-sm font-semibold") Plaid connections
+          div(class="overflow-x-auto rounded-lg border border-default mt-2")
+            table(class="w-full text-sm")
+              thead(class="bg-elevated")
+                tr
+                  th(class="p-2 text-left") Item ID
+                  th(class="p-2 text-left") User
+                  th(class="p-2 text-left") Item updated
+                  th(class="p-2 text-left") Sync cursor
+              tbody
+                tr(
+                  v-for="row in selectedAccount.plaidItems"
+                  :key="row.itemId"
+                  class="border-t border-default")
+                  td(class="p-2 font-mono text-xs break-all") {{ row.itemId }}
+                  td(class="p-2") {{ row.userId }}
+                  td(class="p-2") {{ new Date(row.updatedAt).toLocaleString() }}
+                  td(class="p-2") {{ row.syncCursorUpdatedAt ? new Date(row.syncCursorUpdatedAt).toLocaleString() : '—' }}
+
+        p(v-else class="text-sm frog-text-muted") No Plaid items for this account’s members.
+
+        div(class="border-t border-default pt-4 space-y-3")
+          h3(class="text-sm font-semibold") Account-scoped jobs
+          p(class="text-sm frog-text-muted")
+            | Queue forecast recalculation, Plaid sync for all items on this account’s members, or remove balance-only register entries for this account.
+          div(class="flex flex-wrap gap-2")
+            UButton(
+              color="primary"
+              variant="soft"
+              icon="i-lucide-calculator"
+              :loading="accountAction === 'recalculate'"
+              :disabled="!!accountAction"
+              @click="runAccountRecalculate") Queue recalculate
+            UButton(
+              color="info"
+              variant="soft"
+              icon="i-lucide-link"
+              :loading="accountAction === 'sync-plaid'"
+              :disabled="!!accountAction"
+              @click="runAccountPlaidSync") Queue Plaid sync
+            UButton(
+              color="error"
+              variant="soft"
+              icon="i-lucide-trash-2"
+              :loading="accountAction === 'cleanup-balance'"
+              :disabled="!!accountAction"
+              @click="cleanupModalOpen = true") Remove balance entries…
+
+    UModal(v-model:open="cleanupModalOpen" :ui="{ width: 'sm:max-w-md' }")
+      template(#header) Remove balance entries?
+      template(#body)
+        p(class="text-sm frog-text-muted")
+          | Deletes all register entries marked as balance entries for this account only. Use after backups; this cannot be undone from the UI.
+      template(#footer)
+        div(class="flex justify-end gap-2")
+          UButton(variant="soft" @click="cleanupModalOpen = false") Cancel
+          UButton(color="error" @click="runAccountCleanupBalance") Remove balance entries
 </template>

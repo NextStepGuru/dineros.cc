@@ -21,11 +21,36 @@ const overlay = useOverlay();
 const budgetModal = overlay.create(ModalsBudgetManager);
 const notificationCount = useNotificationCount();
 
-const currentBudgetName = computed(
+const currentBudget = computed(
   () =>
-    listStore.getBudgets.find((b) => b.id === authStore.getBudgetId)?.name ??
-    "Select budget",
+    listStore.getBudgets.find((b) => b.id === authStore.getBudgetId) ?? null,
 );
+
+const currentBudgetName = computed(
+  () => currentBudget.value?.name ?? "Select budget",
+);
+
+const isUsingNonDefaultBudget = computed(() => {
+  const def = listStore.getDefaultBudget;
+  if (!def || !authStore.getBudgetId) return false;
+  return authStore.getBudgetId !== def.id;
+});
+
+const nonDefaultBudgetTooltipText = computed(() => {
+  const name = currentBudget.value?.name ?? "This budget";
+  return `${name} — forecasts and registers use this budget until you switch (not your default).`;
+});
+
+const budgetSwitcherDropdownItems = computed(() => [
+  listStore.getBudgets.map((b) => {
+    const active = b.id === authStore.getBudgetId;
+    return {
+      label: b.name,
+      ...(active ? { icon: "i-lucide-check" as const } : {}),
+      onSelect: () => selectBudget(b.id),
+    };
+  }),
+]);
 
 function selectBudget(id: number) {
   authStore.setBudgetId(id);
@@ -93,8 +118,10 @@ type LoggedInNavItem = {
   active: boolean;
 };
 
+const { isAdminConsoleUser } = useAdminAccess();
+
 const adminNavItems = computed((): LoggedInNavItem[] =>
-  authStore.getUser?.role === "ADMIN"
+  isAdminConsoleUser.value
     ? [
         {
           label: "Admin",
@@ -429,6 +456,23 @@ UHeader(
   UNavigationMenu(v-else :items="guestNavItems" class="flex flex-col md:flex-row")
 
   template(#right)
+    div(
+      v-if="authStore.getIsUserLoggedIn && isUsingNonDefaultBudget && listStore.getBudgets.length > 0"
+      class="my-0 mr-1.5 flex max-w-[min(12rem,42vw)] shrink-0 items-center sm:max-w-56")
+      UDropdownMenu(
+        :items="budgetSwitcherDropdownItems"
+        :content="{ align: 'end', sideOffset: 4 }")
+        UTooltip(:text="nonDefaultBudgetTooltipText" :delay-duration="150")
+          UButton(
+            variant="soft"
+            color="warning"
+            size="sm"
+            trailing-icon="i-lucide-chevron-down"
+            class="h-8 min-w-0 max-w-full gap-1.5 px-2"
+            data-testid="header-non-default-budget-trigger"
+            :aria-label="`Active budget: ${currentBudgetName} (not default). Open to switch.`")
+            UIcon(name="i-lucide-layers" class="size-4 shrink-0 opacity-80")
+            span(class="truncate") {{ currentBudgetName }}
     UPopover(
       v-if="authStore.getIsUserLoggedIn"
       class="my-0 mr-2 hidden lg:block"
@@ -450,7 +494,7 @@ UHeader(
           | {{ notificationCount > 99 ? '99+' : notificationCount }}
       template(#content="{ close }")
         .flex.flex-col.p-1.min-w-64.max-w-80
-          .px-2.pt-2.pb-1.text-xs.frog-text-muted Budget
+          .px-2.pt-2.pb-1.text-xs.frog-text-muted Budget Forecast
           .max-h-52.overflow-auto
             div(
               v-for="b in listStore.getBudgets"

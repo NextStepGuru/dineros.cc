@@ -6,7 +6,8 @@ definePageMeta({
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
-const isAdminUser = computed(() => authStore.getUser?.role === "ADMIN");
+const { isAdminConsoleUser } = useAdminAccess();
+const isAdminUser = isAdminConsoleUser;
 
 // Lazy-load tab components so Plaid and other heavy deps load only when tab is selected
 const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {

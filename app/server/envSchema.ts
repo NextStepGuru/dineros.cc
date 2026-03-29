@@ -16,6 +16,8 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.email().default("admin@dineros.cc"),
   /** Optional notification target for new user signups. */
   SIGNUP_NOTIFICATION_EMAIL: z.email().optional(),
+  /** Optional inbox for Plaid/OpenAI integration credential alerts (defaults to ADMIN_EMAIL). */
+  INTEGRATION_ALERT_EMAIL: z.email().optional(),
   REDIS_HOST: z.string().default("localhost"),
   REDIS_PORT: z
     .string()

@@ -2,6 +2,7 @@ import type { Job } from "bullmq";
 import { log } from "~/server/logger";
 import PlaidSyncService from "~/server/services/PlaidSyncService";
 import { dateTimeService } from "../services/forecast/DateTimeService";
+import { recordIntegrationJobLog } from "~/server/lib/recordIntegrationJobLog";
 
 export type PlaidSyncJob = {
   name: string;
@@ -23,11 +24,28 @@ export default {
 
     const plaidSyncService = new PlaidSyncService();
 
-    await plaidSyncService.getAndSyncPlaidAccounts({
-      accountRegisterId: job.data.accountRegisterId,
-      resetSyncDates: job.data.resetSyncDates,
-      itemId: job.data.itemId,
-    });
+    try {
+      await plaidSyncService.getAndSyncPlaidAccounts({
+        accountRegisterId: job.data.accountRegisterId,
+        resetSyncDates: job.data.resetSyncDates,
+        itemId: job.data.itemId,
+      });
+    } catch (err) {
+      console.error("[PLAID_SYNC_JOB_ERROR]", String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      await recordIntegrationJobLog({
+        source: "plaid",
+        queueName: "plaid-sync",
+        jobId: job.id ? String(job.id) : null,
+        message: msg.slice(0, 2000),
+        itemId: job.data.itemId ?? null,
+        metadata: {
+          accountRegisterId: job.data.accountRegisterId ?? null,
+          resetSyncDates: job.data.resetSyncDates ?? null,
+        },
+      });
+      throw err;
+    }
 
     log({
       message: `Completed PlaidSyncJob ${job.id} in ${

@@ -34,6 +34,18 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_DEPLOY_ENV ||
         process.env.DEPLOY_ENV ||
         "production",
+      /** Must match server `ADMIN_EMAIL` for env-based admin to use `/admin` UI. */
+      adminEmail: process.env.NUXT_PUBLIC_ADMIN_EMAIL || "",
+      /** Optional URL to Bull Board or queue UI (e.g. microservice `/bull`). */
+      bullBoardUrl: process.env.NUXT_PUBLIC_BULL_BOARD_URL || "",
+      /** Postmark server activity UI base (optional deep-link for operators). */
+      postmarkActivityBaseUrl:
+        process.env.NUXT_PUBLIC_POSTMARK_ACTIVITY_URL || "",
+      /** External log search (e.g. Cloud Logging, Datadog). */
+      externalLoggingUrl:
+        process.env.NUXT_PUBLIC_EXTERNAL_LOGGING_URL || "",
+      /** Runbook or on-call doc. */
+      runbookUrl: process.env.NUXT_PUBLIC_RUNBOOK_URL || "",
     },
   },
   devtools: false,
