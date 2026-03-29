@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "~/server/clients/prismaClient";
 
 vi.hoisted(() => {
   (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
@@ -34,16 +35,10 @@ vi.mock("~/server/services/forecast", () => ({
   },
 }));
 
-const prismaMock = vi.hoisted(() => ({
-  accountRegister: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-  },
-}));
-
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: prismaMock,
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 describe("GET /api/tasks/recalculate", () => {
   let handler: any;
@@ -61,7 +56,7 @@ describe("GET /api/tasks/recalculate", () => {
   it("returns early when single accountId not found", async () => {
     const { getQuery } = await import("h3");
     (getQuery as any).mockReturnValue({ accountId: "missing-id" });
-    prismaMock.accountRegister.findFirst.mockResolvedValue(null);
+    prisma.accountRegister.findFirst.mockResolvedValue(null);
 
     const out = await handler({});
 
@@ -74,7 +69,7 @@ describe("GET /api/tasks/recalculate", () => {
   it("processes single account when register exists", async () => {
     const { getQuery } = await import("h3");
     (getQuery as any).mockReturnValue({ accountId: "acc-1" });
-    prismaMock.accountRegister.findFirst.mockResolvedValue({ id: 1 });
+    prisma.accountRegister.findFirst.mockResolvedValue({ id: 1 });
     mockEngine.recalculate.mockResolvedValue({
       isSuccess: true,
       registerEntries: [
@@ -95,7 +90,7 @@ describe("GET /api/tasks/recalculate", () => {
   it("returns message when no accounts in DB", async () => {
     const { getQuery } = await import("h3");
     (getQuery as any).mockReturnValue({});
-    prismaMock.accountRegister.findMany.mockResolvedValue([]);
+    prisma.accountRegister.findMany.mockResolvedValue([]);
 
     const out = await handler({});
 

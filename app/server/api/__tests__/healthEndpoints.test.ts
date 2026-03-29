@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockIsPrismaActive = vi.hoisted(() => vi.fn());
+
 vi.hoisted(() => {
   (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
 });
@@ -9,7 +11,7 @@ vi.mock('h3', () => ({
 }));
 
 vi.mock('~/server/clients/prismaClient', () => ({
-  isPrismaActive: vi.fn(),
+  isPrismaActive: mockIsPrismaActive,
 }));
 
 vi.mock('~/server/clients/redisClient', () => ({

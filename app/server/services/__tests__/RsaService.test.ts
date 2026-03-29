@@ -1,6 +1,4 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-
-// Import modules after mocks
 import RsaService from "../RsaService";
 import { prisma } from "~/server/clients/prismaClient";
 
@@ -27,17 +25,10 @@ vi.mock("crypto", async (importOriginal) => {
 });
 
 // Mock prisma with the exact path used in RsaService
-// Use factory function to avoid hoisting issues
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    rsa: {
-      findFirstOrThrow: vi.fn(),
-      findFirst: vi.fn(),
-      updateMany: vi.fn(),
-      create: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 // Get typed references to the mocked functions
 const mockRsaDb = prisma.rsa as any;

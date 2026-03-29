@@ -92,24 +92,6 @@ export async function getMembership(
   return row;
 }
 
-/** All account links for a user (for lists / client). */
-export async function loadMembershipsForUser(
-  userId: number,
-): Promise<AccountMembershipRow[]> {
-  return prisma.userAccount.findMany({
-    where: { userId },
-    select: {
-      userId: true,
-      accountId: true,
-      canViewBudgets: true,
-      canInviteUsers: true,
-      canManageMembers: true,
-      allowedBudgetIds: true,
-      allowedAccountRegisterIds: true,
-    },
-  });
-}
-
 export async function assertAccountCapability(
   userId: number,
   accountId: string,

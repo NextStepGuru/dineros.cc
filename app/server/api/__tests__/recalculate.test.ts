@@ -1,32 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the dependencies
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    accountRegister: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-    },
-    registerEntry: {
-      findMany: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      create: vi.fn(),
-      count: vi.fn(),
-    },
-    reoccurrence: {
-      findMany: vi.fn(),
-      aggregate: vi.fn(),
-    },
-    reoccurrenceSkip: {
-      findMany: vi.fn(),
-    },
-    account: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/services/forecast", () => ({
   ForecastEngineFactory: {

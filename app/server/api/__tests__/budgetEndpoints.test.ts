@@ -31,36 +31,10 @@ const defaultUserAccountMembership = {
   allowedAccountRegisterIds: null,
 };
 
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    userAccount: {
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-    },
-    budget: {
-      findFirst: vi.fn(),
-      findFirstOrThrow: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    accountRegister: {
-      findMany: vi.fn(),
-      updateMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    reoccurrence: {
-      findMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    registerEntry: { deleteMany: vi.fn() },
-    reoccurrencePlaidNameAlias: { deleteMany: vi.fn() },
-    reoccurrenceSplit: { deleteMany: vi.fn() },
-    reoccurrenceSkip: { deleteMany: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),

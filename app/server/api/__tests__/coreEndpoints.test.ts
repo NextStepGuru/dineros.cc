@@ -8,6 +8,11 @@ vi.hoisted(() => {
   (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
 });
 
+const accountListsRepoMocks = vi.hoisted(() => ({
+  loadMemberships: vi.fn(),
+  loadRawLists: vi.fn(),
+}));
+
 // Mock H3/Nuxt utilities before any imports
 vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
@@ -44,40 +49,13 @@ vi.mock("~/server/logger", () => ({
 }));
 
 // Mock the dependencies
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    userAccount: {
-      findMany: vi.fn(),
-    },
-    user: {
-      findUniqueOrThrow: vi.fn(),
-    },
-    reoccurrence: {
-      findMany: vi.fn(),
-    },
-    budget: {
-      findMany: vi.fn(),
-    },
-    interval: {
-      findMany: vi.fn(),
-    },
-    accountType: {
-      findMany: vi.fn(),
-    },
-    accountRegister: {
-      findMany: vi.fn(),
-    },
-    account: {
-      findMany: vi.fn(),
-    },
-    category: {
-      findMany: vi.fn(),
-    },
-    savingsGoal: {
-      findMany: vi.fn(),
-    },
-    $queryRaw: vi.fn(),
-  },
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
+
+vi.mock("~/server/repositories/accountListsRepository.singleton", () => ({
+  accountListsRepository: accountListsRepoMocks,
 }));
 
 vi.mock("~/server/lib/getUser", () => ({
@@ -210,7 +188,22 @@ describe("Core API Endpoints", () => {
       };
     }
 
+    function emptyRawLists() {
+      return {
+        reoccurrences: [] as unknown[],
+        budgets: [] as unknown[],
+        intervals: [] as unknown[],
+        accountTypes: [] as unknown[],
+        accountRegisters: [] as unknown[],
+        accounts: [] as unknown[],
+        categories: [] as unknown[],
+        savingsGoals: [] as unknown[],
+      };
+    }
+
     beforeEach(async () => {
+      accountListsRepoMocks.loadMemberships.mockReset();
+      accountListsRepoMocks.loadRawLists.mockReset();
       const module = await import("../lists");
       listsHandler = module.default;
     });
@@ -272,24 +265,21 @@ describe("Core API Endpoints", () => {
       const mockCategories: any[] = [];
 
       const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.userAccount.findMany as any).mockResolvedValue([
+      accountListsRepoMocks.loadMemberships.mockResolvedValue([
         fullMembership(123, listAccountId),
       ]);
-      (prisma.reoccurrence.findMany as any).mockResolvedValue(
-        mockReoccurrences,
-      );
-      (prisma.budget.findMany as any).mockResolvedValue(mockBudgets);
-      (prisma.interval.findMany as any).mockResolvedValue(mockIntervals);
-      (prisma.accountType.findMany as any).mockResolvedValue(mockAccountTypes);
-      (prisma.accountRegister.findMany as any).mockResolvedValue(
-        mockAccountRegisters,
-      );
-      (prisma.account.findMany as any).mockResolvedValue(mockAccounts);
-      (prisma.category.findMany as any).mockResolvedValue(mockCategories);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
+      accountListsRepoMocks.loadRawLists.mockResolvedValue({
+        reoccurrences: mockReoccurrences,
+        budgets: mockBudgets,
+        intervals: mockIntervals,
+        accountTypes: mockAccountTypes,
+        accountRegisters: mockAccountRegisters,
+        accounts: mockAccounts,
+        categories: mockCategories,
+        savingsGoals: [],
+      });
 
       const result = await listsHandler(mockEvent);
 
@@ -314,106 +304,33 @@ describe("Core API Endpoints", () => {
         ],
       });
 
-      expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith({
-        where: {
-          account: {
-            is: {
-              userAccounts: {
-                some: { userId: 123 },
-              },
-            },
-          },
-        },
-        include: {
-          splits: {
-            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-          },
-        },
-        orderBy: [{ lastAt: "asc" }, { id: "asc" }],
-      });
-
-      expect(prisma.budget.findMany).toHaveBeenCalledWith({
-        where: {
-          isArchived: false,
-          account: {
-            userAccounts: { some: { userId: 123 } },
-          },
-        },
-      });
-
-      expect(prisma.userAccount.findMany).toHaveBeenCalledWith({
-        where: { userId: 123 },
-        select: {
-          userId: true,
-          accountId: true,
-          canViewBudgets: true,
-          canInviteUsers: true,
-          canManageMembers: true,
-          allowedBudgetIds: true,
-          allowedAccountRegisterIds: true,
-        },
-      });
+      expect(accountListsRepoMocks.loadMemberships).toHaveBeenCalledWith(123);
+      expect(accountListsRepoMocks.loadRawLists).toHaveBeenCalledWith(123);
     });
 
     it("should filter results by user access permissions", async () => {
       const mockEvent = { context: { user: { userId: 456 } } };
 
       const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 456 });
-      (prisma.userAccount.findMany as any).mockResolvedValue([]);
-      (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
-      (prisma.budget.findMany as any).mockResolvedValue([]);
-      (prisma.interval.findMany as any).mockResolvedValue([]);
-      (prisma.accountType.findMany as any).mockResolvedValue([]);
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
-      (prisma.account.findMany as any).mockResolvedValue([]);
-      (prisma.category.findMany as any).mockResolvedValue([]);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
+      accountListsRepoMocks.loadMemberships.mockResolvedValue([]);
+      accountListsRepoMocks.loadRawLists.mockResolvedValue(emptyRawLists());
 
       await listsHandler(mockEvent);
 
-      // Should filter by correct user ID
-      expect(prisma.budget.findMany).toHaveBeenCalledWith({
-        where: {
-          isArchived: false,
-          account: {
-            userAccounts: { some: { userId: 456 } },
-          },
-        },
-      });
-
-      expect(prisma.account.findMany).toHaveBeenCalledWith({
-        where: {
-          userAccounts: {
-            some: { userId: 456 },
-          },
-        },
-      });
-
-      expect(prisma.userAccount.findMany).toHaveBeenCalledWith({
-        where: { userId: 456 },
-        select: expect.any(Object),
-      });
+      expect(accountListsRepoMocks.loadMemberships).toHaveBeenCalledWith(456);
+      expect(accountListsRepoMocks.loadRawLists).toHaveBeenCalledWith(456);
     });
 
     it("should handle empty results gracefully", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
       const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
 
       (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.userAccount.findMany as any).mockResolvedValue([]);
-      (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
-      (prisma.budget.findMany as any).mockResolvedValue([]);
-      (prisma.interval.findMany as any).mockResolvedValue([]);
-      (prisma.accountType.findMany as any).mockResolvedValue([]);
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
-      (prisma.account.findMany as any).mockResolvedValue([]);
-      (prisma.category.findMany as any).mockResolvedValue([]);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
+      accountListsRepoMocks.loadMemberships.mockResolvedValue([]);
+      accountListsRepoMocks.loadRawLists.mockResolvedValue(emptyRawLists());
 
       const result = await listsHandler(mockEvent);
 
@@ -434,110 +351,21 @@ describe("Core API Endpoints", () => {
       const mockEvent = { context: { user: { userId: 123 } } };
 
       const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (getUser as any).mockReturnValue({ userId: 123 });
 
       const dbError = new Error("Database connection failed");
-      (prisma.userAccount.findMany as any).mockResolvedValue([
+      accountListsRepoMocks.loadMemberships.mockResolvedValue([
         fullMembership(123, listAccountId),
       ]);
-      (prisma.reoccurrence.findMany as any).mockRejectedValue(dbError);
-      (prisma.budget.findMany as any).mockResolvedValue([]);
-      (prisma.interval.findMany as any).mockResolvedValue([]);
-      (prisma.accountType.findMany as any).mockResolvedValue([]);
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
-      (prisma.account.findMany as any).mockResolvedValue([]);
-      (prisma.category.findMany as any).mockResolvedValue([]);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
+      accountListsRepoMocks.loadRawLists.mockRejectedValue(dbError);
 
       await expect(listsHandler(mockEvent)).rejects.toThrow(
         "Database connection failed",
       );
 
       expect(handleApiError).toHaveBeenCalledWith(dbError);
-    });
-
-    it("should filter out archived budgets and account registers", async () => {
-      const mockEvent = { context: { user: { userId: 123 } } };
-
-      const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
-
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.userAccount.findMany as any).mockResolvedValue([]);
-      (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
-      (prisma.budget.findMany as any).mockResolvedValue([]);
-      (prisma.interval.findMany as any).mockResolvedValue([]);
-      (prisma.accountType.findMany as any).mockResolvedValue([]);
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
-      (prisma.account.findMany as any).mockResolvedValue([]);
-      (prisma.category.findMany as any).mockResolvedValue([]);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
-
-      await listsHandler(mockEvent);
-
-      // Should filter out archived items
-      expect(prisma.budget.findMany).toHaveBeenCalledWith({
-        where: {
-          isArchived: false,
-          account: {
-            userAccounts: { some: { userId: 123 } },
-          },
-        },
-      });
-
-      expect(prisma.accountRegister.findMany).toHaveBeenCalledWith({
-        where: {
-          isArchived: false,
-          account: {
-            is: {
-              userAccounts: {
-                some: { userId: 123 },
-              },
-            },
-          },
-        },
-        orderBy: {
-          sortOrder: "asc",
-        },
-      });
-    });
-
-    it("should sort results correctly", async () => {
-      const mockEvent = { context: { user: { userId: 123 } } };
-
-      const { getUser } = await import("~/server/lib/getUser");
-      const { prisma } = await import("~/server/clients/prismaClient");
-
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.userAccount.findMany as any).mockResolvedValue([]);
-      (prisma.reoccurrence.findMany as any).mockResolvedValue([]);
-      (prisma.budget.findMany as any).mockResolvedValue([]);
-      (prisma.interval.findMany as any).mockResolvedValue([]);
-      (prisma.accountType.findMany as any).mockResolvedValue([]);
-      (prisma.accountRegister.findMany as any).mockResolvedValue([]);
-      (prisma.account.findMany as any).mockResolvedValue([]);
-      (prisma.category.findMany as any).mockResolvedValue([]);
-      (prisma.savingsGoal.findMany as any).mockResolvedValue([]);
-
-      await listsHandler(mockEvent);
-
-      // Should apply correct sorting
-      expect(prisma.reoccurrence.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          orderBy: [{ lastAt: "asc" }, { id: "asc" }],
-        }),
-      );
-
-      expect(prisma.accountRegister.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          orderBy: {
-            sortOrder: "asc",
-          },
-        }),
-      );
     });
   });
 

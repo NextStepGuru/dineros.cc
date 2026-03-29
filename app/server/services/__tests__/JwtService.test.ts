@@ -1,28 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
-
-// Import modules after mocks
 import JwtService from "../JwtService";
 import RsaService from "../RsaService";
 import { prisma } from "~/server/clients/prismaClient";
 
 // Mock prisma client (used by both JwtService and RsaService)
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    rsa: {
-      findFirstOrThrow: vi.fn(),
-      findFirst: vi.fn(),
-      updateMany: vi.fn(),
-      create: vi.fn(),
-    },
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 // Mock RsaService to return properly formatted keys
 vi.mock("../RsaService", () => {

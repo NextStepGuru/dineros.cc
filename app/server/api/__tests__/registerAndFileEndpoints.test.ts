@@ -47,26 +47,10 @@ vi.mock("h3", () => ({
 }));
 
 // Mock server dependencies
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    accountRegister: {
-      findUniqueOrThrow: vi.fn(),
-      aggregate: vi.fn(),
-      findFirstOrThrow: vi.fn(),
-      findMany: vi.fn(),
-    },
-    registerEntry: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      createMany: vi.fn(),
-      count: vi.fn(),
-    },
-    category: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn(),

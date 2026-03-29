@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "~/server/clients/prismaClient";
 
 vi.hoisted(() => {
   (globalThis as any).defineEventHandler = vi.fn((handler) => handler);
@@ -32,46 +33,10 @@ vi.mock("h3", () => ({
 (globalThis as any).readBody = vi.fn();
 (globalThis as any).getQuery = vi.fn();
 
-const prismaMock = vi.hoisted(() => ({
-  category: {
-    findMany: vi.fn(),
-    findFirstOrThrow: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  account: {
-    findFirstOrThrow: vi.fn(),
-  },
-  registerEntry: {
-    count: vi.fn(),
-    findFirst: vi.fn(),
-    findUniqueOrThrow: vi.fn(),
-    update: vi.fn(),
-  },
-  reoccurrence: {
-    findFirstOrThrow: vi.fn(),
-  },
-  accountRegister: {
-    findUniqueOrThrow: vi.fn(),
-    findFirst: vi.fn(),
-  },
-  accountSnapshot: {
-    findMany: vi.fn(),
-  },
-  savingsGoal: {
-    aggregate: vi.fn(),
-    create: vi.fn(),
-  },
-  reoccurrencePlaidNameAlias: {
-    upsert: vi.fn(),
-  },
-  $transaction: vi.fn(),
-}));
-
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: prismaMock,
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
@@ -114,13 +79,13 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     await resetH3Mocks();
-    prismaMock.$transaction.mockImplementation(
+    prisma.$transaction.mockImplementation(
       async (fn: (_tx: unknown) => Promise<unknown>) => {
         const tx = {
           reoccurrencePlaidNameAlias: {
-            upsert: prismaMock.reoccurrencePlaidNameAlias.upsert,
+            upsert: prisma.reoccurrencePlaidNameAlias.upsert,
           },
-          registerEntry: { update: prismaMock.registerEntry.update },
+          registerEntry: { update: prisma.registerEntry.update },
         };
         return fn(tx);
       },
@@ -145,7 +110,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
           isArchived: false,
         },
       ];
-      prismaMock.category.findMany.mockResolvedValue(rows);
+      prisma.category.findMany.mockResolvedValue(rows);
       const { getUser } = await import("~/server/lib/getUser");
       const { getQuery } = await import("h3");
       (getUser as any).mockReturnValue({ userId: 1 });
@@ -153,7 +118,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
 
       const out = await handler({});
       expect(out).toEqual(rows);
-      expect(prismaMock.category.findMany).toHaveBeenCalledWith(
+      expect(prisma.category.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ isArchived: false }),
           orderBy: { name: "asc" },
@@ -162,14 +127,14 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     });
 
     it("filters by accountId when provided", async () => {
-      prismaMock.category.findMany.mockResolvedValue([]);
+      prisma.category.findMany.mockResolvedValue([]);
       const { getUser } = await import("~/server/lib/getUser");
       const { getQuery } = await import("h3");
       (getUser as any).mockReturnValue({ userId: 1 });
       (getQuery as any).mockReturnValue({ accountId: ACCOUNT_ID });
 
       await handler({});
-      expect(prismaMock.category.findMany).toHaveBeenCalledWith(
+      expect(prisma.category.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ accountId: ACCOUNT_ID }),
         }),
@@ -194,8 +159,8 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         isArchived: false,
         updatedAt: new Date(),
       };
-      prismaMock.account.findFirstOrThrow.mockResolvedValue({ id: ACCOUNT_ID });
-      prismaMock.category.create.mockResolvedValue(created);
+      prisma.account.findFirstOrThrow.mockResolvedValue({ id: ACCOUNT_ID });
+      prisma.category.create.mockResolvedValue(created);
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
       (readBody as any).mockResolvedValue({
@@ -206,7 +171,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
 
       const out = await handler({});
       expect((out as { name: string }).name).toBe("New");
-      expect(prismaMock.category.create).toHaveBeenCalled();
+      expect(prisma.category.create).toHaveBeenCalled();
     });
   });
 
@@ -227,8 +192,8 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         isArchived: false,
         updatedAt: new Date(),
       };
-      prismaMock.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
-      prismaMock.category.update.mockResolvedValue(updated);
+      prisma.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
+      prisma.category.update.mockResolvedValue(updated);
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
       (readBody as any).mockResolvedValue({ id: CAT_ID, name: "Renamed" });
@@ -256,9 +221,9 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         isArchived: false,
         updatedAt: new Date(),
       };
-      prismaMock.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
-      prismaMock.registerEntry.count.mockResolvedValue(0);
-      prismaMock.category.delete.mockResolvedValue(deleted);
+      prisma.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
+      prisma.registerEntry.count.mockResolvedValue(0);
+      prisma.category.delete.mockResolvedValue(deleted);
       const { getUser } = await import("~/server/lib/getUser");
       const { getQuery } = await import("h3");
       (getUser as any).mockReturnValue({ userId: 1 });
@@ -266,7 +231,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
       (globalThis as any).getQuery.mockReturnValue({ id: CAT_ID });
 
       const out = await handler({});
-      expect(prismaMock.category.delete).toHaveBeenCalled();
+      expect(prisma.category.delete).toHaveBeenCalled();
       expect((out as { id: string }).id).toBe(CAT_ID);
     });
 
@@ -279,9 +244,9 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         isArchived: true,
         updatedAt: new Date(),
       };
-      prismaMock.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
-      prismaMock.registerEntry.count.mockResolvedValue(3);
-      prismaMock.category.update.mockResolvedValue(archived);
+      prisma.category.findFirstOrThrow.mockResolvedValue({ id: CAT_ID });
+      prisma.registerEntry.count.mockResolvedValue(3);
+      prisma.category.update.mockResolvedValue(archived);
       const { getUser } = await import("~/server/lib/getUser");
       const { getQuery } = await import("h3");
       (getUser as any).mockReturnValue({ userId: 1 });
@@ -289,7 +254,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
       (globalThis as any).getQuery.mockReturnValue({ id: CAT_ID });
 
       await handler({});
-      expect(prismaMock.category.update).toHaveBeenCalledWith({
+      expect(prisma.category.update).toHaveBeenCalledWith({
         where: { id: CAT_ID },
         data: { isArchived: true },
       });
@@ -331,7 +296,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
 
     it("lists snapshots", async () => {
       const d = new Date("2024-01-02T00:00:00.000Z");
-      prismaMock.accountSnapshot.findMany.mockResolvedValue([
+      prisma.accountSnapshot.findMany.mockResolvedValue([
         { id: "s1", createdAt: d },
       ]);
       const { getUser } = await import("~/server/lib/getUser");
@@ -373,13 +338,13 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
           userAccounts: [{ userId: 99 }],
         },
       };
-      prismaMock.accountRegister.findFirst
+      prisma.accountRegister.findFirst
         .mockResolvedValueOnce(source as any)
         .mockResolvedValueOnce(target as any);
-      prismaMock.savingsGoal.aggregate.mockResolvedValue({
+      prisma.savingsGoal.aggregate.mockResolvedValue({
         _max: { sortOrder: 0 },
       });
-      prismaMock.savingsGoal.create.mockResolvedValue({
+      prisma.savingsGoal.create.mockResolvedValue({
         id: 5,
         accountId: ACCOUNT_ID,
         budgetId: 1,
@@ -410,7 +375,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     });
 
     it("404 when source register missing", async () => {
-      prismaMock.accountRegister.findFirst
+      prisma.accountRegister.findFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null);
       const { readBody } = await import("h3");
@@ -442,7 +407,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     });
 
     it("rejects when entry missing", async () => {
-      prismaMock.registerEntry.findFirst.mockResolvedValue(null);
+      prisma.registerEntry.findFirst.mockResolvedValue(null);
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
       (readBody as any).mockResolvedValue({
@@ -456,7 +421,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     });
 
     it("rejects when not plaid-imported", async () => {
-      prismaMock.registerEntry.findFirst.mockResolvedValue({
+      prisma.registerEntry.findFirst.mockResolvedValue({
         id: "e1",
         plaidId: null,
         description: "Cash",
@@ -475,14 +440,14 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
     });
 
     it("matches and updates entry", async () => {
-      prismaMock.registerEntry.findFirst.mockResolvedValue({
+      prisma.registerEntry.findFirst.mockResolvedValue({
         id: "entry-1",
         plaidId: "plaid-x",
         description: "Coffee Shop",
         accountRegisterId: 5,
       });
-      prismaMock.reoccurrence.findFirstOrThrow.mockResolvedValue({ id: 2 });
-      prismaMock.registerEntry.findUniqueOrThrow.mockResolvedValue({
+      prisma.reoccurrence.findFirstOrThrow.mockResolvedValue({ id: 2 });
+      prisma.registerEntry.findUniqueOrThrow.mockResolvedValue({
         id: "entry-1",
         accountRegisterId: 5,
         description: "Coffee Shop",
@@ -492,7 +457,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
         isPending: false,
         hasBalanceReCalc: true,
       });
-      prismaMock.accountRegister.findUniqueOrThrow.mockResolvedValue({
+      prisma.accountRegister.findUniqueOrThrow.mockResolvedValue({
         accountId: ACCOUNT_ID,
       });
       const { readBody } = await import("h3");
@@ -507,7 +472,7 @@ describe("categories, snapshots, savings-goal, match-reoccurrence API", () => {
       (getUser as any).mockReturnValue({ userId: 1 });
 
       await handler({});
-      expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(addRecalculateJob).toHaveBeenCalledWith({ accountId: ACCOUNT_ID });
     });
   });

@@ -20,31 +20,10 @@ vi.mock("~/schema/zod", () => ({
 }));
 
 // Mock Prisma client
-vi.mock("~/server/clients/prismaClient", () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    country: {
-      findUnique: vi.fn(),
-    },
-    account: {
-      create: vi.fn(),
-    },
-    budget: {
-      create: vi.fn(),
-    },
-    userAccount: {
-      create: vi.fn(),
-    },
-    accountRegister: {
-      create: vi.fn(),
-    },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock("~/server/clients/prismaClient", async () => {
+  const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
+  return { prisma: createMockPrisma() };
+});
 
 // Mock services
 const mockHashService = {
