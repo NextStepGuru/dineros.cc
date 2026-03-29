@@ -12,7 +12,6 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
-import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 import type { TableColumn } from "@nuxt/ui";
 import type {
   AccountRegister,
@@ -41,7 +40,8 @@ const BaseIconBtn = resolveComponent("BaseIconButton");
 const overlay = useOverlay();
 const route = useRoute();
 const toast = useToast();
-const selectedTab = ref("future");
+const { workflowMode, defaultRegisterTab } = useWorkflowMode();
+/** `defaultRegisterTab`: future/past API direction from header workflow. */
 const { todayISOString } = useToday();
 
 definePageMeta({
@@ -157,14 +157,6 @@ const hasReoccurrences = computed(
 
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 
-const showRegisterOnboarding = computed(() => {
-  if (snapshotMode.isSnapshotMode.value) return false;
-  if (onboardingDismissed.value) return false;
-  if (!listStore.getAccountRegisters.length) return false;
-  if (isInitialLoading.value) return false;
-  return tableEntries.value.length === 0;
-});
-
 onBeforeMount(async () => {
   const regs = listStore.getAccountRegisters;
   if (regs.length === 0) {
@@ -186,11 +178,26 @@ const accountRegisterId = ref<number>(
     : Number.parseInt(String(route.params.id), 10),
 );
 
-// Watch for changes to accountRegisterId and navigate to the new route
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id === "" || Array.isArray(id)) return;
+    const n = Number.parseInt(String(id), 10);
+    if (!Number.isNaN(n) && n > 0 && n !== accountRegisterId.value) {
+      accountRegisterId.value = n;
+    }
+  },
+);
+
 watch(accountRegisterId, async (newId) => {
-  if (newId) {
-    await navigateTo(`/register/${newId}`);
-  }
+  if (!newId) return;
+  const current = route.params.id;
+  const cur =
+    current === "" || Array.isArray(current)
+      ? 0
+      : Number.parseInt(String(current), 10);
+  if (newId === cur) return;
+  await navigateTo(`/register/${newId}`);
 });
 
 watch(authStore, async () => {
@@ -216,9 +223,7 @@ const currentSkip = ref(0);
 const pageSize = 500; // Number of records per page
 const hasMoreData = ref(true);
 const isLoadingMore = ref(false);
-const isInitialLoading = ref(false);
 
-// Progressive loading: Quick load first (50 records), then full load
 const accountEntries = shallowRef<{
   entries: RegisterEntry[];
   lowest: RegisterEntry;
@@ -226,58 +231,88 @@ const accountEntries = shallowRef<{
   isPartialLoad?: boolean;
 }>({ entries: [], lowest: {} as RegisterEntry, highest: {} as RegisterEntry });
 
-const isQuickLoading = ref(false);
-const isFullLoading = ref(false);
-const isPartialLoad = ref(false);
 const isRefreshLoading = ref(false);
 
-// Direct reactive reference for table data
 const tableEntries = ref<RegisterEntry[]>([]);
 const tableKey = ref(0); // Force table re-render
 
-// Load initial data
-const loadInitialEntries = async () => {
-  isInitialLoading.value = true;
-  currentSkip.value = 0;
-  hasMoreData.value = true;
-  tableEntries.value = [];
-  try {
-    if (snapshotMode.isSnapshotMode.value) {
-      const rsid =
-        snapshotMode.registerSnapshotIdByRegisterId.value[
-          accountRegisterId.value
-        ];
-      if (!rsid) {
-        accountEntries.value = {
-          entries: [],
-          lowest: {} as RegisterEntry,
-          highest: {} as RegisterEntry,
-        };
-        hasMoreData.value = false;
-        tableKey.value++;
-        return;
-      }
-      const data = await (useNuxtApp().$api as typeof $fetch)<{
+type RegisterPagePayload = {
+  entries: RegisterEntry[];
+  lowest: RegisterEntry;
+  highest: RegisterEntry;
+  isPartialLoad?: boolean;
+  hasMore: boolean;
+  currentSkip: number;
+};
+
+async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
+  const id = accountRegisterId.value;
+  if (!id || Number.isNaN(id)) {
+    return {
+      entries: [],
+      lowest: {} as RegisterEntry,
+      highest: {} as RegisterEntry,
+      hasMore: false,
+      currentSkip: 0,
+    };
+  }
+
+  const $fetchApi = useNuxtApp().$api as typeof $fetch;
+
+  if (snapshotMode.isSnapshotMode.value) {
+    const rsid =
+      snapshotMode.registerSnapshotIdByRegisterId.value[id];
+    if (!rsid) {
+      return {
+        entries: [],
+        lowest: {} as RegisterEntry,
+        highest: {} as RegisterEntry,
+        hasMore: false,
+        currentSkip: 0,
+      };
+    }
+    try {
+      const data = await $fetchApi<{
         entries: RegisterEntry[];
         lowest?: RegisterEntry;
         highest?: RegisterEntry;
       }>(`/api/snapshot-register/${rsid}`);
-      if (data) {
-        accountEntries.value = {
-          entries: [...(data.entries || [])],
-          lowest: data.lowest ?? ({} as RegisterEntry),
-          highest: data.highest ?? ({} as RegisterEntry),
+      if (!data) {
+        return {
+          entries: [],
+          lowest: {} as RegisterEntry,
+          highest: {} as RegisterEntry,
+          hasMore: false,
+          currentSkip: 0,
         };
-        tableEntries.value = data.entries ? [...data.entries] : [];
-        hasMoreData.value = false;
-        currentSkip.value = data.entries?.length || 0;
-        tableKey.value++;
       }
-      return;
+      const entries = [...(data.entries || [])];
+      return {
+        entries,
+        lowest: data.lowest ?? ({} as RegisterEntry),
+        highest: data.highest ?? ({} as RegisterEntry),
+        hasMore: false,
+        currentSkip: entries.length,
+      };
+    } catch (error) {
+      console.error("Initial load failed:", error);
+      return {
+        entries: [],
+        lowest: {} as RegisterEntry,
+        highest: {} as RegisterEntry,
+        hasMore: false,
+        currentSkip: 0,
+      };
     }
+  }
 
-    // use $api (not useAPI) so request resolves; useAPI/useFetch was hanging after nav (Nuxt 4)
-    const data = await (useNuxtApp().$api as typeof $fetch)<{
+  const reg = registersForRegisterPage.value.find((r) => r.id === id);
+  if (!reg?.accountId) {
+    return null;
+  }
+
+  try {
+    const data = await $fetchApi<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
@@ -285,39 +320,96 @@ const loadInitialEntries = async () => {
       hasMore: boolean;
     }>("/api/register", {
       query: {
-        accountId: registersForRegisterPage.value.find(
-          (r) => r.id === accountRegisterId.value,
-        )?.accountId,
-        accountRegisterId: accountRegisterId.value,
-        direction: selectedTab.value,
+        accountId: reg.accountId,
+        accountRegisterId: id,
+        direction: defaultRegisterTab.value,
         loadMode: "full",
         skip: 0,
         take: pageSize,
       },
     });
 
-    if (data) {
-      // Update both accountEntries and tableEntries directly
-      accountEntries.value = {
-        entries: [...(data.entries || [])],
-        lowest: data.lowest,
-        highest: data.highest,
-        isPartialLoad: data.isPartialLoad,
-      };
+    if (!data) return null;
 
-      tableEntries.value = data.entries ? [...data.entries] : [];
-      hasMoreData.value = data.hasMore || false;
-      currentSkip.value = data.entries?.length || 0;
-
-      // Force table re-render by updating key
-      tableKey.value++;
-    }
+    const entries = [...(data.entries || [])];
+    return {
+      entries,
+      lowest: data.lowest,
+      highest: data.highest,
+      isPartialLoad: data.isPartialLoad,
+      hasMore: data.hasMore || false,
+      currentSkip: entries.length,
+    };
   } catch (error) {
     console.error("Initial load failed:", error);
-  } finally {
-    isInitialLoading.value = false;
+    return null;
   }
-};
+}
+
+const registerInitialDataKey = computed(() => {
+  const rid = accountRegisterId.value;
+  const reg = registersForRegisterPage.value.find((r) => r.id === rid);
+  const snapId = snapshotMode.isSnapshotMode.value
+    ? snapshotMode.registerSnapshotIdByRegisterId.value[rid] ?? 0
+    : 0;
+  return [
+    "register-initial",
+    authStore.getBudgetId,
+    rid,
+    defaultRegisterTab.value,
+    snapshotMode.isSnapshotMode.value ? "snap" : "live",
+    snapId,
+    reg?.accountId ?? 0,
+  ].join(":");
+});
+
+const {
+  data: registerPageData,
+  pending: registerPagePending,
+  refresh: refreshRegisterPageData,
+} = await useAsyncData(
+  () => registerInitialDataKey.value,
+  fetchRegisterPagePayload,
+  { watch: [registerInitialDataKey] },
+);
+
+function applyRegisterPageData(payload: RegisterPagePayload | null) {
+  if (payload == null) return;
+  accountEntries.value = {
+    entries: [...payload.entries],
+    lowest: payload.lowest,
+    highest: payload.highest,
+    isPartialLoad: payload.isPartialLoad,
+  };
+  tableEntries.value = [...payload.entries];
+  hasMoreData.value = payload.hasMore;
+  currentSkip.value = payload.currentSkip;
+  tableKey.value++;
+}
+
+watch(registerPageData, (payload) => applyRegisterPageData(payload), {
+  immediate: true,
+});
+
+watch(registerInitialDataKey, (_key, oldKey) => {
+  if (oldKey === undefined) return;
+  currentSkip.value = 0;
+  hasMoreData.value = true;
+  tableEntries.value = [];
+  accountEntries.value = {
+    entries: [],
+    lowest: {} as RegisterEntry,
+    highest: {} as RegisterEntry,
+  };
+});
+
+const showRegisterOnboarding = computed(() => {
+  if (snapshotMode.isSnapshotMode.value) return false;
+  if (onboardingDismissed.value) return false;
+  if (!listStore.getAccountRegisters.length) return false;
+  if (registerPagePending.value) return false;
+  return tableEntries.value.length === 0;
+});
 
 // Load more data for infinite scrolling
 const loadMoreEntries = async () => {
@@ -338,7 +430,7 @@ const loadMoreEntries = async () => {
           (r) => r.id === accountRegisterId.value,
         )?.accountId,
         accountRegisterId: accountRegisterId.value,
-        direction: selectedTab.value,
+        direction: defaultRegisterTab.value,
         loadMode: "full",
         skip: currentSkip.value,
         take: pageSize,
@@ -376,33 +468,31 @@ const loadMoreEntries = async () => {
   }
 };
 
-// Handle scroll events for infinite scrolling
-const handleScroll = (event?: Event) => {
-  const tableElement =
-    (event?.target as HTMLElement | null) ??
-    registerTableViewportEl.value ??
-    tableRef.value;
-  if (!tableElement) return;
-
-  const scrollTop = tableElement.scrollTop;
-  const scrollHeight = tableElement.scrollHeight;
-  const clientHeight = tableElement.clientHeight;
-
-  // Load more when user scrolls to 80% of the content
+/** Load more when the window is scrolled most of the way through the document. */
+function handleWindowScrollForInfiniteLoad() {
+  if (!import.meta.client) return;
+  const doc = document.documentElement;
+  const scrollTop = window.scrollY ?? doc.scrollTop;
+  const scrollHeight = doc.scrollHeight;
+  const clientHeight = window.innerHeight;
   if (
     scrollTop + clientHeight >= scrollHeight * 0.8 &&
     hasMoreData.value &&
     !isLoadingMore.value
   ) {
-    loadMoreEntries();
+    void loadMoreEntries();
   }
-};
+}
 
-// Simplified: just load initial data directly
+watch([() => tableEntries.value.length, hasMoreData], () => {
+  if (!import.meta.client) return;
+  void nextTick(() => handleWindowScrollForInfiniteLoad());
+});
+
 const refreshAccountEntries = async () => {
   isRefreshLoading.value = true;
   try {
-    await loadInitialEntries();
+    await refreshRegisterPageData();
   } finally {
     isRefreshLoading.value = false;
   }
@@ -522,30 +612,11 @@ function openMatchToRecurrence(entry: RegisterEntry) {
   matchToRecurrenceModal.open(payload);
 }
 
-// Computed status for compatibility
 const accountEntriesStatus = computed(() => {
-  if (isQuickLoading.value) return "pending";
-  if (isInitialLoading.value && !tableEntries.value.length) return "pending";
+  if (registerPagePending.value) return "pending";
   if (tableEntries.value.length > 0) return "success";
   return "idle";
 });
-
-// Trigger loading when accountRegisterId or selectedTab changes (or snapshot / mapping)
-watch(
-  [
-    accountRegisterId,
-    selectedTab,
-    () => snapshotMode.isSnapshotMode.value,
-    () =>
-      snapshotMode.registerSnapshotIdByRegisterId.value[
-        accountRegisterId.value
-      ] ?? 0,
-  ],
-  () => {
-    void refreshAccountEntries();
-  },
-  { immediate: true },
-);
 
 const lowestEntry = computed(() => accountEntries?.value?.lowest);
 const highestEntry = computed(() => accountEntries?.value?.highest);
@@ -562,36 +633,21 @@ const currentType = computed(() =>
   ),
 );
 
-// Determine if any data is still loading
 const isLoading = computed(
-  () => isQuickLoading.value || isFullLoading.value || isInitialLoading.value,
+  () => registerPagePending.value || isRefreshLoading.value,
 );
 
-// Add scroll event listener when table is mounted
 onMounted(() => {
-  updateRegisterTableViewportMaxHeight();
-  window.addEventListener("resize", updateRegisterTableViewportMaxHeight);
-  registerResizeObserver = new ResizeObserver(() => {
-    updateRegisterTableViewportMaxHeight();
-  });
-  if (registerSectionEl.value) {
-    registerResizeObserver.observe(registerSectionEl.value);
-  }
-  if (registerTabsEl.value) {
-    registerResizeObserver.observe(registerTabsEl.value);
+  if (import.meta.client) {
+    window.addEventListener("scroll", handleWindowScrollForInfiniteLoad, {
+      passive: true,
+    });
   }
 });
 
-// Clean up scroll event listener
 onUnmounted(() => {
-  window.removeEventListener("resize", updateRegisterTableViewportMaxHeight);
-  if (registerResizeObserver) {
-    registerResizeObserver.disconnect();
-    registerResizeObserver = null;
-  }
-  if (registerViewportFrameId != null) {
-    cancelAnimationFrame(registerViewportFrameId);
-    registerViewportFrameId = null;
+  if (import.meta.client) {
+    window.removeEventListener("scroll", handleWindowScrollForInfiniteLoad);
   }
 });
 
@@ -913,14 +969,6 @@ function scrollToLowestBalance() {
   }
 }
 
-function isSelectedTab(tab: string) {
-  const isActive =
-    "relative z-20 cursor-pointer px-5 pt-1 pb-2 text-xs text-primary text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 rounded-b-lg border border-primary/40 border-t-0 bg-primary/12 shadow-sm focus:outline-none translate-y-[2px]";
-  const isInactive =
-    "relative z-10 cursor-pointer px-5 pt-1 pb-2 text-xs text-muted/80 text-left rtl:text-right font-semibold [&:has([role=checkbox])]:pe-0 rounded-b-lg border border-default/70 border-t-0 bg-muted/20 opacity-70 shadow-sm focus:outline-none hover:opacity-90";
-  return selectedTab.value === tab ? isActive : isInactive;
-}
-
 const globalFilter = ref("");
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 const tableRef = ref<HTMLElement | null>(null);
@@ -1029,96 +1077,9 @@ defineShortcuts({
 const isRecalcAccountLoading = ref(false);
 const showShortcuts = ref(false);
 const recalcLiveMessage = ref("");
-const registerSectionEl = ref<HTMLElement | null>(null);
-const registerTableViewportEl = ref<HTMLElement | null>(null);
-const registerOnboardingViewportEl = ref<HTMLElement | null>(null);
-const registerTabsEl = ref<HTMLElement | null>(null);
-const registerTableViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)",
-);
-const registerOnboardingMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)",
-);
-const registerTableViewportAvailablePx = ref<number | null>(null);
-const registerOnboardingViewportAvailablePx = ref<number | null>(null);
-let registerResizeObserver: ResizeObserver | null = null;
-let registerViewportFrameId: number | null = null;
-
-function updateRegisterTableViewportMaxHeight() {
-  if (registerViewportFrameId != null) {
-    cancelAnimationFrame(registerViewportFrameId);
-  }
-
-  registerViewportFrameId = requestAnimationFrame(() => {
-    registerViewportFrameId = null;
-    const tabsHeight = registerTabsEl.value?.offsetHeight ?? 0;
-    const bottomSpacing = 20;
-    if (registerTableViewportEl.value) {
-      const tableTop =
-        registerTableViewportEl.value.getBoundingClientRect().top ?? 0;
-      const available = Math.max(
-        220,
-        Math.floor(window.innerHeight - tableTop - tabsHeight - bottomSpacing),
-      );
-      if (
-        !shouldSkipViewportTableHeightChange(
-          available,
-          registerTableViewportAvailablePx.value,
-        )
-      ) {
-        registerTableViewportAvailablePx.value = available;
-        registerTableViewportMaxHeight.value = `${available}px`;
-      }
-    }
-    if (registerOnboardingViewportEl.value) {
-      const top =
-        registerOnboardingViewportEl.value.getBoundingClientRect().top ?? 0;
-      const available = Math.max(
-        220,
-        Math.floor(window.innerHeight - top - tabsHeight - bottomSpacing),
-      );
-      if (
-        !shouldSkipViewportTableHeightChange(
-          available,
-          registerOnboardingViewportAvailablePx.value,
-        )
-      ) {
-        registerOnboardingViewportAvailablePx.value = available;
-        registerOnboardingMaxHeight.value = `${available}px`;
-      }
-    }
-  });
-}
-
-watch([accountRegisterId, selectedTab], async () => {
-  await nextTick();
-  updateRegisterTableViewportMaxHeight();
-});
-
-watch(
-  () => tableEntries.value.length,
-  async () => {
-    await nextTick();
-    updateRegisterTableViewportMaxHeight();
-  },
-);
-
-watch(showRegisterOnboarding, async (on) => {
-  if (on) {
-    await nextTick();
-    updateRegisterTableViewportMaxHeight();
-  }
-});
-
-watch(showShortcuts, async () => {
-  if (showRegisterOnboarding.value) {
-    await nextTick();
-    updateRegisterTableViewportMaxHeight();
-  }
-});
-
 async function recalcAccount() {
   if (snapshotMode.isSnapshotMode.value) return;
+  if (workflowMode.value === "reconciliation") return;
   if (isRecalcAccountLoading.value) return; // Prevent multiple simultaneous calls
 
   isRecalcAccountLoading.value = true;
@@ -1166,7 +1127,7 @@ async function recalcAccount() {
 </script>
 
 <template lang="pug">
-  section.mx-2(ref="registerSectionEl" class="min-w-0")
+  section.mx-2(class="min-w-0")
     h1(class="sr-only") Register
     div(
       class="sr-only"
@@ -1183,52 +1144,35 @@ async function recalcAccount() {
         .flex.flex-wrap.gap-2.items-center
           span Read-only projected register as captured.
           UButton(size="xs" variant="soft" @click="exitSnapshotView") Exit snapshot
+    UAlert(
+      v-else-if="workflowMode === 'forecasting'"
+      color="primary"
+      variant="subtle"
+      class="mt-4"
+      title="Forecasting"
+    )
+      template(#description)
+        span.frog-text-muted Projected entries and balances — use Recalc to refresh the forecast. Choose Reconcile in the header for cleared history and statement periods.
+    UAlert(
+      v-else
+      color="neutral"
+      variant="subtle"
+      class="mt-4"
+      title="Reconciliation"
+    )
+      template(#description)
+        .flex.flex-wrap.gap-2.items-center
+          span.frog-text-muted This view shows cleared and reconciled activity. Open the workspace to match your bank statement.
+          UButton(
+            size="xs"
+            variant="soft"
+            icon="i-lucide-calculator"
+            :to="`/reconciliation/${accountRegisterId}`") Reconciliation workspace
+    //- Account picker when there is no table yet (toolbar lives in thead once rows load)
     .flex(
-      v-if="tableEntries.length > 0 || showAccountSelector"
-      class="mt-4 gap-2 items-center flex-wrap xl:flex-nowrap")
-      div(v-if="tableEntries.length > 0" class="min-w-0 flex-1 flex items-center gap-2")
-        RegisterListToolbar(
-          v-model:global-filter="globalFilter"
-          v-model:show-shortcuts="showShortcuts"
-          :show-add="!isSnapshotMode"
-          :show-refresh="!isSnapshotMode"
-          :refresh-loading="isRefreshLoading"
-          filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
-          @add="handleAddEntry"
-          @refresh="refreshAccountEntries"
-        )
-          template(#filter)
-            FiltersCombinedGlobalCategoryFilter(
-              ref="combinedTableFilterRef"
-              v-model:global-filter="globalFilter"
-              v-model:category-filter="categoryFilter"
-              :category-items="categoryFilterSelectItems"
-              filter-input-id="search"
-              input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
-            )
-          template(#middle)
-            UDropdownMenu(:items="snapshotMenuItems")
-              UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
-                BaseIconButton(
-                  icon="i-lucide-camera"
-                  :active="!!isSnapshotMode"
-                  :title="`Snapshot view: ${selectedSnapshotLabel}`"
-                  :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
-                )
-            UTooltip(v-if="!isSnapshotMode" text="Recalculate forecast" :delay-duration="150")
-              BaseIconButton(
-                icon="i-lucide-calculator"
-                title="Recalculate forecast"
-                aria-label="Recalculate forecast"
-                @click="recalcAccount()"
-                :loading="isRecalcAccountLoading"
-                :aria-busy="isRecalcAccountLoading"
-              )
-
-      div(
-        v-if="showAccountSelector || (lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId) || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
-        class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
-      )
+      v-if="showAccountSelector && tableEntries.length === 0"
+      class="mt-4 flex-wrap gap-2 items-center justify-end")
+      div(class="basis-full md:basis-auto shrink min-w-0 flex flex-col items-end gap-1")
         div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
           div(class="text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
           ClientOnly
@@ -1254,7 +1198,6 @@ async function recalcAccount() {
                   span(class="truncate min-w-0") {{ selectedAccountOption.label }}
                   span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                 span(v-else) …
-
         div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
           span The lowest balance of&nbsp;
           b(@click="scrollToLowestBalance" class="cursor-pointer frog-link")
@@ -1274,7 +1217,7 @@ async function recalcAccount() {
         li Add entry: ⌘ + A
         li Open filters &amp; focus search: ⌘ + F
         li Refresh register: ⌘ + R
-        li Recalculate forecast: ⌘ + Shift + R
+        li(v-if="workflowMode === 'forecasting'") Recalculate forecast: ⌘ + Shift + R
 
     UCard(v-if="listStore.getAccountRegisters.length === 0" class="my-4")
       template(#header)
@@ -1282,14 +1225,10 @@ async function recalcAccount() {
       p(class="frog-text-muted mb-4") Create your first account register before adding transactions and forecasts.
       UButton(to="/account-registers" color="primary" size="sm") Add account
 
-    //- Centered first-run checklist (scrolls inside panel only; page does not scroll)
     div(
       v-else-if="showRegisterOnboarding"
-      ref="registerOnboardingViewportEl"
-      class="w-full flex justify-center min-h-0 overflow-hidden"
-      :style="{ height: registerOnboardingMaxHeight, maxHeight: registerOnboardingMaxHeight }"
-    )
-      div(class="w-full max-w-lg h-full min-h-0 overflow-y-auto overscroll-y-contain py-2 px-1")
+      class="w-full flex justify-center py-2 px-1")
+      div(class="w-full max-w-lg")
         UCard(class="w-full frog-surface-elevated")
           template(#header)
             div(class="text-center space-y-1")
@@ -1344,127 +1283,225 @@ async function recalcAccount() {
               UButton(size="xs" variant="ghost" @click="dismissRegisterOnboarding") Skip checklist
               UButton(size="xs" color="info" @click="handleAddEntry") Add entry
 
-    //- Skeleton loading state
+    //- Skeleton loading state (shell matches loaded register-table-outer + merged thead)
     template(v-else-if="isLoading && tableEntries.length === 0")
-      //- Toolbar/loading controls skeleton (above table)
-      div(class="mt-4 mb-2 p-1")
-        div(class="flex flex-wrap xl:flex-nowrap items-start gap-3")
-          div(class="min-w-0 flex-1 flex flex-wrap items-center gap-2")
-            USkeleton(class="h-9 w-24 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-          div(class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-2")
-            div(class="flex items-center gap-2")
-              USkeleton(class="h-4 w-28")
-              USkeleton(class="h-7 w-36 rounded-md")
-            USkeleton(class="h-4 w-56")
+      div(class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
+        div(class="flex flex-col min-h-0")
+          div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+            div(class="min-w-0 flex-1 flex items-center gap-2")
+              USkeleton(class="h-9 grow min-w-32 sm:max-w-48 rounded-md")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+            div(class="basis-full xl:basis-auto xl:ml-auto shrink min-w-0 flex flex-col items-end gap-2")
+              div(class="flex items-center gap-2")
+                USkeleton(class="h-4 w-28")
+                USkeleton(class="h-7 w-36 rounded-md")
+              USkeleton(class="h-4 w-56")
+          div(
+            class="register-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+          )
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+              USkeleton(class="h-4 w-2 mx-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+              USkeleton(class="h-4 w-20")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 hidden md:block")
+              USkeleton(class="h-4 w-16")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+          div(
+            v-for="i in 25"
+            :key="`reg-skel-${i}`"
+            class="register-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+          )
+            div(class="p-2 sm:p-4 min-w-0 flex justify-center")
+              USkeleton(class="h-4 w-2")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-20")
+            div(class="p-2 sm:p-4 min-w-0")
+              USkeleton(class="h-4 max-w-full")
+            div(class="p-2 sm:p-4 min-w-0 hidden md:flex md:items-center")
+              USkeleton(class="h-4 w-24")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-16")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-20")
 
-      //- Table skeleton
-      div(ref="registerTableViewportEl" class="flex-1 overflow-hidden rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }")
-        //- Table header skeleton
-        div(class="flex border-b frog-border p-4")
-          div(class="w-7 shrink-0")
-            USkeleton(class="h-4 w-2 mx-auto")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-16")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-24")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-20 ml-auto")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-20 ml-auto")
-
-        //- Table rows skeleton
-        div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
-          div(class="w-7 shrink-0")
-            USkeleton(class="h-4 w-2 mx-auto")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-20")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-32")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-16 ml-auto")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-16 ml-auto")
-
-    div(v-else-if="tableEntries.length > 0" ref="registerTableViewportEl" class="flex-1 min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-md border border-primary/40" :style="{ maxHeight: registerTableViewportMaxHeight }" @scroll="handleScroll")
-      UAlert(
-        v-if="registerRowsForTable.length === 0"
-        class="mb-2"
-        color="neutral"
-        variant="subtle"
-        title="No rows match this category filter"
-        description="Choose All categories, Uncategorized, or another category.")
+    div(v-else-if="tableEntries.length > 0" class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
       table(
-        v-if="registerRowsForTable.length > 0"
         ref="tableRef"
         :key="tableKey"
-        class="w-full min-w-full text-xs sm:text-sm border-collapse")
-        caption(class="sr-only") Register entries
-        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+        aria-label="Register entries"
+        class="register-main-table w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm")
+        colgroup
+          col(style="width:3%")
+          col(style="width:11%")
+          col(style="width:36%")
+          col.register-col-category(style="width:17%")
+          col(style="width:14%")
+          col(style="width:19%")
+        thead.register-sticky-thead
           tr
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold w-7")
-              span(class="sr-only") Import review
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Date
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold") Description
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Category
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Amount
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Balance
+            th(
+              colspan="6"
+              scope="colgroup"
+              class="register-table-controls-th register-thead-sticky-th sticky top-(--ui-header-height) z-38 overflow-hidden rounded-t-md border-b border-default bg-default/95 backdrop-blur-md supports-backdrop-filter:bg-default/90 p-0 align-top font-normal")
+              div.register-sticky-head
+                  div(class="flex flex-col min-h-0")
+                    div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+                      div(class="min-w-0 flex-1 flex items-center gap-2")
+                        RegisterListToolbar(
+                          v-model:global-filter="globalFilter"
+                          v-model:show-shortcuts="showShortcuts"
+                          :show-add="!isSnapshotMode"
+                          :show-refresh="!isSnapshotMode"
+                          :refresh-loading="isRefreshLoading"
+                          filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+                          @add="handleAddEntry"
+                          @refresh="refreshAccountEntries"
+                        )
+                          template(#filter)
+                            FiltersCombinedGlobalCategoryFilter(
+                              ref="combinedTableFilterRef"
+                              v-model:global-filter="globalFilter"
+                              v-model:category-filter="categoryFilter"
+                              :category-items="categoryFilterSelectItems"
+                              filter-input-id="register-table-filter"
+                              input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+                            )
+                          template(#middle)
+                            UDropdownMenu(:items="snapshotMenuItems")
+                              UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+                                BaseIconButton(
+                                  icon="i-lucide-camera"
+                                  :active="!!isSnapshotMode"
+                                  :title="`Snapshot view: ${selectedSnapshotLabel}`"
+                                  :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+                                )
+                            UTooltip(v-if="!isSnapshotMode && workflowMode === 'forecasting'" text="Recalculate forecast" :delay-duration="150")
+                              BaseIconButton(
+                                icon="i-lucide-calculator"
+                                title="Recalculate forecast"
+                                aria-label="Recalculate forecast"
+                                @click="recalcAccount()"
+                                :loading="isRecalcAccountLoading"
+                                :aria-busy="isRecalcAccountLoading"
+                              )
+                      div(
+                        v-if="showAccountSelector || (lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId) || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
+                        class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
+                      )
+                        div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
+                          div(class="text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
+                          ClientOnly
+                            USelectMenu(
+                              v-model="accountRegisterId"
+                              value-key="id"
+                              size="xs"
+                              class="w-44 sm:w-52 md:w-56 my-0 max-w-[38vw] sm:max-w-none"
+                              placeholder="Select an Account"
+                              :items="accountRegisterOptionsWithBalance"
+                              :search-input="false")
+                              template(#default)
+                                span(class="inline-flex items-center gap-2 min-w-0 max-w-full text-default")
+                                  template(v-if="selectedAccountOption")
+                                    span(class="truncate min-w-0") {{ selectedAccountOption.label }}
+                                    span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                                  span(v-else) …
+                              template(#item-trailing="{ item }")
+                                span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
+                            template(#fallback)
+                              span(class="inline-flex items-center gap-2 min-w-0 w-full md:w-64 my-0 text-sm text-default")
+                                template(v-if="selectedAccountOption")
+                                  span(class="truncate min-w-0") {{ selectedAccountOption.label }}
+                                  span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                                span(v-else) …
+                        div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
+                          span The lowest balance of&nbsp;
+                          b(@click="scrollToLowestBalance" class="cursor-pointer frog-link")
+                            DollarFormat(:amount="lowestEntry.balance")
+                            | &nbsp;
+                          span &nbsp;on
+                          b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
+                        div(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
+                          span The loan will be paid off on
+                          b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
+                    div.register-inner-head-grid(
+                      class="w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default")
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left border-b border-default min-w-0")
+                        span(class="sr-only") Import review
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Date
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left border-b border-default min-w-0") Description
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left whitespace-nowrap border-b border-default min-w-0 hidden md:block") Category
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Amount
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Balance
         tbody
-          tr(
-            v-for="(entry, index) in registerRowsForTable"
-            :key="entry.id ?? `reg-entry-${index}-${entry.createdAt}`"
-            :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700`")
-            td(class="p-2 sm:p-4 border-b border-default w-7")
-              .flex.justify-center.w-7
-                UTooltip(
-                  v-if="isPlaidImportAwaitingReview(entry)"
-                  text="Bank import not reviewed yet. Clear, reconcile, or match to a recurrence using the row actions."
-                  :delay-duration="200")
-                  span(class="inline-flex cursor-default items-center justify-center p-1.5 -m-1 rounded-sm")
-                    span(
-                      class="inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0"
-                      role="img"
-                      aria-label="Bank import not reviewed yet.")
-                span(v-else class="inline-block size-2 shrink-0")
-            td(class="p-2 sm:p-4 border-b border-default text-right tabular-nums whitespace-nowrap") {{ formatDate(entry.createdAt) }}
-            td(class="p-2 sm:p-4 border-b border-default")
-              .flex.items-center.gap-1.min-w-0
-                div(
-                  class="cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0"
-                  role="button"
-                  tabindex="0"
-                  @click="handleTableClick(entry)"
-                  @keydown.enter.prevent="handleTableClick(entry)"
-                  @keydown.space.prevent="handleTableClick(entry)") {{ entry.description }}
-                template(v-if="isPlaidImportAwaitingReview(entry)")
+          template(v-if="registerRowsForTable.length === 0")
+            tr
+              td(colspan="6" class="p-2 sm:p-4 align-top")
+                UAlert(
+                  color="neutral"
+                  variant="subtle"
+                  title="No rows match this category filter"
+                  description="Choose All categories, Uncategorized, or another category.")
+          template(v-else)
+            tr(
+              v-for="(entry, index) in registerRowsForTable"
+              :key="entry.id ?? `reg-entry-${index}-${entry.createdAt}`"
+              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700`")
+              td(class="p-2 sm:p-4 border-b border-default w-7")
+                .flex.justify-center.w-7
                   UTooltip(
-                    text="Create a recurring rule from this import and link this row to it."
+                    v-if="isPlaidImportAwaitingReview(entry)"
+                    text="Bank import not reviewed yet. Clear, reconcile, or match to a recurrence using the row actions."
                     :delay-duration="200")
-                    BaseIconButton(
-                      size="xs"
-                      icon="i-lucide-repeat"
-                      class="shrink-0"
-                      aria-label="Create recurrence from this import and link this transaction"
-                      @click.stop="openReoccurrenceFromPlaidEntry(entry)")
-                  UTooltip(
-                    text="Match to an existing recurrence and remember this bank name for the next Plaid sync."
-                    :delay-duration="200")
-                    BaseIconButton(
-                      size="xs"
-                      icon="i-lucide-link"
-                      class="shrink-0"
-                      aria-label="Match to existing recurrence and save name alias for future syncs"
-                      @click.stop="openMatchToRecurrence(entry)")
-            td(class="p-2 sm:p-4 border-b border-default text-muted whitespace-nowrap")
-              | {{ entry.categoryId == null ? "—" : (listStore.getCategories.find((c) => c.id === entry.categoryId)?.name ?? "—") }}
-            td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
-              DollarFormat(:amount="Number(entry.amount)")
-            td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
-              DollarFormat(:amount="Number(entry.balance)")
+                    span(class="inline-flex cursor-default items-center justify-center p-1.5 -m-1 rounded-sm")
+                      span(
+                        class="inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0"
+                        role="img"
+                        aria-label="Bank import not reviewed yet.")
+                  span(v-else class="inline-block size-2 shrink-0")
+              td(class="p-2 sm:p-4 border-b border-default text-right tabular-nums whitespace-nowrap") {{ formatDate(entry.createdAt) }}
+              td(class="p-2 sm:p-4 border-b border-default")
+                .flex.items-center.gap-1.min-w-0
+                  div(
+                    class="cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0"
+                    role="button"
+                    tabindex="0"
+                    @click="handleTableClick(entry)"
+                    @keydown.enter.prevent="handleTableClick(entry)"
+                    @keydown.space.prevent="handleTableClick(entry)") {{ entry.description }}
+                  template(v-if="isPlaidImportAwaitingReview(entry)")
+                    UTooltip(
+                      text="Create a recurring rule from this import and link this row to it."
+                      :delay-duration="200")
+                      BaseIconButton(
+                        size="xs"
+                        icon="i-lucide-repeat"
+                        class="shrink-0"
+                        aria-label="Create recurrence from this import and link this transaction"
+                        @click.stop="openReoccurrenceFromPlaidEntry(entry)")
+                    UTooltip(
+                      text="Match to an existing recurrence and remember this bank name for the next Plaid sync."
+                      :delay-duration="200")
+                      BaseIconButton(
+                        size="xs"
+                        icon="i-lucide-link"
+                        class="shrink-0"
+                        aria-label="Match to existing recurrence and save name alias for future syncs"
+                        @click.stop="openMatchToRecurrence(entry)")
+              td.register-cell-category(class="p-2 sm:p-4 border-b border-default text-muted whitespace-nowrap")
+                | {{ entry.categoryId == null ? "—" : (listStore.getCategories.find((c) => c.id === entry.categoryId)?.name ?? "—") }}
+              td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
+                DollarFormat(:amount="Number(entry.amount)")
+              td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
+                DollarFormat(:amount="Number(entry.balance)")
     UCard(v-else class="my-4 max-w-lg mx-auto")
       template(#header)
         h3(class="font-semibold") No entries in this register
@@ -1480,32 +1517,9 @@ async function recalcAccount() {
     // div(v-if="!hasMoreData && tableEntries.length > 0" class="flex justify-center items-center py-4 text-sm text-gray-500 dark:text-gray-400")
       span No more entries to load
 
-    //- Tabs (shown after at least one entry exists; hidden in snapshot — data is future-only)
-    ul(
-      v-if="tableEntries.length > 0 && !isSnapshotMode"
-      ref="registerTabsEl"
-      class="relative z-30 flex flex-wrap gap-2 -mt-1 ml-1 sm:ml-5 mb-5"
-      role="tablist"
-      aria-label="Register time range")
-      li(role="presentation")
-        button(
-          type="button"
-          role="tab"
-          :aria-selected="selectedTab === 'future'"
-          :class="isSelectedTab('future')"
-          class="min-h-11 min-w-18 sm:min-h-0 sm:min-w-0 touch-manipulation"
-          @click="selectedTab = 'future'") Future
-      li(role="presentation")
-        button(
-          type="button"
-          role="tab"
-          :aria-selected="selectedTab === 'past'"
-          :class="isSelectedTab('past')"
-          class="min-h-11 min-w-18 sm:min-h-0 sm:min-w-0 touch-manipulation"
-          @click="selectedTab = 'past'") Past
     div(
-      v-if="selectedTab === 'past' && tableEntries.length > 0 && !isSnapshotMode"
-      class="flex justify-end -mt-3 mb-4")
+      v-if="workflowMode === 'reconciliation' && tableEntries.length > 0 && !isSnapshotMode"
+      class="flex justify-end mb-4")
       UButton(
         size="xs"
         variant="soft"
@@ -1513,3 +1527,118 @@ async function recalcAccount() {
         :to="`/reconciliation/${accountRegisterId}`") Open reconciliation workspace
 
 </template>
+
+<style scoped>
+/* Default: no overflow so sticky thead uses the viewport. On narrow screens we enable horizontal scroll here
+   and pair `overflow-y: clip` so the box is not a vertical scrollport (avoids sticky/`top` gaps). */
+.register-table-outer {
+  padding: 0;
+}
+
+/* Table cells default to middle/baseline alignment; kills stray gap above the toolbar block. */
+.register-table-controls-th {
+  vertical-align: top;
+  line-height: 0;
+}
+
+.register-table-controls-th .register-sticky-head {
+  line-height: normal;
+}
+
+/* Sticky on `thead`/`tr` is not portable; one colspan `th` carries the whole header block. */
+.register-main-table thead.register-sticky-thead .register-thead-sticky-th {
+  position: sticky;
+  top: var(--ui-header-height);
+}
+
+/* Bottom corners of the bordered block (top corners are on the sticky `th`). `border-separate` + spacing 0 is set on the table so radii apply — `collapse` ignores them. */
+.register-main-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.375rem;
+}
+
+.register-main-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.375rem;
+}
+
+.register-main-table tbody tr:last-child td:only-child {
+  border-bottom-left-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+
+/* Column floor widths — keep text from overlapping; table may exceed 100% and scroll on narrow screens. */
+.register-main-table col:nth-child(1) {
+  min-width: 2.25rem;
+}
+
+.register-main-table col:nth-child(2) {
+  min-width: 5.5rem;
+}
+
+.register-main-table col:nth-child(3) {
+  min-width: 9rem;
+}
+
+.register-main-table col.register-col-category {
+  min-width: 5.5rem;
+}
+
+.register-main-table col:nth-child(5) {
+  min-width: 5rem;
+}
+
+.register-main-table col:nth-child(6) {
+  min-width: 5.5rem;
+}
+
+/* Match outer <colgroup> ratios so column labels line up with body cells. */
+.register-inner-head-grid {
+  display: grid;
+  grid-template-columns: minmax(1.75rem, 3%) minmax(4.5rem, 11%) minmax(
+      0,
+      1fr
+    ) minmax(5rem, 17%) minmax(3.5rem, 14%) minmax(4rem, 19%);
+}
+
+/* Below `md` (768px): hide category column.
+   Do not use `display:none` on `td` — it drops the cell from the table grid and breaks col/colgroup alignment
+   (Amount/Balance shift under wrong headers). Use `visibility:collapse` on col + td and widen description col. */
+@media (max-width: 767px) {
+  .register-table-outer {
+    overflow-x: auto;
+    overflow-y: clip;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  /* At least full container width or 36rem — beats `min-w-full` so the table can grow and scroll inside the wrapper. */
+  .register-table-outer .register-main-table {
+    min-width: max(100%, 36rem);
+  }
+
+  .register-main-table col:nth-child(3) {
+    min-width: 12rem;
+    width: 53% !important; /* 36% + 17% when category is collapsed */
+  }
+
+  .register-main-table col.register-col-category {
+    visibility: collapse;
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .register-main-table td.register-cell-category {
+    visibility: collapse;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+  }
+
+  .register-inner-head-grid {
+    grid-template-columns:
+      minmax(2.25rem, 3%) minmax(5.5rem, 11%) minmax(12rem, 1fr) minmax(5rem, 14%)
+      minmax(5.5rem, 19%);
+  }
+}
+</style>

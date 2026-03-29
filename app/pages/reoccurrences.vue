@@ -16,7 +16,6 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
-import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 import {
   dismissNotification,
   dispatchNotificationsRefresh,
@@ -54,15 +53,6 @@ type ReoccurrenceHealthIssue = {
   details: string;
   occurrenceKey?: string;
 };
-
-/** Root `overflow-auto` + table `overflow-clip` break sticky headers when the real scroll is the outer wrapper. */
-const tableUi = ref({
-  root: "!overflow-visible relative min-h-0",
-  base: "!overflow-visible min-w-full",
-  /** `tbody` uses `isolate` in the default theme; keep header above row backgrounds while sticky. */
-  thead: "!z-30",
-  tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
-});
 
 const overlay = useOverlay();
 const modal = overlay.create(ModalsEditReoccurrence);
@@ -352,45 +342,6 @@ const isRecalculating = ref(false);
 const reoccurrenceHealthLoading = ref(false);
 const reoccurrenceHealthIssues = ref<ReoccurrenceHealthIssue[]>([]);
 const reoccurrenceActionLoading = ref<Set<number>>(new Set());
-const sectionEl = ref<HTMLElement | null>(null);
-const controlsEl = ref<HTMLElement | null>(null);
-const tableHostEl = ref<HTMLElement | null>(null);
-const tableViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)",
-);
-const tableViewportAvailablePx = ref<number | null>(null);
-
-let tableResizeObserver: ResizeObserver | null = null;
-let tableViewportFrameId: number | null = null;
-
-function updateTableViewportMaxHeight() {
-  if (!tableHostEl.value) return;
-
-  if (tableViewportFrameId != null) {
-    cancelAnimationFrame(tableViewportFrameId);
-  }
-
-  tableViewportFrameId = requestAnimationFrame(() => {
-    tableViewportFrameId = null;
-    const tableTop = tableHostEl.value?.getBoundingClientRect().top ?? 0;
-    const bottomSpacing = 16;
-    const available = Math.max(
-      220,
-      Math.floor(window.innerHeight - tableTop - bottomSpacing),
-    );
-    if (
-      shouldSkipViewportTableHeightChange(
-        available,
-        tableViewportAvailablePx.value,
-      )
-    ) {
-      return;
-    }
-    tableViewportAvailablePx.value = available;
-    tableViewportMaxHeight.value = `${available}px`;
-  });
-}
-
 const reoccurrenceHealthSummary = computed(() => {
   const total = reoccurrenceHealthIssues.value.length;
   if (total === 0) return "";
@@ -446,36 +397,12 @@ async function dismissRecurringIssue(notificationId: number) {
 
 onMounted(async () => {
   import("~/components/modals/EditReoccurrence.vue").catch(() => {});
-  await nextTick();
-  updateTableViewportMaxHeight();
-  window.addEventListener("resize", updateTableViewportMaxHeight);
-
-  tableResizeObserver = new ResizeObserver(() => {
-    updateTableViewportMaxHeight();
-  });
-
-  if (sectionEl.value) {
-    tableResizeObserver.observe(sectionEl.value);
-  }
-  if (controlsEl.value) {
-    tableResizeObserver.observe(controlsEl.value);
-  }
   await fetchReoccurrenceHealth();
 });
 
 watch(
-  () => listStore.getIsListsLoading,
-  async () => {
-    await nextTick();
-    updateTableViewportMaxHeight();
-  },
-);
-
-watch(
   () => listStore.getReoccurrencesForCurrentBudget.length,
   async () => {
-    await nextTick();
-    updateTableViewportMaxHeight();
     await fetchReoccurrenceHealth();
   },
 );
@@ -486,29 +413,12 @@ watch(
     await fetchReoccurrenceHealth();
   },
 );
-
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", updateTableViewportMaxHeight);
-
-  if (tableResizeObserver) {
-    tableResizeObserver.disconnect();
-    tableResizeObserver = null;
-  }
-
-  if (tableViewportFrameId != null) {
-    cancelAnimationFrame(tableViewportFrameId);
-    tableViewportFrameId = null;
-  }
-});
 </script>
 
 <template lang="pug">
-  section(
-    ref="sectionEl"
-    class="my-4 mx-2 overflow-y-auto"
-    style="max-height: calc(100dvh - var(--ui-header-height) - 2rem);")
+  section(class="my-4 mx-2")
     h1(class="sr-only") Recurring Entries
-    div(ref="controlsEl" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
+    div(v-if="reoccurrencesForTable.length === 0" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
         v-model:show-shortcuts="showShortcuts"
@@ -578,8 +488,7 @@ onBeforeUnmount(() => {
 
     div(
       v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 || listStore.getIsListsLoading"
-      ref="tableHostEl"
-      class="rounded-md border border-primary/40 overflow-x-auto")
+      class="reoccurrences-table-outer h-fit mt-2 min-w-0 w-full rounded-md border border-primary/40")
       UAlert(
         v-if="listStore.getReoccurrencesForCurrentBudget.length > 0 && reoccurrencesForTable.length === 0"
         class="mb-2"
@@ -589,47 +498,118 @@ onBeforeUnmount(() => {
         description="Choose All categories, Uncategorized, or another category.")
       div(
         v-else-if="listStore.getIsListsLoading && reoccurrencesForTable.length === 0"
-        class="p-2 sm:p-4"
+        class="flex flex-col min-h-0"
       )
-        div(class="grid grid-cols-6 gap-2 sm:gap-4 pb-3 border-b border-default")
-          USkeleton(class="h-4 w-16")
-          USkeleton(class="h-4 w-14")
-          USkeleton(class="h-4 w-16")
-          USkeleton(class="h-4 w-24")
-          USkeleton(class="h-4 w-12 ml-auto")
-          USkeleton(class="h-4 w-14 ml-auto")
-        .space-y-3.pt-3
-          div(class="grid grid-cols-6 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`reocc-skeleton-${i}`")
+        div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+          div(class="min-w-0 flex-1 flex items-center gap-2")
+            USkeleton(class="h-9 grow min-w-32 sm:max-w-48 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md shrink-0")
+            USkeleton(class="h-9 w-9 rounded-md shrink-0")
+        div(
+          class="reoccurrences-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+        )
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
+            USkeleton(class="h-4 w-14")
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
+            USkeleton(class="h-4 w-12")
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
             USkeleton(class="h-4 w-20")
-            USkeleton(class="h-4 w-16")
-            USkeleton(class="h-4 w-20")
-            USkeleton(class="h-4 w-28")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+            USkeleton(class="h-4 w-full max-w-md")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
             USkeleton(class="h-4 w-14 ml-auto")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-20 ml-auto")
+        div(
+          v-for="i in 12"
+          :key="`reocc-skeleton-${i}`"
+          class="reoccurrences-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+        )
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-20 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-16 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-24 max-w-full")
+          div(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm")
+            USkeleton(class="h-4 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
             USkeleton(class="h-4 w-16 ml-auto")
-      table(
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-20 ml-auto")
+      table.reoccurrences-main-table(
         v-if="reoccurrencesForTable.length > 0"
-        class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
-        caption(class="sr-only") Recurring entries
-        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+        class="w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm"
+        aria-label="Recurring entries"
+      )
+        colgroup
+          col(style="width:12%")
+          col(style="width:11%")
+          col(style="width:18%")
+          col(style="width:35%")
+          col(style="width:12%")
+          col(style="width:12%")
+        thead.reoccurrences-sticky-thead
           tr
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Account
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Interval
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold whitespace-nowrap") Category
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left font-semibold") Description
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Amount
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Last run
+            th(
+              colspan="6"
+              scope="colgroup"
+              class="reoccurrences-table-controls-th reoccurrences-thead-sticky-th sticky top-(--ui-header-height) z-38 overflow-hidden rounded-t-md border-b border-default bg-default/95 backdrop-blur-md supports-backdrop-filter:bg-default/90 p-0 align-top font-normal"
+            )
+              div.reoccurrences-sticky-head
+                div(class="flex flex-col min-h-0")
+                  div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+                    div(class="min-w-0 flex-1 flex items-center gap-2")
+                      RegisterListToolbar(
+                        v-model:global-filter="globalFilter"
+                        v-model:show-shortcuts="showShortcuts"
+                        :show-refresh="false"
+                        filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+                        add-tooltip="Add recurring entry"
+                        add-title="Add recurring entry"
+                        add-aria-label="Add recurring entry"
+                        @add="handleAddReoccurrence"
+                      )
+                        template(#middle)
+                          UTooltip(text="Recalculate forecast" :delay-duration="150")
+                            BaseIconButton(
+                              icon="i-lucide-calculator"
+                              title="Recalculate forecast"
+                              aria-label="Recalculate forecast"
+                              @click="handleRecalculate"
+                              :loading="isRecalculating"
+                              :disabled="isRecalculating"
+                            )
+                        template(#filter)
+                          FiltersCombinedGlobalCategoryFilter(
+                            ref="combinedTableFilterRef"
+                            v-model:global-filter="globalFilter"
+                            v-model:category-filter="categoryFilter"
+                            :category-items="categoryFilterSelectItems"
+                            filter-input-id="search"
+                            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+                          )
+                  div(
+                    class="reoccurrences-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+                  )
+                    div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default text-left") Account
+                    div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default text-left") Interval
+                    div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default text-left") Category
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left") Description
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Amount
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Last run
         tbody
           tr(
             v-for="(row, index) in reoccurrencesForTable"
             :key="row.id ?? `reocc-${index}`"
             class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
-            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getAccountRegisterLabel(row.accountRegisterId, listStore.getAccountRegisters) }}
-            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getIntervalLabel(row.intervalId, listStore.getIntervals) }}
-            td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
+            td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default") {{ getAccountRegisterLabel(row.accountRegisterId, listStore.getAccountRegisters) }}
+            td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default") {{ getIntervalLabel(row.intervalId, listStore.getIntervals) }}
+            td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
               | {{ row.categoryId == null ? "—" : (listStore.getCategories.find((c) => c.id === row.categoryId)?.name ?? row.categoryId) }}
-            td(class="p-2 sm:p-4 text-xs sm:text-sm border-b border-default")
+            td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm border-b border-default")
               div(
-                class="cursor-pointer font-semibold frog-text"
+                class="cursor-pointer font-semibold frog-text truncate"
                 role="button"
                 tabindex="0"
                 @click="handleTableClick(row)"
@@ -638,4 +618,67 @@ onBeforeUnmount(() => {
             td(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default")
               DollarFormat(:amount="Number(row.amount)")
             td(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap border-b border-default") {{ formatDate(row.lastAt) }}
+
 </template>
+
+<style scoped>
+.reoccurrences-table-outer {
+  padding: 0;
+}
+
+.reoccurrences-table-controls-th {
+  vertical-align: top;
+  line-height: 0;
+}
+
+.reoccurrences-table-controls-th .reoccurrences-sticky-head {
+  line-height: normal;
+}
+
+.reoccurrences-main-table thead.reoccurrences-sticky-thead .reoccurrences-thead-sticky-th {
+  position: sticky;
+  top: var(--ui-header-height);
+}
+
+.reoccurrences-main-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.375rem;
+}
+
+.reoccurrences-main-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.375rem;
+}
+
+.reoccurrences-main-table tbody tr:last-child td:only-child {
+  border-bottom-left-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+
+/* Same percentages as <colgroup>. */
+.reoccurrences-inner-head-grid {
+  display: grid;
+  grid-template-columns: 12% 11% 18% 35% 12% 12%;
+  width: 100%;
+}
+
+/* Fixed layout: clip so nowrap text cannot paint over the next column. */
+.reoccurrences-head-clip,
+.reoccurrences-main-table td.reoccurrences-cell-clip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .reoccurrences-table-outer {
+    overflow-x: auto;
+    overflow-y: clip;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .reoccurrences-table-outer .reoccurrences-main-table {
+    min-width: max(100%, 36rem);
+  }
+}
+</style>

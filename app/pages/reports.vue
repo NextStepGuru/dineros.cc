@@ -9,8 +9,8 @@ useHead({ title: "Reports | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const { workflowMode } = useWorkflowMode();
 const {
-  mode,
   dateFrom,
   dateTo,
   accountRegisterScope,
@@ -43,24 +43,26 @@ onMounted(async () => {
 <template lang="pug">
 section(class="m-4 max-w-6xl mx-auto space-y-6")
   h1(class="text-xl font-semibold") Category reports
+  UAlert(
+    v-if="workflowMode === 'forecasting'"
+    color="primary"
+    variant="subtle"
+    title="Forecasting report"
+  )
+    template(#description)
+      span.frog-text-muted Future / forecast mode shows projected register activity in the date range. Switch workflow in the header for past actuals.
+  UAlert(
+    v-else
+    color="neutral"
+    variant="subtle"
+    title="Reconciliation report"
+  )
+    template(#description)
+      span.frog-text-muted Past mode reflects cleared and reconciled history. Use this to review spending against what actually happened.
 
   UCard
     template(#header)
-      .flex.flex-wrap.gap-4.items-center.justify-between
-        .flex.flex-wrap.gap-2.items-center
-          span(class="text-sm font-medium shrink-0") Mode
-          .flex.gap-1(
-            role="group"
-            aria-label="Report mode")
-            UButton(
-              size="sm"
-              :variant="mode === 'past' ? 'solid' : 'outline'"
-              @click="mode = 'past'") Past
-            UButton(
-              size="sm"
-              :variant="mode === 'future' ? 'solid' : 'outline'"
-              @click="mode = 'future'") Future / forecast
-        .flex.flex-wrap.gap-3.items-end
+      .flex.flex-wrap.gap-3.items-end
           UFormField(label="From")
             UInput(v-model="dateFrom" type="date" class="w-40")
           UFormField(label="To")
@@ -108,7 +110,7 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
           color="neutral"
           variant="subtle"
           title="No entries in this range"
-          description="Try a different date range, register, or mode (past vs future).")
+          description="Try a different date range, register, or Forecast / Reconcile in the header.")
 
       template(v-else-if="data")
         .grid.gap-4(class="sm:grid-cols-2 lg:grid-cols-4")
@@ -137,6 +139,6 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
             h2(class="font-medium") By category
           .space-y-8
             ReportsCategoryReportsDonut(:categories="data.donutCategories")
-            ReportsCategoryReportsGroupedTable(
-              :groups="data.tableGroups")
+            div(class="h-fit w-full overflow-x-auto overscroll-x-contain")
+              ReportsCategoryReportsGroupedTable(:groups="data.tableGroups")
 </template>

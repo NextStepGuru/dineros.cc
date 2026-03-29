@@ -15,6 +15,7 @@ const authStore = useAuthStore();
 const listStore = useListStore();
 const toast = useToast();
 const route = useRoute();
+const { workflowMode, setWorkflowMode } = useWorkflowMode();
 const { $api } = useNuxtApp();
 const overlay = useOverlay();
 const budgetModal = overlay.create(ModalsBudgetManager);
@@ -80,91 +81,175 @@ const authTokenCookie = useCookie("authToken", {
   path: "/",
 });
 
-const items = computed(() => {
-  if (authStore.getIsUserLoggedIn) {
-    // Items for logged-in users
-    return [
-      {
-        label: "Register",
-        to: `${
-          listStore.getAccountRegisters.length
-            ? "/register/" +
-              formatAccountRegisters(listStore.getAccountRegisters)[0]?.id
-            : "/account-registers?onboarding=1"
-        }`,
-        active: route.path.startsWith("/register"),
-      },
-      {
-        label: "Accounts",
-        to: "/account-registers",
-        active: route.path.startsWith("/account-registers"),
-      },
-      {
-        label: "Recurring",
-        to: "/reoccurrences",
-        active: route.path.startsWith("/reoccurrences"),
-      },
-      {
-        label: "Bills",
-        to: "/bills",
-        active: route.path.startsWith("/bills"),
-      },
-      {
-        label: "Reconciliation",
-        to: "/reconciliation",
-        active: route.path.startsWith("/reconciliation"),
-      },
-      {
-        label: "Goals",
-        to: "/goals",
-        active: route.path.startsWith("/goals"),
-      },
-      {
-        label: "Reports",
-        to: "/reports",
-        active: route.path.startsWith("/reports"),
-      },
-      {
-        label: "Help",
-        to: "/help",
-        active: route.path.startsWith("/help"),
-      },
-      ...(authStore.getUser?.role === "ADMIN"
-        ? [
-            {
-              label: "Admin",
-              to: "/admin",
-              active: route.path.startsWith("/admin"),
-            },
-          ]
-        : []),
-    ];
-  } else {
-    // Items for not logged-in users
-    return [
-      {
-        label: "Home",
-        to: "/",
-        active: route.path === "/",
-      },
-      {
-        label: "About",
-        to: "/about",
-        active: route.path.startsWith("/about"),
-      },
-      {
-        label: "Contact",
-        to: "/contact",
-        active: route.path.startsWith("/contact"),
-      },
-      {
-        label: "Create account",
-        to: "/signup",
-        active: route.path.startsWith("/signup"),
-      },
-    ];
-  }
+const registerHref = computed(() => {
+  const sorted = formatAccountRegisters(listStore.getAccountRegisters);
+  const firstId = sorted[0]?.id;
+  return firstId ? `/register/${firstId}` : "/account-registers?onboarding=1";
 });
+
+type LoggedInNavItem = {
+  label: string;
+  to: string;
+  active: boolean;
+};
+
+const adminNavItems = computed((): LoggedInNavItem[] =>
+  authStore.getUser?.role === "ADMIN"
+    ? [
+        {
+          label: "Admin",
+          to: "/admin",
+          active: route.path.startsWith("/admin"),
+        },
+      ]
+    : [],
+);
+
+/** Forecast dropdown: planning + forecast reports. */
+const forecastingPagesDropdownItems = computed((): LoggedInNavItem[] => [
+  {
+    label: "Register",
+    to: registerHref.value,
+    active: route.path.startsWith("/register"),
+  },
+  {
+    label: "Accounts",
+    to: "/account-registers",
+    active: route.path.startsWith("/account-registers"),
+  },
+  {
+    label: "Recurring",
+    to: "/reoccurrences",
+    active: route.path.startsWith("/reoccurrences"),
+  },
+  {
+    label: "Reports",
+    to: "/reports",
+    active: route.path.startsWith("/reports"),
+  },
+]);
+
+/** Reconcile dropdown: statement flow + bills + goals. */
+const reconciliationPagesDropdownItems = computed((): LoggedInNavItem[] => [
+  {
+    label: "Reconciliation",
+    to: "/reconciliation",
+    active: route.path.startsWith("/reconciliation"),
+  },
+  {
+    label: "Register",
+    to: registerHref.value,
+    active: route.path.startsWith("/register"),
+  },
+  {
+    label: "Bills",
+    to: "/bills",
+    active: route.path.startsWith("/bills"),
+  },
+  {
+    label: "Goals",
+    to: "/goals",
+    active: route.path.startsWith("/goals"),
+  },
+]);
+
+/** Top-level only: Help + Admin (Reports lives under Forecast). */
+const topLevelNavItems = computed((): LoggedInNavItem[] => [
+  {
+    label: "Help",
+    to: "/help",
+    active: route.path.startsWith("/help"),
+  },
+  ...adminNavItems.value,
+]);
+
+function navIconForLabel(label: string): string {
+  const m: Record<string, string> = {
+    Register: "i-lucide-table-properties",
+    Accounts: "i-lucide-wallet",
+    Recurring: "i-lucide-repeat",
+    Bills: "i-lucide-receipt",
+    Goals: "i-lucide-target",
+    Reports: "i-lucide-pie-chart",
+    Help: "i-lucide-circle-help",
+    Admin: "i-lucide-shield-check",
+    Reconciliation: "i-lucide-clipboard-check",
+  };
+  return m[label] ?? "i-lucide-file-text";
+}
+
+function navToForecast(to: string) {
+  setWorkflowMode("forecasting");
+  void navigateTo(to);
+}
+
+function navToReconcile(to: string) {
+  setWorkflowMode("reconciliation");
+  void navigateTo(to);
+}
+
+const forecastDropdownMenuItems = computed(() => [
+  forecastingPagesDropdownItems.value.map((it) => ({
+    label: it.label,
+    icon: navIconForLabel(it.label),
+    onSelect: () => navToForecast(it.to),
+  })),
+]);
+
+const reconcileDropdownMenuItems = computed(() => [
+  reconciliationPagesDropdownItems.value.map((it) => ({
+    label: it.label,
+    icon: navIconForLabel(it.label),
+    onSelect: () => navToReconcile(it.to),
+  })),
+]);
+
+/** Sync workflow highlight with URL (bookmark / direct navigation). */
+watch(
+  () => route.path,
+  (p) => {
+    if (!authStore.getIsUserLoggedIn) return;
+    if (
+      p.startsWith("/reconciliation") ||
+      p.startsWith("/bills") ||
+      p.startsWith("/goals")
+    ) {
+      setWorkflowMode("reconciliation");
+      return;
+    }
+    if (
+      p.startsWith("/reoccurrences") ||
+      p.startsWith("/account-registers") ||
+      p.startsWith("/reports")
+    ) {
+      setWorkflowMode("forecasting");
+    }
+  },
+  { immediate: true },
+);
+
+const guestNavItems = computed(() => [
+  {
+    label: "Home",
+    to: "/",
+    active: route.path === "/",
+  },
+  {
+    label: "About",
+    to: "/about",
+    active: route.path.startsWith("/about"),
+  },
+  {
+    label: "Contact",
+    to: "/contact",
+    active: route.path.startsWith("/contact"),
+  },
+  {
+    label: "Create account",
+    to: "/signup",
+    active: route.path.startsWith("/signup"),
+  },
+]);
 
 // Logout: navigate while session is still valid, then clear auth (logout-first can strand on protected route)
 async function logout() {
@@ -297,7 +382,51 @@ UHeader(
   template(#title)
     XLogo(class="h-6 w-auto")
 
-  UNavigationMenu(:items="items"  class="flex flex-col md:flex-row")
+  template(v-if="authStore.getIsUserLoggedIn")
+    div(class="flex flex-row flex-wrap items-center gap-1.5 sm:gap-2 min-w-0")
+      //- Two workspace menus (no separate tab strip)
+      div(class="hidden md:flex items-center gap-1 shrink-0")
+        UDropdownMenu(
+          :items="forecastDropdownMenuItems"
+          :content="{ align: 'start', sideOffset: 4 }")
+          UButton(
+            variant="soft"
+            :color="workflowMode === 'forecasting' ? 'primary' : 'neutral'"
+            size="sm"
+            trailing-icon="i-lucide-chevron-down"
+            class="h-8"
+            aria-haspopup="menu"
+            aria-label="Forecast menu"
+            data-testid="header-forecast-menu-trigger")
+            UIcon(name="i-lucide-line-chart" class="size-4 shrink-0 opacity-80")
+            span Forecast
+        UDropdownMenu(
+          :items="reconcileDropdownMenuItems"
+          :content="{ align: 'start', sideOffset: 4 }")
+          UButton(
+            variant="soft"
+            :color="workflowMode === 'reconciliation' ? 'primary' : 'neutral'"
+            size="sm"
+            trailing-icon="i-lucide-chevron-down"
+            class="h-8"
+            aria-haspopup="menu"
+            aria-label="Reconcile menu"
+            data-testid="header-reconcile-menu-trigger")
+            UIcon(name="i-lucide-clipboard-check" class="size-4 shrink-0 opacity-80")
+            span Reconcile
+        UButton(
+          v-for="it in topLevelNavItems"
+          :key="it.label"
+          :to="it.to"
+          variant="soft"
+          :color="it.active ? 'primary' : 'neutral'"
+          size="sm"
+          class="h-8 gap-1.5 px-2 sm:px-2.5"
+          :aria-label="it.label"
+          :aria-current="it.active ? 'page' : undefined")
+          UIcon(:name="navIconForLabel(it.label)" class="size-4 shrink-0 opacity-80")
+          span {{ it.label }}
+  UNavigationMenu(v-else :items="guestNavItems" class="flex flex-col md:flex-row")
 
   template(#right)
     UPopover(
@@ -404,8 +533,8 @@ UHeader(
     UColorModeButton(v-else class="toolbar-icon-button hidden lg:inline-flex")
 
   template(#content="{ close }")
-    .mobile-menu-container(class="flex h-dvh flex-col overflow-y-auto px-4 pb-6 pt-4")
-      .mobile-menu-header(class="mb-4 flex w-full max-w-md items-center justify-end self-center")
+    .mobile-menu-container(class="flex h-dvh flex-col overflow-y-auto overflow-x-hidden px-4 pb-6 pt-4")
+      .mobile-menu-header(class="mb-4 flex w-full shrink-0 justify-end")
         UButton(
           icon="i-lucide-x"
           color="neutral"
@@ -414,29 +543,80 @@ UHeader(
           class="mobile-close-button"
           aria-label="Close menu"
           @click="close")
-      .mobile-menu-items(class="w-full max-w-md space-y-3 self-center pb-6")
-        .mobile-menu-item(
-          v-for="item in items"
-          :key="item.label"
-          class="w-full")
+      .mobile-menu-items(class="flex w-full max-w-md flex-col gap-3 self-center pb-4")
+        section(
+          v-if="authStore.getIsUserLoggedIn"
+          class="mobile-menu-card flex w-full flex-col gap-2")
+          .mobile-card-title Forecast
           UButton(
+            v-for="it in forecastingPagesDropdownItems"
+            :key="`m-fc-${it.label}`"
+            variant="soft"
+            :color="it.active ? 'primary' : 'neutral'"
+            size="lg"
+            class="mobile-nav-button w-full min-w-0 justify-start gap-2"
+            :aria-current="it.active ? 'page' : undefined"
+            @click="navToForecast(it.to); close()")
+            UIcon(:name="navIconForLabel(it.label)" class="size-4 shrink-0 opacity-80")
+            span {{ it.label }}
+
+        section(
+          v-if="authStore.getIsUserLoggedIn"
+          class="mobile-menu-card flex w-full flex-col gap-2")
+          .mobile-card-title Reconcile
+          UButton(
+            v-for="it in reconciliationPagesDropdownItems"
+            :key="`m-rc-${it.label}`"
+            variant="soft"
+            :color="it.active ? 'primary' : 'neutral'"
+            size="lg"
+            class="mobile-nav-button w-full min-w-0 justify-start gap-2"
+            :aria-current="it.active ? 'page' : undefined"
+            @click="navToReconcile(it.to); close()")
+            UIcon(:name="navIconForLabel(it.label)" class="size-4 shrink-0 opacity-80")
+            span {{ it.label }}
+
+        section(
+          v-if="authStore.getIsUserLoggedIn"
+          class="mobile-menu-card flex w-full flex-col gap-2")
+          .mobile-card-title More
+          UButton(
+            v-for="item in topLevelNavItems"
+            :key="item.label"
+            :to="item.to"
+            variant="soft"
+            :color="item.active ? 'primary' : 'neutral'"
+            size="lg"
+            class="mobile-nav-button w-full min-w-0 justify-start gap-2"
+            :aria-current="item.active ? 'page' : undefined"
+            @click="close")
+            UIcon(:name="navIconForLabel(item.label)" class="size-4 shrink-0 opacity-80")
+            span {{ item.label }}
+
+        section(
+          v-else
+          class="mobile-menu-card flex w-full flex-col gap-2")
+          .mobile-card-title Menu
+          UButton(
+            v-for="item in guestNavItems"
+            :key="item.label"
             :to="item.to"
             :color="item.active ? 'primary' : 'neutral'"
             :variant="item.active ? 'solid' : 'soft'"
-            size="xl"
-            class="mobile-nav-button w-full justify-start"
+            size="lg"
+            class="mobile-nav-button w-full min-w-0 justify-start"
             @click="close") {{ item.label }}
 
         div(
           v-if="authStore.getIsUserLoggedIn"
-          class="mobile-menu-card space-y-3")
+          class="mobile-menu-card flex w-full flex-col gap-2")
           div(class="mobile-card-title") Account
           UButton(
             to="/notifications"
             variant="soft"
             color="neutral"
             size="lg"
-            class="w-full justify-between"
+            class="mobile-nav-button w-full justify-between"
             @click="close")
             .flex.items-center.gap-2
               UIcon(name="lucide:bell")
@@ -449,19 +629,11 @@ UHeader(
               class="notification-indicator")
               | {{ notificationCount > 99 ? '99+' : notificationCount }}
           UButton(
-            to="/help"
-            variant="soft"
-            color="neutral"
-            size="lg"
-            class="w-full justify-start"
-            icon="i-lucide-circle-help"
-            @click="close") Help
-          UButton(
             to="/edit-profile/profile"
             variant="soft"
             color="neutral"
             size="lg"
-            class="w-full justify-start"
+            class="mobile-nav-button w-full justify-start"
             icon="lucide:user-cog"
             @click="close") Settings
           .mobile-theme-row
@@ -472,18 +644,18 @@ UHeader(
 
         div(
           v-if="authStore.getIsUserLoggedIn && listStore.getBudgets.length > 0"
-          class="mobile-menu-card space-y-2")
+          class="mobile-menu-card flex w-full flex-col gap-2")
           div(class="mobile-card-title") Budgets
-          .max-h-48.overflow-auto.space-y-1
+          .max-h-52.flex.flex-col.gap-2.overflow-auto
             div(
               v-for="b in listStore.getBudgets"
               :key="`mobile-budget-${b.id}`"
-              class="flex items-center gap-2")
+              class="flex min-w-0 items-center gap-2")
               UButton(
                 variant="soft"
                 color="neutral"
-                size="sm"
-                class="flex-1 justify-between"
+                size="lg"
+                class="mobile-nav-button min-w-0 flex-1 justify-between"
                 :class="{ 'bg-primary/20': b.id === authStore.getBudgetId }"
                 @click="selectBudget(b.id); close()")
                 span.truncate {{ b.name }}
@@ -497,18 +669,19 @@ UHeader(
                 :items="budgetMenuItems(b)"
                 @click.stop)
                 UButton(
-                  size="xs"
+                  size="sm"
                   icon="i-lucide-more-horizontal"
                   square
                   variant="ghost"
                   color="neutral"
+                  class="shrink-0"
                   :aria-label="`Budget options for ${b.name}`"
                   @click.stop)
           UButton(
             variant="soft"
             color="neutral"
-            size="sm"
-            class="w-full justify-start"
+            size="lg"
+            class="mobile-nav-button w-full justify-start"
             icon="i-lucide-plus"
             @click="openBudgetModal('create', null); close()") Create budget
 
@@ -518,7 +691,7 @@ UHeader(
           color="error"
           variant="soft"
           size="lg"
-          class="mobile-signout-button w-full justify-center mt-6") Sign out
+          class="mobile-signout-button w-full justify-center") Sign out
 
 </template>
 
@@ -604,11 +777,6 @@ UHeader(
 }
 
 .notification-indicator {
-  background-color: rgb(185 28 28);
-  color: rgb(255 255 255);
-}
-
-:global(.dark) .notification-indicator {
   background-color: rgb(220 38 38);
   color: rgb(255 255 255);
 }

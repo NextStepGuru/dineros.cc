@@ -12,6 +12,7 @@ import {
   formatLoginError,
   getPostLoginRedirect,
 } from "~/lib/auth";
+import { readWorkflowModeFromStorage } from "~/lib/workflowMode";
 
 const authStore = useAuthStore();
 const listStore = useListStore();
@@ -102,7 +103,10 @@ async function completePasswordLoginRedirect(
   await listStore.fetchLists();
   const defaultBudget = listStore.getDefaultBudget;
   if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
-  const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
+  const redirectPath = getPostLoginRedirect(
+    listStore.getAccountRegisters,
+    readWorkflowModeFromStorage() ?? "forecasting",
+  );
   toast.add({ color: "success", description: "Login successful!" });
   globalThis.location.assign(redirectPath);
   return true;
@@ -259,7 +263,10 @@ async function startPasskeySignIn() {
       if (listStore.getBudgets.length > 0) {
         authStore.setBudgetId(listStore.getBudgets[0].id);
       }
-      const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
+      const redirectPath = getPostLoginRedirect(
+        listStore.getAccountRegisters,
+        readWorkflowModeFromStorage() ?? "forecasting",
+      );
       toast.add({ color: "success", description: "Login successful!" });
       globalThis.location.assign(redirectPath);
       return;

@@ -20,12 +20,19 @@ test.describe("Form validation — authed empty-submit", () => {
 
   test("add entry modal rejects empty submit", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
 
-    await page.getByRole("button", { name: /add entry/i }).first().click();
-    await expect(page.getByLabel(/description/i).first()).toBeVisible({
+    const addEntry = page.getByRole("button", { name: /add entry/i }).first();
+    await addEntry.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      await addEntry.click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }).toPass({ timeout: 20_000 });
+    const modal = page.getByRole("dialog");
+    await expect(modal.locator("#description")).toBeVisible({
       timeout: 15_000,
     });
 

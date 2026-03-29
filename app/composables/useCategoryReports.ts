@@ -7,8 +7,7 @@ export function useCategoryReports() {
   const listStore = useListStore();
   const toast = useToast();
   const { todayISOString } = useToday();
-
-  const mode = ref<"past" | "future">("future");
+  const { workflowMode, defaultReportMode: mode } = useWorkflowMode();
   const dateFrom = ref("");
   const dateTo = ref("");
   /** `all` or register id */
@@ -134,7 +133,7 @@ export function useCategoryReports() {
 
   watch(
     [
-      mode,
+      () => workflowMode.value,
       dateFrom,
       dateTo,
       accountRegisterScope,

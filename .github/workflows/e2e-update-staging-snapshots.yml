@@ -1,4 +1,4 @@
-# Manual only: regenerate Linux PNG baselines against https://staging.dineros.cc (same URL as PR staging-e2e).
+# Manual only: regenerate Linux PNG baselines against https://staging.dineros.cc.
 # Local `pnpm test:e2e:update-snapshots` uses localhost — heights differ; use this workflow (or test:e2e:update-snapshots:staging on Mac + merge linux from here).
 name: E2E — update staging visual snapshots
 

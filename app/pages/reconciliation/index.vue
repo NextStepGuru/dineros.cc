@@ -8,6 +8,7 @@ useHead({ title: "Reconciliation | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const { setWorkflowMode } = useWorkflowMode();
 const { $api } = useNuxtApp();
 
 const registers = computed(() =>
@@ -44,10 +45,21 @@ watch(
   () => loadOpenPeriods(),
   { immediate: true },
 );
+
+onMounted(() => {
+  setWorkflowMode("reconciliation");
+});
 </script>
 
 <template lang="pug">
 section(class="px-3 sm:px-4 py-4 max-w-4xl mx-auto space-y-6")
+  UAlert(
+    color="neutral"
+    variant="subtle"
+    title="Reconciliation workflow"
+  )
+    template(#description)
+      span.frog-text-muted Match cleared entries to your statement for each period. Switch to Forecasting in the header when you want projections and recurring rules.
   div
     h1(class="text-xl font-semibold") Reconciliation
     p(class="text-sm frog-text-muted") Select an account to reconcile against your bank statement.

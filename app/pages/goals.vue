@@ -11,7 +11,6 @@ import {
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
 import { getAccountRegisterLabel } from "~/lib/utils";
-import { shouldSkipViewportTableHeightChange } from "~/lib/viewportTableMaxHeight";
 
 const ModalsEditSavingsGoal = defineAsyncComponent(
   () => import("~/components/modals/EditSavingsGoal.vue"),
@@ -151,41 +150,13 @@ defineShortcuts({
   },
 });
 
-const sectionEl = ref<HTMLElement | null>(null);
-const tableHostEl = ref<HTMLElement | null>(null);
-const tableViewportMaxHeight = ref(
-  "calc(100dvh - var(--ui-header-height) - 12rem)",
-);
-const tableViewportAvailablePx = ref<number | null>(null);
-
-function updateTableViewportMaxHeight() {
-  if (!tableHostEl.value) return;
-  const tableTop = tableHostEl.value?.getBoundingClientRect().top ?? 0;
-  const bottomSpacing = 16;
-  const available = Math.max(
-    220,
-    Math.floor(window.innerHeight - tableTop - bottomSpacing),
-  );
-  if (shouldSkipViewportTableHeightChange(available, tableViewportAvailablePx.value)) {
-    return;
-  }
-  tableViewportAvailablePx.value = available;
-  tableViewportMaxHeight.value = `${available}px`;
-}
-
 onMounted(() => {
   import("~/components/modals/EditSavingsGoal.vue").catch(() => {});
-  window.addEventListener("resize", updateTableViewportMaxHeight);
-  nextTick(updateTableViewportMaxHeight);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", updateTableViewportMaxHeight);
 });
 </script>
 
 <template>
-  <section ref="sectionEl" class="m-4">
+  <section class="m-4">
     <h1 class="sr-only">Savings Goals</h1>
     <div class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4">
       <RegisterListToolbar
@@ -238,9 +209,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="listStore.getSavingsGoalsForCurrentBudget.length > 0 || listStore.getIsListsLoading"
-      ref="tableHostEl"
-      class="flex-1 min-h-0 overflow-auto rounded-md border border-primary/40"
-      :style="{ maxHeight: tableViewportMaxHeight }"
+      class="h-fit w-full overflow-x-auto rounded-md border border-primary/40"
     >
       <UAlert
         v-if="

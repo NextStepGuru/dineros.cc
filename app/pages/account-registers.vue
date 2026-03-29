@@ -38,6 +38,7 @@ definePageMeta({
 useHead({ title: "Accounts | Dineros" });
 
 const snapshotMode = useSnapshotMode();
+const { workflowMode } = useWorkflowMode();
 const {
   isSnapshotMode,
   activeSnapshotCreatedAt,
@@ -1336,6 +1337,10 @@ const showDebitCreditColumns = computed(() =>
   ),
 );
 
+const accountsTableColspan = computed(() =>
+  showDebitCreditColumns.value ? 6 : 4,
+);
+
 // Only main accounts for draggable (no sub-accounts)
 const draggableAccountRegisters = ref<AccountRegister[]>([]);
 
@@ -1395,10 +1400,17 @@ onBeforeUnmount(() => {
     longPressTimer.value = null;
   }
 });
+
+watch(workflowMode, (w) => {
+  if (w === "reconciliation") {
+    showProjectedBalanceTimeline.value = false;
+    showCrossAccountSnapshot.value = false;
+  }
+});
 </script>
 
 <template lang="pug">
-  section(class="my-4 mx-2 overflow-y-auto" style="max-height: calc(100dvh - var(--ui-header-height) - 2rem);")
+  section(class="my-4 mx-2")
     h1(class="sr-only") Accounts
     UAlert(
       v-if="isSnapshotMode && activeSnapshotCreatedAt"
@@ -1411,7 +1423,25 @@ onBeforeUnmount(() => {
         .flex.flex-wrap.gap-2.items-center
           span Read-only — balances and registers as captured.
           UButton(size="xs" variant="soft" @click="exitSnapshotView") Exit snapshot
-    div(class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
+    UAlert(
+      v-else-if="workflowMode === 'forecasting'"
+      color="primary"
+      variant="subtle"
+      class="mb-4"
+      title="Forecasting — Accounts"
+    )
+      template(#description)
+        span.frog-text-muted Balances and ordering for planning. Use the chart icon for projected end-of-month balances after Recalc.
+    UAlert(
+      v-else
+      color="neutral"
+      variant="subtle"
+      class="mb-4"
+      title="Reconciliation — Accounts"
+    )
+      template(#description)
+        span.frog-text-muted Live balances for monitoring. Use Register (Past) and Reconciliation for statement matching — forecast tools are hidden in this workflow.
+    div(v-if="draggableAccountRegisters.length === 0" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
         v-model:show-shortcuts="showShortcuts"
@@ -1431,7 +1461,7 @@ onBeforeUnmount(() => {
               :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
               @click="handleManageCategories"
             )
-          UTooltip(text="Save snapshot" :delay-duration="150")
+          UTooltip(v-if="workflowMode === 'forecasting'" text="Save snapshot" :delay-duration="150")
             BaseIconButton(
               icon="i-lucide-save"
               title="Save snapshot"
@@ -1456,7 +1486,7 @@ onBeforeUnmount(() => {
                 :title="`Snapshot view: ${selectedSnapshotLabel}`"
                 :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
               )
-          UTooltip(text="Projected balance (end of month)" :delay-duration="150")
+          UTooltip(v-if="workflowMode === 'forecasting'" text="Projected balance (end of month)" :delay-duration="150")
             BaseIconButton(
               icon="i-lucide-line-chart"
               :active="showProjectedBalanceTimeline"
@@ -1477,6 +1507,7 @@ onBeforeUnmount(() => {
           )
         template(#trailing)
           .ml-auto(
+            v-if="workflowMode === 'forecasting'"
             class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
             role="button"
             tabindex="0"
@@ -1489,9 +1520,17 @@ onBeforeUnmount(() => {
               | &nbsp;
               DollarFormat(:amount="estimatedNetWorth")
               | &nbsp;
+          .ml-auto(
+            v-else
+            class="text-muted text-right text-sm shrink-0")
+            span Your estimated net worth
+            b.text-nowrap
+              | &nbsp;
+              DollarFormat(:amount="estimatedNetWorth")
+              | &nbsp;
 
     UAlert(
-      v-if="!isSnapshotMode && hasRiskAlerts"
+      v-if="!isSnapshotMode && hasRiskAlerts && workflowMode === 'forecasting'"
       class="mb-4"
       color="warning"
       variant="subtle"
@@ -1524,7 +1563,7 @@ onBeforeUnmount(() => {
           ) Dismiss
 
     div(
-      v-if="showProjectedBalanceTimeline && !isSnapshotMode && draggableAccountRegisters.length > 0"
+      v-if="workflowMode === 'forecasting' && showProjectedBalanceTimeline && !isSnapshotMode && draggableAccountRegisters.length > 0"
       class="w-full mb-4 flex flex-col gap-2 rounded-lg border border-default px-3 py-3 bg-elevated/40"
     )
       div(class="flex flex-col sm:flex-row sm:items-center gap-3")
@@ -1571,21 +1610,46 @@ onBeforeUnmount(() => {
 
     div(
       v-else-if="listStore.getIsListsLoading"
-      class="relative overflow-x-auto w-full rounded-md border border-primary/40 p-2 sm:p-4"
+      class="accounts-table-outer mt-2 min-w-0 h-fit w-full rounded-md border border-primary/40"
     )
-      div(class="grid grid-cols-4 gap-2 sm:gap-4 pb-3 border-b border-default")
-        USkeleton(class="h-4 w-8")
-        USkeleton(class="h-4 w-14")
-        USkeleton(class="h-4 w-24")
-        USkeleton(class="h-4 w-16 ml-auto")
-      .space-y-3.pt-3
-        div(class="grid grid-cols-4 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`acct-skeleton-${i}`")
-          USkeleton(class="h-4 w-6")
-          USkeleton(class="h-4 w-16")
+      div(
+        :class="showDebitCreditColumns ? 'accounts-inner-head-grid accounts-inner-head-grid--6' : 'accounts-inner-head-grid accounts-inner-head-grid--4'"
+        class="w-full border-b border-default bg-default text-xs sm:text-sm font-semibold text-default"
+      )
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+          USkeleton(class="h-4 w-4")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+          USkeleton(class="h-4 w-12")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
           USkeleton(class="h-4 w-28")
-          USkeleton(class="h-4 w-18 ml-auto")
+        template(v-if="showDebitCreditColumns")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-14 ml-auto")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-14 ml-auto")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap")
+          USkeleton(class="h-4 w-20 ml-auto")
+      div(
+        v-for="i in 12"
+        :key="`acct-skeleton-${i}`"
+        :class="showDebitCreditColumns ? 'accounts-inner-head-grid accounts-inner-head-grid--6' : 'accounts-inner-head-grid accounts-inner-head-grid--4'"
+        class="w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+      )
+        div(class="p-2 sm:p-4 min-w-0")
+          USkeleton(class="h-4 w-5")
+        div(class="p-2 sm:p-4 text-xs sm:text-sm min-w-0")
+          USkeleton(class="h-4 w-20")
+        div(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm")
+          USkeleton(class="h-4 max-w-full")
+        template(v-if="showDebitCreditColumns")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-16 ml-auto")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-16 ml-auto")
+        div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+          USkeleton(class="h-4 w-24 ml-auto")
 
-    UCard(v-if="showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
+    UCard(v-if="workflowMode === 'forecasting' && showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
       template(#header)
         h3(class="font-semibold") Cross-account snapshot
       p(class="text-sm frog-text-muted")
@@ -1603,23 +1667,147 @@ onBeforeUnmount(() => {
           variant="soft"
           :to="`/register/${accountLiquiditySnapshot.lowest.id}`") Open lowest-balance register
 
-    div(v-if="draggableAccountRegisters.length > 0" class="relative overflow-x-auto w-full rounded-md border border-primary/40")
-      table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
-        caption(class="sr-only") Account registers with balances
-        thead(class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border")
+    div(
+      v-if="draggableAccountRegisters.length > 0"
+      class="accounts-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
+      table.accounts-main-table(
+        class="w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm"
+        aria-label="Account registers with balances"
+      )
+        colgroup(v-if="showDebitCreditColumns")
+          col(style="width:5%")
+          col(style="width:14%")
+          col(style="width:42%")
+          col(style="width:13%")
+          col(style="width:13%")
+          col(style="width:13%")
+        colgroup(v-else)
+          col(style="width:5%")
+          col(style="width:14%")
+          col(style="width:56%")
+          col(style="width:25%")
+        thead.accounts-sticky-thead
           tr
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold w-12 sm:w-16")
-              span(class="sr-only") Drag handle
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold w-1/5") Type
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-left rtl:text-right font-semibold") Account Name
-            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Debit
-            th(scope="col" v-if="showDebitCreditColumns" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Credit
-            th(scope="col" class="sticky top-0 z-20 bg-default px-2 sm:px-4 py-2 sm:py-3.5 text-xs sm:text-sm text-default text-right font-semibold whitespace-nowrap") Balance
+            th(
+              :colspan="accountsTableColspan"
+              scope="colgroup"
+              class="accounts-table-controls-th accounts-thead-sticky-th sticky top-(--ui-header-height) z-38 overflow-hidden rounded-t-md border-b border-default bg-default/95 backdrop-blur-md supports-backdrop-filter:bg-default/90 p-0 align-top font-normal"
+            )
+              div.accounts-sticky-head
+                div(class="flex flex-col min-h-0")
+                  div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+                    div(class="min-w-0 flex-1 flex items-center gap-2")
+                      RegisterListToolbar(
+                        v-model:global-filter="globalFilter"
+                        v-model:show-shortcuts="showShortcuts"
+                        :show-add="!isSnapshotMode"
+                        :show-refresh="false"
+                        add-tooltip="Add account"
+                        add-title="Add account"
+                        add-aria-label="Add account"
+                        @add="handleAddAccountRegister"
+                      )
+                        template(#middle)
+                          UTooltip(text="Manage categories" :delay-duration="150")
+                            BaseIconButton(
+                              icon="i-lucide-tags"
+                              title="Manage categories"
+                              aria-label="Manage categories"
+                              :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
+                              @click="handleManageCategories"
+                            )
+                          UTooltip(v-if="workflowMode === 'forecasting'" text="Save snapshot" :delay-duration="150")
+                            BaseIconButton(
+                              icon="i-lucide-save"
+                              title="Save snapshot"
+                              aria-label="Save snapshot"
+                              :loading="isSavingSnapshot"
+                              :disabled="!currentBudgetAccountId || !!isSnapshotMode"
+                              @click="handleSaveSnapshotClick"
+                            )
+                          UDropdownMenu(:items="sortMenuItems")
+                            UTooltip(text="Sort accounts" :delay-duration="150")
+                              BaseIconButton(
+                                icon="i-lucide-arrow-up-down"
+                                title="Sort accounts"
+                                aria-label="Sort accounts"
+                                :disabled="!!isSnapshotMode"
+                              )
+                          UDropdownMenu(:items="snapshotMenuItems")
+                            UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+                              BaseIconButton(
+                                icon="i-lucide-camera"
+                                :active="!!isSnapshotMode"
+                                :title="`Snapshot view: ${selectedSnapshotLabel}`"
+                                :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+                              )
+                          UTooltip(v-if="workflowMode === 'forecasting'" text="Projected balance (end of month)" :delay-duration="150")
+                            BaseIconButton(
+                              icon="i-lucide-line-chart"
+                              :active="showProjectedBalanceTimeline"
+                              title="Projected balance timeline"
+                              aria-label="Toggle projected balance timeline"
+                              :disabled="!!isSnapshotMode || draggableAccountRegisters.length === 0"
+                              @click="showProjectedBalanceTimeline = !showProjectedBalanceTimeline"
+                            )
+                        template(#filter)
+                          FiltersCombinedGlobalCategoryFilter(
+                            ref="combinedTableFilterRef"
+                            v-model:global-filter="globalFilter"
+                            v-model:category-filter="categoryFilter"
+                            :category-items="accountRegistersCategoryFilterItems"
+                            :show-category-filter="false"
+                            filter-input-id="search"
+                            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
+                          )
+                        template(#trailing)
+                          .ml-auto(
+                            v-if="workflowMode === 'forecasting'"
+                            class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
+                            role="button"
+                            tabindex="0"
+                            @click="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+                            @keydown.enter.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+                            @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
+                          )
+                            span Your estimated net worth
+                            b.text-nowrap
+                              | &nbsp;
+                              DollarFormat(:amount="estimatedNetWorth")
+                              | &nbsp;
+                          .ml-auto(
+                            v-else
+                            class="text-muted text-right text-sm shrink-0")
+                            span Your estimated net worth
+                            b.text-nowrap
+                              | &nbsp;
+                              DollarFormat(:amount="estimatedNetWorth")
+                              | &nbsp;
+                  div(
+                    v-if="showDebitCreditColumns"
+                    class="accounts-inner-head-grid accounts-inner-head-grid--6 w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+                  )
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right")
+                      span(class="sr-only") Drag handle
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right") Type
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right") Account Name
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Debit
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Credit
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Balance
+                  div(
+                    v-else
+                    class="accounts-inner-head-grid accounts-inner-head-grid--4 w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+                  )
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right")
+                      span(class="sr-only") Drag handle
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right") Type
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 text-left rtl:text-right") Account Name
+                    div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap") Balance
 
         tbody(class="w-full relative")
           // Drop zone indicator when dragging
           tr(v-if="isDragging" class="h-2 bg-primary/20 border-2 border-dashed border-primary/60 transition-all duration-200")
-            td(:colspan="showDebitCreditColumns ? 6 : 4" class="p-0")
+            td(:colspan="accountsTableColspan" class="p-0")
               div(class="h-2 bg-linear-to-r from-(--frog-primary) to-(--frog-accent) animate-pulse")
 
           // Main accounts with their sub-accounts grouped together
@@ -1638,16 +1826,16 @@ onBeforeUnmount(() => {
               @touchend="handleTouchEnd($event, index)"
               style="touch-action: pan-y;"
             )
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16 border-b border-default")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
                 a(
                   v-if="!isSnapshotMode"
                   :aria-label="`Drag to reorder ${row.name}`"
                   role="button"
                   class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                   UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5 border-b border-default") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
-                div(class="flex items-center")
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+              td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
+                div(class="flex items-center min-w-0")
                   button(
                     v-if="pocketSubs(row.id).length > 0"
                     type="button"
@@ -1658,7 +1846,7 @@ onBeforeUnmount(() => {
                     :class="collapsedParents.has(row.id) ? 'rotate-0' : 'rotate-90'"
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
-                  div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text") {{ row.name }}
+                  div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text truncate min-w-0") {{ row.name }}
                   div(
                     v-if="riskAlertForRegister(row.id)"
                     class="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
@@ -1689,23 +1877,23 @@ onBeforeUnmount(() => {
                 @touchmove="handlePocketTouchMove($event, subRow, row.id)"
                 @touchend="handlePocketTouchEnd($event, subRow, row.id)"
                 style="touch-action: pan-y;")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-12 sm:w-16 border-b border-default")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
                   a(
                     v-if="!isSnapshotMode"
                     :aria-label="`Drag to reorder ${subRow.name}`"
                     role="button"
                     class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap w-1/5 border-b border-default")
+                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
                   div(class="flex items-center")
                     div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
-                td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
-                  div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center frog-text")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
+                td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
+                  div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center min-w-0 frog-text")
+                    div(class="w-4 h-4 mr-2 shrink-0 flex items-center justify-center frog-status-positive" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
-                    span {{ subRow.name }}
+                    span(class="truncate min-w-0") {{ subRow.name }}
                 template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")
                   td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
                     DollarFormat(:amount="dcn.debit != null ? -Math.abs(dcn.debit) : null")
@@ -1713,4 +1901,82 @@ onBeforeUnmount(() => {
                     DollarFormat(:amount="dcn.credit")
                   td(class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
                     DollarFormat(:amount="dcn.net")
+
 </template>
+
+<style scoped>
+.accounts-table-outer {
+  padding: 0;
+}
+
+.accounts-table-controls-th {
+  vertical-align: top;
+  line-height: 0;
+}
+
+.accounts-table-controls-th .accounts-sticky-head {
+  line-height: normal;
+}
+
+.accounts-main-table thead.accounts-sticky-thead .accounts-thead-sticky-th {
+  position: sticky;
+  top: var(--ui-header-height);
+}
+
+.accounts-main-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.375rem;
+}
+
+.accounts-main-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.375rem;
+}
+
+.accounts-main-table tbody tr:last-child td:only-child {
+  border-bottom-left-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+
+/* Same percentages as <colgroup>: narrow handle, wider type, name takes remainder, equal debit/credit/balance. */
+.accounts-inner-head-grid--6 {
+  display: grid;
+  grid-template-columns: 5% 14% 42% 13% 13% 13%;
+  width: 100%;
+}
+
+.accounts-inner-head-grid--4 {
+  display: grid;
+  grid-template-columns: 5% 14% 56% 25%;
+  width: 100%;
+}
+
+.accounts-main-table col:nth-child(1) {
+  min-width: 1.75rem;
+}
+
+.accounts-main-table col:nth-child(2) {
+  min-width: 4rem;
+}
+
+.accounts-main-table col:nth-child(3) {
+  min-width: 6rem;
+}
+
+.accounts-main-table col:nth-child(4),
+.accounts-main-table col:nth-child(5),
+.accounts-main-table col:nth-child(6) {
+  min-width: 4rem;
+}
+
+@media (max-width: 767px) {
+  .accounts-table-outer {
+    overflow-x: auto;
+    overflow-y: clip;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .accounts-table-outer .accounts-main-table {
+    min-width: max(100%, 36rem);
+  }
+}
+</style>

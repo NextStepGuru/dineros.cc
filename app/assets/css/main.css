@@ -4,6 +4,19 @@
 /* Reka UI modals lock body scroll; without a stable gutter the viewport width changes when the scrollbar is toggled and the layout jumps (often read as a vertical shift). */
 html {
   scrollbar-gutter: stable;
+  background-color: var(--ui-bg);
+}
+
+body {
+  background-color: var(--ui-bg);
+}
+
+/*
+ * Nuxt UI toast only: root uses `group` (see ui/toast). Bottom UProgress is error-red
+ * and nearly full width on mobile; hide that strip — dismiss timing is unchanged.
+ */
+[data-slot="root"].group [data-slot="progress"] {
+  display: none !important;
 }
 
 :root {
@@ -66,15 +79,13 @@ html {
   --frog-cta-text: #f6fff4;
 }
 
-.ui-main {
-  max-height: 100vh;
-  overflow: hidden;
-}
-
-/** Same app chrome as `.ui-main` pages but allows vertical document scroll (e.g. reports). */
+/** Default app shell: full document height, vertical scroll on the window (no inner viewport cages). */
 .ui-main-scroll {
   min-height: 100dvh;
-  overflow-x: hidden;
+  /* Allow wide tables to scroll horizontally at the document level so nested `overflow-x: auto` wrappers
+     are not required — those become the sticky containing block and `top: var(--ui-header-height)`
+     incorrectly reserves space above thead. */
+  overflow-x: auto;
 }
 
 .frog-surface {

@@ -1,4 +1,5 @@
-# Staging: in-cluster MySQL (mysql.mysql.svc.cluster.local); adjust ingress host / TLS as needed.
+# Staging manifest mirrors .deploy/production/dineros.yaml (main app + microservice + service + ingress).
+# Differences: Namespace dineros-staging, staging secrets/hosts/replicas, in-cluster MySQL URL via dineros-staging-mysql.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -199,6 +200,10 @@ spec:
         - name: dineros-microservice-staging-container
           image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPO}/dineros-microservice:latest
           imagePullPolicy: Always
+          volumeMounts:
+            - name: service-account-volume
+              mountPath: /etc/google-service-account
+              readOnly: true
           ports:
             - name: http
               containerPort: 3050
@@ -249,6 +254,10 @@ spec:
                 secretKeyRef:
                   name: staging-db-secrets
                   key: DB_ENCRYPTION_KEY
+      volumes:
+        - name: service-account-volume
+          secret:
+            secretName: google-service-account-staging
 ---
 apiVersion: v1
 kind: Service
@@ -277,6 +286,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  generation: 1
   labels:
     app: dineros-staging
   name: dineros-staging-ingress

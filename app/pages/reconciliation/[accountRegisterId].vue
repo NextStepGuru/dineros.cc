@@ -45,6 +45,7 @@ type ReconciliationWorkspace = {
 const route = useRoute();
 const authStore = useAuthStore();
 const listStore = useListStore();
+const { setWorkflowMode } = useWorkflowMode();
 const toast = useToast();
 const { $api } = useNuxtApp();
 
@@ -233,10 +234,21 @@ watch(
   },
   { immediate: true },
 );
+
+onMounted(() => {
+  setWorkflowMode("reconciliation");
+});
 </script>
 
 <template lang="pug">
 section(class="px-3 sm:px-4 py-4 max-w-6xl mx-auto space-y-4")
+  UAlert(
+    color="neutral"
+    variant="subtle"
+    title="Statement reconciliation"
+  )
+    template(#description)
+      span.frog-text-muted You are in the Reconciliation workflow — comparing the ledger to bank statement balances, not editing projections.
   //- Header
   .flex.flex-wrap.items-center.justify-between.gap-2
     div
@@ -325,7 +337,7 @@ section(class="px-3 sm:px-4 py-4 max-w-6xl mx-auto space-y-4")
             span(class="text-green-500 font-medium")
               | {{ clearedItems.length }} cleared
 
-      div(class="max-h-[55dvh] overflow-auto")
+      div(class="overflow-x-auto")
         table(class="w-full text-sm")
           thead
             tr(class="border-b sticky top-0 bg-elevated z-10")

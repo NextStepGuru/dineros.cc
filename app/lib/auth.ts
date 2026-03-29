@@ -1,5 +1,7 @@
 // Authentication utility functions that can be easily unit tested
 
+import type { WorkflowMode } from "~/lib/workflowMode";
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -77,16 +79,23 @@ export function validateLoginCredentials(
 /**
  * Determine navigation target after successful login.
  * Uses the first account register when sorted by sortOrder (ascending).
+ * Reconciliation workflow lands on the reconciliation hub; forecasting on register.
  */
-export function getPostLoginRedirect(accountRegisters: any[]): string {
-  if (accountRegisters.length > 0) {
-    const bySortOrder = [...accountRegisters].sort(
-      (a, b) =>
-        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0),
-    );
-    return `/register/${bySortOrder[0].id}`;
+export function getPostLoginRedirect(
+  accountRegisters: any[],
+  workflow: WorkflowMode = "forecasting",
+): string {
+  if (accountRegisters.length === 0) {
+    return "/account-registers?onboarding=1";
   }
-  return "/account-registers?onboarding=1";
+  if (workflow === "reconciliation") {
+    return "/reconciliation";
+  }
+  const bySortOrder = [...accountRegisters].sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.id ?? 0) - (b.id ?? 0),
+  );
+  return `/register/${bySortOrder[0].id}`;
 }
 
 /**

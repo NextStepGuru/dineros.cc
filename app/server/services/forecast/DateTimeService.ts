@@ -447,6 +447,15 @@ export class DateTimeService {
   }
 
   /**
+   * UTC midnight for calendar parts (month 0 = January).
+   */
+  utcCalendarDate(year: number, monthIndex0: number, day: number): DateTime {
+    const mm = String(monthIndex0 + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    return this.parse(`${year}-${mm}-${dd}`, "YYYY-MM-DD");
+  }
+
+  /**
    * Get the number of days in a month
    * If no date is provided, uses the current "now" context
    */

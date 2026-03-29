@@ -15,6 +15,7 @@ test.describe("Register entries", () => {
     e2e,
   }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
@@ -26,36 +27,77 @@ test.describe("Register entries", () => {
     const refresh = page.getByRole("button", { name: /refresh register/i });
     await expect(refresh).toBeVisible();
     await expect(refresh).toBeEnabled();
-    await page.getByRole("button", { name: /open table filters/i }).click();
-    await expect(page.locator("#search")).toBeVisible();
+    const openFilters = page.getByRole("button", { name: /open table filters/i });
+    await openFilters.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      await openFilters.click();
+      await expect(
+        page.getByRole("textbox", { name: /filter table by text/i }),
+      ).toBeVisible();
+    }).toPass({ timeout: 15_000 });
   });
 
   test("add entry opens modal", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
-    await page.getByRole("button", { name: /add entry/i }).first().click();
-    await expect(page.getByLabel(/description/i).first()).toBeVisible({
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("E2E seeded transaction")).toBeVisible({
+      timeout: 45_000,
+    });
+    const addEntry = page.getByRole("button", { name: /add entry/i }).first();
+    await addEntry.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      await addEntry.click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }).toPass({ timeout: 20_000 });
+    await expect(page.getByRole("dialog").locator("#description")).toBeVisible({
       timeout: 15_000,
     });
     await page.keyboard.press("Escape");
   });
 
-  test("future and past tabs switch register view", async ({ page, e2e }) => {
+  test("forecast vs reconcile workspace switches register context", async ({
+    page,
+    e2e,
+  }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
-    const tablist = page.getByRole("tablist", {
-      name: /register time range/i,
-    });
-    await expect(tablist).toBeVisible();
-    const futureTab = tablist.getByRole("tab", { name: /^future$/i });
-    const pastTab = tablist.getByRole("tab", { name: /^past$/i });
-    await expect(futureTab).toBeVisible();
-    await expect(pastTab).toBeVisible();
-    await pastTab.click();
-    await expect(pastTab).toHaveAttribute("aria-selected", "true");
-    await futureTab.click();
-    await expect(futureTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText(/Projected entries and balances/i),
+    ).toBeVisible();
+
+    // Open Reconcile menu and click Register
+    await page.keyboard.press("Escape");
+    const reconTrigger = page.getByRole("banner").getByRole("button", { name: "Reconcile menu" });
+    await expect(async () => {
+      await reconTrigger.click();
+      await expect(reconTrigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
+    const reconRegister = page.getByRole("menu").getByText("Register", { exact: true });
+    await expect(reconRegister).toBeVisible({ timeout: 15_000 });
+    await reconRegister.click();
+    await expect(page).toHaveURL(
+      new RegExp(`/register/${e2e.checkingRegisterId}`),
+    );
+    await expect(
+      page.getByText(/This view shows cleared and reconciled activity/i),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Open Forecast menu and click Register
+    await page.keyboard.press("Escape");
+    const fcTrigger = page.getByRole("banner").getByRole("button", { name: "Forecast menu" });
+    await expect(async () => {
+      await fcTrigger.click();
+      await expect(fcTrigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
+    const fcRegister = page.getByRole("menu").getByText("Register", { exact: true });
+    await expect(fcRegister).toBeVisible({ timeout: 15_000 });
+    await fcRegister.click();
+    await expect(
+      page.getByText(/Projected entries and balances/i),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("account selector shows current register name", async ({

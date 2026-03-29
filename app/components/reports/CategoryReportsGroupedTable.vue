@@ -7,9 +7,7 @@ defineProps<{
 </script>
 
 <template lang="pug">
-.table-wrap(
-  class="relative overflow-auto w-full max-h-[min(65dvh,calc(100dvh-var(--ui-header-height)-12rem))] overscroll-y-contain"
-)
+.table-wrap(class="relative w-full")
   table(class="w-full min-w-full text-xs sm:text-sm border-separate border-spacing-0")
     caption(class="sr-only") Category spending breakdown
     thead(

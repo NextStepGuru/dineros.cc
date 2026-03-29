@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LoginResponse } from "~/lib/auth";
 import { getPostLoginRedirect, processLoginResponse } from "~/lib/auth";
+import { readWorkflowModeFromStorage } from "~/lib/workflowMode";
 import type { User } from "~/types/types";
 import { handleError } from "~/lib/utils";
 
@@ -128,7 +129,10 @@ async function submit() {
     await listStore.fetchLists();
     const defaultBudget = listStore.getDefaultBudget;
     if (defaultBudget) authStore.setBudgetId(defaultBudget.id);
-    const redirectPath = getPostLoginRedirect(listStore.getAccountRegisters);
+    const redirectPath = getPostLoginRedirect(
+      listStore.getAccountRegisters,
+      readWorkflowModeFromStorage() ?? "forecasting",
+    );
     toast.add({
       color: "success",
       description: "Welcome! You have joined the account.",
