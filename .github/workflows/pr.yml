@@ -1,6 +1,7 @@
-# Runs on PRs: unit tests, lint, pre-security checks; build/push app + microservice, deploy to GKE staging, then Playwright E2E vs https://staging.dineros.cc.
+# Runs on PRs: unit tests, lint, pre-security checks; build/push app + microservice (same as production), deploy to GKE staging.
+# Staging Playwright E2E is not run in CI (run locally: pnpm test:e2e with PLAYWRIGHT_BASE_URL).
 # Refresh Linux visual baselines vs staging: .github/workflows/e2e-update-staging-snapshots.yml (manual).
-# Staging manifests: .deploy/staging/dineros.yaml (namespace dineros-staging). Fork PRs skip deploy and staging E2E (no WIF).
+# Staging manifests: .deploy/staging/dineros.yaml (namespace dineros-staging). Fork PRs skip deploy (no WIF).
 name: PR Checks
 
 on:
@@ -203,78 +204,3 @@ jobs:
           sed -i "s|dineros:latest|dineros:${TAG}|g" "$RENDERED_MANIFEST"
           sed -i "s|dineros-microservice:latest|dineros-microservice:${TAG}|g" "$RENDERED_MANIFEST"
           kubectl apply -f "$RENDERED_MANIFEST"
-
-  staging-e2e:
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    needs:
-      - staging-deploy
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      CI: true
-      E2E: "1"
-      TZ: UTC
-      PLAYWRIGHT_BASE_URL: "https://staging.dineros.cc"
-      E2E_SEED_TOKEN: ${{ secrets.E2E_SEED_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-        with:
-          version: "10.32.1"
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - id: auth
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
-      - id: get-credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: ${{ secrets.GKE_CLUSTER }}
-          location: ${{ secrets.GKE_LOCATION }}
-      - name: Wait for staging rollouts
-        run: |
-          kubectl rollout status deployment/dineros-staging-deployment -n dineros-staging --timeout=300s
-          kubectl rollout status deployment/dineros-microservice-staging-deployment -n dineros-staging --timeout=300s
-      - name: Wait for staging HTTP
-        run: |
-          for i in $(seq 1 36); do
-            if curl -fsS -o /dev/null --max-time 20 "https://staging.dineros.cc/"; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "staging URL did not become ready" >&2
-          exit 1
-      - name: Install Playwright Chromium
-        run: pnpm --filter dineros-app exec playwright install --with-deps chromium
-      - name: E2E against staging
-        run: set -o pipefail && pnpm test:e2e 2>&1 | tee ./output.txt
-      - name: Upload Playwright HTML report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-      - name: Upload Playwright test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-      - name: Upload visual snapshots (actual)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: visual-snapshots-linux
-          path: |
-            app/tests/e2e/specs/authed/visual.spec.ts-snapshots/
-            app/tests/e2e/specs/public/visual.spec.ts-snapshots/
