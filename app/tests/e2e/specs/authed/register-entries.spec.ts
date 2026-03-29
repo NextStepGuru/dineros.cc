@@ -39,23 +39,40 @@ test.describe("Register entries", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("future and past tabs switch register view", async ({ page, e2e }) => {
+  test("forecast vs reconcile workspace switches register context", async ({
+    page,
+    e2e,
+  }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
-    const tablist = page.getByRole("tablist", {
-      name: /register time range/i,
-    });
-    await expect(tablist).toBeVisible();
-    const futureTab = tablist.getByRole("tab", { name: /^future$/i });
-    const pastTab = tablist.getByRole("tab", { name: /^past$/i });
-    await expect(futureTab).toBeVisible();
-    await expect(pastTab).toBeVisible();
-    await pastTab.click();
-    await expect(pastTab).toHaveAttribute("aria-selected", "true");
-    await futureTab.click();
-    await expect(futureTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText(/Projected entries and balances/i),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByRole("banner").getByRole("button", { name: "Reconcile menu" }).click();
+    const reconRegister = page
+      .getByRole("menuitem")
+      .filter({ hasText: /^register$/i });
+    await expect(reconRegister.first()).toBeVisible({ timeout: 15_000 });
+    await reconRegister.first().click();
+    await expect(page).toHaveURL(
+      new RegExp(`/register/${e2e.checkingRegisterId}`),
+    );
+    await expect(
+      page.getByText(/This view shows cleared and reconciled activity/i),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape");
+    await page.getByRole("banner").getByRole("button", { name: "Forecast menu" }).click();
+    const fcRegister = page
+      .getByRole("menuitem")
+      .filter({ hasText: /^register$/i });
+    await expect(fcRegister.first()).toBeVisible({ timeout: 15_000 });
+    await fcRegister.first().click();
+    await expect(
+      page.getByText(/Projected entries and balances/i),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("account selector shows current register name", async ({

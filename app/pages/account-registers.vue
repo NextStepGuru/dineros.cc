@@ -1610,19 +1610,44 @@ watch(workflowMode, (w) => {
 
     div(
       v-else-if="listStore.getIsListsLoading"
-      class="relative h-fit w-full overflow-x-auto rounded-md border border-primary/40 p-2 sm:p-4"
+      class="accounts-table-outer mt-2 min-w-0 h-fit w-full rounded-md border border-primary/40"
     )
-      div(class="grid grid-cols-4 gap-2 sm:gap-4 pb-3 border-b border-default")
-        USkeleton(class="h-4 w-8")
-        USkeleton(class="h-4 w-14")
-        USkeleton(class="h-4 w-24")
-        USkeleton(class="h-4 w-16 ml-auto")
-      .space-y-3.pt-3
-        div(class="grid grid-cols-4 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`acct-skeleton-${i}`")
-          USkeleton(class="h-4 w-6")
-          USkeleton(class="h-4 w-16")
+      div(
+        :class="showDebitCreditColumns ? 'accounts-inner-head-grid accounts-inner-head-grid--6' : 'accounts-inner-head-grid accounts-inner-head-grid--4'"
+        class="w-full border-b border-default bg-default text-xs sm:text-sm font-semibold text-default"
+      )
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+          USkeleton(class="h-4 w-4")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+          USkeleton(class="h-4 w-12")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
           USkeleton(class="h-4 w-28")
-          USkeleton(class="h-4 w-18 ml-auto")
+        template(v-if="showDebitCreditColumns")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-14 ml-auto")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-14 ml-auto")
+        div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default whitespace-nowrap")
+          USkeleton(class="h-4 w-20 ml-auto")
+      div(
+        v-for="i in 12"
+        :key="`acct-skeleton-${i}`"
+        :class="showDebitCreditColumns ? 'accounts-inner-head-grid accounts-inner-head-grid--6' : 'accounts-inner-head-grid accounts-inner-head-grid--4'"
+        class="w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+      )
+        div(class="p-2 sm:p-4 min-w-0")
+          USkeleton(class="h-4 w-5")
+        div(class="p-2 sm:p-4 text-xs sm:text-sm min-w-0")
+          USkeleton(class="h-4 w-20")
+        div(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm")
+          USkeleton(class="h-4 max-w-full")
+        template(v-if="showDebitCreditColumns")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-16 ml-auto")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-16 ml-auto")
+        div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+          USkeleton(class="h-4 w-24 ml-auto")
 
     UCard(v-if="workflowMode === 'forecasting' && showCrossAccountSnapshot && accountLiquiditySnapshot && draggableAccountRegisters.length > 0" class="my-4")
       template(#header)

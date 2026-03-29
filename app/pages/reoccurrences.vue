@@ -498,23 +498,45 @@ watch(
         description="Choose All categories, Uncategorized, or another category.")
       div(
         v-else-if="listStore.getIsListsLoading && reoccurrencesForTable.length === 0"
-        class="p-2 sm:p-4"
+        class="flex flex-col min-h-0"
       )
-        div(class="grid grid-cols-6 gap-2 sm:gap-4 pb-3 border-b border-default")
-          USkeleton(class="h-4 w-16")
-          USkeleton(class="h-4 w-14")
-          USkeleton(class="h-4 w-16")
-          USkeleton(class="h-4 w-24")
-          USkeleton(class="h-4 w-12 ml-auto")
-          USkeleton(class="h-4 w-14 ml-auto")
-        .space-y-3.pt-3
-          div(class="grid grid-cols-6 gap-2 sm:gap-4 items-center" v-for="i in 12" :key="`reocc-skeleton-${i}`")
+        div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+          div(class="min-w-0 flex-1 flex items-center gap-2")
+            USkeleton(class="h-9 grow min-w-32 sm:max-w-48 rounded-md")
+            USkeleton(class="h-9 w-9 rounded-md shrink-0")
+            USkeleton(class="h-9 w-9 rounded-md shrink-0")
+        div(
+          class="reoccurrences-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+        )
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
+            USkeleton(class="h-4 w-14")
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
+            USkeleton(class="h-4 w-12")
+          div(class="reoccurrences-head-clip px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default")
             USkeleton(class="h-4 w-20")
-            USkeleton(class="h-4 w-16")
-            USkeleton(class="h-4 w-20")
-            USkeleton(class="h-4 w-28")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+            USkeleton(class="h-4 w-full max-w-md")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
             USkeleton(class="h-4 w-14 ml-auto")
+          div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+            USkeleton(class="h-4 w-20 ml-auto")
+        div(
+          v-for="i in 12"
+          :key="`reocc-skeleton-${i}`"
+          class="reoccurrences-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+        )
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-20 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-16 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
+            USkeleton(class="h-4 w-24 max-w-full")
+          div(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm")
+            USkeleton(class="h-4 max-w-full")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
             USkeleton(class="h-4 w-16 ml-auto")
+          div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
+            USkeleton(class="h-4 w-20 ml-auto")
       table.reoccurrences-main-table(
         v-if="reoccurrencesForTable.length > 0"
         class="w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm"

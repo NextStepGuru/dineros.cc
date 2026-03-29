@@ -157,14 +157,6 @@ const hasReoccurrences = computed(
 
 const plaidLinked = computed(() => authStore.hasPlaidConnected);
 
-const showRegisterOnboarding = computed(() => {
-  if (snapshotMode.isSnapshotMode.value) return false;
-  if (onboardingDismissed.value) return false;
-  if (!listStore.getAccountRegisters.length) return false;
-  if (isInitialLoading.value) return false;
-  return tableEntries.value.length === 0;
-});
-
 onBeforeMount(async () => {
   const regs = listStore.getAccountRegisters;
   if (regs.length === 0) {
@@ -186,11 +178,26 @@ const accountRegisterId = ref<number>(
     : Number.parseInt(String(route.params.id), 10),
 );
 
-// Watch for changes to accountRegisterId and navigate to the new route
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id === "" || Array.isArray(id)) return;
+    const n = Number.parseInt(String(id), 10);
+    if (!Number.isNaN(n) && n > 0 && n !== accountRegisterId.value) {
+      accountRegisterId.value = n;
+    }
+  },
+);
+
 watch(accountRegisterId, async (newId) => {
-  if (newId) {
-    await navigateTo(`/register/${newId}`);
-  }
+  if (!newId) return;
+  const current = route.params.id;
+  const cur =
+    current === "" || Array.isArray(current)
+      ? 0
+      : Number.parseInt(String(current), 10);
+  if (newId === cur) return;
+  await navigateTo(`/register/${newId}`);
 });
 
 watch(authStore, async () => {
@@ -216,9 +223,7 @@ const currentSkip = ref(0);
 const pageSize = 500; // Number of records per page
 const hasMoreData = ref(true);
 const isLoadingMore = ref(false);
-const isInitialLoading = ref(false);
 
-// Progressive loading: Quick load first (50 records), then full load
 const accountEntries = shallowRef<{
   entries: RegisterEntry[];
   lowest: RegisterEntry;
@@ -226,58 +231,88 @@ const accountEntries = shallowRef<{
   isPartialLoad?: boolean;
 }>({ entries: [], lowest: {} as RegisterEntry, highest: {} as RegisterEntry });
 
-const isQuickLoading = ref(false);
-const isFullLoading = ref(false);
-const isPartialLoad = ref(false);
 const isRefreshLoading = ref(false);
 
-// Direct reactive reference for table data
 const tableEntries = ref<RegisterEntry[]>([]);
 const tableKey = ref(0); // Force table re-render
 
-// Load initial data
-const loadInitialEntries = async () => {
-  isInitialLoading.value = true;
-  currentSkip.value = 0;
-  hasMoreData.value = true;
-  tableEntries.value = [];
-  try {
-    if (snapshotMode.isSnapshotMode.value) {
-      const rsid =
-        snapshotMode.registerSnapshotIdByRegisterId.value[
-          accountRegisterId.value
-        ];
-      if (!rsid) {
-        accountEntries.value = {
-          entries: [],
-          lowest: {} as RegisterEntry,
-          highest: {} as RegisterEntry,
-        };
-        hasMoreData.value = false;
-        tableKey.value++;
-        return;
-      }
-      const data = await (useNuxtApp().$api as typeof $fetch)<{
+type RegisterPagePayload = {
+  entries: RegisterEntry[];
+  lowest: RegisterEntry;
+  highest: RegisterEntry;
+  isPartialLoad?: boolean;
+  hasMore: boolean;
+  currentSkip: number;
+};
+
+async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
+  const id = accountRegisterId.value;
+  if (!id || Number.isNaN(id)) {
+    return {
+      entries: [],
+      lowest: {} as RegisterEntry,
+      highest: {} as RegisterEntry,
+      hasMore: false,
+      currentSkip: 0,
+    };
+  }
+
+  const $fetchApi = useNuxtApp().$api as typeof $fetch;
+
+  if (snapshotMode.isSnapshotMode.value) {
+    const rsid =
+      snapshotMode.registerSnapshotIdByRegisterId.value[id];
+    if (!rsid) {
+      return {
+        entries: [],
+        lowest: {} as RegisterEntry,
+        highest: {} as RegisterEntry,
+        hasMore: false,
+        currentSkip: 0,
+      };
+    }
+    try {
+      const data = await $fetchApi<{
         entries: RegisterEntry[];
         lowest?: RegisterEntry;
         highest?: RegisterEntry;
       }>(`/api/snapshot-register/${rsid}`);
-      if (data) {
-        accountEntries.value = {
-          entries: [...(data.entries || [])],
-          lowest: data.lowest ?? ({} as RegisterEntry),
-          highest: data.highest ?? ({} as RegisterEntry),
+      if (!data) {
+        return {
+          entries: [],
+          lowest: {} as RegisterEntry,
+          highest: {} as RegisterEntry,
+          hasMore: false,
+          currentSkip: 0,
         };
-        tableEntries.value = data.entries ? [...data.entries] : [];
-        hasMoreData.value = false;
-        currentSkip.value = data.entries?.length || 0;
-        tableKey.value++;
       }
-      return;
+      const entries = [...(data.entries || [])];
+      return {
+        entries,
+        lowest: data.lowest ?? ({} as RegisterEntry),
+        highest: data.highest ?? ({} as RegisterEntry),
+        hasMore: false,
+        currentSkip: entries.length,
+      };
+    } catch (error) {
+      console.error("Initial load failed:", error);
+      return {
+        entries: [],
+        lowest: {} as RegisterEntry,
+        highest: {} as RegisterEntry,
+        hasMore: false,
+        currentSkip: 0,
+      };
     }
+  }
 
-    // use $api (not useAPI) so request resolves; useAPI/useFetch was hanging after nav (Nuxt 4)
-    const data = await (useNuxtApp().$api as typeof $fetch)<{
+  const reg = registersForRegisterPage.value.find((r) => r.id === id);
+  if (!reg?.accountId) {
+    return null;
+  }
+
+  try {
+    const data = await $fetchApi<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
@@ -285,10 +320,8 @@ const loadInitialEntries = async () => {
       hasMore: boolean;
     }>("/api/register", {
       query: {
-        accountId: registersForRegisterPage.value.find(
-          (r) => r.id === accountRegisterId.value,
-        )?.accountId,
-        accountRegisterId: accountRegisterId.value,
+        accountId: reg.accountId,
+        accountRegisterId: id,
         direction: defaultRegisterTab.value,
         loadMode: "full",
         skip: 0,
@@ -296,28 +329,87 @@ const loadInitialEntries = async () => {
       },
     });
 
-    if (data) {
-      // Update both accountEntries and tableEntries directly
-      accountEntries.value = {
-        entries: [...(data.entries || [])],
-        lowest: data.lowest,
-        highest: data.highest,
-        isPartialLoad: data.isPartialLoad,
-      };
+    if (!data) return null;
 
-      tableEntries.value = data.entries ? [...data.entries] : [];
-      hasMoreData.value = data.hasMore || false;
-      currentSkip.value = data.entries?.length || 0;
-
-      // Force table re-render by updating key
-      tableKey.value++;
-    }
+    const entries = [...(data.entries || [])];
+    return {
+      entries,
+      lowest: data.lowest,
+      highest: data.highest,
+      isPartialLoad: data.isPartialLoad,
+      hasMore: data.hasMore || false,
+      currentSkip: entries.length,
+    };
   } catch (error) {
     console.error("Initial load failed:", error);
-  } finally {
-    isInitialLoading.value = false;
+    return null;
   }
-};
+}
+
+const registerInitialDataKey = computed(() => {
+  const rid = accountRegisterId.value;
+  const reg = registersForRegisterPage.value.find((r) => r.id === rid);
+  const snapId = snapshotMode.isSnapshotMode.value
+    ? snapshotMode.registerSnapshotIdByRegisterId.value[rid] ?? 0
+    : 0;
+  return [
+    "register-initial",
+    authStore.getBudgetId,
+    rid,
+    defaultRegisterTab.value,
+    snapshotMode.isSnapshotMode.value ? "snap" : "live",
+    snapId,
+    reg?.accountId ?? 0,
+  ].join(":");
+});
+
+const {
+  data: registerPageData,
+  pending: registerPagePending,
+  refresh: refreshRegisterPageData,
+} = await useAsyncData(
+  () => registerInitialDataKey.value,
+  fetchRegisterPagePayload,
+  { watch: [registerInitialDataKey] },
+);
+
+function applyRegisterPageData(payload: RegisterPagePayload | null) {
+  if (payload == null) return;
+  accountEntries.value = {
+    entries: [...payload.entries],
+    lowest: payload.lowest,
+    highest: payload.highest,
+    isPartialLoad: payload.isPartialLoad,
+  };
+  tableEntries.value = [...payload.entries];
+  hasMoreData.value = payload.hasMore;
+  currentSkip.value = payload.currentSkip;
+  tableKey.value++;
+}
+
+watch(registerPageData, (payload) => applyRegisterPageData(payload), {
+  immediate: true,
+});
+
+watch(registerInitialDataKey, (_key, oldKey) => {
+  if (oldKey === undefined) return;
+  currentSkip.value = 0;
+  hasMoreData.value = true;
+  tableEntries.value = [];
+  accountEntries.value = {
+    entries: [],
+    lowest: {} as RegisterEntry,
+    highest: {} as RegisterEntry,
+  };
+});
+
+const showRegisterOnboarding = computed(() => {
+  if (snapshotMode.isSnapshotMode.value) return false;
+  if (onboardingDismissed.value) return false;
+  if (!listStore.getAccountRegisters.length) return false;
+  if (registerPagePending.value) return false;
+  return tableEntries.value.length === 0;
+});
 
 // Load more data for infinite scrolling
 const loadMoreEntries = async () => {
@@ -397,11 +489,10 @@ watch([() => tableEntries.value.length, hasMoreData], () => {
   void nextTick(() => handleWindowScrollForInfiniteLoad());
 });
 
-// Simplified: just load initial data directly
 const refreshAccountEntries = async () => {
   isRefreshLoading.value = true;
   try {
-    await loadInitialEntries();
+    await refreshRegisterPageData();
   } finally {
     isRefreshLoading.value = false;
   }
@@ -521,30 +612,11 @@ function openMatchToRecurrence(entry: RegisterEntry) {
   matchToRecurrenceModal.open(payload);
 }
 
-// Computed status for compatibility
 const accountEntriesStatus = computed(() => {
-  if (isQuickLoading.value) return "pending";
-  if (isInitialLoading.value && !tableEntries.value.length) return "pending";
+  if (registerPagePending.value) return "pending";
   if (tableEntries.value.length > 0) return "success";
   return "idle";
 });
-
-// Trigger loading when accountRegisterId or register direction changes (or snapshot / mapping)
-watch(
-  [
-    accountRegisterId,
-    defaultRegisterTab,
-    () => snapshotMode.isSnapshotMode.value,
-    () =>
-      snapshotMode.registerSnapshotIdByRegisterId.value[
-        accountRegisterId.value
-      ] ?? 0,
-  ],
-  () => {
-    void refreshAccountEntries();
-  },
-  { immediate: true },
-);
 
 const lowestEntry = computed(() => accountEntries?.value?.lowest);
 const highestEntry = computed(() => accountEntries?.value?.highest);
@@ -561,9 +633,8 @@ const currentType = computed(() =>
   ),
 );
 
-// Determine if any data is still loading
 const isLoading = computed(
-  () => isQuickLoading.value || isFullLoading.value || isInitialLoading.value,
+  () => registerPagePending.value || isRefreshLoading.value,
 );
 
 onMounted(() => {
@@ -1212,51 +1283,55 @@ async function recalcAccount() {
               UButton(size="xs" variant="ghost" @click="dismissRegisterOnboarding") Skip checklist
               UButton(size="xs" color="info" @click="handleAddEntry") Add entry
 
-    //- Skeleton loading state
+    //- Skeleton loading state (shell matches loaded register-table-outer + merged thead)
     template(v-else-if="isLoading && tableEntries.length === 0")
-      //- Toolbar/loading controls skeleton (above table)
-      div(class="mt-4 mb-2 p-1")
-        div(class="flex flex-wrap xl:flex-nowrap items-start gap-3")
-          div(class="min-w-0 flex-1 flex flex-wrap items-center gap-2")
-            USkeleton(class="h-9 w-24 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md")
-          div(class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-2")
-            div(class="flex items-center gap-2")
-              USkeleton(class="h-4 w-28")
-              USkeleton(class="h-7 w-36 rounded-md")
-            USkeleton(class="h-4 w-56")
-
-      //- Table skeleton
-      div(class="w-full overflow-x-auto rounded-md border border-primary/40")
-        //- Table header skeleton
-        div(class="flex border-b frog-border p-4")
-          div(class="w-7 shrink-0")
-            USkeleton(class="h-4 w-2 mx-auto")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-16")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-24")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-20 ml-auto")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-20 ml-auto")
-
-        //- Table rows skeleton
-        div(v-for="i in 25" :key="i" class="flex border-b frog-border p-4")
-          div(class="w-7 shrink-0")
-            USkeleton(class="h-4 w-2 mx-auto")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-20")
-          div(class="flex-1")
-            USkeleton(class="h-4 w-32")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-16 ml-auto")
-          div(class="flex-1 text-right")
-            USkeleton(class="h-4 w-16 ml-auto")
+      div(class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
+        div(class="flex flex-col min-h-0")
+          div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
+            div(class="min-w-0 flex-1 flex items-center gap-2")
+              USkeleton(class="h-9 grow min-w-32 sm:max-w-48 rounded-md")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+              USkeleton(class="h-9 w-9 rounded-md shrink-0")
+            div(class="basis-full xl:basis-auto xl:ml-auto shrink min-w-0 flex flex-col items-end gap-2")
+              div(class="flex items-center gap-2")
+                USkeleton(class="h-4 w-28")
+                USkeleton(class="h-7 w-36 rounded-md")
+              USkeleton(class="h-4 w-56")
+          div(
+            class="register-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
+          )
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+              USkeleton(class="h-4 w-2 mx-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+              USkeleton(class="h-4 w-20")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 hidden md:block")
+              USkeleton(class="h-4 w-16")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
+              USkeleton(class="h-4 w-14 ml-auto")
+          div(
+            v-for="i in 25"
+            :key="`reg-skel-${i}`"
+            class="register-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+          )
+            div(class="p-2 sm:p-4 min-w-0 flex justify-center")
+              USkeleton(class="h-4 w-2")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-20")
+            div(class="p-2 sm:p-4 min-w-0")
+              USkeleton(class="h-4 max-w-full")
+            div(class="p-2 sm:p-4 min-w-0 hidden md:flex md:items-center")
+              USkeleton(class="h-4 w-24")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-16")
+            div(class="p-2 sm:p-4 min-w-0 flex justify-end")
+              USkeleton(class="h-4 w-20")
 
     div(v-else-if="tableEntries.length > 0" class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
       table(
