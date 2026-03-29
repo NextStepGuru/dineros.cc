@@ -755,3 +755,48 @@ model OpenAiRequestLog {
   @@index([purpose])
   @@map("openai_request_log")
 }
+
+model IntegrationAlert {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  source     String   @db.VarChar(32)
+  kind       String   @db.VarChar(32)
+  message    String   @db.Text
+  httpStatus Int?     @map("http_status")
+  details    Json?
+  dedupeKey  String?  @map("dedupe_key") @db.VarChar(191)
+
+  @@index([createdAt])
+  @@index([source])
+  @@index([kind])
+  @@map("integration_alert")
+}
+
+model AdminAuditLog {
+  id              Int      @id @default(autoincrement()) @db.UnsignedInt
+  adminUserId     Int      @map("admin_user_id") @db.UnsignedInt
+  action          String   @db.VarChar(64)
+  targetUserId    Int?     @map("target_user_id") @db.UnsignedInt
+  targetAccountId String?  @map("target_account_id") @db.VarChar(36)
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([adminUserId])
+  @@index([createdAt])
+  @@map("admin_audit_log")
+}
+
+model IntegrationJobLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  source    String   @db.VarChar(32)
+  queueName String   @map("queue_name") @db.VarChar(64)
+  jobId     String?  @map("job_id") @db.VarChar(191)
+  message   String   @db.Text
+  itemId    String?  @map("item_id") @db.VarChar(191)
+  metadata  Json?
+
+  @@index([createdAt])
+  @@index([source])
+  @@map("integration_job_log")
+}
