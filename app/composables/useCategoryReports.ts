@@ -1,6 +1,5 @@
 import { userFriendlyApiError } from "~/lib/userFriendlyApiError";
 import { formatAccountRegisters } from "~/lib/utils";
-import { defaultReportModeForWorkflow } from "~/lib/workflowMode";
 import type { CategoryReportResponse } from "~/server/services/reports/types";
 
 export function useCategoryReports() {
@@ -8,11 +7,7 @@ export function useCategoryReports() {
   const listStore = useListStore();
   const toast = useToast();
   const { todayISOString } = useToday();
-  const { workflowMode } = useWorkflowMode();
-
-  const mode = computed<"past" | "future">(() =>
-    defaultReportModeForWorkflow(workflowMode.value),
-  );
+  const { workflowMode, defaultReportMode: mode } = useWorkflowMode();
   const dateFrom = ref("");
   const dateTo = ref("");
   /** `all` or register id */

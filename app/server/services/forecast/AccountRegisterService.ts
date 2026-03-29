@@ -412,8 +412,10 @@ export class AccountRegisterService implements IAccountRegisterService {
     const currentYear = currentMoment.year() as number;
 
     const next = this.getNextMonthYear(currentMonth, currentYear);
-    const nextMonthMoment = dateTimeService.createUTC(
-      new Date(Date.UTC(next.year, next.month, 1)),
+    const nextMonthMoment = dateTimeService.utcCalendarDate(
+      next.year,
+      next.month,
+      1,
     );
     const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
 
@@ -433,9 +435,7 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
 
     return dateTimeService.toDate(
-      dateTimeService.createUTC(
-        new Date(Date.UTC(targetYear, targetMonth, targetDay)),
-      ),
+      dateTimeService.utcCalendarDate(targetYear, targetMonth, targetDay),
     );
   }
 
@@ -447,14 +447,12 @@ export class AccountRegisterService implements IAccountRegisterService {
     const nextYear = currentYear + 1;
 
     if (currentMonth === 1 && currentDay === 29) {
-      const nextYearFeb = dateTimeService.createUTC(
-        new Date(Date.UTC(nextYear, 1, 1)),
-      );
+      const nextYearFeb = dateTimeService.utcCalendarDate(nextYear, 1, 1);
       const daysInFeb = dateTimeService.daysInMonth(nextYearFeb);
 
       if (daysInFeb < 29) {
         return dateTimeService.toDate(
-          dateTimeService.createUTC(new Date(Date.UTC(nextYear, 2, 1))),
+          dateTimeService.utcCalendarDate(nextYear, 2, 1),
         );
       }
     }
@@ -463,16 +461,14 @@ export class AccountRegisterService implements IAccountRegisterService {
   }
 
   private calculateDefaultMonthlyStatementDate(currentStatementAt: any): Date {
-    const currentMoment = dateTimeService.create(currentStatementAt);
+    const currentMoment = dateTimeService.createUTC(currentStatementAt);
     const currentDay = currentMoment.date() as number;
     const currentMonth = currentMoment.month() as number;
     const currentYear = currentMoment.year() as number;
     const next = this.getNextMonthYear(currentMonth, currentYear);
 
     return dateTimeService.toDate(
-      dateTimeService.createUTC(
-        new Date(Date.UTC(next.year, next.month, currentDay)),
-      ),
+      dateTimeService.utcCalendarDate(next.year, next.month, currentDay),
     );
   }
 

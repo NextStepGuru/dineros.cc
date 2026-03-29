@@ -325,8 +325,10 @@ export class AssetDepreciationService {
           nextYear++;
         }
 
-        const nextMonthMoment = dateTimeService.createUTC(
-          new Date(Date.UTC(nextYear, nextMonth, 1)),
+        const nextMonthMoment = dateTimeService.utcCalendarDate(
+          nextYear,
+          nextMonth,
+          1,
         );
 
         const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
@@ -353,8 +355,10 @@ export class AssetDepreciationService {
           targetDay = currentDay;
         }
 
-        return dateTimeService.createUTC(
-          new Date(Date.UTC(targetYear, targetMonth, targetDay)),
+        return dateTimeService.utcCalendarDate(
+          targetYear,
+          targetMonth,
+          targetDay,
         );
       }
       case 4: {

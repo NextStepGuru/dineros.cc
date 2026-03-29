@@ -12,7 +12,6 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
-import { defaultRegisterDirectionForWorkflow } from "~/lib/workflowMode";
 import type { TableColumn } from "@nuxt/ui";
 import type {
   AccountRegister,
@@ -41,11 +40,8 @@ const BaseIconBtn = resolveComponent("BaseIconButton");
 const overlay = useOverlay();
 const route = useRoute();
 const toast = useToast();
-const { workflowMode } = useWorkflowMode();
-/** Register API direction; driven by header workflow (no on-page Future/Past tabs). */
-const registerDirection = computed<"future" | "past">(() =>
-  defaultRegisterDirectionForWorkflow(workflowMode.value),
-);
+const { workflowMode, defaultRegisterTab } = useWorkflowMode();
+/** `defaultRegisterTab`: future/past API direction from header workflow. */
 const { todayISOString } = useToday();
 
 definePageMeta({
@@ -293,7 +289,7 @@ const loadInitialEntries = async () => {
           (r) => r.id === accountRegisterId.value,
         )?.accountId,
         accountRegisterId: accountRegisterId.value,
-        direction: registerDirection.value,
+        direction: defaultRegisterTab.value,
         loadMode: "full",
         skip: 0,
         take: pageSize,
@@ -342,7 +338,7 @@ const loadMoreEntries = async () => {
           (r) => r.id === accountRegisterId.value,
         )?.accountId,
         accountRegisterId: accountRegisterId.value,
-        direction: registerDirection.value,
+        direction: defaultRegisterTab.value,
         loadMode: "full",
         skip: currentSkip.value,
         take: pageSize,
@@ -537,7 +533,7 @@ const accountEntriesStatus = computed(() => {
 watch(
   [
     accountRegisterId,
-    registerDirection,
+    defaultRegisterTab,
     () => snapshotMode.isSnapshotMode.value,
     () =>
       snapshotMode.registerSnapshotIdByRegisterId.value[
