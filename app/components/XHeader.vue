@@ -388,7 +388,7 @@ UHeader(
       div(class="hidden md:flex items-center gap-1 shrink-0")
         UDropdownMenu(
           :items="forecastDropdownMenuItems"
-          :content="{ align: 'start', sideOffset: 4, class: 'e2e-forecast-workspace-dropdown' }")
+          :content="{ align: 'start', sideOffset: 4 }")
           UButton(
             variant="soft"
             :color="workflowMode === 'forecasting' ? 'primary' : 'neutral'"
@@ -402,7 +402,7 @@ UHeader(
             span Forecast
         UDropdownMenu(
           :items="reconcileDropdownMenuItems"
-          :content="{ align: 'start', sideOffset: 4, class: 'e2e-reconcile-workspace-dropdown' }")
+          :content="{ align: 'start', sideOffset: 4 }")
           UButton(
             variant="soft"
             :color="workflowMode === 'reconciliation' ? 'primary' : 'neutral'"

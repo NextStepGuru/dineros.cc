@@ -64,11 +64,11 @@ test.describe("Authed shell & header navigation", () => {
     });
 
     await page.keyboard.press("Escape");
-    await page.getByTestId("header-forecast-menu-trigger").click();
+    const trigger = page.getByRole("banner").getByRole("button", { name: "Forecast menu" });
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
     await expect(
-      page
-        .locator(".e2e-forecast-workspace-dropdown")
-        .getByText("Reports", { exact: true }),
+      page.getByRole("menu").getByText("Reports", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -79,11 +79,11 @@ test.describe("Authed shell & header navigation", () => {
     });
 
     await page.keyboard.press("Escape");
-    await page.getByTestId("header-reconcile-menu-trigger").click();
+    const trigger = page.getByRole("banner").getByRole("button", { name: "Reconcile menu" });
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
     await expect(
-      page
-        .locator(".e2e-reconcile-workspace-dropdown")
-        .getByText("Goals", { exact: true }),
+      page.getByRole("menu").getByText("Goals", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });
 

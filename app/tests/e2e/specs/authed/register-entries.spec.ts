@@ -39,7 +39,7 @@ test.describe("Register entries", () => {
     const addEntry = page.getByRole("button", { name: /add entry/i }).first();
     await addEntry.scrollIntoViewIfNeeded();
     await addEntry.click();
-    const modal = page.getByTestId("register-entry-modal");
+    const modal = page.getByRole("dialog");
     await expect(modal).toBeVisible({ timeout: 20_000 });
     await expect(modal.locator("#description")).toBeVisible({
       timeout: 15_000,
@@ -58,10 +58,13 @@ test.describe("Register entries", () => {
     await expect(
       page.getByText(/Projected entries and balances/i),
     ).toBeVisible();
+
+    // Open Reconcile menu and click Register
     await page.keyboard.press("Escape");
-    await page.getByTestId("header-reconcile-menu-trigger").click();
-    const reconMenu = page.locator(".e2e-reconcile-workspace-dropdown");
-    const reconRegister = reconMenu.getByText("Register", { exact: true });
+    const reconTrigger = page.getByRole("banner").getByRole("button", { name: "Reconcile menu" });
+    await reconTrigger.click();
+    await expect(reconTrigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    const reconRegister = page.getByRole("menu").getByText("Register", { exact: true });
     await expect(reconRegister).toBeVisible({ timeout: 15_000 });
     await reconRegister.click();
     await expect(page).toHaveURL(
@@ -70,10 +73,13 @@ test.describe("Register entries", () => {
     await expect(
       page.getByText(/This view shows cleared and reconciled activity/i),
     ).toBeVisible({ timeout: 15_000 });
+
+    // Open Forecast menu and click Register
     await page.keyboard.press("Escape");
-    await page.getByTestId("header-forecast-menu-trigger").click();
-    const fcMenu = page.locator(".e2e-forecast-workspace-dropdown");
-    const fcRegister = fcMenu.getByText("Register", { exact: true });
+    const fcTrigger = page.getByRole("banner").getByRole("button", { name: "Forecast menu" });
+    await fcTrigger.click();
+    await expect(fcTrigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    const fcRegister = page.getByRole("menu").getByText("Register", { exact: true });
     await expect(fcRegister).toBeVisible({ timeout: 15_000 });
     await fcRegister.click();
     await expect(

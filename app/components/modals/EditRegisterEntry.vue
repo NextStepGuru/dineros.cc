@@ -507,11 +507,7 @@ const transferDestinationAccounts = computed(() => {
 </script>
 
 <template lang="pug">
-UModal(
-  title="Edit Register Entry"
-  description="Edit Register Entry"
-  class="modal-mobile-fullscreen"
-  :content="{ 'data-testid': 'register-entry-modal' }")
+UModal(title="Edit Register Entry" description="Edit Register Entry" class="modal-mobile-fullscreen")
   template(#body)
     // Apply Account Selection
     div(v-if="state.showApplySelection" class="space-y-4")
