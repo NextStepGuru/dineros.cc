@@ -147,6 +147,7 @@ model UserAccount {
   canInviteUsers     Boolean  @default(true) @map("can_invite_users")
   canManageMembers   Boolean  @default(true) @map("can_manage_members")
   allowedBudgetIds   Json?    @map("allowed_budget_ids")
+  allowedAccountRegisterIds Json? @map("allowed_account_register_ids")
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 
   user    User    @relation(fields: [userId], references: [id])
@@ -182,6 +183,7 @@ model AccountInviteAccount {
   canInviteUsers     Boolean  @default(true) @map("can_invite_users")
   canManageMembers   Boolean  @default(true) @map("can_manage_members")
   allowedBudgetIds   Json?    @map("allowed_budget_ids")
+  allowedAccountRegisterIds Json? @map("allowed_account_register_ids")
 
   invite  AccountInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
   account Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
