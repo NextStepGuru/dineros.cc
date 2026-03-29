@@ -1,7 +1,11 @@
 import { createError } from "h3";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "~/server/clients/prismaClient";
-import { assertAccountCapability } from "~/server/lib/accountMembership";
+import {
+  assertAccountCapability,
+  parseAllowedAccountRegisterIds,
+} from "~/server/lib/accountMembership";
+import { assertUserCanAssignRegisterScopeForAccounts } from "~/server/services/accountInviteService";
 import type { InvitePermissionInput } from "~/server/services/accountInviteService";
 
 export async function listAccountMembers(params: {
@@ -35,6 +39,9 @@ export async function listAccountMembers(params: {
     canInviteUsers: r.canInviteUsers,
     canManageMembers: r.canManageMembers,
     allowedBudgetIds: r.allowedBudgetIds,
+    allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+      r.allowedAccountRegisterIds,
+    ),
   }));
 }
 
@@ -102,6 +109,12 @@ export async function updateAccountMemberCapabilities(params: {
     await assertNotLastOnlyManager(accountId, targetUserId);
   }
 
+  await assertUserCanAssignRegisterScopeForAccounts(
+    actorUserId,
+    [accountId],
+    permissions.allowedAccountRegisterIds,
+  );
+
   await prisma.userAccount.update({
     where: { id: target.id },
     data: {
@@ -114,6 +127,14 @@ export async function updateAccountMemberCapabilities(params: {
               permissions.allowedBudgetIds === null
                 ? Prisma.JsonNull
                 : (permissions.allowedBudgetIds as Prisma.InputJsonValue),
+          }
+        : {}),
+      ...(permissions.allowedAccountRegisterIds !== undefined
+        ? {
+            allowedAccountRegisterIds:
+              permissions.allowedAccountRegisterIds === null
+                ? Prisma.JsonNull
+                : (permissions.allowedAccountRegisterIds as Prisma.InputJsonValue),
           }
         : {}),
     },

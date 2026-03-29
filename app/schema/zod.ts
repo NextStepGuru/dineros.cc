@@ -355,6 +355,10 @@ export const accountInvitePermissionsSchema = z.object({
   canInviteUsers: z.boolean(),
   canManageMembers: z.boolean(),
   allowedBudgetIds: z.array(z.number().int().positive()).nullable().optional(),
+  allowedAccountRegisterIds: z
+    .array(z.number().int().positive())
+    .nullable()
+    .optional(),
 });
 
 export const accountInviteCreateSchema = z

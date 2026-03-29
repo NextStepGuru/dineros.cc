@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AccountTeamTab from "~/components/profile/AccountTeamTab.vue";
+
 definePageMeta({
   middleware: "auth",
 });
@@ -13,9 +15,6 @@ const isAdminUser = isAdminConsoleUser;
 const tabComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   "/edit-profile/profile": defineAsyncComponent(
     () => import("~/components/profile/EditProfileTab.vue"),
-  ),
-  "/edit-profile/team": defineAsyncComponent(
-    () => import("~/components/profile/AccountTeamTab.vue"),
   ),
   "/edit-profile/password": defineAsyncComponent(
     () => import("~/components/profile/ChangePasswordTab.vue"),
@@ -155,7 +154,12 @@ div(class="container mx-auto px-4 py-6 lg:py-8")
           template(#header)
             div(class="flex items-center justify-between gap-3")
               h2(class="text-base sm:text-lg font-semibold") {{ currentTabLabel }}
-          component(:is="currentTabComponent" v-if="currentTabComponent")
+          ClientOnly(v-if="route.path === '/edit-profile/team'")
+            AccountTeamTab
+          component(
+            v-else-if="currentTabComponent"
+            :is="currentTabComponent"
+          )
           UAlert(
             v-else
             color="error"

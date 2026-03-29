@@ -10,7 +10,12 @@ alwaysApply: false
 
 - **Middleware**: `app/server/middleware/auth.ts` runs on `/api` and exempts specific routes via `ignoredRoutes`. Do not broaden exemptions (e.g. entire `/api/tasks/*` or `/api/webhook/*`) without explicit security review. Task and webhook endpoints should require either internal/auth token or signed webhook verification.
 - **Webhooks**: Implement proper verification (e.g. signature, secret) for webhook handlers. Do not leave placeholder handlers that only log payloads; either implement verification and logic or document as WIP and restrict access.
-- **Admin/debug**: Endpoints like migrate, sync-all, debug-_, test-_ should be gated (e.g. admin role, internal-only, or feature flag). Do not expose them as public unauthenticated routes.
+- **Admin/debug**: Endpoints like migrate, sync-all, debug-_, test-_ should be gated (e.g. admin role, internal-only, or feature flag). Do not expose them as public unauthenticated routes. Example: `app/server/api/admin/microservice-reencrypt-migrate.post.ts` requires `requireAdmin` and still needs `MICROSERVICE_INTERNAL_URL` + `INTERNAL_API_TOKEN` configured on the server to reach the microservice.
+
+## Microservice internal calls
+
+- **`MICROSERVICE_INTERNAL_URL`**: Base URL for server-to-server HTTP from the Nuxt app to the microservice (also `runtimeConfig.microserviceInternalUrl` in `app/nuxt.config.ts`).
+- **`INTERNAL_API_TOKEN`**: Shared secret; the main app sends it as header **`x-internal-token`** when proxying (e.g. admin reencrypt migrate). The microservice validates this token globally for all routes in `microservice/server.ts`—do not add unauthenticated entry points; treat the service as internal-only behind this token.
 
 ## Cookies and Tokens
 

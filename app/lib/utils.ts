@@ -102,6 +102,49 @@ export const formatAccountRegisters = (
   return result;
 };
 
+export type AccountRegisterChecklistRow = {
+  register: AccountRegister;
+  /** Pocket under its master when the master is in the same list */
+  isPocket: boolean;
+};
+
+/**
+ * Orders registers like the header/register USelect: masters by `sortOrder`, pockets nested under each.
+ * If a pocket’s master is not in `registers`, the pocket is shown as a top-level row.
+ * Excludes archived registers.
+ */
+export function accountRegisterRowsForChecklist(
+  registers: AccountRegister[],
+): AccountRegisterChecklistRow[] {
+  const filtered = registers.filter((r) => r.isArchived !== true);
+  const idSet = new Set(filtered.map((r) => r.id));
+  const masters = filtered.filter(
+    (r) => !r.subAccountRegisterId || !idSet.has(r.subAccountRegisterId),
+  );
+  masters.sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      String(a.name).localeCompare(String(b.name)) ||
+      a.id - b.id,
+  );
+  const pocketSort = (a: AccountRegister, b: AccountRegister) =>
+    (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+    String(a.name).localeCompare(String(b.name)) ||
+    a.id - b.id;
+
+  const rows: AccountRegisterChecklistRow[] = [];
+  for (const parent of masters) {
+    rows.push({ register: parent, isPocket: false });
+    const pockets = filtered
+      .filter((r) => r.subAccountRegisterId === parent.id)
+      .sort(pocketSort);
+    for (const p of pockets) {
+      rows.push({ register: p, isPocket: true });
+    }
+  }
+  return rows;
+}
+
 export const mapPlaidTypesToAccountTypes = (
   plaidType?: string | null
 ): number => {

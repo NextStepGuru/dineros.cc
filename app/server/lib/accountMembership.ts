@@ -15,10 +15,24 @@ export type AccountMembershipRow = {
   canInviteUsers: boolean;
   canManageMembers: boolean;
   allowedBudgetIds: unknown | null;
+  allowedAccountRegisterIds: unknown | null;
 };
 
 /** Normalize JSON column to sorted unique budget ids, or null = all budgets (when canViewBudgets). */
 export function parseAllowedBudgetIds(
+  raw: unknown | null | undefined,
+): number[] | null {
+  if (raw == null) return null;
+  if (!Array.isArray(raw)) return null;
+  const nums = raw
+    .map((x) => (typeof x === "number" ? x : Number(x)))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (nums.length === 0) return [];
+  return [...new Set(nums)].sort((a, b) => a - b);
+}
+
+/** null = all registers (subject to budget rules); [] = none. */
+export function parseAllowedAccountRegisterIds(
   raw: unknown | null | undefined,
 ): number[] | null {
   if (raw == null) return null;
@@ -43,6 +57,22 @@ export function budgetAllowedForMembership(
   return allowed.includes(budgetId);
 }
 
+export function accountRegisterVisibleForMembership(
+  membership: Pick<
+    AccountMembershipRow,
+    "canViewBudgets" | "allowedBudgetIds" | "allowedAccountRegisterIds"
+  >,
+  reg: { id: number; budgetId: number; accountId: string },
+): boolean {
+  if (!membership.canViewBudgets) return false;
+  if (!budgetAllowedForMembership(membership, reg.budgetId)) return false;
+  const allowedRegs = parseAllowedAccountRegisterIds(
+    membership.allowedAccountRegisterIds,
+  );
+  if (allowedRegs === null) return true;
+  return allowedRegs.includes(reg.id);
+}
+
 export async function getMembership(
   userId: number,
   accountId: string,
@@ -56,6 +86,7 @@ export async function getMembership(
       canInviteUsers: true,
       canManageMembers: true,
       allowedBudgetIds: true,
+      allowedAccountRegisterIds: true,
     },
   });
   return row;
@@ -74,6 +105,7 @@ export async function loadMembershipsForUser(
       canInviteUsers: true,
       canManageMembers: true,
       allowedBudgetIds: true,
+      allowedAccountRegisterIds: true,
     },
   });
 }

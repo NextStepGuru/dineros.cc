@@ -84,9 +84,6 @@ export const useListStore = defineStore("listStore", {
         .sort((a, b) => a.sortOrder - b.sortOrder);
     },
     getIsListsLoading: (state) => state.isLoading,
-    membershipForAccount:
-      (state) => (accountId: string) =>
-        state.memberships.find((m) => m.accountId === accountId) ?? null,
   },
   actions: {
     setReoccurrences(reoccurrences: Reoccurrence[]) {

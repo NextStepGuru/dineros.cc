@@ -17,7 +17,9 @@ Canonical pattern for API routes:
 
 ## Data Access
 
-- **Ownership**: Scope reads and writes by user/account where applicable. Use `getUser(event)` and filter by `userId` or budget/account ownership so one user cannot access another’s data.
+- **User identity**: Use `getUser(event)` and never trust client-supplied user ids for authorization.
+- **Account membership (`UserAccount`)**: Account-scoped access is not only “user has a link row.” Respect per-membership flags: `canViewBudgets`, `allowedBudgetIds` (JSON: `null` = all budgets when `canViewBudgets`), `canInviteUsers`, `canManageMembers`. Use helpers in `app/server/lib/accountMembership.ts`, `app/server/lib/accountAccess.ts` (e.g. `budgetWhereForAccountMember`), and `app/server/lib/filterListsByMembership.ts` for list aggregates—avoid ad hoc queries that skip these rules.
+- **Invites and members**: Enforce invite/member actions via `app/server/services/accountMemberService.ts` (and related routes) so capability checks stay consistent.
 - **Prisma**: Use the shared client from `app/server/clients/prismaClient.ts`. For multi-step writes (e.g. signup), use `PrismaDb.$transaction(...)`. Rely on the existing Prisma field-level encryption extension for sensitive fields; do not bypass it.
 
 ## Prisma schema and migrations

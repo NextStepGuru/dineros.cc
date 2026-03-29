@@ -63,6 +63,8 @@ export type AccountMembershipSummary = {
   canInviteUsers: boolean;
   canManageMembers: boolean;
   allowedBudgetIds: number[] | null;
+  /** null = all registers (within budget rules); [] = none. */
+  allowedAccountRegisterIds: number[] | null;
 };
 
 export type Lists = {

@@ -11,7 +11,9 @@ import { postmarkClient, hasPostmarkToken } from "~/server/clients/postmarkClien
 import env from "~/server/env";
 import { buildAppUrl } from "~/server/lib/appUrl";
 import {
+  accountRegisterVisibleForMembership,
   assertAccountCapability,
+  parseAllowedAccountRegisterIds,
   parseAllowedBudgetIds,
 } from "~/server/lib/accountMembership";
 import type { Prisma } from "@prisma/client";
@@ -25,6 +27,7 @@ export type InvitePermissionInput = {
   canInviteUsers: boolean;
   canManageMembers: boolean;
   allowedBudgetIds?: number[] | null;
+  allowedAccountRegisterIds?: number[] | null;
 };
 
 export function hashInviteToken(token: string): string {
@@ -98,6 +101,57 @@ function escapeHtml(s: string) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+/** Ensures each register id belongs to an account and the user may grant visibility to it. */
+export async function assertUserCanAssignRegisterScopeForAccounts(
+  userId: number,
+  accountIds: string[],
+  allowedRegisterIds: number[] | null | undefined,
+): Promise<void> {
+  if (allowedRegisterIds == null || allowedRegisterIds.length === 0) return;
+  const inviterRows = await prisma.userAccount.findMany({
+    where: { userId, accountId: { in: accountIds } },
+  });
+  const map = new Map(inviterRows.map((r) => [r.accountId, r]));
+  const regs = await prisma.accountRegister.findMany({
+    where: { id: { in: allowedRegisterIds }, isArchived: false },
+    select: { id: true, accountId: true, budgetId: true },
+  });
+  if (regs.length !== allowedRegisterIds.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "One or more account registers are invalid.",
+    });
+  }
+  for (const reg of regs) {
+    if (!accountIds.includes(reg.accountId)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Register does not belong to selected accounts.",
+      });
+    }
+    const m = map.get(reg.accountId);
+    if (!m) {
+      throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+    }
+    if (
+      !accountRegisterVisibleForMembership(
+        {
+          canViewBudgets: m.canViewBudgets,
+          allowedBudgetIds: m.allowedBudgetIds,
+          allowedAccountRegisterIds: m.allowedAccountRegisterIds,
+        },
+        reg,
+      )
+    ) {
+      throw createError({
+        statusCode: 403,
+        statusMessage:
+          "You cannot grant access to registers you cannot see yourself.",
+      });
+    }
+  }
 }
 
 export async function createAccountInvite(params: {
@@ -210,6 +264,12 @@ export async function createAccountInvite(params: {
     throw createError({ statusCode: 400, statusMessage: "Invalid account id." });
   }
 
+  await assertUserCanAssignRegisterScopeForAccounts(
+    inviterUserId,
+    accountIds,
+    permissions.allowedAccountRegisterIds,
+  );
+
   const inviterDisplayName =
     [inviter.firstName, inviter.lastName].filter(Boolean).join(" ") ||
     "A teammate";
@@ -219,6 +279,12 @@ export async function createAccountInvite(params: {
     permissions.allowedBudgetIds === null
       ? Prisma.JsonNull
       : (permissions.allowedBudgetIds as Prisma.InputJsonValue);
+
+  const arForDb: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+    permissions.allowedAccountRegisterIds === undefined ||
+    permissions.allowedAccountRegisterIds === null
+      ? Prisma.JsonNull
+      : (permissions.allowedAccountRegisterIds as Prisma.InputJsonValue);
 
   const row = await prisma.accountInvite.create({
     data: {
@@ -233,6 +299,7 @@ export async function createAccountInvite(params: {
           canInviteUsers: permissions.canInviteUsers,
           canManageMembers: permissions.canManageMembers,
           allowedBudgetIds: abForDb,
+          allowedAccountRegisterIds: arForDb,
         })),
       },
     },
@@ -261,7 +328,7 @@ export async function listPendingInvitesForAccount(params: {
   const { userId, accountId } = params;
   await assertAccountCapability(userId, accountId, "canInviteUsers");
   const now = dateTimeService.nowDate();
-  return prisma.accountInvite.findMany({
+  const rows = await prisma.accountInvite.findMany({
     where: {
       acceptedAt: null,
       revokedAt: null,
@@ -279,6 +346,8 @@ export async function listPendingInvitesForAccount(params: {
           canViewBudgets: true,
           canInviteUsers: true,
           canManageMembers: true,
+          allowedBudgetIds: true,
+          allowedAccountRegisterIds: true,
         },
       },
       invitedBy: {
@@ -287,6 +356,16 @@ export async function listPendingInvitesForAccount(params: {
     },
     orderBy: { createdAt: "desc" },
   });
+  return rows.map((r) => ({
+    ...r,
+    inviteAccounts: r.inviteAccounts.map((ia) => ({
+      ...ia,
+      allowedBudgetIds: parseAllowedBudgetIds(ia.allowedBudgetIds),
+      allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+        ia.allowedAccountRegisterIds,
+      ),
+    })),
+  }));
 }
 
 export async function revokeAccountInvite(params: {
@@ -369,6 +448,9 @@ export async function getInviteValidationPayload(token: string) {
       canInviteUsers: first.canInviteUsers,
       canManageMembers: first.canManageMembers,
       allowedBudgetIds: parseAllowedBudgetIds(first.allowedBudgetIds),
+      allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+        first.allowedAccountRegisterIds,
+      ),
     },
   };
 }
@@ -501,6 +583,10 @@ export async function acceptAccountInvite(
           target.allowedBudgetIds == null
             ? Prisma.JsonNull
             : (target.allowedBudgetIds as Prisma.InputJsonValue),
+        allowedAccountRegisterIds:
+          target.allowedAccountRegisterIds == null
+            ? Prisma.JsonNull
+            : (target.allowedAccountRegisterIds as Prisma.InputJsonValue),
       };
       if (!existing) {
         await tx.userAccount.create({

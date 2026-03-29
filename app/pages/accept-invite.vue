@@ -35,6 +35,7 @@ type Validate =
         canInviteUsers: boolean;
         canManageMembers: boolean;
         allowedBudgetIds: number[] | null;
+        allowedAccountRegisterIds: number[] | null;
       };
     };
 
@@ -160,6 +161,17 @@ function permLine(v: Extract<Validate, { valid: true }>) {
   bits.push(p.canManageMembers ? "Manage members" : "Cannot manage members");
   if (p.allowedBudgetIds?.length) {
     bits.push(`Budgets #${p.allowedBudgetIds.join(", ")} only`);
+  }
+  if (p.canViewBudgets) {
+    if (p.allowedAccountRegisterIds == null) {
+      bits.push("All account registers");
+    } else if (p.allowedAccountRegisterIds.length === 0) {
+      bits.push("No account registers");
+    } else {
+      bits.push(
+        `Account registers #${p.allowedAccountRegisterIds.join(", ")} only`,
+      );
+    }
   }
   return bits.join(" · ");
 }

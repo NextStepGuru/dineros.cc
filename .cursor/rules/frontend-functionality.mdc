@@ -17,6 +17,7 @@ alwaysApply: false
 - **Composables**: Use `useAPI<T>(url, options?)` for reactive data fetching. It uses `$api` under the hood, defaults to `server: false`, and generates unique keys to avoid unwanted caching.
 - **Imperative calls**: Use `$api` from the plugin (e.g. in actions or submit handlers) for one-off mutations. The plugin attaches the auth token and handles 401 (logout + redirect).
 - **Consistency**: Prefer one pattern per flow: `useAPI` for reads/list loading, `$api` for mutations. Handle errors the same way: check `error.value` for `useAPI`, use try/catch or response checks for `$api`, and surface errors via toast (see frontend-ux-and-state).
+- **Multi-account permissions**: A user may have different **per-account** roles (`canViewBudgets`, budget allowlists, invite/member caps); list and budget visibility follow server filtering and `listStore` membership state—do not assume full access to every linked account.
 
 ## Auth and Route Access
 

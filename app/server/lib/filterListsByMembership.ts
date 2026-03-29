@@ -1,6 +1,8 @@
 import type { AccountMembershipRow } from "~/server/lib/accountMembership";
 import {
+  accountRegisterVisibleForMembership,
   budgetAllowedForMembership,
+  parseAllowedAccountRegisterIds,
   parseAllowedBudgetIds,
 } from "~/server/lib/accountMembership";
 
@@ -15,7 +17,12 @@ export function filterListsByMembership<
   TBudget extends { id: number; accountId: string },
   TReg extends { id: number; accountId: string; budgetId: number },
   TCat extends { accountId: string },
-  TSav extends { accountId: string; budgetId: number },
+  TSav extends {
+    accountId: string;
+    budgetId: number;
+    sourceAccountRegisterId: number;
+    targetAccountRegisterId: number;
+  },
   TAcc extends { id: string },
 >(memberships: AccountMembershipRow[], data: {
   reoccurrences: TRec[];
@@ -35,24 +42,32 @@ export function filterListsByMembership<
   const m = membershipMap(memberships);
   const accountIdSet = new Set(memberships.map((x) => x.accountId));
 
+  const regByIdFull = new Map(data.accountRegisters.map((r) => [r.id, r]));
+
   const budgets = data.budgets.filter((b) => {
     const row = m.get(b.accountId);
-    return row ? budgetAllowedForMembership(row, b.id) : false;
+    if (!row || !budgetAllowedForMembership(row, b.id)) return false;
+    const regPick = parseAllowedAccountRegisterIds(row.allowedAccountRegisterIds);
+    if (regPick === null) return true;
+    return data.accountRegisters.some(
+      (ar) =>
+        ar.accountId === b.accountId &&
+        ar.budgetId === b.id &&
+        regPick.includes(ar.id),
+    );
   });
-  const visibleBudgetIds = new Set(budgets.map((b) => b.id));
-
-  const regByIdFull = new Map(data.accountRegisters.map((r) => [r.id, r]));
 
   const reoccurrences = data.reoccurrences.filter((rec) => {
     const reg = regByIdFull.get(rec.accountRegisterId);
     if (!reg) return false;
     const row = m.get(rec.accountId);
-    return row ? budgetAllowedForMembership(row, reg.budgetId) : false;
+    return row ? accountRegisterVisibleForMembership(row, reg) : false;
   });
 
-  const accountRegisters = data.accountRegisters.filter(
-    (ar) => visibleBudgetIds.has(ar.budgetId) && accountIdSet.has(ar.accountId),
-  );
+  const accountRegisters = data.accountRegisters.filter((ar) => {
+    const row = m.get(ar.accountId);
+    return row ? accountRegisterVisibleForMembership(row, ar) : false;
+  });
 
   const categories = data.categories.filter((c) => {
     const row = m.get(c.accountId);
@@ -61,7 +76,14 @@ export function filterListsByMembership<
 
   const savingsGoals = data.savingsGoals.filter((s) => {
     const row = m.get(s.accountId);
-    return row ? budgetAllowedForMembership(row, s.budgetId) : false;
+    if (!row) return false;
+    const src = regByIdFull.get(s.sourceAccountRegisterId);
+    const tgt = regByIdFull.get(s.targetAccountRegisterId);
+    if (!src || !tgt) return false;
+    return (
+      accountRegisterVisibleForMembership(row, src) &&
+      accountRegisterVisibleForMembership(row, tgt)
+    );
   });
 
   const accounts = data.accounts.filter((a) => accountIdSet.has(a.id));
@@ -84,6 +106,7 @@ export function membershipSummariesForClient(
   canInviteUsers: boolean;
   canManageMembers: boolean;
   allowedBudgetIds: number[] | null;
+  allowedAccountRegisterIds: number[] | null;
 }> {
   return rows.map((r) => ({
     accountId: r.accountId,
@@ -91,5 +114,8 @@ export function membershipSummariesForClient(
     canInviteUsers: r.canInviteUsers,
     canManageMembers: r.canManageMembers,
     allowedBudgetIds: parseAllowedBudgetIds(r.allowedBudgetIds),
+    allowedAccountRegisterIds: parseAllowedAccountRegisterIds(
+      r.allowedAccountRegisterIds,
+    ),
   }));
 }
