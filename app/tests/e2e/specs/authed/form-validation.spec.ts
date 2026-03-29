@@ -24,8 +24,12 @@ test.describe("Form validation — authed empty-submit", () => {
       timeout: 45_000,
     });
 
-    await page.getByRole("button", { name: /add entry/i }).first().click();
-    await expect(page.locator("#description")).toBeVisible({
+    const addEntry = page.getByRole("button", { name: /add entry/i }).first();
+    await addEntry.scrollIntoViewIfNeeded();
+    await addEntry.click();
+    const modal = page.getByTestId("register-entry-modal");
+    await expect(modal).toBeVisible({ timeout: 20_000 });
+    await expect(modal.locator("#description")).toBeVisible({
       timeout: 15_000,
     });
 

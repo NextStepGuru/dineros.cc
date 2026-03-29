@@ -64,12 +64,10 @@ test.describe("Authed shell & header navigation", () => {
     });
 
     await page.keyboard.press("Escape");
-    await page.getByRole("banner").getByRole("button", { name: "Forecast menu" }).click();
+    await page.getByTestId("header-forecast-menu-trigger").click();
     await expect(
       page
-        .locator('[role="menu"]')
-        .filter({ visible: true })
-        .last()
+        .locator(".e2e-forecast-workspace-dropdown")
         .getByText("Reports", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });
@@ -81,12 +79,10 @@ test.describe("Authed shell & header navigation", () => {
     });
 
     await page.keyboard.press("Escape");
-    await page.getByRole("banner").getByRole("button", { name: "Reconcile menu" }).click();
+    await page.getByTestId("header-reconcile-menu-trigger").click();
     await expect(
       page
-        .locator('[role="menu"]')
-        .filter({ visible: true })
-        .last()
+        .locator(".e2e-reconcile-workspace-dropdown")
         .getByText("Goals", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
   });

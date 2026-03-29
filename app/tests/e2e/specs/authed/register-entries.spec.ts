@@ -26,7 +26,9 @@ test.describe("Register entries", () => {
     const refresh = page.getByRole("button", { name: /refresh register/i });
     await expect(refresh).toBeVisible();
     await expect(refresh).toBeEnabled();
-    await page.getByRole("button", { name: /open table filters/i }).click();
+    const openFilters = page.getByRole("button", { name: /open table filters/i });
+    await openFilters.scrollIntoViewIfNeeded();
+    await openFilters.click();
     await expect(
       page.getByRole("textbox", { name: /filter table by text/i }),
     ).toBeVisible({ timeout: 15_000 });
@@ -34,8 +36,12 @@ test.describe("Register entries", () => {
 
   test("add entry opens modal", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
-    await page.getByRole("button", { name: /add entry/i }).first().click();
-    await expect(page.locator("#description")).toBeVisible({
+    const addEntry = page.getByRole("button", { name: /add entry/i }).first();
+    await addEntry.scrollIntoViewIfNeeded();
+    await addEntry.click();
+    const modal = page.getByTestId("register-entry-modal");
+    await expect(modal).toBeVisible({ timeout: 20_000 });
+    await expect(modal.locator("#description")).toBeVisible({
       timeout: 15_000,
     });
     await page.keyboard.press("Escape");
@@ -53,11 +59,8 @@ test.describe("Register entries", () => {
       page.getByText(/Projected entries and balances/i),
     ).toBeVisible();
     await page.keyboard.press("Escape");
-    await page.getByRole("banner").getByRole("button", { name: "Reconcile menu" }).click();
-    const reconMenu = page
-      .locator('[role="menu"]')
-      .filter({ visible: true })
-      .last();
+    await page.getByTestId("header-reconcile-menu-trigger").click();
+    const reconMenu = page.locator(".e2e-reconcile-workspace-dropdown");
     const reconRegister = reconMenu.getByText("Register", { exact: true });
     await expect(reconRegister).toBeVisible({ timeout: 15_000 });
     await reconRegister.click();
@@ -68,11 +71,8 @@ test.describe("Register entries", () => {
       page.getByText(/This view shows cleared and reconciled activity/i),
     ).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press("Escape");
-    await page.getByRole("banner").getByRole("button", { name: "Forecast menu" }).click();
-    const fcMenu = page
-      .locator('[role="menu"]')
-      .filter({ visible: true })
-      .last();
+    await page.getByTestId("header-forecast-menu-trigger").click();
+    const fcMenu = page.locator(".e2e-forecast-workspace-dropdown");
     const fcRegister = fcMenu.getByText("Register", { exact: true });
     await expect(fcRegister).toBeVisible({ timeout: 15_000 });
     await fcRegister.click();

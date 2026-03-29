@@ -1372,7 +1372,7 @@ async function recalcAccount() {
                               v-model:global-filter="globalFilter"
                               v-model:category-filter="categoryFilter"
                               :category-items="categoryFilterSelectItems"
-                              filter-input-id="search"
+                              filter-input-id="register-table-filter"
                               input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
                             )
                           template(#middle)

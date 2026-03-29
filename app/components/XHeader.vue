@@ -388,7 +388,7 @@ UHeader(
       div(class="hidden md:flex items-center gap-1 shrink-0")
         UDropdownMenu(
           :items="forecastDropdownMenuItems"
-          :content="{ align: 'start', sideOffset: 4 }")
+          :content="{ align: 'start', sideOffset: 4, class: 'e2e-forecast-workspace-dropdown' }")
           UButton(
             variant="soft"
             :color="workflowMode === 'forecasting' ? 'primary' : 'neutral'"
@@ -396,12 +396,13 @@ UHeader(
             trailing-icon="i-lucide-chevron-down"
             class="h-8"
             aria-haspopup="menu"
-            aria-label="Forecast menu")
+            aria-label="Forecast menu"
+            data-testid="header-forecast-menu-trigger")
             UIcon(name="i-lucide-line-chart" class="size-4 shrink-0 opacity-80")
             span Forecast
         UDropdownMenu(
           :items="reconcileDropdownMenuItems"
-          :content="{ align: 'start', sideOffset: 4 }")
+          :content="{ align: 'start', sideOffset: 4, class: 'e2e-reconcile-workspace-dropdown' }")
           UButton(
             variant="soft"
             :color="workflowMode === 'reconciliation' ? 'primary' : 'neutral'"
@@ -409,7 +410,8 @@ UHeader(
             trailing-icon="i-lucide-chevron-down"
             class="h-8"
             aria-haspopup="menu"
-            aria-label="Reconcile menu")
+            aria-label="Reconcile menu"
+            data-testid="header-reconcile-menu-trigger")
             UIcon(name="i-lucide-clipboard-check" class="size-4 shrink-0 opacity-80")
             span Reconcile
         UButton(
