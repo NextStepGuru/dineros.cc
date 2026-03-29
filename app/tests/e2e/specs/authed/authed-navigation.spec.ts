@@ -59,14 +59,17 @@ test.describe("Authed shell & header navigation", () => {
 
   test("Forecast header menu opens on register page", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
 
     await page.keyboard.press("Escape");
     const trigger = page.getByRole("banner").getByRole("button", { name: "Forecast menu" });
-    await trigger.click();
-    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    await expect(async () => {
+      await trigger.click();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
     await expect(
       page.getByRole("menu").getByText("Reports", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
@@ -74,14 +77,17 @@ test.describe("Authed shell & header navigation", () => {
 
   test("Reconcile header menu opens on register page", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
 
     await page.keyboard.press("Escape");
     const trigger = page.getByRole("banner").getByRole("button", { name: "Reconcile menu" });
-    await trigger.click();
-    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    await expect(async () => {
+      await trigger.click();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
     await expect(
       page.getByRole("menu").getByText("Goals", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });

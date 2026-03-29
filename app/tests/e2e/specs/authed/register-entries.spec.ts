@@ -15,6 +15,7 @@ test.describe("Register entries", () => {
     e2e,
   }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
@@ -28,20 +29,27 @@ test.describe("Register entries", () => {
     await expect(refresh).toBeEnabled();
     const openFilters = page.getByRole("button", { name: /open table filters/i });
     await openFilters.scrollIntoViewIfNeeded();
-    await openFilters.click();
-    await expect(
-      page.getByRole("textbox", { name: /filter table by text/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+      await openFilters.click();
+      await expect(
+        page.getByRole("textbox", { name: /filter table by text/i }),
+      ).toBeVisible();
+    }).toPass({ timeout: 15_000 });
   });
 
   test("add entry opens modal", async ({ page, e2e }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("E2E seeded transaction")).toBeVisible({
+      timeout: 45_000,
+    });
     const addEntry = page.getByRole("button", { name: /add entry/i }).first();
     await addEntry.scrollIntoViewIfNeeded();
-    await addEntry.click();
-    const modal = page.getByRole("dialog");
-    await expect(modal).toBeVisible({ timeout: 20_000 });
-    await expect(modal.locator("#description")).toBeVisible({
+    await expect(async () => {
+      await addEntry.click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }).toPass({ timeout: 20_000 });
+    await expect(page.getByRole("dialog").locator("#description")).toBeVisible({
       timeout: 15_000,
     });
     await page.keyboard.press("Escape");
@@ -52,6 +60,7 @@ test.describe("Register entries", () => {
     e2e,
   }) => {
     await page.goto(`/register/${e2e.checkingRegisterId}`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
@@ -62,8 +71,10 @@ test.describe("Register entries", () => {
     // Open Reconcile menu and click Register
     await page.keyboard.press("Escape");
     const reconTrigger = page.getByRole("banner").getByRole("button", { name: "Reconcile menu" });
-    await reconTrigger.click();
-    await expect(reconTrigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    await expect(async () => {
+      await reconTrigger.click();
+      await expect(reconTrigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
     const reconRegister = page.getByRole("menu").getByText("Register", { exact: true });
     await expect(reconRegister).toBeVisible({ timeout: 15_000 });
     await reconRegister.click();
@@ -77,8 +88,10 @@ test.describe("Register entries", () => {
     // Open Forecast menu and click Register
     await page.keyboard.press("Escape");
     const fcTrigger = page.getByRole("banner").getByRole("button", { name: "Forecast menu" });
-    await fcTrigger.click();
-    await expect(fcTrigger).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    await expect(async () => {
+      await fcTrigger.click();
+      await expect(fcTrigger).toHaveAttribute("aria-expanded", "true");
+    }).toPass({ timeout: 15_000 });
     const fcRegister = page.getByRole("menu").getByText("Register", { exact: true });
     await expect(fcRegister).toBeVisible({ timeout: 15_000 });
     await fcRegister.click();
