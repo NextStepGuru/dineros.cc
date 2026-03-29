@@ -29,23 +29,17 @@ watch(
   },
 );
 
-// Reactive body class based on route
 onMounted(() => {
   watchEffect(() => {
     if (document.body) {
-      const path = route.path;
-      if (path.startsWith("/reports")) {
-        document.body.className = "ui-main-scroll";
-      } else {
-        document.body.className = isFooterHidden.value ? "ui-main" : "";
-      }
+      document.body.className = "ui-main-scroll";
     }
   });
 });
 </script>
 
 <template lang="pug">
-  UApp
+  UApp(:toaster="{ progress: false }")
     a(
       href="#main-content"
       class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:px-4 focus:py-2 focus:rounded-md focus:bg-primary focus:text-white focus:outline-none focus:ring-2 focus:ring-offset-2"

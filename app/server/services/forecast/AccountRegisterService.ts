@@ -412,10 +412,9 @@ export class AccountRegisterService implements IAccountRegisterService {
     const currentYear = currentMoment.year() as number;
 
     const next = this.getNextMonthYear(currentMonth, currentYear);
-    const nextMonthMoment = dateTimeService
-      .createUTC()
-      .setYear(next.year)
-      .setMonth(next.month);
+    const nextMonthMoment = dateTimeService.createUTC(
+      new Date(Date.UTC(next.year, next.month, 1)),
+    );
     const daysInNextMonth = dateTimeService.daysInMonth(nextMonthMoment);
 
     let targetMonth = next.month;
@@ -434,11 +433,9 @@ export class AccountRegisterService implements IAccountRegisterService {
     }
 
     return dateTimeService.toDate(
-      dateTimeService
-        .createUTC()
-        .setYear(targetYear)
-        .setMonth(targetMonth)
-        .setDate(targetDay),
+      dateTimeService.createUTC(
+        new Date(Date.UTC(targetYear, targetMonth, targetDay)),
+      ),
     );
   }
 
@@ -450,15 +447,14 @@ export class AccountRegisterService implements IAccountRegisterService {
     const nextYear = currentYear + 1;
 
     if (currentMonth === 1 && currentDay === 29) {
-      const nextYearFeb = dateTimeService
-        .createUTC()
-        .setYear(nextYear)
-        .setMonth(1);
+      const nextYearFeb = dateTimeService.createUTC(
+        new Date(Date.UTC(nextYear, 1, 1)),
+      );
       const daysInFeb = dateTimeService.daysInMonth(nextYearFeb);
 
       if (daysInFeb < 29) {
         return dateTimeService.toDate(
-          dateTimeService.createUTC().setYear(nextYear).setMonth(2).setDate(1),
+          dateTimeService.createUTC(new Date(Date.UTC(nextYear, 2, 1))),
         );
       }
     }
@@ -474,11 +470,9 @@ export class AccountRegisterService implements IAccountRegisterService {
     const next = this.getNextMonthYear(currentMonth, currentYear);
 
     return dateTimeService.toDate(
-      dateTimeService
-        .create()
-        .setYear(next.year)
-        .setMonth(next.month)
-        .setDate(currentDay),
+      dateTimeService.createUTC(
+        new Date(Date.UTC(next.year, next.month, currentDay)),
+      ),
     );
   }
 
