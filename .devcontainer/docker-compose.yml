@@ -1,0 +1,54 @@
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/javascript-node:24-bullseye
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/dineros.cc:cached
+    networks:
+      - dineros
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: mysql://root:dineros@mysql:3306/dineros
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: dineros
+      MYSQL_DATABASE: dineros
+    ports:
+      - "3309:3306"
+    networks:
+      - dineros
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-pdineros",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    networks:
+      - dineros
+
+networks:
+  dineros:

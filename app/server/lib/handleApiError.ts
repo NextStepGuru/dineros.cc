@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { createError } from "h3";
 import { log } from "~/server/logger";
+import { poolTimeoutHealthService } from "~/server/services/poolTimeoutHealthService";
 
 export const handleApiError = (error: unknown) => {
+  poolTimeoutHealthService.record(error);
+
   if (error instanceof z.ZodError) {
     log({ message: "Invalid Request Data", data: error, level: "warn" });
     throw createError({

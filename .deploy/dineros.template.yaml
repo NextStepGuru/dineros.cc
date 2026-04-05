@@ -157,16 +157,24 @@ ${OPTIONAL_E2E_SEED_ENTRY}
               value: /etc/google-service-account/service-account.json
           readinessProbe:
             httpGet:
-              path: /api/_ah/readiness
+              path: /health/ready
               port: 80
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
           livenessProbe:
             httpGet:
-              path: /api/_ah/liveness
+              path: /health/live
               port: 80
-            initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 30
       volumes:
         - name: service-account-volume
           secret:
