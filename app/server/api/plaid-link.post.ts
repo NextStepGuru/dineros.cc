@@ -8,6 +8,8 @@ import { plaidRootSchema } from "~/schema/plaid";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast/DateTimeService";
 import { addPlaidSyncJob } from "~/server/clients/queuesClient";
+import { log } from "~/server/logger";
+import { createError } from "h3";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -39,20 +41,38 @@ export default defineEventHandler(async (event) => {
         create: { itemId, userId },
         update: { userId, updatedAt: dateTimeService.now().toDate() },
       });
-      addPlaidSyncJob({ name: "Initial Plaid sync after link", itemId });
     }
 
+    // Persist access_token before enqueueing sync: item-scoped sync resolves the token from user.settings.plaid.
     const userResult = await PrismaDb.user.update({
       data: {
-        settings: JSON.parse(
-          JSON.stringify({
-            ...user.settings,
-            plaid: { ...plaidBody, ...results.data, isEnabled: true },
-          }),
-        ),
+        settings: structuredClone({
+          ...user.settings,
+          plaid: { ...plaidBody, ...results.data, isEnabled: true },
+        }),
       },
       where: { id: userId },
     });
+
+    if (itemId) {
+      try {
+        await addPlaidSyncJob(
+          { name: "Initial Plaid sync after link", itemId },
+          { delay: 0 },
+        );
+      } catch (error) {
+        log({
+          message: "Failed to enqueue initial Plaid sync job after link",
+          level: "error",
+          data: { userId, itemId, error },
+        });
+        throw createError({
+          statusCode: 503,
+          statusMessage: "Queue unavailable",
+          message: "Could not enqueue initial Plaid sync",
+        });
+      }
+    }
 
     await postmarkClient.sendEmail({
       From: "Mr. Pepe Dineros <pepe@dineros.cc>",

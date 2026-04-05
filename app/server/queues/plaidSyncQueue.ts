@@ -31,7 +31,15 @@ export default {
         itemId: job.data.itemId,
       });
     } catch (err) {
-      console.error("[PLAID_SYNC_JOB_ERROR]", String(err));
+      log({
+        message: "PLAID_SYNC_JOB_ERROR",
+        level: "error",
+        data: {
+          error: err instanceof Error ? err.message : String(err),
+          jobId: job.id,
+          jobData: job.data,
+        },
+      });
       const msg = err instanceof Error ? err.message : String(err);
       await recordIntegrationJobLog({
         source: "plaid",

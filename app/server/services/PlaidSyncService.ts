@@ -25,6 +25,7 @@ import {
   isPlaidCredentialClassError,
 } from "~/server/lib/plaidApiError";
 import { notifyIntegrationAlert } from "~/server/services/integrationOpsAlert";
+import { markPlaidItemReauthRequired } from "~/server/services/plaidReauthService";
 
 const DAYS_REQUESTED = 3;
 
@@ -73,6 +74,18 @@ class PlaidSyncService {
   ): Promise<void> {
     const info = extractPlaidErrorInfo(err);
     if (!isPlaidCredentialClassError(info)) return;
+
+    const itemId =
+      typeof context.itemId === "string" && context.itemId.length > 0
+        ? context.itemId
+        : null;
+    if (itemId) {
+      await markPlaidItemReauthRequired({
+        itemId,
+        reason: info.errorCode ?? "CREDENTIAL_ERROR",
+      });
+    }
+
     await notifyIntegrationAlert({
       source: "plaid",
       kind: "credential",
@@ -901,10 +914,13 @@ class PlaidSyncService {
           });
         }
       } catch (error) {
-        console.error("[PLAID_SYNC_ERROR]", String(error));
         log({
           message: "error fetching account transactions",
-          data: { error },
+          data: {
+            error,
+            accessToken,
+            accountCount: accountsForToken.length,
+          },
           level: "error",
         });
       }
