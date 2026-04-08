@@ -101,25 +101,30 @@ describe("Register API Endpoint", () => {
       (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
       mockHashService.hash.mockResolvedValue("hashedPassword123");
 
+      const accountRegisterCreate = vi.fn().mockResolvedValue({});
+      const mockPrismaTransaction = {
+        user: {
+          create: vi.fn().mockResolvedValue(mockUser),
+        },
+        account: {
+          create: vi.fn().mockResolvedValue(mockAccount),
+        },
+        budget: {
+          create: vi.fn().mockResolvedValue(mockBudget),
+        },
+        userAccount: {
+          create: vi.fn().mockResolvedValue({}),
+        },
+        accountRegister: {
+          create: accountRegisterCreate,
+        },
+        accountType: {
+          findFirst: vi.fn().mockResolvedValue({ id: 22 }),
+        },
+      };
+
       // Mock transaction
       (prisma.$transaction as any).mockImplementation(async (callback: any) => {
-        const mockPrismaTransaction = {
-          user: {
-            create: vi.fn().mockResolvedValue(mockUser),
-          },
-          account: {
-            create: vi.fn().mockResolvedValue(mockAccount),
-          },
-          budget: {
-            create: vi.fn().mockResolvedValue(mockBudget),
-          },
-          userAccount: {
-            create: vi.fn().mockResolvedValue({}),
-          },
-          accountRegister: {
-            create: vi.fn().mockResolvedValue({}),
-          },
-        };
         return await callback(mockPrismaTransaction);
       });
 
@@ -136,6 +141,11 @@ describe("Register API Endpoint", () => {
         REGISTER_MOCK_PLAINTEXT,
       );
       expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockPrismaTransaction.accountType.findFirst).toHaveBeenCalledWith({
+        where: { type: "cash" },
+        select: { id: true },
+      });
+      expect(accountRegisterCreate).toHaveBeenCalledTimes(2);
 
       // Verify both emails are sent
       expect(postmarkClient.sendEmail).toHaveBeenCalledTimes(2);
@@ -262,15 +272,20 @@ describe("Register API Endpoint", () => {
       (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
       mockHashService.hash.mockResolvedValue("hashedPassword123");
 
+      const accountRegisterCreate = vi.fn().mockResolvedValue({});
+      const mockPrismaTransaction = {
+        user: { create: vi.fn().mockResolvedValue(mockUser) },
+        account: { create: vi.fn().mockResolvedValue(mockAccount) },
+        budget: { create: vi.fn().mockResolvedValue(mockBudget) },
+        userAccount: { create: vi.fn().mockResolvedValue({}) },
+        accountRegister: { create: accountRegisterCreate },
+        accountType: {
+          findFirst: vi.fn().mockResolvedValue({ id: 22 }),
+        },
+      };
+
       // Mock successful transaction
       (prisma.$transaction as any).mockImplementation(async (callback: any) => {
-        const mockPrismaTransaction = {
-          user: { create: vi.fn().mockResolvedValue(mockUser) },
-          account: { create: vi.fn().mockResolvedValue(mockAccount) },
-          budget: { create: vi.fn().mockResolvedValue(mockBudget) },
-          userAccount: { create: vi.fn().mockResolvedValue({}) },
-          accountRegister: { create: vi.fn().mockResolvedValue({}) },
-        };
         return await callback(mockPrismaTransaction);
       });
 
@@ -279,6 +294,49 @@ describe("Register API Endpoint", () => {
       (postmarkClient.sendEmail as any).mockRejectedValue(emailError);
 
       await expect(registerHandler(mockEvent)).rejects.toThrow();
+    });
+
+    it("should fail when cash account type is not configured", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        firstName: "John",
+        lastName: "Doe",
+        email: "john@example.com",
+        password: REGISTER_MOCK_PLAINTEXT,
+      };
+
+      const mockUser = { id: 123 };
+      const mockAccount = { id: "account-123" };
+      const mockBudget = { id: "budget-123" };
+
+      const { readBody } = await import("h3");
+      const { registerSchema } = await import("~/schema/zod");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { handleApiError } = await import("~/server/lib/handleApiError");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      (registerSchema.parse as any).mockReturnValue(mockBody);
+      (prisma.user.findUnique as any).mockResolvedValue(null);
+      (prisma.country.findUnique as any).mockResolvedValue({ id: 840 });
+      mockHashService.hash.mockResolvedValue("hashedPassword123");
+
+      const mockPrismaTransaction = {
+        user: { create: vi.fn().mockResolvedValue(mockUser) },
+        account: { create: vi.fn().mockResolvedValue(mockAccount) },
+        budget: { create: vi.fn().mockResolvedValue(mockBudget) },
+        userAccount: { create: vi.fn().mockResolvedValue({}) },
+        accountRegister: { create: vi.fn().mockResolvedValue({}) },
+        accountType: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+      };
+
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+        return await callback(mockPrismaTransaction);
+      });
+
+      await expect(registerHandler(mockEvent)).rejects.toThrow();
+      expect(handleApiError).toHaveBeenCalled();
     });
   });
 });

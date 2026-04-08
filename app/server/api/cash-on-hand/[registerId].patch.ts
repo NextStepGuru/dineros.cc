@@ -26,13 +26,23 @@ export default defineEventHandler(async (event) => {
           userAccounts: { some: { userId } },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        type: { select: { type: true } },
+      },
     });
 
     if (!register) {
       throw createError({
         statusCode: 404,
         statusMessage: "Account register not found",
+      });
+    }
+
+    if (register.type.type !== "cash") {
+      throw createError({
+        statusCode: 403,
+        statusMessage: "Cash count is only available for Cash account registers.",
       });
     }
 
