@@ -5,6 +5,7 @@ import { ADMIN_AUDIT_ACTIONS, adminUserPasswordResetSchema } from "~/schema/zod"
 import { requireAdmin } from "~/server/lib/requireAdmin";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { recordAdminAudit } from "~/server/lib/recordAdminAudit";
+import { rotateUserJwtKey } from "~/server/lib/rotateUserJwtKey";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -24,6 +25,8 @@ export default defineEventHandler(async (event) => {
       data: { password },
       select: { id: true },
     });
+
+    await rotateUserJwtKey(userId);
 
     await recordAdminAudit(event, {
       action: ADMIN_AUDIT_ACTIONS.USER_PASSWORD_RESET,

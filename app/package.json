@@ -51,7 +51,9 @@
     "ci:local": "../scripts/ci-local.sh",
     "ci:local:lint": "../scripts/ci-local.sh --lint-only",
     "ci:local:test": "../scripts/ci-local.sh --test-only",
-    "ci:local:pre-commit": "../scripts/ci-local.sh --pre-commit-only"
+    "ci:local:pre-commit": "../scripts/ci-local.sh --pre-commit-only",
+    "sonar": "bash ../scripts/sonar-local.sh",
+    "sonar:quick": "bash ../scripts/sonar-local.sh --no-coverage"
   },
   "dependencies": {
     "@47ng/codec": "^1.1.0",

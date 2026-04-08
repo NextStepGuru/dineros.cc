@@ -23,87 +23,97 @@ const replaySchema = z.object({
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
+    const { userId } = getUser(event);
     const { accountId, budgetId, fixedNow, timezone, startDate, endDate } =
       replaySchema.parse(body);
 
-    if (!accountId) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: "Account ID is required to recalculate account balances",
+    if (accountId) {
+      await prisma.userAccount.findFirstOrThrow({
+        where: {
+          userId,
+          accountId,
+        },
       });
-    }
 
-    const engine = ForecastEngineFactory.create(prisma);
+      const engine = ForecastEngineFactory.create(prisma);
 
-    const buildContext = () => ({
-      accountId,
-      ...(budgetId != null && budgetId > 0 ? { budgetId } : {}),
-      startDate: startDate
-        ? dateTimeService.toDate(dateTimeService.parseInput(startDate))
-        : dateTimeService.now().startOf("month").toDate(),
-      endDate: endDate
-        ? dateTimeService.toDate(dateTimeService.parseInput(endDate))
-        : dateTimeService.now().add(2, "years").toDate(),
-      logging: { enabled: false },
-    });
-
-    const runRecalc = async () => {
-      const context = buildContext();
-      return engine.recalculate(context);
-    };
-
-    const result =
-      fixedNow != null && fixedNow !== ""
-        ? await dateTimeService.withRunContext(
-            {
-              fixedNow,
-              timezone: timezone ?? "UTC",
-            },
-            runRecalc,
-          )
-        : await runRecalc();
-
-    if (!result.isSuccess) {
-      throw createError({
-        statusCode: 500,
-        statusMessage: `Forecast calculation failed: ${result.errors?.join(
-          ", "
-        )}`,
+      const buildContext = () => ({
+        accountId,
+        ...(budgetId != null && budgetId > 0 ? { budgetId } : {}),
+        startDate: startDate
+          ? dateTimeService.toDate(dateTimeService.parseInput(startDate))
+          : dateTimeService.now().startOf("month").toDate(),
+        endDate: endDate
+          ? dateTimeService.toDate(dateTimeService.parseInput(endDate))
+          : dateTimeService.now().add(2, "years").toDate(),
+        logging: { enabled: false },
       });
-    }
 
-    let riskAlertCount: number | null = null;
-    if (budgetId != null && budgetId > 0) {
-      try {
-        const user = getUser(event);
-        const riskResult = await evaluateForecastRiskAlerts({
-          userId: user.userId,
-          budgetId,
-          daysAhead: 90,
-        });
-        riskAlertCount = riskResult.alerts.length;
-      } catch (riskError) {
-        log({
-          level: "warn",
-          message: "Failed to evaluate forecast risk alerts after recalc",
-          data: {
-            userId: user.userId,
-            budgetId,
-            error: riskError,
-          },
+      const runRecalc = async () => {
+        const context = buildContext();
+        return engine.recalculate(context);
+      };
+
+      const result =
+        fixedNow != null && fixedNow !== ""
+          ? await dateTimeService.withRunContext(
+              {
+                fixedNow,
+                timezone: timezone ?? "UTC",
+              },
+              runRecalc,
+            )
+          : await runRecalc();
+
+      if (!result.isSuccess) {
+        throw createError({
+          statusCode: 500,
+          statusMessage: `Forecast calculation failed: ${result.errors?.join(
+            ", "
+          )}`,
         });
       }
+
+      let riskAlertCount: number | null = null;
+      if (budgetId != null && budgetId > 0) {
+        try {
+          const riskResult = await evaluateForecastRiskAlerts({
+            userId,
+            budgetId,
+            daysAhead: 90,
+          });
+          riskAlertCount = riskResult.alerts.length;
+        } catch (riskError) {
+          log({
+            level: "warn",
+            message: "Failed to evaluate forecast risk alerts after recalc",
+            data: {
+              userId,
+              budgetId,
+              error: riskError,
+            },
+          });
+        }
+      }
+
+      const payload = {
+        success: true,
+        entriesCalculated: result.registerEntries.length,
+        entriesBalance: result.registerEntries.filter(
+          (entry) => entry.isBalanceEntry
+        ).length,
+        accountRegisters: result.accountRegisters.length,
+      };
+      if (riskAlertCount !== null) {
+        return { ...payload, riskAlertCount };
+      }
+      return payload;
     }
 
-    return {
-      success: true,
-      entriesCalculated: result.registerEntries.length,
-      entriesBalance: result.registerEntries.filter(
-        (entry) => entry.isBalanceEntry
-      ).length,
-      accountRegisters: result.accountRegisters.length,
-      ...(riskAlertCount !== null ? { riskAlertCount } : {}),
-    };
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Account ID is required to recalculate account balances",
+    });
   } catch (error) {
     handleApiError(error);
 

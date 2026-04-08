@@ -35,7 +35,7 @@ vi.mock("h3", () => ({
 }));
 
 // Make H3 functions globally available
-(global as any).readBody = vi.fn();
+(globalThis as any).readBody = vi.fn();
 
 // Mock dependencies
 vi.mock("~/schema/zod", () => ({
@@ -77,6 +77,11 @@ vi.mock("~/server/clients/prismaClient", async () => {
   return { prisma: mockPrisma };
 });
 
+const authCtx = { userId: 123, jwtKey: "k", iat: 1, exp: 999 };
+function mockEventWithAuth() {
+  return { context: { user: authCtx } };
+}
+
 describe("Recalculate POST API Endpoint", () => {
   let recalculatePostHandler: any;
   let mockEngine: any;
@@ -88,14 +93,18 @@ describe("Recalculate POST API Endpoint", () => {
     };
 
     // Properly set up the global mock function
-    (global as any).readBody = vi.fn();
+    (globalThis as any).readBody = vi.fn();
 
     const module = await import("../recalculate.post");
     recalculatePostHandler = module.default;
+    mockPrisma.userAccount.findFirstOrThrow.mockResolvedValue({
+      userId: 123,
+      accountId: "account123",
+    });
   });
 
   it("should successfully recalculate account balances", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "account123" };
     const mockResult = {
       isSuccess: true,
@@ -115,14 +124,14 @@ describe("Recalculate POST API Endpoint", () => {
       "~/server/services/forecast"
     );
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockResolvedValue(mockResult);
 
     const result = await recalculatePostHandler(mockEvent);
 
     strictEqual(
-      (ForecastEngineFactory.create as any).mock.calls[0][0],
+      ForecastEngineFactory.create.mock.calls[0][0],
       mockPrisma,
     );
     expect(mockEngine.recalculate).toHaveBeenCalledWith({
@@ -139,11 +148,21 @@ describe("Recalculate POST API Endpoint", () => {
     });
   });
 
+  it("rejects when user is not a member of the account", async () => {
+    const mockEvent = mockEventWithAuth();
+    (globalThis as any).readBody.mockResolvedValue({ accountId: "other-account" });
+    mockPrisma.userAccount.findFirstOrThrow.mockRejectedValue(
+      new Error("Not found"),
+    );
+
+    await expect(recalculatePostHandler(mockEvent)).rejects.toThrow("Not found");
+  });
+
   it("should handle missing account ID", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = {};
 
-    (global as any).readBody.mockResolvedValue(mockBody);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
       "Account ID is required"
@@ -151,10 +170,10 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should handle empty account ID", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "" };
 
-    (global as any).readBody.mockResolvedValue(mockBody);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
       "Account ID is required"
@@ -162,7 +181,7 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should handle forecast calculation failure", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "account123" };
     const mockResult = {
       isSuccess: false,
@@ -175,9 +194,9 @@ describe("Recalculate POST API Endpoint", () => {
       "~/server/services/forecast"
     );
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockResolvedValue(mockResult);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow(
       "Forecast calculation failed"
@@ -185,16 +204,16 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should handle engine recalculation errors", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "account123" };
 
     const { ForecastEngineFactory } = await import(
       "~/server/services/forecast"
     );
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockRejectedValue(
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockRejectedValue(
       new Error("Engine recalculation failed")
     );
 
@@ -204,14 +223,14 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should handle schema validation errors", async () => {
-    const mockEvent = {};
-    (global as any).readBody.mockResolvedValue(123);
+    const mockEvent = mockEventWithAuth();
+    (globalThis as any).readBody.mockResolvedValue(123);
 
     await expect(recalculatePostHandler(mockEvent)).rejects.toThrow();
   });
 
   it("should use correct date range for recalculation", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "account123" };
     const mockResult = {
       isSuccess: true,
@@ -227,9 +246,9 @@ describe("Recalculate POST API Endpoint", () => {
       "~/server/services/forecast"
     );
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockResolvedValue(mockResult);
 
     const result = await recalculatePostHandler(mockEvent);
 
@@ -248,7 +267,7 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should return correct statistics for successful recalculation", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = { accountId: "account123" };
     const mockResult = {
       isSuccess: true,
@@ -270,9 +289,9 @@ describe("Recalculate POST API Endpoint", () => {
       "~/server/services/forecast"
     );
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockResolvedValue(mockResult);
 
     const result = await recalculatePostHandler(mockEvent);
 
@@ -285,7 +304,7 @@ describe("Recalculate POST API Endpoint", () => {
   });
 
   it("should run recalculate inside withRunContext when fixedNow is set", async () => {
-    const mockEvent = {};
+    const mockEvent = mockEventWithAuth();
     const mockBody = {
       accountId: "account123",
       fixedNow: "2024-06-15T12:00:00.000Z",
@@ -303,9 +322,9 @@ describe("Recalculate POST API Endpoint", () => {
     );
     const { dateTimeService } = await import("~/server/services/forecast");
 
-    (global as any).readBody.mockResolvedValue(mockBody);
-    (ForecastEngineFactory.create as any).mockReturnValue(mockEngine);
-    (mockEngine.recalculate as any).mockResolvedValue(mockResult);
+    (globalThis as any).readBody.mockResolvedValue(mockBody);
+    ForecastEngineFactory.create.mockReturnValue(mockEngine);
+    mockEngine.recalculate.mockResolvedValue(mockResult);
 
     const result = await recalculatePostHandler(mockEvent);
 

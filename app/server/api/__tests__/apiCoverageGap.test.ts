@@ -107,6 +107,15 @@ vi.mock("~/server/clients/queuesClient", () => ({
   addRecalculateJob: vi.fn(),
 }));
 
+const { gapHashVerify } = vi.hoisted(() => ({
+  gapHashVerify: vi.fn().mockResolvedValue(true),
+}));
+vi.mock("~/server/services/HashService", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    verify: gapHashVerify,
+  })),
+}));
+
 vi.mock("~/server/lib/getUser", () => ({
   getUser: vi.fn().mockReturnValue({ userId: 123 }),
 }));
@@ -316,7 +325,11 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
   describe("POST /api/mfa/passkey/delete", () => {
     it("removes passkey and returns profile", async () => {
       const { readBody } = await import("h3");
-      (readBody as any).mockResolvedValue({ id: "pk-1" });
+      gapHashVerify.mockResolvedValue(true);
+      (readBody as any).mockResolvedValue({
+        id: "pk-1",
+        currentPassword: "fixture-password",
+      });
       const userRow = dbUserForSession({
         settings: {
           speakeasy: { isEnabled: false, isVerified: false },
@@ -349,6 +362,10 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
 
       const mod = await import("../mfa/passkey/delete.post");
       await mod.default({} as never);
+      expect(gapHashVerify).toHaveBeenCalledWith(
+        "hashedPassword",
+        "fixture-password",
+      );
       expect(prisma.user.update).toHaveBeenCalled();
     });
   });

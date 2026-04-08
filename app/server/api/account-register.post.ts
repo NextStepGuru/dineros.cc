@@ -266,6 +266,20 @@ export default defineEventHandler(async (event: H3Event) => {
       },
     });
 
+    if (id > 0) {
+      await PrismaDb.accountRegister.findFirstOrThrow({
+        where: {
+          id,
+          accountId,
+          account: {
+            userAccounts: {
+              some: { userId },
+            },
+          },
+        },
+      });
+    }
+
     const accountRegister = await PrismaDb.accountRegister.upsert({
       create: {
         accountId,

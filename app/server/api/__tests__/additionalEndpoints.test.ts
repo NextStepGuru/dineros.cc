@@ -67,6 +67,10 @@ vi.mock("~/server/lib/handleApiError", () => ({
   handleApiError: vi.fn(),
 }));
 
+vi.mock("~/server/lib/rotateUserJwtKey", () => ({
+  rotateUserJwtKey: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("~/schema/zod", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/schema/zod")>();
   const mockPublicProfileParse = vi.fn();
@@ -129,8 +133,8 @@ describe("Additional API Endpoints Coverage", () => {
       const { sessionUserFromDb } =
         await import("~/server/lib/sessionUserProfile");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
       mockJwtService.sign.mockResolvedValue("new-jwt-token");
 
       const result = await validateTokenHandler(mockEvent);
@@ -149,7 +153,7 @@ describe("Additional API Endpoints Coverage", () => {
           maxAge: 86400,
           path: "/",
           sameSite: "lax",
-          httpOnly: false,
+          httpOnly: true,
         },
       );
       expect(setResponseStatus).toHaveBeenCalledWith(mockEvent, 200);
@@ -166,10 +170,10 @@ describe("Additional API Endpoints Coverage", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
       const { prisma } = await import("~/server/clients/prismaClient");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
+      getUser.mockReturnValue({ userId: 123 });
       const error = new Error("Database error");
-      (prisma.user.findUniqueOrThrow as any).mockRejectedValue(error);
-      (handleApiError as any).mockImplementation((_err: any) => {
+      prisma.user.findUniqueOrThrow.mockRejectedValue(error);
+      handleApiError.mockImplementation((_err: any) => {
         throw _err;
       });
 
@@ -191,7 +195,11 @@ describe("Additional API Endpoints Coverage", () => {
 
     it("should successfully change password and send notification", async () => {
       const mockEvent = {};
-      const mockBody = { newPassword: FIXTURE_NEW_PASSWORD };
+      const mockBody = {
+        newPassword: FIXTURE_NEW_PASSWORD,
+        confirmPassword: FIXTURE_NEW_PASSWORD,
+        currentPassword: "oldPassword123",
+      };
       const mockUser = {
         id: 123,
         email: "test@example.com",
@@ -202,20 +210,25 @@ describe("Additional API Endpoints Coverage", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { postmarkClient } =
         await import("~/server/clients/postmarkClient");
-      const { passwordSchema } = await import("~/schema/zod");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (passwordSchema.parse as any).mockReturnValue({
-        newPassword: FIXTURE_NEW_PASSWORD,
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        id: 123,
+        email: "test@example.com",
+        password: "stored-hash",
       });
+      mockHashService.verify.mockResolvedValue(true);
       mockHashService.hash.mockResolvedValue(FIXTURE_HASHED_NEW_PASSWORD);
-      (prisma.user.update as any).mockResolvedValue(mockUser);
-      (postmarkClient.sendEmail as any).mockResolvedValue({});
+      prisma.user.update.mockResolvedValue(mockUser);
+      postmarkClient.sendEmail.mockResolvedValue({});
 
       const result = await changePasswordHandler(mockEvent);
 
-      expect(passwordSchema.parse).toHaveBeenCalled();
+      expect(mockHashService.verify).toHaveBeenCalledWith(
+        "stored-hash",
+        "oldPassword123",
+      );
       expect(mockHashService.hash).toHaveBeenCalledWith(FIXTURE_NEW_PASSWORD);
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
@@ -232,27 +245,27 @@ describe("Additional API Endpoints Coverage", () => {
 
     it("should handle validation errors", async () => {
       const mockEvent = {};
-      const mockBody = { newPassword: FIXTURE_WEAK_PASSWORD }; // Too short
+      const mockBody = {
+        newPassword: FIXTURE_WEAK_PASSWORD,
+        confirmPassword: FIXTURE_WEAK_PASSWORD,
+        currentPassword: "x",
+      };
 
       const { readBody } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
-      const { passwordSchema } = await import("~/schema/zod");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      const validationError = new Error("Password too short");
-      (passwordSchema.parse as any).mockImplementation(() => {
-        throw validationError;
-      });
-      (handleApiError as any).mockImplementation((_err: any) => {
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      getUser.mockReturnValue({ userId: 123 });
+      handleApiError.mockImplementation((_err: any) => {
         throw new Error("An error occurred while changing password.");
       });
 
       await expect(changePasswordHandler(mockEvent)).rejects.toThrow(
         "An error occurred while changing password.",
       );
-      expect(handleApiError).toHaveBeenCalledWith(validationError);
+      expect(handleApiError).toHaveBeenCalledWith(expect.any(Error));
     });
   });
 
@@ -290,12 +303,12 @@ describe("Additional API Endpoints Coverage", () => {
       const { publicProfileSchema } = await import("~/schema/zod");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (publicProfileSchema.parse as any)
+      getUser.mockReturnValue({ userId: 123 });
+      publicProfileSchema.parse
         .mockReturnValueOnce(mockBody) // First call for validation
         .mockReturnValueOnce(mockParsedUser); // Second call for return value
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue({ id: 123 });
-      (prisma.user.update as any).mockResolvedValue(mockUser);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({ id: 123 });
+      prisma.user.update.mockResolvedValue(mockUser);
 
       const result = await userPostHandler(mockEvent);
 
@@ -327,11 +340,11 @@ describe("Additional API Endpoints Coverage", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 999 });
-      (publicProfileSchema.parse as any).mockReturnValue(mockBody);
+      getUser.mockReturnValue({ userId: 999 });
+      publicProfileSchema.parse.mockReturnValue(mockBody);
       const notFoundError = new Error("User not found");
-      (prisma.user.findUniqueOrThrow as any).mockRejectedValue(notFoundError);
-      (handleApiError as any).mockImplementation((_err: any) => {
+      prisma.user.findUniqueOrThrow.mockRejectedValue(notFoundError);
+      handleApiError.mockImplementation((_err: any) => {
         throw _err;
       });
 

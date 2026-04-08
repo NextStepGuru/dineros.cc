@@ -79,7 +79,7 @@ async function load(reset: boolean) {
 }
 
 function applyFilters() {
-  void router.replace({
+  router.replace({
     query: {
       ...(filters.action.trim() ? { action: filters.action.trim() } : {}),
       ...(filters.adminUserId.trim()
@@ -101,7 +101,11 @@ function exportCsv() {
     params.set("adminUserId", filters.adminUserId.trim());
   if (filters.targetUserId.trim())
     params.set("targetUserId", filters.targetUserId.trim());
-  window.open(`/api/admin/audit-logs?${params.toString()}`, "_blank");
+  window.open(
+    `/api/admin/audit-logs?${params.toString()}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 function loadMore() {

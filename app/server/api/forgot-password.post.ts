@@ -1,6 +1,6 @@
 import type { H3Event } from "h3";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import cuid2 from "@paralleldrive/cuid2";
 import {
   postmarkClient,
   hasPostmarkToken,
@@ -10,15 +10,32 @@ import { log } from "../logger";
 import { prisma } from "../clients/prismaClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
+import {
+  clientIpFromEvent,
+  rateLimitByKey,
+} from "~/server/lib/rateLimitRedis";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
+    const ip = clientIpFromEvent(event);
+    const rl = await rateLimitByKey({
+      key: `forgot-pw:ip:${ip}`,
+      limit: 10,
+      windowSeconds: 3600,
+    });
+    if (!rl.allowed) {
+      setResponseStatus(event, 429);
+      return {
+        message: "Too many requests. Please try again later.",
+        retryAfterSec: rl.retryAfterSec,
+      };
+    }
+
     const body = await readBody(event);
 
     const forgotPasswordSchema = z.object({
-      email: z.string().email(),
+      email: z.email(),
     });
-    // Validate the request body
     const { email } = forgotPasswordSchema.parse(body);
 
     const lookupUser = await prisma.user.findUnique({
@@ -26,19 +43,25 @@ export default defineEventHandler(async (event: H3Event) => {
     });
 
     if (!lookupUser) {
-      setResponseStatus(event, 404);
-      return { message: "User not found" };
+      log({
+        message: "[FORGOT_PASSWORD] Unknown email (generic response)",
+        level: "info",
+        data: { emailRequested: true },
+      });
+      setResponseStatus(event, 200);
+      return {
+        message:
+          "If an account exists for that email, we sent a reset code. Check your inbox.",
+      };
     }
 
-    // Generate a random token
-    const token = cuid2.createId().substring(0, 10);
+    const token = randomBytes(32).toString("hex");
 
-    // Update the user's resetToken and expiration date
     await prisma.user.update({
       where: { id: lookupUser.id },
       data: {
         resetCode: token,
-        resetPasswordAt: dateTimeService.add(5, "minute").toDate(),
+        resetPasswordAt: dateTimeService.add(15, "minute").toDate(),
       },
     });
 
@@ -52,23 +75,27 @@ export default defineEventHandler(async (event: H3Event) => {
       <br>
       Your password reset code is: ${token}<br>
       <br>
-      Please use this code to reset your password within 5 minutes. If you did not request this password reset, please ignore this email.
+      Please use this code to reset your password within 15 minutes. If you did not request this password reset, please ignore this email.
       <br>
       <br>
       Regards,<br>
       &nbsp;&nbsp;Mr. Pepe &amp; The Dineros Team
       `,
       });
-    } else {
+    } else if (isLocal) {
       log({
-        message: "[FORGOT_PASSWORD] Reset code (email not sent; local or no Postmark token)",
+        message:
+          "[FORGOT_PASSWORD] Reset code (local only; email not sent)",
         level: "info",
-        data: { email, resetCode: token },
+        data: { userId: lookupUser.id },
       });
     }
 
     setResponseStatus(event, 200);
-    return { message: "Reset code sent" };
+    return {
+      message:
+        "If an account exists for that email, we sent a reset code. Check your inbox.",
+    };
   } catch (error) {
     handleApiError(error);
 

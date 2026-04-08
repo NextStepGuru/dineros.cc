@@ -145,7 +145,7 @@ describe("Register and File Upload API Endpoints", () => {
 
       registerTestGlobal().getQuery.mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
       vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(2);
@@ -172,8 +172,16 @@ describe("Register and File Upload API Endpoints", () => {
 
       expect(registerTestGlobal().getQuery).toHaveBeenCalledWith(mockEvent);
       expect(getUser).toHaveBeenCalledWith(mockEvent);
-      expect(prisma.accountRegister.findUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(prisma.accountRegister.findFirstOrThrow).toHaveBeenCalledWith({
+        where: {
+          id: 1,
+          account: {
+            userAccounts: {
+              some: { userId: 123 },
+            },
+            id: "account-123",
+          },
+        },
         select: {
           id: true,
           balance: true,
@@ -256,7 +264,7 @@ describe("Register and File Upload API Endpoints", () => {
 
       registerTestGlobal().getQuery.mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
       vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(1);
@@ -383,7 +391,7 @@ describe("Register and File Upload API Endpoints", () => {
 
       registerTestGlobal().getQuery.mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
       vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(fromDb.length);
@@ -454,7 +462,7 @@ describe("Register and File Upload API Endpoints", () => {
       vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
       registerTestGlobal().getQuery.mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
       vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(2);
@@ -547,7 +555,7 @@ describe("Register and File Upload API Endpoints", () => {
       vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
       registerTestGlobal().getQuery.mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockResolvedValue(
         mockAccountRegister,
       );
       vi.mocked(prisma.registerEntry.count as Mock).mockResolvedValue(0);
@@ -613,7 +621,7 @@ describe("Register and File Upload API Endpoints", () => {
 
       vi.mocked(getQuery as Mock).mockReturnValue(mockQuery);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockRejectedValue(
+      vi.mocked(prisma.accountRegister.findFirstOrThrow as Mock).mockRejectedValue(
         new Error("Account register not found"),
       );
       vi.mocked(handleApiError as Mock).mockImplementation((error: any) => {
@@ -679,24 +687,16 @@ describe("Register and File Upload API Endpoints", () => {
         ],
       };
 
-      const mockAccountRegister = {
-        id: 1,
-        account: {
-          userAccounts: [{ userId: 123 }],
-        },
-      };
-
+      const { readMultipartFormData } = await import("h3");
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
       const papaparse = await import("papaparse");
       const { createId } = await import("@paralleldrive/cuid2");
 
-      registerTestGlobal().readMultipartFormData.mockResolvedValue(
-        mockFormData,
-      );
+      vi.mocked(readMultipartFormData as Mock).mockResolvedValue(mockFormData);
       vi.mocked(getUser as Mock).mockReturnValue({ userId: 123 });
-      vi.mocked(prisma.accountRegister.findUniqueOrThrow as Mock).mockResolvedValue({
-        accountId: mockAccountRegister.id,
+      vi.mocked(prisma.accountRegister.findFirst as Mock).mockResolvedValue({
+        accountId: "account-123",
       });
       vi.mocked(papaparse.default.parse as Mock).mockReturnValue(mockCsvData);
       vi.mocked(prisma.registerEntry.findFirst as Mock).mockResolvedValue(null); // No duplicates found
@@ -713,9 +713,7 @@ describe("Register and File Upload API Endpoints", () => {
 
       const result = await uploadFileHandler(mockEvent);
 
-      expect(registerTestGlobal().readMultipartFormData).toHaveBeenCalledWith(
-        mockEvent,
-      );
+      expect(readMultipartFormData).toHaveBeenCalledWith(mockEvent);
       expect(getUser).toHaveBeenCalledWith(mockEvent);
       expect(papaparse.default.parse).toHaveBeenCalledWith(
         "Date,Description,Amount,Note,Check Number,Category\n2024-01-01,Test Transaction,100.00,Test Note,,Food",

@@ -91,7 +91,7 @@ describe("Register Entry API Endpoints", () => {
       const mockCreatedEntry = {
         ...mockBody,
         id: "entry-123",
-        isManualEntry: true,
+        isManualEntry: false,
         hasBalanceReCalc: true,
       };
 
@@ -103,14 +103,15 @@ describe("Register Entry API Endpoints", () => {
         await import("~/server/clients/queuesClient");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      registerEntrySchema.parse
+        .mockReturnValueOnce(mockBody)
+        .mockReturnValue(mockCreatedEntry);
+      prisma.accountRegister.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
       (createId as any).mockReturnValue("entry-123");
-      (prisma.registerEntry.upsert as any).mockResolvedValue(mockCreatedEntry);
-      (registerEntrySchema.parse as any).mockReturnValue(mockCreatedEntry);
+      prisma.registerEntry.create.mockResolvedValue(mockCreatedEntry);
 
       const result = await registerEntryPostHandler(mockEvent);
 
@@ -128,17 +129,9 @@ describe("Register Entry API Endpoints", () => {
           },
         },
       });
-      expect(prisma.registerEntry.upsert).toHaveBeenCalledWith({
-        where: { id: "entry-123" },
-        create: expect.objectContaining({
+      expect(prisma.registerEntry.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
           id: "entry-123",
-          accountRegisterId: 1,
-          description: "Test Entry",
-          amount: 100,
-          isManualEntry: true,
-          hasBalanceReCalc: true,
-        }),
-        update: expect.objectContaining({
           accountRegisterId: 1,
           description: "Test Entry",
           amount: 100,
@@ -169,7 +162,7 @@ describe("Register Entry API Endpoints", () => {
 
       const mockUpdatedEntry = {
         ...mockBody,
-        isManualEntry: true,
+        isManualEntry: false,
         hasBalanceReCalc: true,
       };
 
@@ -180,25 +173,60 @@ describe("Register Entry API Endpoints", () => {
       await import("~/server/clients/queuesClient");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      registerEntrySchema.parse
+        .mockReturnValueOnce(mockBody)
+        .mockReturnValue(mockUpdatedEntry);
+      prisma.accountRegister.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      (prisma.registerEntry.upsert as any).mockResolvedValue(mockUpdatedEntry);
-      (registerEntrySchema.parse as any).mockReturnValue(mockUpdatedEntry);
+      prisma.registerEntry.findFirst.mockResolvedValue({
+        id: "existing-entry-123",
+        accountRegisterId: 1,
+      });
+      prisma.registerEntry.update.mockResolvedValue(mockUpdatedEntry);
 
       const result = await registerEntryPostHandler(mockEvent);
 
-      expect(prisma.registerEntry.upsert).toHaveBeenCalledWith({
+      expect(prisma.registerEntry.update).toHaveBeenCalledWith({
         where: { id: "existing-entry-123" },
-        create: expect.any(Object),
-        update: expect.objectContaining({
+        data: expect.objectContaining({
           description: "Updated Entry",
           amount: 200,
         }),
       });
       expect(result).toEqual(mockUpdatedEntry);
+    });
+
+    it("returns 404 when entry id does not belong to the account register", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        id: "wrong-entry",
+        accountRegisterId: 1,
+        description: "X",
+        amount: 1,
+        balance: 1,
+      };
+      const mockLookup = { id: 1, accountId: "account-123" };
+
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { registerEntrySchema } = await import("~/schema/zod");
+
+      (readBody as any).mockResolvedValue(mockBody);
+      getUser.mockReturnValue({ userId: 123 });
+      registerEntrySchema.parse
+        .mockReturnValueOnce(mockBody)
+        .mockReturnValue(mockBody);
+      prisma.accountRegister.findFirstOrThrow.mockResolvedValue(
+        mockLookup,
+      );
+      prisma.registerEntry.findFirst.mockResolvedValue(null);
+
+      await expect(registerEntryPostHandler(mockEvent)).rejects.toThrow(
+        "Register entry not found",
+      );
     });
 
     it("should handle permission denied error", async () => {
@@ -215,12 +243,12 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (registerEntrySchema.parse as any).mockReturnValue(mockBody);
-      (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      registerEntrySchema.parse.mockReturnValue(mockBody);
+      prisma.accountRegister.findFirstOrThrow.mockRejectedValue(
         new Error("User does not have permission"),
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -264,11 +292,11 @@ describe("Register Entry API Endpoints", () => {
         await import("~/server/clients/queuesClient");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      (prisma.registerEntry.update as any).mockResolvedValue(mockUpdatedEntry);
+      prisma.registerEntry.update.mockResolvedValue(mockUpdatedEntry);
 
       const result = await registerEntryPatchHandler(mockEvent);
 
@@ -327,11 +355,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockRejectedValue(
         new Error("Entry not found or unauthorized"),
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -367,11 +395,11 @@ describe("Register Entry API Endpoints", () => {
         await import("~/server/clients/queuesClient");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      (prisma.registerEntry.delete as any).mockResolvedValue({
+      prisma.registerEntry.delete.mockResolvedValue({
         id: "entry-123",
       });
 
@@ -423,11 +451,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockRejectedValue(
         new Error("Failed to delete register entry"),
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -471,20 +499,20 @@ describe("Register Entry API Endpoints", () => {
       const { dateTimeService } = await import("~/server/services/forecast");
 
       // Mock dateTimeService methods
-      (dateTimeService.add as any) = vi.fn().mockReturnValue({
+      dateTimeService.add = vi.fn().mockReturnValue({
         toISOString: () => "2024-02-01T00:00:00.000Z",
       });
-      (dateTimeService.isSameOrBefore as any) = vi.fn().mockReturnValue(true);
+      dateTimeService.isSameOrBefore = vi.fn().mockReturnValue(true);
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      (prisma.reoccurrence.findUniqueOrThrow as any).mockResolvedValue(
+      prisma.reoccurrence.findUniqueOrThrow.mockResolvedValue(
         mockReoccurrence,
       );
-      (prisma.reoccurrence.update as any).mockResolvedValue(mockReoccurrence);
+      prisma.reoccurrence.update.mockResolvedValue(mockReoccurrence);
 
       const result = await registerEntryAppliedHandler(mockEvent);
 
@@ -513,11 +541,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockRejectedValue(
         new Error("Entry not found"),
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -567,15 +595,15 @@ describe("Register Entry API Endpoints", () => {
           await import("~/server/clients/queuesClient");
 
         (globalThis as any).readBody.mockResolvedValue(mockBody);
-        (getUser as any).mockReturnValue({ userId: 123 });
-        (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(
+        getUser.mockReturnValue({ userId: 123 });
+        prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
           mockLookup,
         );
-        (prisma.reoccurrence.findFirstOrThrow as any).mockResolvedValue(
+        prisma.reoccurrence.findFirstOrThrow.mockResolvedValue(
           mockReoccurrence,
         );
-        (prisma.reoccurrence.update as any).mockResolvedValue(mockReoccurrence);
-        (prisma.$transaction as any).mockImplementation(
+        prisma.reoccurrence.update.mockResolvedValue(mockReoccurrence);
+        prisma.$transaction.mockImplementation(
           async (callback: any) => {
             const mockPrismaTransaction = {
               registerEntry: {
@@ -622,11 +650,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -677,14 +705,14 @@ describe("Register Entry API Endpoints", () => {
       const { registerEntrySchema } = await import("~/schema/zod");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockResolvedValueOnce(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockResolvedValueOnce(
         mockOriginalEntry,
       );
-      (prisma.accountRegister.findFirstOrThrow as any).mockResolvedValue({
+      prisma.accountRegister.findFirstOrThrow.mockResolvedValue({
         accountId: "target-account-id",
       });
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+      prisma.$transaction.mockImplementation(async (callback: any) => {
         const mockTx = {
           registerEntry: {
             create: vi.fn().mockResolvedValue(mockTransferEntry),
@@ -696,7 +724,7 @@ describe("Register Entry API Endpoints", () => {
         };
         return await callback(mockTx);
       });
-      (registerEntrySchema.parse as any)
+      registerEntrySchema.parse
         .mockReturnValueOnce(mockUpdatedOriginal)
         .mockReturnValueOnce(mockTransferEntry);
 
@@ -728,11 +756,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.registerEntry.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockRejectedValue(
         new Error("Not found"),
       );
-      (handleApiError as any).mockImplementation((err: any) => {
+      handleApiError.mockImplementation((err: any) => {
         throw err;
       });
 
@@ -752,8 +780,8 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (handleApiError as any).mockImplementation((err: any) => {
+      getUser.mockReturnValue({ userId: 123 });
+      handleApiError.mockImplementation((err: any) => {
         throw err;
       });
 
@@ -800,18 +828,18 @@ describe("Register Entry API Endpoints", () => {
       const { registerEntrySchema } = await import("~/schema/zod");
       const { dateTimeService } = await import("~/server/services/forecast");
 
-      (dateTimeService.toDate as any) = vi
+      dateTimeService.toDate = vi
         .fn()
         .mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
-      (dateTimeService.parseInput as any) = vi
+      dateTimeService.parseInput = vi
         .fn()
         .mockReturnValue(new Date("2024-01-15T00:00:00.000Z"));
       const createUTCMock = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnThis(),
         isSameOrBefore: vi.fn().mockReturnValue(true),
       });
-      (dateTimeService.createUTC as any) = createUTCMock;
-      (dateTimeService.now as any) = vi
+      dateTimeService.createUTC = createUTCMock;
+      dateTimeService.now = vi
         .fn()
         .mockReturnValue({
           utc: vi.fn().mockReturnThis(),
@@ -819,11 +847,11 @@ describe("Register Entry API Endpoints", () => {
         });
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findFirstOrThrow as any)
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.accountRegister.findFirstOrThrow
         .mockResolvedValueOnce(mockSourceRegister)
         .mockResolvedValueOnce(mockTargetRegister);
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+      prisma.$transaction.mockImplementation(async (callback: any) => {
         const mockTx = {
           registerEntry: {
             create: vi
@@ -834,7 +862,7 @@ describe("Register Entry API Endpoints", () => {
         };
         return await callback(mockTx);
       });
-      (registerEntrySchema.parse as any)
+      registerEntrySchema.parse
         .mockReturnValueOnce(mockSourceEntry)
         .mockReturnValueOnce(mockTargetEntry);
 
@@ -867,8 +895,8 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (handleApiError as any).mockImplementation((err: any) => {
+      getUser.mockReturnValue({ userId: 123 });
+      handleApiError.mockImplementation((err: any) => {
         throw err;
       });
 
@@ -893,11 +921,11 @@ describe("Register Entry API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.accountRegister.findFirstOrThrow as any).mockRejectedValue(
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.accountRegister.findFirstOrThrow.mockRejectedValue(
         new Error("Not found"),
       );
-      (handleApiError as any).mockImplementation((err: any) => {
+      handleApiError.mockImplementation((err: any) => {
         throw err;
       });
 

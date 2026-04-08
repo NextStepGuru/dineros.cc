@@ -1,14 +1,7 @@
-name: CodeQL
+# Weekly default-branch scan. PRs run CodeQL in pr.yml alongside lint/test.
+name: CodeQL (scheduled)
 
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
   schedule:
     - cron: "23 3 * * 1"
 
@@ -29,9 +22,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: none
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4

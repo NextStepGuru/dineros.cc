@@ -24,46 +24,36 @@ export default defineEventHandler(async (event) => {
       return false;
     }
 
-    // Check if the token is a backup code
     const backupCodes = totp.backupCodes || [];
     const isBackupCode = backupCodes.includes(token);
 
-    let verificationResult = false;
+    let nextSettings: Prisma.InputJsonValue;
 
     if (isBackupCode) {
-      // Remove the used backup code
       const updatedBackupCodes = backupCodes.filter((code) => code !== token);
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          settings: structuredClone(
-            withUpdatedTotp(user.settings, {
-              backupCodes: updatedBackupCodes,
-            }),
-          ) as Prisma.InputJsonValue,
-        },
-      });
-
-      verificationResult = true;
+      nextSettings = structuredClone(
+        withUpdatedTotp(user.settings, {
+          backupCodes: updatedBackupCodes,
+          isVerified: true,
+        }),
+      ) as Prisma.InputJsonValue;
     } else {
-      // Verify TOTP token
       const result = await verify({
         secret: totp.base32secret,
         token,
-        epochTolerance: 300, // ±300s (10 periods), matches previous speakeasy window
+        epochTolerance: 30,
       });
-      verificationResult = result.valid;
+      nextSettings = structuredClone(
+        withUpdatedTotp(user.settings, {
+          isVerified: result.valid,
+        }),
+      ) as Prisma.InputJsonValue;
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        settings: structuredClone(
-          withUpdatedTotp(user.settings, {
-            isVerified: verificationResult,
-          }),
-        ) as Prisma.InputJsonValue,
+        settings: nextSettings,
       },
     });
 

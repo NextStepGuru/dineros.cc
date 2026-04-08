@@ -10,14 +10,6 @@ const toast = useToast();
 const authStore = useAuthStore();
 const listStore = useListStore();
 const $api = useNuxtApp().$api as typeof $fetch;
-const authTokenCookie = useCookie<string | undefined>("authToken", {
-  secure: false,
-  httpOnly: false,
-  sameSite: "lax",
-  maxAge: 86400,
-  path: "/",
-});
-
 const token = computed(() => String(route.query.token ?? ""));
 
 type Validate =
@@ -73,33 +65,29 @@ onMounted(async () => {
   }
 });
 
-async function submit() {
-  const v = validation.value;
-  if (!v?.valid) return;
-  if (
-    v.needsName &&
-    (!formState.value.firstName.trim() || !formState.value.lastName.trim())
-  ) {
-    toast.add({
-      color: "error",
-      description: "First and last name are required.",
-    });
-    return;
+function validateForm(v: Extract<Validate, { valid: true }>): boolean {
+  if (v.needsName && (!formState.value.firstName.trim() || !formState.value.lastName.trim())) {
+    toast.add({ color: "error", description: "First and last name are required." });
+    return false;
   }
   if (v.needsPassword) {
     const pw = formState.value.password;
-    if (!pw || pw.length < 6) {
-      toast.add({
-        color: "error",
-        description: "Password must be at least 6 characters.",
-      });
-      return;
+    if (!pw || pw.length < 8) {
+      toast.add({ color: "error", description: "Password must be at least 8 characters." });
+      return false;
     }
     if (pw !== formState.value.confirmPassword) {
       toast.add({ color: "error", description: "Passwords do not match." });
-      return;
+      return false;
     }
   }
+  return true;
+}
+
+async function submit() {
+  const v = validation.value;
+  if (!v?.valid) return;
+  if (!validateForm(v)) return;
   isSubmitting.value = true;
   try {
     const data = await $api<LoginResponse>("/api/account-invite/accept", {
@@ -129,7 +117,6 @@ async function submit() {
       isSubmitting.value = false;
       return;
     }
-    authTokenCookie.value = processed.token;
     authStore.setToken(processed.token);
     if (processed.user) {
       authStore.setUser(processed.user as User);
@@ -155,10 +142,11 @@ async function submit() {
 
 function permLine(v: Extract<Validate, { valid: true }>) {
   const p = v.permissions;
-  const bits: string[] = [];
-  bits.push(p.canViewBudgets ? "View budgets" : "No budget access");
-  bits.push(p.canInviteUsers ? "Invite users" : "Cannot invite");
-  bits.push(p.canManageMembers ? "Manage members" : "Cannot manage members");
+  const bits: string[] = [
+    p.canViewBudgets ? "View budgets" : "No budget access",
+    p.canInviteUsers ? "Invite users" : "Cannot invite",
+    p.canManageMembers ? "Manage members" : "Cannot manage members",
+  ];
   if (p.allowedBudgetIds?.length) {
     bits.push(`Budgets #${p.allowedBudgetIds.join(", ")} only`);
   }

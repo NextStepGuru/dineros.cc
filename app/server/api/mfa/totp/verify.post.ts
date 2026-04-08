@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(body);
     const session = await getPendingMfaSession(event);
 
-    if (!session || !session.methods.includes("totp")) {
+    if (!session?.methods?.includes("totp")) {
       setResponseStatus(event, 401);
       return { errors: "No pending TOTP challenge found." };
     }
@@ -44,12 +44,10 @@ export default defineEventHandler(async (event) => {
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          settings: JSON.parse(
-            JSON.stringify(
-              withUpdatedTotp(user.settings, {
-                backupCodes: nextBackupCodes,
-              }),
-            ),
+          settings: structuredClone(
+            withUpdatedTotp(user.settings, {
+              backupCodes: nextBackupCodes,
+            }),
           ),
         },
       });
@@ -58,7 +56,7 @@ export default defineEventHandler(async (event) => {
       const result = await verify({
         secret: user.settings.mfa.totp.base32secret,
         token: trimmedToken,
-        epochTolerance: 300,
+        epochTolerance: 30,
       });
       isValid = result.valid;
     }

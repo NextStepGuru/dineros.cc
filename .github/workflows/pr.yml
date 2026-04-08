@@ -1,7 +1,11 @@
-# Runs on PRs: unit tests, lint, pre-security checks; build/push app + microservice to gcr.io (same as main), deploy to GKE staging.
+# Runs on PRs: unit tests, lint, pre-security checks, CodeQL; build/push app + microservice to gcr.io (same as main), deploy to GKE staging.
 # Staging Playwright E2E is not run in CI (run locally: pnpm test:e2e with PLAYWRIGHT_BASE_URL).
 # Refresh Linux visual baselines vs staging: .github/workflows/e2e-update-staging-snapshots.yml (manual).
 # Staging deploy: .deploy/dineros.template.yaml + .deploy/profiles/staging.env. Fork PRs skip deploy (no WIF).
+#
+# After staging deploy, we post `bugbot run` so Cursor Bugbot can queue (optional repo secret
+# CURSOR_BUGBOT_TRIGGER_PAT: fine‑grained PAT as a machine user — Cursor often ignores comments from
+# github-actions[bot]). Bugbot Autofix is configured in https://cursor.com/dashboard/bugbot , not in YAML.
 name: PR Checks
 
 on:
@@ -14,16 +18,18 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: "10.32.1"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm audit --audit-level=high
+        continue-on-error: true
 
   test:
     runs-on: ubuntu-latest
@@ -38,11 +44,11 @@ jobs:
       PLAID_CLIENT_ID: "ci-test"
       PLAID_SECRET: "ci-test-secret"
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: "10.32.1"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -53,13 +59,13 @@ jobs:
   pre-commit-security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.24"
       - name: Install TruffleHog
@@ -80,6 +86,26 @@ jobs:
             exit "$first_exit"
           fi
 
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - javascript-typescript
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13 # v4
+
   staging-build-main-site:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -87,15 +113,16 @@ jobs:
       - lint
       - test
       - pre-commit-security
+      - codeql
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - id: auth
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -113,15 +140,16 @@ jobs:
       - lint
       - test
       - pre-commit-security
+      - codeql
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - id: auth
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -146,16 +174,16 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - id: auth
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
       - id: get-credentials
-        uses: google-github-actions/get-gke-credentials@v2
+        uses: google-github-actions/get-gke-credentials@64bc7249bbcf78056bb92f14d3cedc2da193946c # v2
         with:
           cluster_name: ${{ secrets.GKE_CLUSTER }}
           location: ${{ secrets.GKE_LOCATION }}
@@ -165,3 +193,15 @@ jobs:
           image_tag: pr-${{ github.event.pull_request.number }}-${{ github.sha }}
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+  # Cursor Bugbot / Autofix are the Cursor GitHub App + dashboard; there is no `bugbot` CLI in Actions.
+  # Implementation lives in cursor-bugbot-request.yml (declares optional PAT for Actions schema / linters).
+  request-cursor-bugbot:
+    name: Request Cursor Bugbot
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs:
+      - staging-deploy
+    uses: ./.github/workflows/cursor-bugbot-request.yml
+    # Map repo Actions secret (same name as cursor-bugbot-request.yml workflow_call). Optional: omit creating the secret to use GITHUB_TOKEN in the callee.
+    secrets:
+      CURSOR_BUGBOT_TRIGGER_PAT: ${{ secrets.CURSOR_BUGBOT_TRIGGER_PAT }}

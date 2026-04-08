@@ -4,6 +4,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   return {
     provide: {
       api: $fetch.create({
+        credentials: "include",
         onRequest({ options }) {
           // Send token if we have one, regardless of isLoggedIn status
           // This allows token validation during initialization
@@ -23,7 +24,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             });
 
             // Only redirect if we're not already on a public page
-            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+            const currentPath = globalThis.window === undefined ? '/' : globalThis.location.pathname;
             const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password-with-code', '/'];
 
             if (!publicRoutes.includes(currentPath)) {

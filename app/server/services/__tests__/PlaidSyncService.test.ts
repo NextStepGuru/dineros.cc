@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "~/server/clients/prismaClient";
+import { log } from "~/server/logger";
 import PlaidSyncService from "../PlaidSyncService";
 import TransactionMatchingService from "../TransactionMatchingService";
 import type {
@@ -340,6 +342,32 @@ describe("PlaidSyncService", () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toContain(
         "Failed to process transaction test-id"
+      );
+    });
+  });
+
+  describe("logging (no token leakage)", () => {
+    it("Transactions fetched log payload does not include the Plaid access token", async () => {
+      vi.mocked(log).mockClear();
+      vi.spyOn(plaidSyncService.client, "transactionsGet").mockResolvedValue({
+        data: { transactions: [] },
+      } as any);
+      vi.mocked(prisma.accountRegister.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.userAccount.findMany).mockResolvedValue([]);
+
+      await plaidSyncService.syncAllTransactions({
+        accessToken: "secret-plaid-access-token-xyz",
+        plaidAccountIds: ["plaid-acc-1"],
+        startDate: "2024-01-01",
+        endDate: "2024-01-02",
+      });
+
+      const fetchedCall = vi.mocked(log).mock.calls.find(
+        (c) => (c[0] as { message?: string }).message === "Transactions fetched",
+      );
+      expect(fetchedCall).toBeDefined();
+      expect(JSON.stringify(fetchedCall![0])).not.toContain(
+        "secret-plaid-access-token",
       );
     });
   });

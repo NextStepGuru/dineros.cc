@@ -56,7 +56,9 @@ class JwtService {
       throw new Error("Invalid or expired session");
     }
 
-    const decoded = jwt.verify(token, rsa.publicKey);
+    const decoded = jwt.verify(token, rsa.publicKey, {
+      algorithms: ["PS512"],
+    });
 
     await prisma.user.findUniqueOrThrow({
       where: { jwtKey },

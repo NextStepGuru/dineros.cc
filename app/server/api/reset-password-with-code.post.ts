@@ -5,12 +5,31 @@ import HashService from "../services/HashService";
 import { passwordAndCodeSchema } from "~/schema/zod";
 import { prisma } from "../clients/prismaClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { rotateUserJwtKey } from "~/server/lib/rotateUserJwtKey";
+import { stripMfaFromUserSettings } from "~/server/lib/stripMfaSettings";
+import {
+  clientIpFromEvent,
+  rateLimitByKey,
+} from "~/server/lib/rateLimitRedis";
+import { dateTimeService } from "~/server/services/forecast";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
+    const ip = clientIpFromEvent(event);
+    const rl = await rateLimitByKey({
+      key: `reset-pw-code:ip:${ip}`,
+      limit: 20,
+      windowSeconds: 3600,
+    });
+    if (!rl.allowed) {
+      throw createError({
+        statusCode: 429,
+        statusMessage: "Too many attempts. Please try again later.",
+      });
+    }
+
     const body = await readBody(event);
 
-    // Validate the request body
     const { resetCode, newPassword } = passwordAndCodeSchema.parse(body);
 
     const verifyUser = await prisma.user.findFirst({
@@ -24,17 +43,36 @@ export default defineEventHandler(async (event: H3Event) => {
       });
     }
 
+    if (!verifyUser.resetPasswordAt) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Reset code expired",
+      });
+    }
+
+    const deadline = dateTimeService
+      .createUTC(verifyUser.resetPasswordAt)
+      .add(15, "minute");
+    if (dateTimeService.now().isAfter(deadline)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Reset code expired",
+      });
+    }
+
     const password = await new HashService().hash(newPassword);
 
-    // Update the user's resetToken and expiration date
     await prisma.user.update({
       where: { id: verifyUser.id },
       data: {
         resetCode: null,
         resetPasswordAt: null,
         password,
+        settings: stripMfaFromUserSettings(verifyUser.settings),
       },
     });
+
+    await rotateUserJwtKey(verifyUser.id);
 
     await postmarkClient.sendEmail({
       From: "Mr. Pepe Dineros <pepe@dineros.cc>",

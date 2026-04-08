@@ -1,15 +1,18 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   defineEventHandler,
   getCookie,
   getHeader,
   getRequestURL,
   setResponseStatus,
+  type H3Event,
 } from "h3";
 import JwtService from "../services/JwtService";
 import { prisma } from "~/server/clients/prismaClient";
 import { isAdminEmail } from "~/server/lib/adminConfig";
 
 const ignoredRoutes = [
+  { type: "exact", path: "/api/logout", method: "POST" },
   { type: "exact", path: "/api/login", method: "POST" },
   { type: "exact", path: "/api/mfa/totp/verify", method: "POST" },
   { type: "exact", path: "/api/mfa/email/send-code", method: "POST" },
@@ -32,6 +35,53 @@ const ignoredRoutes = [
   { type: "regex", path: /^\/api\/_nuxt_icon\/.*/, method: "GET" },
 ];
 
+function isPublicOrIgnoredApiRoute(
+  pathname: string,
+  method: string | undefined,
+): boolean {
+  return ignoredRoutes.some((route) => {
+    if (route.method !== method) return false;
+    if (route.type === "exact") {
+      return route.path === pathname;
+    }
+    if (route.type === "regex" && typeof route.path !== "string") {
+      return route.path.test(pathname);
+    }
+    if (route.type === "regex" && typeof route.path === "string") {
+      throw new Error(`Invalid route path type: ${route.path}`);
+    }
+    return false;
+  });
+}
+
+function internalRequestTokensMatch(
+  supplied: string | undefined,
+  expected: string | undefined,
+): boolean {
+  if (supplied == null || expected == null) return false;
+  if (supplied.length !== expected.length) return false;
+  return timingSafeEqual(
+    Buffer.from(supplied, "utf8"),
+    Buffer.from(expected, "utf8"),
+  );
+}
+
+async function forbiddenUnlessAdminForTaskRoute(
+  event: H3Event,
+  isTaskRoute: boolean,
+  userId: number,
+): Promise<{ message: string } | null> {
+  if (!isTaskRoute) return null;
+  const currentUser = (await prisma.user.findUnique({
+    where: { id: userId },
+  })) as { role?: string | null; email?: string | null } | null;
+  const role = typeof currentUser?.role === "string" ? currentUser.role : null;
+  const isAdmin = role === "ADMIN" || isAdminEmail(currentUser?.email);
+  if (isAdmin) return null;
+  setResponseStatus(event, 403);
+  return { message: "Forbidden." };
+}
+
 export default defineEventHandler(async (event) => {
   const { method } = event.node.req;
   // Use pathname only: req.url includes ?query so e.g. /api/account-invite/validate?token=…
@@ -39,31 +89,18 @@ export default defineEventHandler(async (event) => {
   const pathname = getRequestURL(event).pathname;
   const isTaskRoute = pathname.startsWith("/api/tasks/");
 
-  if (
-    !pathname.startsWith("/api") ||
-    ignoredRoutes.some((route) => {
-      if (route.method !== method) return false;
-      if (route.type === "exact") {
-        return route.path === pathname;
-      } else if (route.type === "regex" && typeof route.path !== "string") {
-        return route.path.test(pathname);
-      } else if (route.type === "regex" && typeof route.path === "string") {
-        throw new Error(`Invalid route path type: ${route.path}`);
-      }
-      return false;
-    })
-  ) {
+  if (!pathname.startsWith("/api") || isPublicOrIgnoredApiRoute(pathname, method)) {
     return;
   }
 
   const suppliedInternalToken = getHeader(event, "x-internal-token")?.trim();
   const expectedInternalToken = process.env.INTERNAL_API_TOKEN?.trim();
+  const tokensEqual = internalRequestTokensMatch(
+    suppliedInternalToken,
+    expectedInternalToken,
+  );
 
-  if (
-    isTaskRoute &&
-    expectedInternalToken &&
-    suppliedInternalToken === expectedInternalToken
-  ) {
+  if (isTaskRoute && expectedInternalToken && tokensEqual) {
     return;
   }
 
@@ -87,24 +124,18 @@ export default defineEventHandler(async (event) => {
 
     event.context.user = decoded;
 
-    if (isTaskRoute) {
-      const currentUser = (await prisma.user.findUnique({
-        where: { id: decoded.userId },
-      })) as { role?: string | null; email?: string | null } | null;
-      const role = typeof currentUser?.role === "string" ? currentUser.role : null;
-      const isAdmin = role === "ADMIN" || isAdminEmail(currentUser?.email);
-      if (!isAdmin) {
-        setResponseStatus(event, 403);
-        return { message: "Forbidden." };
-      }
-    }
+    const taskForbidden = await forbiddenUnlessAdminForTaskRoute(
+      event,
+      isTaskRoute,
+      decoded.userId,
+    );
+    if (taskForbidden) return taskForbidden;
   } catch (error) {
-    if (error instanceof Error) {
-      setResponseStatus(event, 401);
+    const isProd = process.env.NODE_ENV === "production";
+    setResponseStatus(event, 401);
+    if (error instanceof Error && !isProd) {
       return { message: error.message };
     }
-
-    setResponseStatus(event, 401);
-    return { message: "Invalid token." };
+    return { message: "Invalid or expired session." };
   }
 });

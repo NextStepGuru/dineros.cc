@@ -81,21 +81,11 @@ onMounted(() => {
   }
 });
 
-// Cookie for storing the auth token
-const authTokenCookie = useCookie("authToken", {
-  secure: false,
-  httpOnly: false,
-  sameSite: "lax",
-  maxAge: 86400, // 24 hours
-  path: "/",
-});
-
 async function completePasswordLoginRedirect(
   response: LoginResponse,
 ): Promise<boolean> {
   const result = processLoginResponse(response);
   if (!result.success || !result.token) return false;
-  authTokenCookie.value = result.token;
   authStore.setToken(result.token);
   if (result.user) {
     authStore.setUser(result.user as User);
@@ -254,7 +244,6 @@ async function startPasskeySignIn() {
     });
     const result = processLoginResponse(data);
     if (result.success && result.token) {
-      authTokenCookie.value = result.token;
       authStore.setToken(result.token);
       if (result.user) {
         authStore.setUser(result.user as User);

@@ -20,13 +20,15 @@ COPY microservice ./microservice
 WORKDIR /repo/microservice
 # Prisma config requires DATABASE_URL at generate time; placeholder is enough (no DB connection)
 ENV DATABASE_URL="mysql://build:build@localhost:3306/build"
-ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN pnpm prisma generate
 
 # ---- Runtime stage ----
 FROM node:24-alpine AS runner
 WORKDIR /repo/microservice
 ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 appgroup \
+  && adduser --system --uid 1001 --ingroup appgroup appuser
 
 # Set up pnpm environment for runtime
 ENV PNPM_HOME=/pnpm
@@ -39,9 +41,13 @@ COPY --from=build /repo/package.json /repo/package.json
 COPY --from=build /repo/pnpm-workspace.yaml /repo/pnpm-workspace.yaml
 COPY --from=build /repo/microservice /repo/microservice
 
+RUN chown -R appuser:appgroup /repo
+
 ARG PORT=3000
 ENV PORT=$PORT
 EXPOSE $PORT
+
+USER appuser
 
 # Use test-start script for testing (skips migration)
 CMD ["sh", "-c", "if [ \"$NODE_ENV\" = \"test\" ]; then pnpm test-start; else pnpm start; fi"]

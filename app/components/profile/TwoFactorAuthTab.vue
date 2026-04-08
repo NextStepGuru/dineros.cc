@@ -14,6 +14,7 @@ const showBackupCodes = ref(false);
 const twoFaFormState = reactive({
   twoFactorCode: "",
   passkeyName: "",
+  stepUpPassword: "",
 });
 
 const mfaSettings = computed(() => authStore.user?.settings?.mfa);
@@ -132,13 +133,21 @@ async function addPasskey() {
 }
 
 async function removePasskey(id: string) {
+  if (!twoFaFormState.stepUpPassword.trim()) {
+    toast.add({
+      color: "error",
+      description: "Enter your current password to remove a security key.",
+    });
+    return;
+  }
   isTwoFaSaving.value = true;
   try {
     const res = await $api<User>("/api/mfa/passkey/delete", {
       method: "POST",
-      body: { id },
+      body: { id, currentPassword: twoFaFormState.stepUpPassword },
     });
     authStore.setUser(res);
+    twoFaFormState.stepUpPassword = "";
     toast.add({
       color: "success",
       description: "Security key removed.",
@@ -154,14 +163,27 @@ async function removePasskey(id: string) {
 }
 
 async function toggleEmailOtp() {
+  const enabled = !emailOtpEnabled.value;
+  if (emailOtpEnabled.value && !enabled && !twoFaFormState.stepUpPassword.trim()) {
+    toast.add({
+      color: "error",
+      description: "Enter your current password to disable email OTP.",
+    });
+    return;
+  }
   isTwoFaSaving.value = true;
   try {
-    const enabled = !emailOtpEnabled.value;
     const res = await $api<User>("/api/mfa/email/toggle", {
       method: "POST",
-      body: { enabled },
+      body: {
+        enabled,
+        ...(emailOtpEnabled.value && !enabled
+          ? { currentPassword: twoFaFormState.stepUpPassword }
+          : {}),
+      },
     });
     authStore.setUser(res);
+    twoFaFormState.stepUpPassword = "";
     toast.add({
       color: "success",
       description: enabled ? "Email OTP enabled." : "Email OTP disabled.",
@@ -178,12 +200,21 @@ async function toggleEmailOtp() {
 }
 
 async function disable2fa() {
+  if (!twoFaFormState.stepUpPassword.trim()) {
+    toast.add({
+      color: "error",
+      description: "Enter your current password to disable two-factor authentication.",
+    });
+    return;
+  }
   isTwoFaSaving.value = true;
   try {
     const res = await $api<User>("/api/disable-two-factor-auth", {
       method: "POST",
+      body: { currentPassword: twoFaFormState.stepUpPassword },
     });
     authStore.setUser(res);
+    twoFaFormState.stepUpPassword = "";
     resetTotpSetup();
     toast.add({
       color: "success",
@@ -216,6 +247,16 @@ function toggleBackupCodes() {
 
 <template lang="pug">
 div(class="max-w-2xl mx-auto space-y-5")
+
+  div(v-if="hasAnyMfaEnabled" class="rounded-lg border border-amber-200/80 dark:border-amber-900/50 p-4 bg-amber-50/50 dark:bg-amber-950/20")
+    UFormField(label="Current password (required to remove a key, disable email OTP, or disable all MFA)" for="stepUpPassword")
+      UInput(
+        id="stepUpPassword"
+        v-model="twoFaFormState.stepUpPassword"
+        type="password"
+        autocomplete="current-password"
+        class="w-full"
+      )
 
   div(class="rounded-lg border border-gray-200 dark:border-gray-800 p-4")
     .flex.items-center.justify-between.mb-3

@@ -85,6 +85,10 @@ export function createPrismaAccountListsRepository(
             ...userAccountFilter,
           },
           orderBy: { sortOrder: "asc" },
+          omit: {
+            plaidAccessToken: true,
+            plaidJson: true,
+          },
         }),
         db.account.findMany({
           where: {

@@ -10,7 +10,7 @@ Official reference: [Nuxt 4 — Testing](https://nuxt.com/docs/4.x/getting-start
 ## Commands and config files
 
 - **`pnpm test`** (from repo root) delegates to the app package and uses **`app/vitest.config.ts`** (`TZ=UTC vitest --run --config vitest.config.ts` inside `app/`).
-- **`pnpm test:crypto`** delegates to **`app/vitest.crypto.config.ts`**: Hash/Jwt/Rsa service tests listed in **`vitestSlowTestExcludes`** (slow bcrypt work; not part of default `pnpm test`).
+- **`pnpm test:crypto`** delegates to **`app/vitest.crypto.config.ts`**: Hash/Rsa service tests listed in **`vitestSlowTestExcludes`** (slow bcrypt work; not part of default `pnpm test`). **`JwtService.test.ts`** runs with **`pnpm test`**.
 - **`app/vitest.config.all.ts`** only re-exports `app/vitest.config.ts` for backwards compatibility; prefer **`app/vitest.config.ts`** for new references.
 - Coverage config lives at **`app/vitest.config.coverage.ts`** (same project split + coverage reporters/options).
 

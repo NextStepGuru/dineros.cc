@@ -23,10 +23,12 @@ const envSchema = z.object({
     .string()
     .transform((val: string) => Number.parseInt(val, 10))
     .default(6379),
+  /** Optional; when set, passed to ioredis (e.g. managed Redis with ACL). */
+  REDIS_PASSWORD: z.string().optional(),
   NATS_URL: z.string().default("nats://localhost:4222"),
   INTERNAL_API_TOKEN: z.string().optional(),
   /** Base URL for server-to-server calls to the microservice (e.g. http://127.0.0.1:3050). */
-  MICROSERVICE_INTERNAL_URL: z.string().url().optional(),
+  MICROSERVICE_INTERNAL_URL: z.url().optional(),
   NUXT_PUBLIC_SITE_URL: z.preprocess(
     (value) =>
       typeof value === "string" && value.trim().length === 0

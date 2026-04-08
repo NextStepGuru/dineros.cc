@@ -24,6 +24,16 @@ vi.mock("h3", () => ({
     (err as any).statusCode = error.statusCode || 500;
     throw err;
   }),
+  readBody: vi.fn(),
+}));
+
+const { hashVerify } = vi.hoisted(() => ({
+  hashVerify: vi.fn().mockResolvedValue(true),
+}));
+vi.mock("~/server/services/HashService", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    verify: hashVerify,
+  })),
 }));
 
 // Mock dependencies
@@ -67,6 +77,9 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
   beforeEach(async () => {
     // Clear all mocks
     vi.clearAllMocks();
+    hashVerify.mockResolvedValue(true);
+    const { readBody } = await import("h3");
+    (readBody as any).mockResolvedValue({ currentPassword: "correct-password" });
 
     // Import the handler dynamically to ensure mocks are applied
     const module = await import("../disable-two-factor-auth.post");
@@ -80,6 +93,7 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
       email: "test@example.com",
       firstName: "Test",
       lastName: "User",
+      password: "hashed-password",
       settings: {
         speakeasy: { isEnabled: true, isVerified: true },
         otherSetting: "value",
@@ -119,11 +133,11 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     );
 
     // Set up mocks properly
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (privateUserSchema.parse as any).mockReturnValue(mockParsedUser);
-    (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
-    (publicProfileSchema.parse as any).mockReturnValue(mockParsedResponse);
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockReturnValue(mockParsedUser);
+    prisma.user.update.mockResolvedValue(mockUpdatedUser);
+    publicProfileSchema.parse.mockReturnValue(mockParsedResponse);
 
     const result = await disableTwoFactorAuthHandler(mockEvent);
 
@@ -146,6 +160,59 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     });
     expect(publicProfileSchema.parse).toHaveBeenCalledWith(mockUpdatedUser);
     expect(result).toEqual(mockParsedResponse);
+    expect(hashVerify).toHaveBeenCalledWith(
+      "hashed-password",
+      "correct-password",
+    );
+  });
+
+  it("should return 401 when current password is incorrect", async () => {
+    const mockEvent = {};
+    const mockUser = {
+      id: 123,
+      email: "test@example.com",
+      password: "hashed-password",
+      settings: {
+        speakeasy: { isEnabled: true, isVerified: true },
+      },
+    };
+    hashVerify.mockResolvedValue(false);
+
+    const { getUser } = await import("~/server/lib/getUser");
+    const { prisma } = await import("~/server/clients/prismaClient");
+    const { privateUserSchema } = await import("~/schema/zod");
+
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockReturnValue(mockUser);
+
+    await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow(
+      "Current password is incorrect.",
+    );
+  });
+
+  it("should return 400 when user has no password set", async () => {
+    const mockEvent = {};
+    const mockUser = {
+      id: 123,
+      email: "test@example.com",
+      password: null,
+      settings: {
+        speakeasy: { isEnabled: true, isVerified: true },
+      },
+    };
+
+    const { getUser } = await import("~/server/lib/getUser");
+    const { prisma } = await import("~/server/clients/prismaClient");
+    const { privateUserSchema } = await import("~/schema/zod");
+
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockReturnValue(mockUser);
+
+    await expect(disableTwoFactorAuthHandler(mockEvent)).rejects.toThrow(
+      "Password confirmation is not available for this account.",
+    );
   });
 
   it("should handle user not found", async () => {
@@ -155,8 +222,8 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     const { prisma } = await import("~/server/clients/prismaClient");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 999 });
-    (prisma.user.findUniqueOrThrow as any).mockRejectedValue(
+    getUser.mockReturnValue({ userId: 999 });
+    prisma.user.findUniqueOrThrow.mockRejectedValue(
       new Error("User not found")
     );
 
@@ -178,6 +245,7 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
       email: "invalid-email",
       firstName: "Test",
       lastName: "User",
+      password: "hashed-password",
     };
 
     const { getUser } = await import("~/server/lib/getUser");
@@ -185,9 +253,9 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     const { privateUserSchema } = await import("~/schema/zod");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (privateUserSchema.parse as any).mockImplementation(() => {
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockImplementation(() => {
       throw new Error("Invalid user data");
     });
 
@@ -210,6 +278,7 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
       email: "test@example.com",
       firstName: "Test",
       lastName: "User",
+      password: "hashed-password",
       settings: {
         speakeasy: { isEnabled: true, isVerified: true },
       },
@@ -229,10 +298,10 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     const { privateUserSchema } = await import("~/schema/zod");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (privateUserSchema.parse as any).mockReturnValue(mockParsedUser);
-    (prisma.user.update as any).mockRejectedValue(
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockReturnValue(mockParsedUser);
+    prisma.user.update.mockRejectedValue(
       new Error("Database update failed")
     );
 
@@ -266,6 +335,7 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
       email: "test@example.com",
       firstName: "Test",
       lastName: "User",
+      password: "hashed-password",
       settings: {
         speakeasy: { isEnabled: true, isVerified: true },
       },
@@ -296,11 +366,11 @@ describe("Disable Two-Factor Auth POST API Endpoint", () => {
     );
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-    (privateUserSchema.parse as any).mockReturnValue(mockParsedUser);
-    (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
-    (publicProfileSchema.parse as any).mockImplementation(() => {
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+    privateUserSchema.parse.mockReturnValue(mockParsedUser);
+    prisma.user.update.mockResolvedValue(mockUpdatedUser);
+    publicProfileSchema.parse.mockImplementation(() => {
       throw new Error("Invalid response data");
     });
 

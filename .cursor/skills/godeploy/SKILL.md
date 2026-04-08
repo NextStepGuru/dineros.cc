@@ -1,13 +1,14 @@
 ---
 name: godeploy
 description: >-
-  Full deploy-to-review flow: create a branch from the default branch, stage
-  and commit all project changes, run pnpm lint and pnpm test until both pass,
-  push safely, then open a PR. Trigger when the user says /godeploy, godeploy,
-  or asks to branch + commit everything + push + PR in one go.
+  Full deploy-to-review flow: create a branch from the default branch when
+  starting on that branch, otherwise keep the current non-default branch; then
+  stage and commit all project changes, run pnpm lint and pnpm test until both
+  pass, push safely, then open a PR. Trigger when the user says /godeploy,
+  godeploy, or asks to branch + commit everything + push + PR in one go.
 ---
 
-# /godeploy — branch, commit all, push, PR
+# /godeploy — optional branch, commit all, push, PR
 
 Run only when the user says `/godeploy`, `godeploy`, or explicitly asks for the full branch + commit + push + PR flow. This skill is the exception that chains git operations with user consent for that workflow.
 
@@ -15,7 +16,7 @@ Run these steps in order. Stop and tell the user if any step fails (including `p
 
 ## 0. Preconditions
 
-- Resolve **branch name**, **commit message**, **PR title**, and **PR body**. Ask once if branch/message are missing; branch name may be derived from the change (e.g. `feat/category-management`).
+- Resolve **commit message**, **PR title**, and **PR body**. Resolve **branch name** only when starting from `main`/`DEFAULT` (since branch creation is skipped on other branches). Ask once if required values are missing.
 - Do not run if the user is in **detached HEAD** (`git branch --show-current` empty).
 
 ### Generating commit, PR title, and PR body from the diff
@@ -44,14 +45,24 @@ git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/ori
 
 Fallback: `main`, then `master`. Remote: `origin/<DEFAULT>`.
 
-## 2. Create branch
+## 2. Branch handling (conditional)
+
+Resolve current branch:
 
 ```bash
-git fetch origin
-git checkout -b <new-branch> origin/<DEFAULT>
+git branch --show-current
 ```
 
-Uncommitted changes stay on the new branch. If checkout would overwrite untracked files, stop and warn.
+- If current branch is `main` (or exactly `DEFAULT`): create a new branch from `origin/<DEFAULT>`.
+
+  ```bash
+  git fetch origin
+  git checkout -b <new-branch> origin/<DEFAULT>
+  ```
+
+  Uncommitted changes stay on the new branch. If checkout would overwrite untracked files, stop and warn.
+
+- If current branch is anything else (for example `feature/*`, `fix/*`, etc.): **skip branch creation** and continue on the current branch.
 
 ## 3. Stage and commit everything
 

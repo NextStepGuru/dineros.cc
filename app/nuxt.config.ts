@@ -11,6 +11,8 @@ const watchIgnore = [
   "**/.pnpm/**",
 ];
 
+const isProdDeploy = process.env.NODE_ENV === "production";
+
 const baseSecurityHeaders = {
   "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
@@ -18,7 +20,13 @@ const baseSecurityHeaders = {
   "permissions-policy":
     "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
   "content-security-policy":
-    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' ws: wss: https:;",
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; connect-src 'self' ws: wss: https:;",
+  ...(isProdDeploy
+    ? {
+        "strict-transport-security":
+          "max-age=63072000; includeSubDomains; preload",
+      }
+    : {}),
 };
 
 export default defineNuxtConfig({

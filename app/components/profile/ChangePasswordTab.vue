@@ -4,15 +4,19 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import type { z } from "zod";
 import type { User } from "../../types/types";
 
-import type { passwordSchema } from "~/schema/zod";
+import { changePasswordSchema } from "~/schema/zod";
 
-type PasswordSchemaType = z.infer<typeof passwordSchema>;
+/** Runtime schema for UForm `:schema` (value use; avoids type-only import lint). */
+const passwordFormSchema = changePasswordSchema;
+
+type PasswordSchemaType = z.infer<typeof changePasswordSchema>;
 
 const toast = useToast();
 const authStore = useAuthStore();
 
 const passwordState = ref<
   Partial<{
+    currentPassword: string;
     newPassword: string;
     confirmPassword: string;
   }>
@@ -64,8 +68,18 @@ const handleErrorForTemplate = handleError;
 
 <template lang="pug">
 UCard(class="max-w-md mx-auto")
-  UForm(class="space-y-4" @submit.prevent="handlePasswordSubmit" :state="passwordState" :schema="passwordSchema" @error="handleError($event, toast)" :disabled="isPasswordChanging")
-    UFormField(label="Password" for="newPassword")
+  UForm(class="space-y-4" @submit.prevent="handlePasswordSubmit" :state="passwordState" :schema="passwordFormSchema" @error="handleError($event, toast)" :disabled="isPasswordChanging")
+    UFormField(label="Current password" for="currentPassword")
+      UInput(
+        id="currentPassword"
+        v-model="passwordState.currentPassword"
+        type="password"
+        placeholder="Enter your current password"
+        aria-label="Current password"
+        autocomplete="current-password"
+        class="w-full"
+      )
+    UFormField(label="New password" for="newPassword")
       UInput(
         id="newPassword"
         v-model="passwordState.newPassword"

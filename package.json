@@ -27,7 +27,9 @@
     "ci:local": "pnpm --filter dineros-app ci:local",
     "ci:local:lint": "pnpm --filter dineros-app ci:local:lint",
     "ci:local:test": "pnpm --filter dineros-app ci:local:test",
-    "ci:local:pre-commit": "pnpm --filter dineros-app ci:local:pre-commit"
+    "ci:local:pre-commit": "pnpm --filter dineros-app ci:local:pre-commit",
+    "sonar": "bash scripts/sonar-local.sh",
+    "sonar:quick": "bash scripts/sonar-local.sh --no-coverage"
   },
   "pnpm": {
     "overrides": {

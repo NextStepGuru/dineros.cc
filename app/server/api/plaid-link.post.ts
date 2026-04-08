@@ -10,6 +10,7 @@ import { dateTimeService } from "~/server/services/forecast/DateTimeService";
 import { addPlaidSyncJob } from "~/server/clients/queuesClient";
 import { log } from "~/server/logger";
 import { createError } from "h3";
+import { encryptPlaidAccessTokenForSettings } from "~/server/lib/plaidAccessTokenCrypto";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -44,11 +45,20 @@ export default defineEventHandler(async (event) => {
     }
 
     // Persist access_token before enqueueing sync: item-scoped sync resolves the token from user.settings.plaid.
+    const plaidMerged = {
+      ...plaidBody,
+      ...results.data,
+      isEnabled: true,
+    } as Record<string, unknown>;
+    const rawToken = plaidMerged.access_token;
+    if (typeof rawToken === "string" && rawToken.length > 0) {
+      plaidMerged.access_token = encryptPlaidAccessTokenForSettings(rawToken);
+    }
     const userResult = await PrismaDb.user.update({
       data: {
         settings: structuredClone({
           ...user.settings,
-          plaid: { ...plaidBody, ...results.data, isEnabled: true },
+          plaid: plaidMerged,
         }),
       },
       where: { id: userId },

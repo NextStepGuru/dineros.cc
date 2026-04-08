@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createError, getHeader, getRequestURL, type H3Event } from "h3";
 import env from "~/server/env";
 
@@ -36,7 +37,11 @@ export function assertE2EAllowed(event: H3Event): void {
     throw createError({ statusCode: 404, statusMessage: "Not found" });
   }
   const token = getHeader(event, "x-e2e-token")?.trim();
-  if (!token || token !== expected) {
+  const tokenOk =
+    token != null &&
+    token.length === expected.length &&
+    timingSafeEqual(Buffer.from(token, "utf8"), Buffer.from(expected, "utf8"));
+  if (!tokenOk) {
     throw createError({ statusCode: 403, statusMessage: "Forbidden" });
   }
 }

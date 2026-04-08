@@ -47,13 +47,13 @@ export default defineEventHandler(async (event: H3Event) => {
         );
       }
 
-      // Check if user has access to this account register
-      await PrismaDb.account.findFirstOrThrow({
+      await PrismaDb.accountRegister.findFirstOrThrow({
         where: {
-          id: accountRegister.accountId,
-          userAccounts: {
-            some: {
-              userId,
+          id: accountRegister.id,
+          accountId: accountRegister.accountId,
+          account: {
+            userAccounts: {
+              some: { userId },
             },
           },
         },

@@ -38,96 +38,60 @@ export const useAuthStore = defineStore("authStore", {
     },
     async validateLogin() {
       try {
-        const authTokenCookie = useCookie<string | undefined>("authToken", {
-          secure: false,
-          httpOnly: false,
-          sameSite: "lax",
-          maxAge: 86400, // 24 hours
-          path: "/",
+        const headers =
+          import.meta.server && import.meta.prerender === false
+            ? useRequestHeaders(["cookie"])
+            : undefined;
+
+        const { data: user, error } = await useAPI<User>("/api/user", {
+          server: true,
+          headers: headers as Record<string, string> | undefined,
+          credentials: "include",
         });
 
-        if (authTokenCookie.value) {
-          this.token = authTokenCookie.value;
-
-          // Check if token is expired before making API call
-          try {
-            const tokenPayload = JSON.parse(atob(this.token.split(".")[1]));
-            const now = Math.floor(Date.now() / 1000);
-            if (tokenPayload.exp && tokenPayload.exp < now) {
-              console.log({
-                message: "Token is expired, clearing cookie",
-                level: "debug",
-              });
-              authTokenCookie.value = undefined;
-              this.isLoggedIn = false;
-              this.token = "";
-              this.user = null;
-              return;
-            }
-          } catch (error) {
-            console.log({
-              message: "Error parsing token:",
-              data: error,
-              level: "debug",
-            });
-            // If we can't parse the token, it's invalid
-            authTokenCookie.value = undefined;
-            this.isLoggedIn = false;
-            this.token = "";
-            this.user = null;
-            return;
-          }
-
-          // Don't set isLoggedIn = true yet, wait for API verification.
-          // Run on server too so SSR and client agree on auth state (avoids hydration mismatch).
-          const { data: user, error } = await useAPI<User>("/api/user", {
-            server: true,
-          });
-
-          if (!error.value && user.value) {
-            // Only set logged in if API call succeeded
-            this.user = user.value;
-            this.isLoggedIn = true;
-          } else {
-            // API call failed - check if it's a server error vs auth error
-            console.log({
-              message: "API validation failed:",
-              data: error.value,
-              level: "warn",
-            });
-
-            // Only clear auth state if it's definitely an auth error (401/403)
-            // For network errors or server errors, preserve the token and try again later
-            if (error.value?.status === 401 || error.value?.status === 403) {
-              console.log({
-                message: "Authentication failed, clearing auth state",
-                level: "debug",
-              });
-              this.isLoggedIn = false;
-              this.token = "";
-              this.user = null;
-              authTokenCookie.value = undefined;
-            } else {
-              // For other errors (500, network issues, etc.), keep the token
-              // but don't set isLoggedIn yet - let the user retry
-              console.log({
-                message: "Non-auth error, preserving token for retry",
-                level: "debug",
-              });
-              this.isLoggedIn = false;
-              // Keep this.token and don't clear the cookie
+        if (!error.value && user.value) {
+          this.user = user.value;
+          this.isLoggedIn = true;
+          if (import.meta.client) {
+            try {
+              const refreshed = await useNuxtApp().$api<{ token: string }>(
+                "/api/validate-token",
+                { credentials: "include" },
+              );
+              if (refreshed?.token) {
+                this.token = refreshed.token;
+              }
+            } catch {
+              // Cookie-only session still works for same-origin API calls
             }
           }
-        } else {
-          this.isLoggedIn = false;
+          return;
         }
+
+        if (error.value?.status === 401 || error.value?.status === 403) {
+          this.isLoggedIn = false;
+          this.token = "";
+          this.user = null;
+          return;
+        }
+
+        if (error.value) {
+          console.log({
+            message: "API validation failed:",
+            data: error.value,
+            level: "warn",
+          });
+          this.isLoggedIn = false;
+          return;
+        }
+
+        this.isLoggedIn = false;
       } catch (error) {
         console.log({
-          message: "Could not validate login - cookie access failed:",
+          message: "Could not validate login:",
           data: error,
           level: "warn",
         });
-        // Don't clear tokens on cookie access errors - might be SSR context issues
         this.isLoggedIn = false;
       }
     },
@@ -152,7 +116,6 @@ export const useAuthStore = defineStore("authStore", {
       this.user = null;
       this.budgetId = 0;
 
-      // Only try to access localStorage on the client side
       if (import.meta.client) {
         try {
           localStorage.removeItem("authToken");
@@ -163,27 +126,18 @@ export const useAuthStore = defineStore("authStore", {
             level: "debug",
           });
         }
-      }
-
-      // Try to clear cookie, but don't fail if we're outside Nuxt context
-      try {
-        const authToken = useCookie<string | undefined>("authToken", {
-          expires: new Date(Date.now() - 1),
-          secure: false,
-          httpOnly: false,
-          sameSite: "lax",
-          maxAge: 86400, // 24 hours - keep consistent
-          path: "/",
-        });
-        authToken.value = undefined;
-      } catch (error) {
-        // Cookie clearing failed - this can happen when called outside Nuxt context
-        // This is expected when logout is called from API error handlers
-        console.log({
-          message: "Could not clear auth cookie:",
-          data: error,
-          level: "warn",
-        });
+        try {
+          await useNuxtApp().$api("/api/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+        } catch (error) {
+          console.log({
+            message: "Could not clear httpOnly session cookie:",
+            data: error,
+            level: "warn",
+          });
+        }
       }
 
       // Try to reset list store, but don't fail if we're outside Nuxt context

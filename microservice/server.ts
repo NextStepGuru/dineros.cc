@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { listen } from "listhen";
 import bull from "./lib/bull";
 import {
@@ -14,6 +15,18 @@ import { log } from "./logger";
 
 const app = createApp();
 
+function internalRequestTokensMatch(
+  supplied: string | undefined,
+  expected: string,
+): boolean {
+  if (supplied == null) return false;
+  if (supplied.length !== expected.length) return false;
+  return timingSafeEqual(
+    Buffer.from(supplied, "utf8"),
+    Buffer.from(expected, "utf8"),
+  );
+}
+
 app.use(
   eventHandler((event) => {
     const expectedInternalToken = env.INTERNAL_API_TOKEN?.trim();
@@ -25,7 +38,11 @@ app.use(
     }
 
     const suppliedInternalToken = getHeader(event, "x-internal-token")?.trim();
-    if (suppliedInternalToken !== expectedInternalToken) {
+    const ok = internalRequestTokensMatch(
+      suppliedInternalToken,
+      expectedInternalToken,
+    );
+    if (!ok) {
       throw createError({
         statusCode: 401,
         statusMessage: "Unauthorized",
@@ -58,10 +75,11 @@ for (const file of routes) {
   const module = await import(`./${file}`);
   const handler: (event: unknown) => unknown = module.default;
 
-  if (!handlersByRoute.has(route)) {
-    handlersByRoute.set(route, new Map());
+  let methods = handlersByRoute.get(route);
+  if (!methods) {
+    methods = new Map();
+    handlersByRoute.set(route, methods);
   }
-  const methods = handlersByRoute.get(route)!;
   if (methods.has(method)) {
     log({
       message: `Duplicate handler ${method.toUpperCase()} for /${route}, skipping ${file}`,
