@@ -5,6 +5,15 @@ import {
   formatCurrencyOptions,
 } from "~/lib/utils";
 import { formatMoneyUsd } from "~/lib/bankers-rounding";
+import {
+  bumpCashDenomCount,
+  CASH_DENOM_CONFIG,
+  subtotalForCashDenom,
+  totalDollarsFromCashCounts,
+  ZERO_CASH_COUNTS,
+  type CashDenomCounts,
+  type CashDenomKey,
+} from "~/lib/cashDenominations";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import type { z } from "zod";
 import {
@@ -244,54 +253,24 @@ const isSelectedAccountTypeCash = computed(
   () => selectedAccountType.value?.type === "cash",
 );
 
-const denomConfig = [
-  { key: "hundreds" as const, face: 100, label: "$100" },
-  { key: "fifties" as const, face: 50, label: "$50" },
-  { key: "twenties" as const, face: 20, label: "$20" },
-  { key: "tens" as const, face: 10, label: "$10" },
-  { key: "fives" as const, face: 5, label: "$5" },
-  { key: "ones" as const, face: 1, label: "$1" },
-];
-
-type CashCountKey = (typeof denomConfig)[number]["key"];
-
-const cashCounts = ref({
-  ones: 0,
-  fives: 0,
-  tens: 0,
-  twenties: 0,
-  fifties: 0,
-  hundreds: 0,
+const persistedAccountIsCashType = computed(() => {
+  const t = listStore.getAccountTypes.find(
+    (x) => x.id === props.accountRegister.typeId,
+  );
+  return t?.type === "cash";
 });
+
+const cashCounts = ref<CashDenomCounts>({ ...ZERO_CASH_COUNTS });
 
 const cashLoading = ref(false);
 const activeTab = ref<string | number>("account");
 
-const cashTotal = computed(() => {
-  const c = cashCounts.value;
-  return (
-    c.ones * 1 +
-    c.fives * 5 +
-    c.tens * 10 +
-    c.twenties * 20 +
-    c.fifties * 50 +
-    c.hundreds * 100
-  );
-});
-
-function formatCashMoney(amount: number): string {
-  return formatMoneyUsd(amount);
-}
+const cashTotal = computed(() =>
+  totalDollarsFromCashCounts(cashCounts.value),
+);
 
 function resetCashCounts() {
-  cashCounts.value = {
-    ones: 0,
-    fives: 0,
-    tens: 0,
-    twenties: 0,
-    fifties: 0,
-    hundreds: 0,
-  };
+  cashCounts.value = { ...ZERO_CASH_COUNTS };
 }
 
 function syncCashBalanceFromCounts() {
@@ -301,14 +280,12 @@ function syncCashBalanceFromCounts() {
   formState.value.latestBalance = t;
 }
 
-function bumpCashCount(key: CashCountKey, delta: number) {
-  const next = cashCounts.value[key] + delta;
-  cashCounts.value[key] = Math.max(0, next);
+function bumpCashCount(key: CashDenomKey, delta: number) {
+  bumpCashDenomCount(cashCounts, key, delta);
 }
 
-function subtotalCash(key: CashCountKey): number {
-  const face = denomConfig.find((d) => d.key === key)?.face ?? 0;
-  return cashCounts.value[key] * face;
+function subtotalCash(key: CashDenomKey): number {
+  return subtotalForCashDenom(key, cashCounts.value);
 }
 
 async function loadCashOnHand(registerId: number) {
@@ -609,7 +586,11 @@ watch(props, () => {
   const t = listStore.getAccountTypes.find(
     (x) => x.id === formState.value.typeId,
   );
-  if (t?.type === "cash" && formState.value.id > 0) {
+  if (
+    t?.type === "cash" &&
+    persistedAccountIsCashType.value &&
+    formState.value.id > 0
+  ) {
     void loadCashOnHand(formState.value.id);
   }
 });
@@ -739,7 +720,7 @@ watch(
     }
 
     if (newType?.type === "cash") {
-      if (formState.value.id > 0) {
+      if (formState.value.id > 0 && persistedAccountIsCashType.value) {
         void loadCashOnHand(formState.value.id);
       } else {
         resetCashCounts();
@@ -811,6 +792,14 @@ async function handleSubmit({
   data: formData,
 }: FormSubmitEvent<AccountRegister>) {
   try {
+    if (
+      isSelectedAccountTypeCash.value &&
+      formState.value.id > 0 &&
+      cashLoading.value
+    ) {
+      return;
+    }
+
     isSaving.value = true;
 
     if (isSelectedAccountTypeCash.value) {
@@ -857,6 +846,8 @@ async function handleSubmit({
 
     formState.value = accountRegisterSchema.parse(responseData);
 
+    props.callback(formState.value);
+
     if (isSelectedAccountTypeCash.value && formState.value.id > 0) {
       try {
         await saveCashOnHand(formState.value.id);
@@ -866,8 +857,6 @@ async function handleSubmit({
         return;
       }
     }
-
-    props.callback(formState.value);
 
     toast.add({
       color: "success",
@@ -933,6 +922,13 @@ function cancelArchiveConfirmation() {
 
 function triggerPrimaryAction() {
   if (isSaving.value || isDeleting.value || showArchiveConfirm.value) return;
+  if (
+    isSelectedAccountTypeCash.value &&
+    formState.value.id > 0 &&
+    cashLoading.value
+  ) {
+    return;
+  }
   form.value?.submit?.();
 }
 
@@ -952,7 +948,7 @@ defineShortcuts({
 <template lang="pug">
 UModal(:title="props.title" :description="props.description || props.title" class="modal-mobile-fullscreen")
   template(#body)
-    UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isSaving" ref="form")
+    UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isDeleting || (isSelectedAccountTypeCash && formState.id > 0 && cashLoading)" ref="form")
       UTabs(v-model="activeTab" :items="tabItems" variant="link" class="w-full" :unmount-on-hide="false")
         template(#account)
           div(class="space-y-4 pt-2")
@@ -987,7 +983,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
             template(v-if="isSelectedAccountTypeCash")
               UFormField(label="Account balance" name="balance" hint="Total from bill counts on the Cash Count tab")
                 UInput(
-                  :model-value="formatCashMoney(cashTotal)"
+                  :model-value="formatMoneyUsd(cashTotal)"
                   type="text"
                   readonly
                   disabled
@@ -1008,9 +1004,9 @@ UModal(:title="props.title" :description="props.description || props.title" clas
             template(v-else)
               div(class="text-center py-3 border-b border-default mb-2")
                 p(class="text-sm text-muted mb-1") Total (from bills)
-                p(class="text-2xl font-bold tabular-nums frog-text") {{ formatCashMoney(cashTotal) }}
+                p(class="text-2xl font-bold tabular-nums frog-text") {{ formatMoneyUsd(cashTotal) }}
               div(
-                v-for="d in denomConfig"
+                v-for="d in CASH_DENOM_CONFIG"
                 :key="d.key"
                 class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
               )
@@ -1020,7 +1016,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                     color="neutral"
                     variant="soft"
                     size="sm"
-                    :disabled="isSaving || isDeleting"
+                    :disabled="isSaving || isDeleting || cashLoading"
                     @click="bumpCashCount(d.key, -1)"
                     aria-label="Decrease"
                   )
@@ -1030,18 +1026,18 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                     :min="0"
                     :step="1"
                     class="w-24"
-                    :disabled="isSaving || isDeleting"
+                    :disabled="isSaving || isDeleting || cashLoading"
                   )
                   UButton(
                     color="neutral"
                     variant="soft"
                     size="sm"
-                    :disabled="isSaving || isDeleting"
+                    :disabled="isSaving || isDeleting || cashLoading"
                     @click="bumpCashCount(d.key, 1)"
                     aria-label="Increase"
                   )
                     UIcon(name="i-lucide-plus" class="w-4 h-4")
-                span(class="text-right text-muted tabular-nums sm:w-28") {{ formatCashMoney(subtotalCash(d.key)) }}
+                span(class="text-right text-muted tabular-nums sm:w-28") {{ formatMoneyUsd(subtotalCash(d.key)) }}
 
         template(#rates)
           div(class="space-y-4 pt-2")
@@ -1342,7 +1338,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
             color="primary"
             @click.prevent="form?.submit()"
             :loading="isSaving"
-            :disabled="isSaving || isDeleting"
+            :disabled="isSaving || isDeleting || (isSelectedAccountTypeCash && formState.id > 0 && cashLoading)"
             class="modal-action-button"
           ) Save
           UButton(
