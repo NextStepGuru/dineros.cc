@@ -2,16 +2,16 @@
 name: godeploy
 description: >-
   Full deploy-to-review flow: create a branch from the default branch, stage
-  and commit all project changes, run pnpm lint until it passes, push safely,
-  then open a PR. Trigger when the user says /godeploy, godeploy, or asks to
-  branch + commit everything + push + PR in one go.
+  and commit all project changes, run pnpm lint and pnpm test until both pass,
+  push safely, then open a PR. Trigger when the user says /godeploy, godeploy,
+  or asks to branch + commit everything + push + PR in one go.
 ---
 
 # /godeploy — branch, commit all, push, PR
 
 Run only when the user says `/godeploy`, `godeploy`, or explicitly asks for the full branch + commit + push + PR flow. This skill is the exception that chains git operations with user consent for that workflow.
 
-Run these steps in order. Stop and tell the user if any step fails (including `pnpm lint`).
+Run these steps in order. Stop and tell the user if any step fails (including `pnpm lint` or `pnpm test`). Fix failures and **re-run** the failed gate until it passes (see §4–5) before continuing; resolve **rebase merge conflicts** after `git pull --rebase` before pushing.
 
 ## 0. Preconditions
 
@@ -78,9 +78,23 @@ pnpm lint
 - If this exits non-zero, **do not push**. Fix reported issues (e.g. ESLint), commit any fixes, then re-run `pnpm lint` until it exits **0**.
 - Prefer logging full command output to `./output.txt` (e.g. `pnpm lint 2>&1 | tee ./output.txt`) when the workspace workflow asks for inspectable logs.
 
-Only proceed to push once `pnpm lint` succeeds.
+Only proceed once `pnpm lint` succeeds.
 
-## 5. Push (safe)
+## 5. Tests (must pass before push)
+
+From the **git repository root** (where `pnpm test` is defined):
+
+```bash
+pnpm test
+```
+
+- If this exits non-zero, **do not push**. Fix failing tests or implementation, commit if needed, then re-run `pnpm test` until it exits **0**.
+- Prefer logging full output to `./output.txt` (e.g. `pnpm test 2>&1 | tee ./output.txt`) when the workspace workflow asks for inspectable logs.
+- If tests fail because the Prisma client is missing locally, run `npx prisma generate` in `app/` (or the package that owns the schema) and re-run tests—do not push until `pnpm test` is green.
+
+Only proceed to push once `pnpm test` succeeds.
+
+## 6. Push (safe)
 
 `<branch>` = `git branch --show-current`
 
@@ -97,7 +111,7 @@ Then push:
 
 Resolve conflicts before pushing. Never `git push --force` without lease.
 
-## 6. Open PR
+## 7. Open PR
 
 Follow the **pr** skill: resolve owner/repo from `origin`, `head` = current branch, `base` = `DEFAULT`. Prefer GitHub MCP `create_pull_request`; else `gh pr create --base <base> --head <branch> --title "..." [--body "..."]`.
 
