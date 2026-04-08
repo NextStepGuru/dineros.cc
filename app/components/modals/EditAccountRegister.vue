@@ -4,6 +4,16 @@ import {
   handleError,
   formatCurrencyOptions,
 } from "~/lib/utils";
+import { formatMoneyUsd } from "~/lib/bankers-rounding";
+import {
+  bumpCashDenomCount,
+  CASH_DENOM_CONFIG,
+  subtotalForCashDenom,
+  totalDollarsFromCashCounts,
+  ZERO_CASH_COUNTS,
+  type CashDenomCounts,
+  type CashDenomKey,
+} from "~/lib/cashDenominations";
 import { buildSortedCategorySelectItems } from "~/lib/categorySelect";
 import type { z } from "zod";
 import {
@@ -239,6 +249,161 @@ const isSelectedAccountTypeDepreciatingOrAppreciatingAsset = computed(
     isSelectedAccountTypeCollectableVehicle.value,
 );
 
+const isSelectedAccountTypeCash = computed(
+  () => selectedAccountType.value?.type === "cash",
+);
+
+const persistedAccountIsCashType = computed(() => {
+  const t = listStore.getAccountTypes.find(
+    (x) => x.id === props.accountRegister.typeId,
+  );
+  return t?.type === "cash";
+});
+
+const cashCounts = ref<CashDenomCounts>({ ...ZERO_CASH_COUNTS });
+
+const cashLoading = ref(false);
+const activeTab = ref<string | number>("account");
+
+const cashTotal = computed(() =>
+  totalDollarsFromCashCounts(cashCounts.value),
+);
+
+function resetCashCounts() {
+  cashCounts.value = { ...ZERO_CASH_COUNTS };
+}
+
+function syncCashBalanceFromCounts() {
+  if (!isSelectedAccountTypeCash.value) return;
+  const t = cashTotal.value;
+  formState.value.balance = t;
+  formState.value.latestBalance = t;
+}
+
+function bumpCashCount(key: CashDenomKey, delta: number) {
+  bumpCashDenomCount(cashCounts, key, delta);
+}
+
+function subtotalCash(key: CashDenomKey): number {
+  return subtotalForCashDenom(key, cashCounts.value);
+}
+
+async function loadCashOnHand(registerId: number) {
+  if (!Number.isInteger(registerId) || registerId < 1) return;
+  cashLoading.value = true;
+  try {
+    const res = await $api<{
+      ones: number;
+      fives: number;
+      tens: number;
+      twenties: number;
+      fifties: number;
+      hundreds: number;
+    }>(`/api/cash-on-hand/${registerId}`);
+    cashCounts.value = {
+      ones: res.ones,
+      fives: res.fives,
+      tens: res.tens,
+      twenties: res.twenties,
+      fifties: res.fifties,
+      hundreds: res.hundreds,
+    };
+    syncCashBalanceFromCounts();
+  } catch {
+    toast.add({
+      color: "error",
+      description: "Failed to load cash count.",
+    });
+  } finally {
+    cashLoading.value = false;
+  }
+}
+
+async function saveCashOnHand(registerId: number) {
+  if (!Number.isInteger(registerId) || registerId < 1) return;
+  await $api(`/api/cash-on-hand/${registerId}`, {
+    method: "PATCH",
+    body: { ...cashCounts.value },
+  });
+}
+
+const showRatesTab = computed(() => {
+  if (isSelectedAccountTypeCash.value) return false;
+  return (
+    isSelectedAccountTypeCredit.value ||
+    isSelectedAccountTypeWithInterest.value ||
+    isSelectedAccountTypeChecking.value
+  );
+});
+
+type AccountRegisterTabItem = {
+  label: string;
+  value: string;
+  icon: string;
+  slot: string;
+};
+
+const tabItems = computed((): AccountRegisterTabItem[] => {
+  const items: AccountRegisterTabItem[] = [
+    {
+      label: "Account",
+      value: "account",
+      icon: "i-lucide-wallet",
+      slot: "account",
+    },
+  ];
+  if (isSelectedAccountTypeCash.value) {
+    items.push({
+      label: "Cash Count",
+      value: "cash",
+      icon: "i-lucide-banknote",
+      slot: "cash",
+    });
+  }
+  if (showRatesTab.value) {
+    items.push({
+      label: "Rates & Loan",
+      value: "rates",
+      icon: "i-lucide-percent",
+      slot: "rates",
+    });
+  }
+  if (isSelectedAccountTypeDepreciatingOrAppreciatingAsset.value) {
+    items.push({
+      label: "Asset",
+      value: "asset",
+      icon: "i-lucide-car",
+      slot: "asset",
+    });
+  }
+  if (formState.value.id > 0) {
+    items.push({
+      label: "Import",
+      value: "import",
+      icon: "i-lucide-upload",
+      slot: "import",
+    });
+  }
+  return items;
+});
+
+watch(
+  [cashCounts, isSelectedAccountTypeCash],
+  () => {
+    syncCashBalanceFromCounts();
+  },
+  { deep: true },
+);
+
+watch([activeTab, tabItems], () => {
+  const valid = new Set(
+    tabItems.value.map((i) => i.value as string | number),
+  );
+  if (!valid.has(activeTab.value)) {
+    activeTab.value = "account";
+  }
+});
+
 const assetSectionLabel = computed(() =>
   isSelectedAccountTypeVehicleAsset.value ? "Depreciation" : "Appreciation",
 );
@@ -416,6 +581,18 @@ watch(props, () => {
     ),
   );
   lastVehicleEstimate.value = null;
+  activeTab.value = "account";
+  resetCashCounts();
+  const t = listStore.getAccountTypes.find(
+    (x) => x.id === formState.value.typeId,
+  );
+  if (
+    t?.type === "cash" &&
+    persistedAccountIsCashType.value &&
+    formState.value.id > 0
+  ) {
+    void loadCashOnHand(formState.value.id);
+  }
 });
 
 watch(
@@ -513,7 +690,7 @@ function applyEstimateToOriginal() {
 
 watch(
   () => formState.value.typeId,
-  (_, oldTypeId) => {
+  (newTypeId, oldTypeId) => {
     if (!isSelectedAccountTypeCredit.value) {
       formState.value.collateralAssetRegisterId = null;
       formState.value.targetAccountRegisterId = null;
@@ -534,6 +711,21 @@ watch(
       formState.value.loanTotalYears = null;
       formState.value.loanOriginalAmount = null;
       formState.value.allowExtraPayment = false;
+    }
+
+    const previousWasCash = previousType?.type === "cash";
+    const newType = listStore.getAccountTypes.find((t) => t.id === newTypeId);
+    if (previousWasCash && newType?.type !== "cash") {
+      activeTab.value = "account";
+    }
+
+    if (newType?.type === "cash") {
+      if (formState.value.id > 0 && persistedAccountIsCashType.value) {
+        void loadCashOnHand(formState.value.id);
+      } else {
+        resetCashCounts();
+        syncCashBalanceFromCounts();
+      }
     }
   },
 );
@@ -600,7 +792,19 @@ async function handleSubmit({
   data: formData,
 }: FormSubmitEvent<AccountRegister>) {
   try {
+    if (
+      isSelectedAccountTypeCash.value &&
+      formState.value.id > 0 &&
+      cashLoading.value
+    ) {
+      return;
+    }
+
     isSaving.value = true;
+
+    if (isSelectedAccountTypeCash.value) {
+      syncCashBalanceFromCounts();
+    }
 
     const fileInputData = new FormData();
     const fileInputs = fileInput?.value?.inputRef as HTMLInputElement;
@@ -614,7 +818,14 @@ async function handleSubmit({
       });
     }
 
-    const payload = { ...formData, latestBalance: formData.balance };
+    const balanceForPayload = isSelectedAccountTypeCash.value
+      ? cashTotal.value
+      : formData.balance;
+    const payload = {
+      ...formData,
+      balance: balanceForPayload,
+      latestBalance: balanceForPayload,
+    };
     const responseData = await $api("/api/account-register", {
       method: "POST",
       body: payload,
@@ -636,6 +847,16 @@ async function handleSubmit({
     formState.value = accountRegisterSchema.parse(responseData);
 
     props.callback(formState.value);
+
+    if (isSelectedAccountTypeCash.value && formState.value.id > 0) {
+      try {
+        await saveCashOnHand(formState.value.id);
+      } catch (e) {
+        handleError(e, toast);
+        isSaving.value = false;
+        return;
+      }
+    }
 
     toast.add({
       color: "success",
@@ -701,6 +922,13 @@ function cancelArchiveConfirmation() {
 
 function triggerPrimaryAction() {
   if (isSaving.value || isDeleting.value || showArchiveConfirm.value) return;
+  if (
+    isSelectedAccountTypeCash.value &&
+    formState.value.id > 0 &&
+    cashLoading.value
+  ) {
+    return;
+  }
   form.value?.submit?.();
 }
 
@@ -718,312 +946,371 @@ defineShortcuts({
 </script>
 
 <template lang="pug">
-UModal(title="Edit Account Register" description="Edit Account Register" class="modal-mobile-fullscreen")
+UModal(:title="props.title" :description="props.description || props.title" class="modal-mobile-fullscreen")
   template(#body)
-    UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isSaving" ref="form")
-      .flex.space-x-4
-        UFormField(label="Budget" name="budgetId" class="flex-1")
-          USelect(v-model="formState.budgetId"
-            class="w-full"
-            placeholder="Select a Budget"
-            :items="listStore.getBudgets"
-            valueKey="id"
-            labelKey="name")
+    UForm(class="space-y-4" @submit.prevent="handleSubmit" :schema="accountRegisterSchema" :state="formState" @error="handleError($event, toast)" :disabled="isSaving || isDeleting || (isSelectedAccountTypeCash && formState.id > 0 && cashLoading)" ref="form")
+      UTabs(v-model="activeTab" :items="tabItems" variant="link" class="w-full" :unmount-on-hide="false")
+        template(#account)
+          div(class="space-y-4 pt-2")
+            .flex.space-x-4
+              UFormField(label="Budget" name="budgetId" class="flex-1")
+                USelect(v-model="formState.budgetId"
+                  class="w-full"
+                  placeholder="Select a Budget"
+                  :items="listStore.getBudgets"
+                  valueKey="id"
+                  labelKey="name")
 
-        UFormField(label="Type" name="typeId" class="flex-1")
-          USelect(v-model="formState.typeId"
-            class="w-full"
-            placeholder="Select a Type"
-            :items="listStore.getAccountTypes.map(i => ({ id: i.id, name: i.name }))"
-            valueKey="id"
-            labelKey="name")
+              UFormField(label="Type" name="typeId" class="flex-1")
+                USelect(v-model="formState.typeId"
+                  class="w-full"
+                  placeholder="Select a Type"
+                  :items="listStore.getAccountTypes.map(i => ({ id: i.id, name: i.name }))"
+                  valueKey="id"
+                  labelKey="name")
 
-      UFormField(label="Sub Account" name="subAccountRegisterId" v-if="formState.typeId === 15")
-        USelect(v-model="formState.subAccountRegisterId"
-          class="w-full"
-          placeholder="Select a Sub Account"
-          :items="formatAccountRegisters(listStore.getAccountRegisters).filter(register => register.typeId !== 15 && register.id !== formState.id)"
-          valueKey="id"
-          labelKey="name")
+            UFormField(label="Sub Account" name="subAccountRegisterId" v-if="formState.typeId === 15")
+              USelect(v-model="formState.subAccountRegisterId"
+                class="w-full"
+                placeholder="Select a Sub Account"
+                :items="formatAccountRegisters(listStore.getAccountRegisters).filter(register => register.typeId !== 15 && register.id !== formState.id)"
+                valueKey="id"
+                labelKey="name")
 
-      UFormField(label="Name" name="name")
-        UInput(v-model="formState.name" type="text" id="name" class="w-full")
+            UFormField(label="Name" name="name")
+              UInput(v-model="formState.name" type="text" id="name" class="w-full")
 
-      UFormField(label="Account Balance" name="balance")
-        UInputNumber(
-          v-model="formState.balance"
-          :format-options="formatCurrencyOptions"
-          :step="0.01"
-          id="balance" class="w-full")
+            template(v-if="isSelectedAccountTypeCash")
+              UFormField(label="Account balance" name="balance" hint="Total from bill counts on the Cash Count tab")
+                UInput(
+                  :model-value="formatMoneyUsd(cashTotal)"
+                  type="text"
+                  readonly
+                  disabled
+                  class="w-full"
+                )
 
-      UFormField(label="Min Payment" name="minPayment" v-if="isSelectedAccountTypeCredit")
-        UInputNumber(
-          v-model="formState.minPayment"
-          :format-options="formatCurrencyOptions"
-          :step="0.01"
-          class="w-full")
+            template(v-else)
+              UFormField(label="Account Balance" name="balance")
+                UInputNumber(
+                  v-model="formState.balance"
+                  :format-options="formatCurrencyOptions"
+                  :step="0.01"
+                  id="balance" class="w-full")
 
-      UFormField(
-        label="Pay from account"
-        name="targetAccountRegisterId"
-        v-if="isSelectedAccountTypeCredit"
-        hint="Optional. The account (e.g. checking) used for minimum and forecasted loan or card payments."
-      )
-        USelect(
-          v-model="formState.targetAccountRegisterId"
-          class="w-full"
-          placeholder="None"
-          :items="loanPaymentSourceSelectItems"
-          valueKey="id"
-          labelKey="name")
+        template(#cash)
+          div(class="space-y-4 pt-2")
+            div(v-if="cashLoading" class="text-muted") Loading cash count…
+            template(v-else)
+              div(class="text-center py-3 border-b border-default mb-2")
+                p(class="text-sm text-muted mb-1") Total (from bills)
+                p(class="text-2xl font-bold tabular-nums frog-text") {{ formatMoneyUsd(cashTotal) }}
+              div(
+                v-for="d in CASH_DENOM_CONFIG"
+                :key="d.key"
+                class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+              )
+                span(class="font-medium shrink-0 w-12") {{ d.label }}
+                div(class="flex items-center gap-2 flex-1 justify-end")
+                  UButton(
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    :disabled="isSaving || isDeleting || cashLoading"
+                    @click="bumpCashCount(d.key, -1)"
+                    aria-label="Decrease"
+                  )
+                    UIcon(name="i-lucide-minus" class="w-4 h-4")
+                  UInputNumber(
+                    v-model="cashCounts[d.key]"
+                    :min="0"
+                    :step="1"
+                    class="w-24"
+                    :disabled="isSaving || isDeleting || cashLoading"
+                  )
+                  UButton(
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    :disabled="isSaving || isDeleting || cashLoading"
+                    @click="bumpCashCount(d.key, 1)"
+                    aria-label="Increase"
+                  )
+                    UIcon(name="i-lucide-plus" class="w-4 h-4")
+                span(class="text-right text-muted tabular-nums sm:w-28") {{ formatMoneyUsd(subtotalCash(d.key)) }}
 
-      UFormField(
-        label="Linked asset (collateral)"
-        name="collateralAssetRegisterId"
-        v-if="isSelectedAccountTypeCredit"
-        hint="Optional. Pair this loan with an asset (e.g. home) for net equity on Accounts."
-      )
-        USelect(
-          v-model="formState.collateralAssetRegisterId"
-          class="w-full"
-          placeholder="None"
-          :items="collateralAssetSelectItems"
-          valueKey="id"
-          labelKey="name")
+        template(#rates)
+          div(class="space-y-4 pt-2")
+            UFormField(label="Min Payment" name="minPayment" v-if="isSelectedAccountTypeCredit")
+              UInputNumber(
+                v-model="formState.minPayment"
+                :format-options="formatCurrencyOptions"
+                :step="0.01"
+                class="w-full")
 
-      UFormField(label="Statement Date" name="statementAt" v-if="isSelectedAccountTypeWithInterest")
-        UInput(
-          v-model="statementAtString"
-          type="date"
-          class="w-full")
+            UFormField(
+              label="Pay from account"
+              name="targetAccountRegisterId"
+              v-if="isSelectedAccountTypeCredit"
+              hint="Optional. The account (e.g. checking) used for minimum and forecasted loan or card payments."
+            )
+              USelect(
+                v-model="formState.targetAccountRegisterId"
+                class="w-full"
+                placeholder="None"
+                :items="loanPaymentSourceSelectItems"
+                valueKey="id"
+                labelKey="name")
 
-      UFormField(label="Statement Interval" name="statementIntervalId" v-if="isSelectedAccountTypeWithInterest")
-        USelect(v-model="formState.statementIntervalId"
-          class="w-full"
-          placeholder="Select a Statement Interval"
-          :items="listStore.getIntervals.map(i => ({ id: i.id, name: i.name }))"
-          valueKey="id"
-          labelKey="name")
+            UFormField(
+              label="Linked asset (collateral)"
+              name="collateralAssetRegisterId"
+              v-if="isSelectedAccountTypeCredit"
+              hint="Optional. Pair this loan with an asset (e.g. home) for net equity on Accounts."
+            )
+              USelect(
+                v-model="formState.collateralAssetRegisterId"
+                class="w-full"
+                placeholder="None"
+                :items="collateralAssetSelectItems"
+                valueKey="id"
+                labelKey="name")
 
-      UFormField(:label="interestRateLabel" name="apr1" v-if="isSelectedAccountTypeWithInterest" :hint="interestRateHint")
-        div(class="relative")
-          UInputNumber(
-            v-model="apr1Percent"
-            :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
-            :step="0.001"
-            :min="0"
-            :max="100"
-            class="w-full")
+            UFormField(label="Statement Date" name="statementAt" v-if="isSelectedAccountTypeWithInterest")
+              UInput(
+                v-model="statementAtString"
+                type="date"
+                class="w-full")
 
-      div(v-if="isSelectedAccountTypeMortgage" class="space-y-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800")
-        h3(class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2") Mortgage details
+            UFormField(label="Statement Interval" name="statementIntervalId" v-if="isSelectedAccountTypeWithInterest")
+              USelect(v-model="formState.statementIntervalId"
+                class="w-full"
+                placeholder="Select a Statement Interval"
+                :items="listStore.getIntervals.map(i => ({ id: i.id, name: i.name }))"
+                valueKey="id"
+                labelKey="name")
 
-        UFormField(label="APR 1 start date" name="apr1StartAt" hint="Optional date when APR 1 schedule starts")
-          UInput(
-            v-model="apr1StartAtString"
-            type="date"
-            class="w-full")
+            UFormField(:label="interestRateLabel" name="apr1" v-if="isSelectedAccountTypeWithInterest" :hint="interestRateHint")
+              div(class="relative")
+                UInputNumber(
+                  v-model="apr1Percent"
+                  :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+                  :step="0.001"
+                  :min="0"
+                  :max="100"
+                  class="w-full")
 
-        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
-          UFormField(label="APR 2 (%)" name="apr2" hint="Optional future APR")
-            UInputNumber(
-              v-model="apr2Percent"
-              :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
-              :step="0.001"
-              :min="0"
-              :max="100"
-              class="w-full")
-          UFormField(label="APR 2 start date" name="apr2StartAt")
-            UInput(
-              v-model="apr2StartAtString"
-              type="date"
-              class="w-full")
+            div(v-if="isSelectedAccountTypeMortgage" class="space-y-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800")
+              h3(class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2") Mortgage details
 
-        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
-          UFormField(label="APR 3 (%)" name="apr3" hint="Optional additional APR tier")
-            UInputNumber(
-              v-model="apr3Percent"
-              :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
-              :step="0.001"
-              :min="0"
-              :max="100"
-              class="w-full")
-          UFormField(label="APR 3 start date" name="apr3StartAt")
-            UInput(
-              v-model="apr3StartAtString"
-              type="date"
-              class="w-full")
+              UFormField(label="APR 1 start date" name="apr1StartAt" hint="Optional date when APR 1 schedule starts")
+                UInput(
+                  v-model="apr1StartAtString"
+                  type="date"
+                  class="w-full")
 
-        UFormField(label="Loan start date" name="loanStartAt" hint="Optional origination / amortization start date")
-          UInput(
-            v-model="loanStartAtString"
-            type="date"
-            class="w-full")
+              div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+                UFormField(label="APR 2 (%)" name="apr2" hint="Optional future APR")
+                  UInputNumber(
+                    v-model="apr2Percent"
+                    :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+                    :step="0.001"
+                    :min="0"
+                    :max="100"
+                    class="w-full")
+                UFormField(label="APR 2 start date" name="apr2StartAt")
+                  UInput(
+                    v-model="apr2StartAtString"
+                    type="date"
+                    class="w-full")
 
-        UFormField(label="Original loan amount" name="loanOriginalAmount")
-          UInputNumber(
-            v-model="formState.loanOriginalAmount"
-            :format-options="formatCurrencyOptions"
-            :step="0.01"
-            class="w-full")
+              div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+                UFormField(label="APR 3 (%)" name="apr3" hint="Optional additional APR tier")
+                  UInputNumber(
+                    v-model="apr3Percent"
+                    :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 3 }"
+                    :step="0.001"
+                    :min="0"
+                    :max="100"
+                    class="w-full")
+                UFormField(label="APR 3 start date" name="apr3StartAt")
+                  UInput(
+                    v-model="apr3StartAtString"
+                    type="date"
+                    class="w-full")
 
-        div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
-          UFormField(label="Loan term (years)" name="loanTotalYears")
-            UInputNumber(
-              v-model="formState.loanTotalYears"
-              :step="1"
-              :min="1"
-              :max="100"
-              class="w-full")
-          UFormField(label="Payments per year" name="loanPaymentsPerYear")
-            USelect(
-              v-model="formState.loanPaymentsPerYear"
-              class="w-full"
-              :items="loanPaymentsPerYearItems"
-              valueKey="id"
-              labelKey="name"
-              placeholder="None")
+              UFormField(label="Loan start date" name="loanStartAt" hint="Optional origination / amortization start date")
+                UInput(
+                  v-model="loanStartAtString"
+                  type="date"
+                  class="w-full")
 
-        UFormField(label="Allow extra payment" name="allowExtraPayment" hint="When enabled, forecast can pay more than the minimum payment")
-          .flex.items-center(class="h-8")
-            USwitch(v-model="formState.allowExtraPayment")
+              UFormField(label="Original loan amount" name="loanOriginalAmount")
+                UInputNumber(
+                  v-model="formState.loanOriginalAmount"
+                  :format-options="formatCurrencyOptions"
+                  :step="0.01"
+                  class="w-full")
 
-      UFormField(label="Interest category" name="interestCategoryId" v-if="isSelectedAccountTypeWithInterest")
-        USelectMenu(
-          v-model="formState.interestCategoryId"
-          class="w-full"
-          :items="categorySelectItemsForRegister"
-          value-key="value"
-          label-key="label"
-          :filter-fields="['label', 'name']"
-          placeholder="None")
+              div(class="grid grid-cols-1 md:grid-cols-2 gap-3")
+                UFormField(label="Loan term (years)" name="loanTotalYears")
+                  UInputNumber(
+                    v-model="formState.loanTotalYears"
+                    :step="1"
+                    :min="1"
+                    :max="100"
+                    class="w-full")
+                UFormField(label="Payments per year" name="loanPaymentsPerYear")
+                  USelect(
+                    v-model="formState.loanPaymentsPerYear"
+                    class="w-full"
+                    :items="loanPaymentsPerYearItems"
+                    valueKey="id"
+                    labelKey="name"
+                    placeholder="None")
 
-      UFormField(label="Payment category" name="paymentCategoryId" v-if="isSelectedAccountTypeCredit")
-        USelectMenu(
-          v-model="formState.paymentCategoryId"
-          class="w-full"
-          :items="categorySelectItemsForRegister"
-          value-key="value"
-          label-key="label"
-          :filter-fields="['label', 'name']"
-          placeholder="None")
+              UFormField(label="Allow extra payment" name="allowExtraPayment" hint="When enabled, forecast can pay more than the minimum payment")
+                .flex.items-center(class="h-8")
+                  USwitch(v-model="formState.allowExtraPayment")
 
-      UFormField(label="Min Account Balance" name="minAccountBalance" v-if="isSelectedAccountTypeChecking" hint="before paying down extra debt")
-        UInputNumber(
-          v-model="formState.minAccountBalance"
-          :format-options="formatCurrencyOptions"
-          :step="0.01"
-          class="w-full")
+            UFormField(label="Interest category" name="interestCategoryId" v-if="isSelectedAccountTypeWithInterest")
+              USelectMenu(
+                v-model="formState.interestCategoryId"
+                class="w-full"
+                :items="categorySelectItemsForRegister"
+                value-key="value"
+                label-key="label"
+                :filter-fields="['label', 'name']"
+                placeholder="None")
 
-      // Savings Goal Fields (only for savings type accounts)
-      div(v-if="isSelectedAccountTypeSavings" class="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
-        h3(class="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2") Savings Goal Settings
+            UFormField(label="Payment category" name="paymentCategoryId" v-if="isSelectedAccountTypeCredit")
+              USelectMenu(
+                v-model="formState.paymentCategoryId"
+                class="w-full"
+                :items="categorySelectItemsForRegister"
+                value-key="value"
+                label-key="label"
+                :filter-fields="['label', 'name']"
+                placeholder="None")
 
-        UFormField(label="Savings Goal Amount" name="accountSavingsGoal" hint="target amount to save")
-          UInputNumber(
-            v-model="formState.accountSavingsGoal"
-            :format-options="formatCurrencyOptions"
-            :step="0.01"
-            class="w-full")
+            UFormField(label="Min Account Balance" name="minAccountBalance" v-if="isSelectedAccountTypeChecking" hint="before paying down extra debt")
+              UInputNumber(
+                v-model="formState.minAccountBalance"
+                :format-options="formatCurrencyOptions"
+                :step="0.01"
+                class="w-full")
 
-      // Depreciation/Appreciation (Vehicle Asset, Collectable Vehicle)
-      div(v-if="isSelectedAccountTypeDepreciatingOrAppreciatingAsset" class="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800")
-        h3(class="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2") {{ assetSectionLabel }} Settings
+            div(v-if="isSelectedAccountTypeSavings" class="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
+              h3(class="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2") Savings Goal Settings
 
-        UFormField(:label="assetSectionLabel + ' Rate (%)'" name="depreciationRate" :hint="assetSectionLabel === 'Depreciation' ? 'Annual depreciation rate (0–100%)' : 'Annual appreciation rate (0–100%)'")
-          UInputNumber(
-            v-model="depreciationRatePercent"
-            :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 2 }"
-            :step="0.1"
-            :min="0"
-            :max="100"
-            class="w-full")
+              UFormField(label="Savings Goal Amount" name="accountSavingsGoal" hint="target amount to save")
+                UInputNumber(
+                  v-model="formState.accountSavingsGoal"
+                  :format-options="formatCurrencyOptions"
+                  :step="0.01"
+                  class="w-full")
 
-        UFormField(label="Method" name="depreciationMethod" v-if="isSelectedAccountTypeVehicleAsset" hint="declining-balance, straight-line, or compound")
-          USelect(
-            v-model="formState.depreciationMethod"
-            class="w-full"
-            placeholder="Default (declining-balance)"
-            :items="[{ id: null, name: 'Default (declining-balance)' }, { id: 'declining-balance', name: 'Declining balance' }, { id: 'straight-line', name: 'Straight-line' }, { id: 'compound', name: 'Compound' }]"
-            valueKey="id"
-            labelKey="name")
+        template(#asset)
+          div(class="space-y-4 pt-2")
+            div(v-if="isSelectedAccountTypeDepreciatingOrAppreciatingAsset" class="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800")
+              h3(class="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2") {{ assetSectionLabel }} Settings
 
-        UFormField(label="Residual value (floor)" name="assetResidualValue" hint="Optional minimum value")
-          UInputNumber(
-            v-model="formState.assetResidualValue"
-            :format-options="formatCurrencyOptions"
-            :step="0.01"
-            class="w-full")
+              UFormField(:label="assetSectionLabel + ' Rate (%)'" name="depreciationRate" :hint="assetSectionLabel === 'Depreciation' ? 'Annual depreciation rate (0–100%)' : 'Annual appreciation rate (0–100%)'")
+                UInputNumber(
+                  v-model="depreciationRatePercent"
+                  :format-options="{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 2 }"
+                  :step="0.1"
+                  :min="0"
+                  :max="100"
+                  class="w-full")
 
-        UFormField(label="Useful life (years)" name="assetUsefulLifeYears" v-if="isSelectedAccountTypeVehicleAsset" hint="For straight-line method")
-          UInputNumber(
-            v-model="formState.assetUsefulLifeYears"
-            :step="1"
-            :min="1"
-            :max="100"
-            class="w-full")
+              UFormField(label="Method" name="depreciationMethod" v-if="isSelectedAccountTypeVehicleAsset" hint="declining-balance, straight-line, or compound")
+                USelect(
+                  v-model="formState.depreciationMethod"
+                  class="w-full"
+                  placeholder="Default (declining-balance)"
+                  :items="[{ id: null, name: 'Default (declining-balance)' }, { id: 'declining-balance', name: 'Declining balance' }, { id: 'straight-line', name: 'Straight-line' }, { id: 'compound', name: 'Compound' }]"
+                  valueKey="id"
+                  labelKey="name")
 
-        UFormField(label="Start date" name="assetStartAt" hint="When depreciation/appreciation begins (default: statement date)")
-          UInput(
-            v-model="assetStartAtString"
-            type="date"
-            class="w-full")
+              UFormField(label="Residual value (floor)" name="assetResidualValue" hint="Optional minimum value")
+                UInputNumber(
+                  v-model="formState.assetResidualValue"
+                  :format-options="formatCurrencyOptions"
+                  :step="0.01"
+                  class="w-full")
 
-      div(v-if="isSelectedAccountTypeVehicleAsset" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
-        h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") Vehicle details (for AI estimate)
+              UFormField(label="Useful life (years)" name="assetUsefulLifeYears" v-if="isSelectedAccountTypeVehicleAsset" hint="For straight-line method")
+                UInputNumber(
+                  v-model="formState.assetUsefulLifeYears"
+                  :step="1"
+                  :min="1"
+                  :max="100"
+                  class="w-full")
 
-        p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
+              UFormField(label="Start date" name="assetStartAt" hint="When depreciation/appreciation begins (default: statement date)")
+                UInput(
+                  v-model="assetStartAtString"
+                  type="date"
+                  class="w-full")
 
-        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-          UFormField(label="Year")
-            UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
-          UFormField(label="ZIP (optional)" hint="5-digit US")
-            UInput(v-model="vehicleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
-        UFormField(label="Make")
-          UInput(v-model="vehicleDetailsLocal.make" type="text" class="w-full")
-        UFormField(label="Model")
-          UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
-        UFormField(label="Trim (optional)")
-          UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
-        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-          UFormField(label="Mileage")
-            UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
-          UFormField(label="Condition")
-            USelect(
-              v-model="vehicleDetailsLocal.condition"
-              class="w-full"
-              :items="vehicleConditionItems"
-              valueKey="id"
-              labelKey="name")
-        div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-          UFormField(label="VIN last 4 (optional)")
-            UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
-          UFormField(label="Purchase / MSRP hint (optional)")
-            UInputNumber(
-              v-model="vehicleDetailsLocal.purchasePriceHint"
-              :format-options="formatCurrencyOptions"
-              :step="0.01"
-              class="w-full")
+            div(v-if="isSelectedAccountTypeVehicleAsset" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
+              h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") Vehicle details (for AI estimate)
 
-        UButton(
-          color="primary"
-          variant="subtle"
-          :loading="isEstimatingVehicle"
-          :disabled="isSaving || isDeleting || isEstimatingVehicle"
-          @click.prevent="runVehicleEstimate"
-        ) Get estimate
+              p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
 
-        div(v-if="lastVehicleEstimate" class="space-y-2 text-sm")
-          p(class="font-medium text-emerald-900 dark:text-emerald-100") {{ estimateRangeLabel }}
-          p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastVehicleEstimate.rationale }}
-          p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastVehicleEstimate.disclaimer }}
+              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                UFormField(label="Year")
+                  UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+                UFormField(label="ZIP (optional)" hint="5-digit US")
+                  UInput(v-model="vehicleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+              UFormField(label="Make")
+                UInput(v-model="vehicleDetailsLocal.make" type="text" class="w-full")
+              UFormField(label="Model")
+                UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
+              UFormField(label="Trim (optional)")
+                UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
+              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                UFormField(label="Mileage")
+                  UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+                UFormField(label="Condition")
+                  USelect(
+                    v-model="vehicleDetailsLocal.condition"
+                    class="w-full"
+                    :items="vehicleConditionItems"
+                    valueKey="id"
+                    labelKey="name")
+              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                UFormField(label="VIN last 4 (optional)")
+                  UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
+                UFormField(label="Purchase / MSRP hint (optional)")
+                  UInputNumber(
+                    v-model="vehicleDetailsLocal.purchasePriceHint"
+                    :format-options="formatCurrencyOptions"
+                    :step="0.01"
+                    class="w-full")
 
-        .flex.flex-wrap.gap-2(v-if="lastVehicleEstimate")
-          UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToBalance" :disabled="isSaving || isDeleting") Apply mid to balance
-          UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToOriginal" :disabled="isSaving || isDeleting") Apply mid to original value
+              UButton(
+                color="primary"
+                variant="subtle"
+                :loading="isEstimatingVehicle"
+                :disabled="isSaving || isDeleting || isEstimatingVehicle"
+                @click.prevent="runVehicleEstimate"
+              ) Get estimate
 
-      UFormField(label="Import Transactions" hint="optional, CSV File Import")
-        UInput(type="file" accept=".csv" ref="fileInput" class="w-full")
+              div(v-if="lastVehicleEstimate" class="space-y-2 text-sm")
+                p(class="font-medium text-emerald-900 dark:text-emerald-100") {{ estimateRangeLabel }}
+                p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastVehicleEstimate.rationale }}
+                p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastVehicleEstimate.disclaimer }}
+
+              .flex.flex-wrap.gap-2(v-if="lastVehicleEstimate")
+                UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToBalance" :disabled="isSaving || isDeleting") Apply mid to balance
+                UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToOriginal" :disabled="isSaving || isDeleting") Apply mid to original value
+
+        template(#import)
+          div(class="space-y-4 pt-2")
+            UFormField(label="Import Transactions" hint="optional, CSV File Import")
+              UInput(type="file" accept=".csv" ref="fileInput" class="w-full")
 
   template(#footer)
     .w-full
@@ -1051,7 +1338,7 @@ UModal(title="Edit Account Register" description="Edit Account Register" class="
             color="primary"
             @click.prevent="form?.submit()"
             :loading="isSaving"
-            :disabled="isSaving || isDeleting"
+            :disabled="isSaving || isDeleting || (isSelectedAccountTypeCash && formState.id > 0 && cashLoading)"
             class="modal-action-button"
           ) Save
           UButton(

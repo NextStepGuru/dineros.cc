@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { formatMoneyUsd } from "~/lib/bankers-rounding";
-
-const formatMoney = (amount: number) => formatMoneyUsd(amount);
+import {
+  bumpCashDenomCount,
+  CASH_DENOM_CONFIG,
+  subtotalForCashDenom,
+  totalDollarsFromCashCounts,
+  ZERO_CASH_COUNTS,
+  type CashDenomCounts,
+  type CashDenomKey,
+} from "~/lib/cashDenominations";
 
 definePageMeta({
   middleware: "auth",
@@ -19,15 +26,6 @@ type CashOnHandResponse = {
   hundreds: number;
 };
 
-const denomConfig = [
-  { key: "hundreds" as const, face: 100, label: "$100" },
-  { key: "fifties" as const, face: 50, label: "$50" },
-  { key: "twenties" as const, face: 20, label: "$20" },
-  { key: "tens" as const, face: 10, label: "$10" },
-  { key: "fives" as const, face: 5, label: "$5" },
-  { key: "ones" as const, face: 1, label: "$1" },
-];
-
 const route = useRoute();
 const toast = useToast();
 const { $api } = useNuxtApp();
@@ -43,35 +41,18 @@ const registerId = computed(() => {
 const loading = ref(true);
 const saving = ref(false);
 const registerName = ref("");
-const counts = ref({
-  ones: 0,
-  fives: 0,
-  tens: 0,
-  twenties: 0,
-  fifties: 0,
-  hundreds: 0,
-});
+const counts = ref<CashDenomCounts>({ ...ZERO_CASH_COUNTS });
 
-const totalDollars = computed(() => {
-  const c = counts.value;
-  return (
-    c.ones * 1 +
-    c.fives * 5 +
-    c.tens * 10 +
-    c.twenties * 20 +
-    c.fifties * 50 +
-    c.hundreds * 100
-  );
-});
+const totalDollars = computed(() =>
+  totalDollarsFromCashCounts(counts.value),
+);
 
-function subtotal(key: keyof typeof counts.value): number {
-  const face = denomConfig.find((d) => d.key === key)?.face ?? 0;
-  return counts.value[key] * face;
+function subtotal(key: CashDenomKey): number {
+  return subtotalForCashDenom(key, counts.value);
 }
 
-function bump(key: keyof typeof counts.value, delta: number) {
-  const next = counts.value[key] + delta;
-  counts.value[key] = Math.max(0, next);
+function bump(key: CashDenomKey, delta: number) {
+  bumpCashDenomCount(counts, key, delta);
 }
 
 async function load() {
@@ -93,7 +74,7 @@ async function load() {
       twenties: res.twenties,
       fifties: res.fifties,
       hundreds: res.hundreds,
-    };
+    } satisfies CashDenomCounts;
     useHead({
       title: `Cash count — ${res.registerName} | Dineros`,
     });
@@ -158,11 +139,11 @@ div(class="max-w-lg mx-auto px-4 py-6")
     UCard
       div(class="text-center py-4 border-b border-default mb-4")
         p(class="text-sm text-muted mb-1") Total (from bills)
-        p(class="text-3xl font-bold tabular-nums frog-text") {{ formatMoney(totalDollars) }}
+        p(class="text-3xl font-bold tabular-nums frog-text") {{ formatMoneyUsd(totalDollars) }}
 
       div(class="space-y-4")
         div(
-          v-for="d in denomConfig"
+          v-for="d in CASH_DENOM_CONFIG"
           :key="d.key"
           class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
         )
@@ -193,7 +174,7 @@ div(class="max-w-lg mx-auto px-4 py-6")
               aria-label="Increase"
             )
               UIcon(name="i-lucide-plus" class="w-4 h-4")
-          span(class="text-right text-muted tabular-nums sm:w-28") {{ formatMoney(subtotal(d.key)) }}
+          span(class="text-right text-muted tabular-nums sm:w-28") {{ formatMoneyUsd(subtotal(d.key)) }}
 
       div(class="mt-6 flex justify-end")
         UButton(
