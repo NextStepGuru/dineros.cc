@@ -644,6 +644,15 @@ export const createSavingsGoalSchema = z.object({
 
 export const updateSavingsGoalSchema = createSavingsGoalSchema.partial();
 
+export const cashOnHandSchema = z.object({
+  ones: z.number().int().min(0),
+  fives: z.number().int().min(0),
+  tens: z.number().int().min(0),
+  twenties: z.number().int().min(0),
+  fifties: z.number().int().min(0),
+  hundreds: z.number().int().min(0),
+});
+
 export const accountSchema = z.object({
   id: z.number(),
   name: z.string(),
