@@ -560,6 +560,13 @@ const overlay = useOverlay();
 const route = useRoute();
 
 const listStore = useListStore();
+
+function isCashAccountType(typeId: number): boolean {
+  return listStore.getAccountTypes.some(
+    (t) => t.id === typeId && t.type === "cash",
+  );
+}
+
 const authStore = useAuthStore();
 const { $api } = useNuxtApp();
 const { today } = useToday();
@@ -1848,7 +1855,7 @@ watch(workflowMode, (w) => {
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
                   div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text truncate min-w-0") {{ row.name }}
                   NuxtLink(
-                    v-if="!isSnapshotMode"
+                    v-if="!isSnapshotMode && isCashAccountType(row.typeId)"
                     :to="`/cash-on-hand/${row.id}`"
                     class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
                     aria-label="Cash count"
@@ -1904,7 +1911,7 @@ watch(workflowMode, (w) => {
                         UIcon(name="i-lucide-corner-down-right" class="text-xs")
                       span(class="truncate min-w-0") {{ subRow.name }}
                     NuxtLink(
-                      v-if="!isSnapshotMode"
+                      v-if="!isSnapshotMode && isCashAccountType(subRow.typeId)"
                       :to="`/cash-on-hand/${subRow.id}`"
                       class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
                       aria-label="Cash count"

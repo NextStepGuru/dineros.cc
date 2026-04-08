@@ -93,6 +93,31 @@ export default defineEventHandler(async (event) => {
         },
       });
 
+      const cashAccountType = await prisma.accountType.findFirst({
+        where: { type: "cash" },
+        select: { id: true },
+      });
+      if (!cashAccountType) {
+        throw new Error("Cash account type is not configured.");
+      }
+
+      await prisma.accountRegister.create({
+        data: {
+          name: "Cash",
+          balance: 0,
+          statementAt: dateTimeService.nowDate(),
+          account: {
+            connect: { id: defaultAccountId },
+          },
+          type: {
+            connect: { id: cashAccountType.id },
+          },
+          budget: {
+            connect: { id: defaultBudgetId },
+          },
+        },
+      });
+
       return newUser;
     });
 

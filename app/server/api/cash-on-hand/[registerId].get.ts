@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
         id: true,
         name: true,
         accountId: true,
+        type: { select: { type: true } },
       },
     });
 
@@ -36,6 +37,13 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 404,
         statusMessage: "Account register not found",
+      });
+    }
+
+    if (register.type.type !== "cash") {
+      throw createError({
+        statusCode: 403,
+        statusMessage: "Cash count is only available for Cash account registers.",
       });
     }
 
