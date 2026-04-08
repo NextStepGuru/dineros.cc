@@ -33,7 +33,7 @@ jobs:
             '<!-- cursor-bugbot-ci -->' \
             'bugbot run' \
             '' \
-            "_Triggered after staging deploy ([workflow run](${RUN_URL}))._" \
+            "_Triggered from PR checks ([workflow run](${RUN_URL}))._" \
             '' \
             'Autofix is toggled in the [Cursor Bugbot dashboard](https://cursor.com/dashboard/bugbot), not in this workflow.')"
           gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$body"

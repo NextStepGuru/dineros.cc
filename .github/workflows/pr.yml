@@ -3,7 +3,7 @@
 # Refresh Linux visual baselines vs staging: .github/workflows/e2e-update-staging-snapshots.yml (manual).
 # Staging deploy: .deploy/dineros.template.yaml + .deploy/profiles/staging.env. Fork PRs skip deploy (no WIF).
 #
-# After staging deploy, we post `bugbot run` so Cursor Bugbot can queue (optional repo secret
+# Early in the workflow we post `bugbot run` so Cursor Bugbot can queue alongside lint/test (optional repo secret
 # CURSOR_BUGBOT_TRIGGER_PAT: fine‑grained PAT as a machine user — Cursor often ignores comments from
 # github-actions[bot]). Bugbot Autofix is configured in https://cursor.com/dashboard/bugbot , not in YAML.
 name: PR Checks
@@ -199,8 +199,6 @@ jobs:
   request-cursor-bugbot:
     name: Request Cursor Bugbot
     if: github.event.pull_request.head.repo.full_name == github.repository
-    needs:
-      - staging-deploy
     uses: ./.github/workflows/cursor-bugbot-request.yml
     # Map repo Actions secret (same name as cursor-bugbot-request.yml workflow_call). Optional: omit creating the secret to use GITHUB_TOKEN in the callee.
     secrets:

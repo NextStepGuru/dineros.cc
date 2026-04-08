@@ -164,7 +164,7 @@ async function removePasskey(id: string) {
 
 async function toggleEmailOtp() {
   const enabled = !emailOtpEnabled.value;
-  if (emailOtpEnabled.value && !enabled && !twoFaFormState.stepUpPassword.trim()) {
+  if (emailOtpEnabled.value && !twoFaFormState.stepUpPassword.trim()) {
     toast.add({
       color: "error",
       description: "Enter your current password to disable email OTP.",
@@ -177,7 +177,7 @@ async function toggleEmailOtp() {
       method: "POST",
       body: {
         enabled,
-        ...(emailOtpEnabled.value && !enabled
+        ...(emailOtpEnabled.value
           ? { currentPassword: twoFaFormState.stepUpPassword }
           : {}),
       },
