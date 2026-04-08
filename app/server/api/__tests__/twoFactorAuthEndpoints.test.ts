@@ -71,9 +71,22 @@ vi.mock("qrcode", () => ({
   toDataURL: vi.fn(),
 }));
 
+const { twoFaHashVerify } = vi.hoisted(() => ({
+  twoFaHashVerify: vi.fn().mockResolvedValue(true),
+}));
+vi.mock("~/server/services/HashService", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    verify: twoFaHashVerify,
+  })),
+}));
+
 describe("Two-Factor Authentication API Endpoints", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    twoFaHashVerify.mockResolvedValue(true);
+    const { readBody } = await import("h3");
+    (readBody as any).mockResolvedValue({ currentPassword: "correct-password" });
+    (globalThis as any).readBody = readBody;
   });
 
   describe("GET /api/two-factor-auth", () => {
@@ -108,15 +121,15 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const otplib = await import("otplib");
       const qrcode = await import("qrcode");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
       (otplib.generateSecret as any).mockReturnValue(mockSecret);
       (otplib.generateURI as any).mockReturnValue(mockUri);
       (qrcode.default.toDataURL as any).mockResolvedValue(
         "data:image/png;base64,qrcode-data"
       );
-      (prisma.user.update as any).mockResolvedValue({
+      prisma.user.update.mockResolvedValue({
         ...mockUser,
         settings: {
           speakeasy: {
@@ -185,10 +198,10 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { privateUserSchema } = await import("~/schema/zod");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (handleApiError as any).mockImplementation((error: any) => {
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -207,9 +220,9 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockRejectedValue(dbError);
-      (handleApiError as any).mockImplementation((error: any) => {
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockRejectedValue(dbError);
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -233,11 +246,17 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const mockUser = {
         id: 123,
         email: "test@example.com",
+        password: "hashed-password",
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: true,
             base32secret: "secret-base32",
+          },
+          mfa: {
+            totp: { isEnabled: true, isVerified: true, base32secret: "x" },
+            passkeys: [],
+            emailOtp: { isEnabled: false, isVerified: false },
           },
           otherSetting: "preserved",
         },
@@ -248,6 +267,8 @@ describe("Two-Factor Authentication API Endpoints", () => {
         email: "test@example.com",
         firstName: "Test",
         lastName: "User",
+        password: "hashed-password",
+        settings: mockUser.settings,
       };
 
       const mockParsedUser = {
@@ -263,11 +284,11 @@ describe("Two-Factor Authentication API Endpoints", () => {
         "~/schema/zod"
       );
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
-      (publicProfileSchema.parse as any).mockReturnValue(mockParsedUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
+      prisma.user.update.mockResolvedValue(mockUpdatedUser);
+      publicProfileSchema.parse.mockReturnValue(mockParsedUser);
 
       const result = await disableTwoFactorAuthHandler(mockEvent);
 
@@ -288,6 +309,10 @@ describe("Two-Factor Authentication API Endpoints", () => {
         },
       });
       expect(result).toEqual(mockParsedUser);
+      expect(twoFaHashVerify).toHaveBeenCalledWith(
+        "hashed-password",
+        "correct-password",
+      );
     });
 
     it("should handle authentication errors", async () => {
@@ -297,10 +322,10 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { getUser } = await import("~/server/lib/getUser");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockImplementation(() => {
+      getUser.mockImplementation(() => {
         throw authError;
       });
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -314,10 +339,16 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const mockEvent = {};
       const mockUser = {
         id: 123,
+        password: "hashed-password",
         settings: {
           speakeasy: {
             isEnabled: true,
             isVerified: true,
+          },
+          mfa: {
+            totp: { isEnabled: true, isVerified: true },
+            passkeys: [],
+            emailOtp: { isEnabled: false, isVerified: false },
           },
         },
       };
@@ -328,11 +359,11 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { privateUserSchema } = await import("~/schema/zod");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (prisma.user.update as any).mockRejectedValue(updateError);
-      (handleApiError as any).mockImplementation((error: any) => {
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
+      prisma.user.update.mockRejectedValue(updateError);
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 
@@ -385,11 +416,11 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const otplib = await import("otplib");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
       (otplib.verify as any).mockResolvedValue({ valid: true });
-      (prisma.user.update as any).mockResolvedValue(mockUpdatedUser);
+      prisma.user.update.mockResolvedValue(mockUpdatedUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
@@ -397,7 +428,7 @@ describe("Two-Factor Authentication API Endpoints", () => {
       expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret-base32",
         token: "123456",
-        epochTolerance: 300,
+        epochTolerance: 30,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
@@ -444,18 +475,18 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const updatedRow = dbUserForSession();
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
       (otplib.verify as any).mockResolvedValue({ valid: false });
-      (prisma.user.update as any).mockResolvedValue(updatedRow);
+      prisma.user.update.mockResolvedValue(updatedRow);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
       expect(otplib.verify).toHaveBeenCalledWith({
         secret: "secret-base32",
         token: "123456",
-        epochTolerance: 300,
+        epochTolerance: 30,
       });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 123 },
@@ -489,9 +520,9 @@ describe("Two-Factor Authentication API Endpoints", () => {
       const { privateUserSchema } = await import("~/schema/zod");
 
       (readBody as any).mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 
@@ -542,12 +573,10 @@ describe("Two-Factor Authentication API Endpoints", () => {
 
       (readBody as any).mockResolvedValue(mockBody);
       (globalThis as any).readBody.mockResolvedValue(mockBody);
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
-      (privateUserSchema.parse as any).mockReturnValue(mockUser);
-      (prisma.user.update as any)
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(mockUpdatedUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      privateUserSchema.parse.mockReturnValue(mockUser);
+      prisma.user.update.mockResolvedValue(mockUpdatedUser);
 
       const result = await verifyTwoFactorAuthHandler(mockEvent);
 

@@ -24,7 +24,7 @@ export default defineEventHandler(async (event: H3Event) => {
           account: {
             userAccounts: {
               some: {
-                id: user.userId,
+                userId: user.userId,
               },
             },
           },

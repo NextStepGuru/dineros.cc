@@ -80,6 +80,31 @@ vi.mock("~/schema/zod", async (importOriginal) => {
   };
 });
 
+function listsFullMembership(userId: number, accountId: string) {
+  return {
+    userId,
+    accountId,
+    canViewBudgets: true,
+    canInviteUsers: true,
+    canManageMembers: true,
+    allowedBudgetIds: null,
+    allowedAccountRegisterIds: null,
+  };
+}
+
+function listsEmptyRawLists() {
+  return {
+    reoccurrences: [] as unknown[],
+    budgets: [] as unknown[],
+    intervals: [] as unknown[],
+    accountTypes: [] as unknown[],
+    accountRegisters: [] as unknown[],
+    accounts: [] as unknown[],
+    categories: [] as unknown[],
+    savingsGoals: [] as unknown[],
+  };
+}
+
 describe("Core API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,8 +128,8 @@ describe("Core API Endpoints", () => {
       const { sessionUserFromDb } =
         await import("~/server/lib/sessionUserProfile");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
 
       const result = await userGetHandler(mockEvent);
 
@@ -122,9 +147,9 @@ describe("Core API Endpoints", () => {
       const { prisma } = await import("~/server/clients/prismaClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 999 });
+      getUser.mockReturnValue({ userId: 999 });
       const notFoundError = new Error("User not found");
-      (prisma.user.findUniqueOrThrow as any).mockRejectedValue(notFoundError);
+      prisma.user.findUniqueOrThrow.mockRejectedValue(notFoundError);
 
       await expect(userGetHandler(mockEvent)).rejects.toThrow("User not found");
 
@@ -138,7 +163,7 @@ describe("Core API Endpoints", () => {
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
       const authError = new Error("User not found in context");
-      (getUser as any).mockImplementation(() => {
+      getUser.mockImplementation(() => {
         throw authError;
       });
 
@@ -152,16 +177,16 @@ describe("Core API Endpoints", () => {
     it("should handle schema validation errors", async () => {
       const mockEvent = { context: { user: { userId: 123 } } };
       const { password: _omit, ...row } = dbUserForSession();
-      const mockUser = row as Record<string, unknown>;
+      const mockUser = { ...row, firstName: "" } as Record<string, unknown>;
 
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
 
-      (handleApiError as any).mockImplementation((err: unknown) => {
+      handleApiError.mockImplementation((err: unknown) => {
         throw err;
       });
 
@@ -175,31 +200,6 @@ describe("Core API Endpoints", () => {
     let listsHandler: any;
 
     const listAccountId = "acc-list-1";
-
-    function fullMembership(userId: number, accountId: string) {
-      return {
-        userId,
-        accountId,
-        canViewBudgets: true,
-        canInviteUsers: true,
-        canManageMembers: true,
-        allowedBudgetIds: null,
-        allowedAccountRegisterIds: null,
-      };
-    }
-
-    function emptyRawLists() {
-      return {
-        reoccurrences: [] as unknown[],
-        budgets: [] as unknown[],
-        intervals: [] as unknown[],
-        accountTypes: [] as unknown[],
-        accountRegisters: [] as unknown[],
-        accounts: [] as unknown[],
-        categories: [] as unknown[],
-        savingsGoals: [] as unknown[],
-      };
-    }
 
     beforeEach(async () => {
       accountListsRepoMocks.loadMemberships.mockReset();
@@ -266,9 +266,9 @@ describe("Core API Endpoints", () => {
 
       const { getUser } = await import("~/server/lib/getUser");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
+      getUser.mockReturnValue({ userId: 123 });
       accountListsRepoMocks.loadMemberships.mockResolvedValue([
-        fullMembership(123, listAccountId),
+        listsFullMembership(123, listAccountId),
       ]);
       accountListsRepoMocks.loadRawLists.mockResolvedValue({
         reoccurrences: mockReoccurrences,
@@ -313,9 +313,9 @@ describe("Core API Endpoints", () => {
 
       const { getUser } = await import("~/server/lib/getUser");
 
-      (getUser as any).mockReturnValue({ userId: 456 });
+      getUser.mockReturnValue({ userId: 456 });
       accountListsRepoMocks.loadMemberships.mockResolvedValue([]);
-      accountListsRepoMocks.loadRawLists.mockResolvedValue(emptyRawLists());
+      accountListsRepoMocks.loadRawLists.mockResolvedValue(listsEmptyRawLists());
 
       await listsHandler(mockEvent);
 
@@ -328,9 +328,9 @@ describe("Core API Endpoints", () => {
 
       const { getUser } = await import("~/server/lib/getUser");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
+      getUser.mockReturnValue({ userId: 123 });
       accountListsRepoMocks.loadMemberships.mockResolvedValue([]);
-      accountListsRepoMocks.loadRawLists.mockResolvedValue(emptyRawLists());
+      accountListsRepoMocks.loadRawLists.mockResolvedValue(listsEmptyRawLists());
 
       const result = await listsHandler(mockEvent);
 
@@ -353,11 +353,11 @@ describe("Core API Endpoints", () => {
       const { getUser } = await import("~/server/lib/getUser");
       const { handleApiError } = await import("~/server/lib/handleApiError");
 
-      (getUser as any).mockReturnValue({ userId: 123 });
+      getUser.mockReturnValue({ userId: 123 });
 
       const dbError = new Error("Database connection failed");
       accountListsRepoMocks.loadMemberships.mockResolvedValue([
-        fullMembership(123, listAccountId),
+        listsFullMembership(123, listAccountId),
       ]);
       accountListsRepoMocks.loadRawLists.mockRejectedValue(dbError);
 
@@ -384,7 +384,7 @@ describe("Core API Endpoints", () => {
       ];
 
       const { prisma } = await import("~/server/clients/prismaClient");
-      (prisma.$queryRaw as any).mockResolvedValue(mockCountries);
+      prisma.$queryRaw.mockResolvedValue(mockCountries);
 
       const result = await countriesHandler({});
 
@@ -399,7 +399,7 @@ describe("Core API Endpoints", () => {
 
     it("should return empty array when no active countries", async () => {
       const { prisma } = await import("~/server/clients/prismaClient");
-      (prisma.$queryRaw as any).mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
 
       const result = await countriesHandler({});
 
@@ -408,7 +408,7 @@ describe("Core API Endpoints", () => {
 
     it("should throw 500 when database fails", async () => {
       const { prisma } = await import("~/server/clients/prismaClient");
-      (prisma.$queryRaw as any).mockRejectedValue(
+      prisma.$queryRaw.mockRejectedValue(
         new Error("Connection refused"),
       );
 
@@ -428,12 +428,12 @@ describe("Core API Endpoints", () => {
       const mockEvent = { context: {} };
       const authError = new Error("Unauthorized");
 
-      (getUser as any).mockImplementation(() => {
+      getUser.mockImplementation(() => {
         throw authError;
       });
 
       // Make handleApiError throw the original error
-      (handleApiError as any).mockImplementation((error: any) => {
+      handleApiError.mockImplementation((error: any) => {
         throw error;
       });
 

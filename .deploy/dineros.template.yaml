@@ -31,11 +31,27 @@ spec:
       labels:
         app: ${APP_LABEL}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
       serviceAccountName: ${SERVICE_ACCOUNT_K8S}
       containers:
         - name: ${MAIN_CONTAINER_NAME}
           image: gcr.io/${GCP_PROJECT_ID}/dineros:${IMAGE_TAG}
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
           volumeMounts:
             - name: service-account-volume
               mountPath: /etc/google-service-account
@@ -205,11 +221,27 @@ spec:
       labels:
         app: ${MICRO_APP_LABEL}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
       serviceAccountName: ${SERVICE_ACCOUNT_K8S}
       containers:
         - name: ${MICRO_CONTAINER_NAME}
           image: gcr.io/${GCP_PROJECT_ID}/dineros-microservice:${IMAGE_TAG}
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
           volumeMounts:
             - name: service-account-volume
               mountPath: /etc/google-service-account

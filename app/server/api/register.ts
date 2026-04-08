@@ -11,6 +11,40 @@ import {
   stripRegisterEntryPlaidJson,
 } from "~/server/lib/registerLedgerFuture";
 
+function registerEntriesListWhere(
+  direction: "past" | "future",
+  accountRegisterId: number,
+  accountId: string | undefined,
+  userId: number,
+) {
+  return {
+    ...(direction === "past"
+      ? {
+          OR: [
+            { isCleared: true },
+            { isBalanceEntry: true },
+            { isReconciled: true },
+          ],
+        }
+      : {
+          OR: [...futureRegisterEntryOr],
+        }),
+    accountRegisterId,
+    register: {
+      account: {
+        is: {
+          userAccounts: {
+            some: {
+              userId,
+            },
+          },
+          id: accountId,
+        },
+      },
+    },
+  };
+}
+
 export default defineEventHandler(async (event) => {
   try {
     const user = getUser(event);
@@ -38,9 +72,17 @@ export default defineEventHandler(async (event) => {
       loadMode,
     } = querySchema.parse(queryParams);
 
-    const accountRegister = await PrismaDb.accountRegister.findUniqueOrThrow({
+    const accountRegister = await PrismaDb.accountRegister.findFirstOrThrow({
       where: {
         id: accountRegisterId,
+        account: {
+          userAccounts: {
+            some: {
+              userId: user.userId,
+            },
+          },
+          ...(accountId ? { id: accountId } : {}),
+        },
       },
       select: {
         id: true,
@@ -67,32 +109,12 @@ export default defineEventHandler(async (event) => {
 
     // Get total count for pagination
     const totalCount = await PrismaDb.registerEntry.count({
-      where: {
-        ...(direction === "past"
-          ? {
-              OR: [
-                { isCleared: true },
-                { isBalanceEntry: true },
-                { isReconciled: true },
-              ],
-            }
-          : {
-              OR: [...futureRegisterEntryOr],
-            }),
+      where: registerEntriesListWhere(
+        direction,
         accountRegisterId,
-        register: {
-          account: {
-            is: {
-              userAccounts: {
-                some: {
-                  userId: user.userId,
-                },
-              },
-              id: accountId,
-            },
-          },
-        },
-      },
+        accountId,
+        user.userId,
+      ),
     });
 
     // Future tab: `recalculateRunningBalanceAndSort` reorders rows; a small `take` from DB order
@@ -134,32 +156,12 @@ export default defineEventHandler(async (event) => {
 
     // For pagination, we need to load all records up to skip + take to calculate balances correctly
     const allRegisterEntries = await PrismaDb.registerEntry.findMany({
-      where: {
-        ...(direction === "past"
-          ? {
-              OR: [
-                { isCleared: true },
-                { isBalanceEntry: true },
-                { isReconciled: true },
-              ],
-            }
-          : {
-              OR: [...futureRegisterEntryOr],
-            }),
+      where: registerEntriesListWhere(
+        direction,
         accountRegisterId,
-        register: {
-          account: {
-            is: {
-              userAccounts: {
-                some: {
-                  userId: user.userId,
-                },
-              },
-              id: accountId,
-            },
-          },
-        },
-      },
+        accountId,
+        user.userId,
+      ),
       orderBy: [{ seq: "asc" }, { createdAt: "asc" }],
       take: fetchLimit,
     });

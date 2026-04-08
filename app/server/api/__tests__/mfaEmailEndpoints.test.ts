@@ -7,6 +7,15 @@ vi.hoisted(() => {
 
 vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
+  createError: vi.fn((error: { statusCode?: number; statusMessage?: string }) => {
+    const err = new Error(error.statusMessage ?? "Error") as Error & {
+      statusCode?: number;
+      statusMessage?: string;
+    };
+    err.statusCode = error.statusCode ?? 500;
+    err.statusMessage = error.statusMessage;
+    throw err;
+  }),
   readBody: vi.fn(),
   setResponseStatus: vi.fn(),
 }));
@@ -46,6 +55,15 @@ const mfaFns = vi.hoisted(() => ({
 
 vi.mock("~/server/lib/mfa", () => mfaFns);
 
+const { emailHashVerify } = vi.hoisted(() => ({
+  emailHashVerify: vi.fn().mockResolvedValue(true),
+}));
+vi.mock("~/server/services/HashService", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    verify: emailHashVerify,
+  })),
+}));
+
 vi.mock("~/server/clients/prismaClient", async () => {
   const { createMockPrisma } = await import("~/tests/helpers/prismaMock");
   return { prisma: createMockPrisma() };
@@ -77,6 +95,7 @@ vi.mock("~/schema/zod", async (importOriginal) => {
 describe("MFA email API", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    emailHashVerify.mockResolvedValue(true);
     const { readBody, setResponseStatus } = await import("h3");
     (readBody as any).mockReset();
     (readBody as any).mockResolvedValue({});
@@ -154,17 +173,76 @@ describe("MFA email API", () => {
 
       (readBody as any).mockResolvedValue({ enabled: true });
       (globalThis as any).readBody.mockResolvedValue({ enabled: true });
-      (getUser as any).mockReturnValue({ userId: 5 });
-      (prisma.user.findUniqueOrThrow as any).mockResolvedValue({
-        id: 5,
-        settings: {},
-      });
-      (prisma.user.update as any).mockResolvedValue(
+      getUser.mockReturnValue({ userId: 5 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue(
+        dbUserForSession({ id: 5 }),
+      );
+      prisma.user.update.mockResolvedValue(
         dbUserForSession({ id: 5 }),
       );
 
       await handler({});
 
+      expect(prisma.user.update).toHaveBeenCalled();
+    });
+
+    it("returns 400 when disabling email OTP without current password", async () => {
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+
+      (readBody as any).mockResolvedValue({ enabled: false });
+      (globalThis as any).readBody.mockResolvedValue({ enabled: false });
+      getUser.mockReturnValue({ userId: 5 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        id: 5,
+        password: "hashed",
+        settings: {
+          mfa: {
+            totp: { isEnabled: false, isVerified: false },
+            passkeys: [],
+            emailOtp: { isEnabled: true, isVerified: true },
+          },
+        },
+      });
+
+      await expect(handler({})).rejects.toThrow(
+        "Current password is required to disable email OTP.",
+      );
+    });
+
+    it("disables email OTP when current password verifies", async () => {
+      const { readBody } = await import("h3");
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+
+      (readBody as any).mockResolvedValue({
+        enabled: false,
+        currentPassword: "plain",
+      });
+      (globalThis as any).readBody.mockResolvedValue({
+        enabled: false,
+        currentPassword: "plain",
+      });
+      getUser.mockReturnValue({ userId: 5 });
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        id: 5,
+        password: "hashed",
+        settings: {
+          mfa: {
+            totp: { isEnabled: false, isVerified: false },
+            passkeys: [],
+            emailOtp: { isEnabled: true, isVerified: true },
+          },
+        },
+      });
+      prisma.user.update.mockResolvedValue(
+        dbUserForSession({ id: 5 }),
+      );
+
+      await handler({});
+
+      expect(emailHashVerify).toHaveBeenCalledWith("hashed", "plain");
       expect(prisma.user.update).toHaveBeenCalled();
     });
   });

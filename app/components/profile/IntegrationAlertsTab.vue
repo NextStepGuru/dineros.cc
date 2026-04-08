@@ -98,7 +98,11 @@ function exportCsv() {
   if (kindFilter.value.trim()) params.set("kind", kindFilter.value.trim());
   if (fromFilter.value.trim()) params.set("from", fromFilter.value.trim());
   if (toFilter.value.trim()) params.set("to", toFilter.value.trim());
-  window.open(`/api/admin/integration-alerts?${params.toString()}`, "_blank");
+  window.open(
+    `/api/admin/integration-alerts?${params.toString()}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 watch(

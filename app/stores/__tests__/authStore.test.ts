@@ -9,20 +9,28 @@ const listStoreModule = await import("../listStore");
 (globalThis as any).useListStore = listStoreModule.useListStore;
 const { useAuthStore } = authStoreModule;
 
-const useCookieStub = vi.fn(() => ({ value: undefined }));
 const useAPIStub = vi.fn(() => ({
   data: { value: null },
   error: { value: null },
 }));
-vi.stubGlobal("useCookie", useCookieStub);
+const useRequestHeadersStub = vi.fn(() => ({}));
+const apiClient = vi.fn().mockResolvedValue(undefined);
+
 vi.stubGlobal("useAPI", useAPIStub);
-vi.stubGlobal("useNuxtApp", vi.fn(() => ({})));
-vi.stubGlobal("process", { ...process, client: false });
+vi.stubGlobal("useRequestHeaders", useRequestHeadersStub);
+vi.stubGlobal("useNuxtApp", vi.fn(() => ({ $api: apiClient })));
 
 describe("authStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.spyOn(console, "log").mockImplementation(() => {});
+    useAPIStub.mockReturnValue({
+      data: { value: null },
+      error: { value: null },
+    });
+    useRequestHeadersStub.mockReturnValue({});
+    apiClient.mockReset();
+    apiClient.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -108,7 +116,13 @@ describe("authStore", () => {
   it("logout clears state", async () => {
     const store = useAuthStore();
     store.setToken("x");
-    store.setUser({ id: 1, firstName: "J", lastName: "D", email: "j@d.co", password: "" } as User);
+    store.setUser({
+      id: 1,
+      firstName: "J",
+      lastName: "D",
+      email: "j@d.co",
+      password: "",
+    } as User);
     store.setBudgetId(5);
 
     await store.logout();
@@ -151,16 +165,18 @@ describe("authStore", () => {
     expect(store.getUser?.settings?.plaid?.public_token).toBeUndefined();
   });
 
-  it("validateLogin sets isLoggedIn when cookie and API succeed", async () => {
+  it("validateLogin sets user and isLoggedIn when /api/user succeeds", async () => {
     const store = useAuthStore();
-    const mockUser = { id: 1, firstName: "J", lastName: "D", email: "j@d.co", password: "" } as User;
-    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-    const token = `header.${payload}.sig`;
-    const cookieRef = { value: token };
+    const mockUser = {
+      id: 1,
+      firstName: "J",
+      lastName: "D",
+      email: "j@d.co",
+      password: "",
+    } as User;
     const userRef = { value: null as User | null };
     const errorRef = { value: null as { status?: number } | null };
 
-    useCookieStub.mockReturnValue(cookieRef as any);
     useAPIStub.mockReturnValue({
       data: userRef,
       error: errorRef,
@@ -170,50 +186,22 @@ describe("authStore", () => {
 
     await store.validateLogin();
 
+    expect(useAPIStub).toHaveBeenCalledWith(
+      "/api/user",
+      expect.objectContaining({
+        server: true,
+        credentials: "include",
+      }),
+    );
     expect(store.getIsUserLoggedIn).toBe(true);
     expect(store.getUser).toEqual(mockUser);
   });
 
-  it("validateLogin clears state when token is expired", async () => {
-    const store = useAuthStore();
-    store.setToken("old");
-    store.setUser({ id: 1, firstName: "J", lastName: "D", email: "j@d.co", password: "" } as User);
-    const payload = btoa(JSON.stringify({ exp: 1 }));
-    const token = `h.${payload}.s`;
-    const cookieRef = { value: token };
-
-    useCookieStub.mockReturnValue(cookieRef as any);
-
-    await store.validateLogin();
-
-    expect(store.getIsUserLoggedIn).toBe(false);
-    expect(store.getToken).toBe("");
-    expect(store.getUser).toBeNull();
-    expect(cookieRef.value).toBeUndefined();
-  });
-
-  it("validateLogin clears state when token parse fails", async () => {
-    const store = useAuthStore();
-    const cookieRef = { value: "not-valid-jwt" };
-
-    useCookieStub.mockReturnValue(cookieRef as any);
-
-    await store.validateLogin();
-
-    expect(store.getIsUserLoggedIn).toBe(false);
-    expect(store.getToken).toBe("");
-    expect(cookieRef.value).toBeUndefined();
-  });
-
   it("validateLogin clears state on API 401", async () => {
     const store = useAuthStore();
-    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-    const token = `h.${payload}.s`;
-    const cookieRef = { value: token };
     const userRef = { value: null as User | null };
-    const errorRef = { value: { status: 401 } };
+    const errorRef = { value: { status: 401 } as { status?: number } };
 
-    useCookieStub.mockReturnValue(cookieRef as any);
     useAPIStub.mockReturnValue({ data: userRef, error: errorRef } as any);
 
     await store.validateLogin();
@@ -221,40 +209,50 @@ describe("authStore", () => {
     expect(store.getIsUserLoggedIn).toBe(false);
     expect(store.getToken).toBe("");
     expect(store.getUser).toBeNull();
-    expect(cookieRef.value).toBeUndefined();
   });
 
-  it("validateLogin preserves token on non-auth API error", async () => {
+  it("validateLogin clears state on API 403", async () => {
     const store = useAuthStore();
-    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-    const token = `h.${payload}.s`;
-    const cookieRef = { value: token };
     const userRef = { value: null as User | null };
-    const errorRef = { value: { status: 500 } };
+    const errorRef = { value: { status: 403 } as { status?: number } };
 
-    useCookieStub.mockReturnValue(cookieRef as any);
     useAPIStub.mockReturnValue({ data: userRef, error: errorRef } as any);
 
     await store.validateLogin();
 
     expect(store.getIsUserLoggedIn).toBe(false);
-    expect(store.getToken).toBe(token);
-    expect(cookieRef.value).toBe(token);
+    expect(store.getToken).toBe("");
+    expect(store.getUser).toBeNull();
   });
 
-  it("validateLogin sets isLoggedIn false when no cookie", async () => {
+  it("validateLogin sets isLoggedIn false on non-auth API error", async () => {
     const store = useAuthStore();
-    useCookieStub.mockReturnValue({ value: undefined } as any);
+    const userRef = { value: null as User | null };
+    const errorRef = { value: { status: 500 } as { status?: number } };
+
+    useAPIStub.mockReturnValue({ data: userRef, error: errorRef } as any);
 
     await store.validateLogin();
 
     expect(store.getIsUserLoggedIn).toBe(false);
   });
 
-  it("validateLogin sets isLoggedIn false when cookie access throws", async () => {
+  it("validateLogin sets isLoggedIn false when user data is missing without error", async () => {
     const store = useAuthStore();
-    useCookieStub.mockImplementation(() => {
-      throw new Error("Cookie unavailable");
+    const userRef = { value: null as User | null };
+    const errorRef = { value: null };
+
+    useAPIStub.mockReturnValue({ data: userRef, error: errorRef } as any);
+
+    await store.validateLogin();
+
+    expect(store.getIsUserLoggedIn).toBe(false);
+  });
+
+  it("validateLogin sets isLoggedIn false when useAPI throws", async () => {
+    const store = useAuthStore();
+    useAPIStub.mockImplementation(() => {
+      throw new Error("network");
     });
 
     await store.validateLogin();

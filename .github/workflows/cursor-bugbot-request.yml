@@ -1,0 +1,39 @@
+# Invoked from pr.yml. Declares optional PAT here so Actions language tools type-check secrets.*.
+name: Cursor Bugbot request
+
+on:
+  workflow_call:
+    secrets:
+      CURSOR_BUGBOT_TRIGGER_PAT:
+        description: Optional fine-grained PAT (machine user) so Bugbot reacts to the PR comment
+        required: false
+
+jobs:
+  post:
+    name: Post bugbot run on PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post bugbot run on PR
+        env:
+          PAT: ${{ secrets.CURSOR_BUGBOT_TRIGGER_PAT }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PAT:-}" ]; then
+            export GH_TOKEN="$PAT"
+          else
+            export GH_TOKEN="$GITHUB_TOKEN"
+            echo "Using GITHUB_TOKEN for the comment. If Bugbot does not start, add repo secret CURSOR_BUGBOT_TRIGGER_PAT (fine-grained PAT for a machine user) — Cursor often ignores bot comments."
+          fi
+          body="$(printf '%s\n' \
+            '<!-- cursor-bugbot-ci -->' \
+            'bugbot run' \
+            '' \
+            "_Triggered from PR checks ([workflow run](${RUN_URL}))._" \
+            '' \
+            'Autofix is toggled in the [Cursor Bugbot dashboard](https://cursor.com/dashboard/bugbot), not in this workflow.')"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$body"

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { getCookie, setCookie } from "h3";
 import { sharedRedisConnection } from "~/server/clients/redisClient";
 import env from "~/server/env";
@@ -240,7 +240,7 @@ export async function clearPendingMfaSession(event: any) {
 export function generateNumericOtpCode(length = 6) {
   let code = "";
   for (let i = 0; i < length; i += 1) {
-    code += Math.floor(Math.random() * 10).toString();
+    code += randomInt(0, 10).toString();
   }
   return code;
 }
@@ -279,11 +279,35 @@ export async function verifyEmailOtpForSession(
     return false;
   }
 
-  const matches = expectedHash === hashOtp(code.trim());
+  const computed = hashOtp(code.trim());
+  const matches =
+    expectedHash.length === computed.length &&
+    timingSafeEqual(Buffer.from(expectedHash, "utf8"), Buffer.from(computed, "utf8"));
   if (matches) {
     await sharedRedisConnection.del(key);
   }
   return matches;
+}
+
+const EMAIL_OTP_VERIFY_MAX_ATTEMPTS = 5;
+
+/** Increment failed verify attempts; invalidates OTP after too many failures. */
+export async function recordEmailOtpVerifyFailure(
+  sessionId: string,
+): Promise<"ok" | "locked"> {
+  if (process.env.NODE_ENV === "test") {
+    return "ok";
+  }
+  const key = `mfa:email:verify:fail:${sessionId}`;
+  const count = await sharedRedisConnection.incr(key);
+  if (count === 1) {
+    await sharedRedisConnection.expire(key, EMAIL_OTP_TTL_SECONDS);
+  }
+  if (count > EMAIL_OTP_VERIFY_MAX_ATTEMPTS) {
+    await sharedRedisConnection.del(emailOtpRedisKey(sessionId));
+    return "locked";
+  }
+  return "ok";
 }
 
 export function getWebAuthnConfig() {

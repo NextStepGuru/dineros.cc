@@ -230,6 +230,22 @@ async function upsertReoccurrenceWithSplits(
   const mode = body.amountAdjustmentMode ?? "NONE";
   const adjustmentFields = buildAdjustmentFields(mode, body, parsedAdjustmentAnchorAt);
 
+  if (body.id > 0) {
+    const existing = await prisma.reoccurrence.findFirst({
+      where: {
+        id: body.id,
+        accountRegisterId: body.accountRegisterId,
+        accountId: body.accountId,
+      },
+    });
+    if (!existing) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: "Reoccurrence not found",
+      });
+    }
+  }
+
   const upserted = await prisma.reoccurrence.upsert({
     create: {
       accountId: body.accountId,

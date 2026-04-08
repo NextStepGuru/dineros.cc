@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from "h3";
+import { defineEventHandler, readBody, setResponseStatus, createError } from "h3";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import HashService from "../services/HashService";
 import { log } from "../logger";
@@ -8,9 +8,26 @@ import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
 import env from "~/server/env";
 import { ADMIN_EMAIL } from "~/server/lib/adminConfig";
+import {
+  clientIpFromEvent,
+  rateLimitByKey,
+} from "~/server/lib/rateLimitRedis";
 
 export default defineEventHandler(async (event) => {
   try {
+    const ip = clientIpFromEvent(event);
+    const rl = await rateLimitByKey({
+      key: `signup:ip:${ip}`,
+      limit: 20,
+      windowSeconds: 3600,
+    });
+    if (!rl.allowed) {
+      throw createError({
+        statusCode: 429,
+        statusMessage: "Too many signup attempts. Try again later.",
+      });
+    }
+
     // Read and validate request body
     const body = await readBody(event);
     const { firstName, lastName, email, password } = registerSchema.parse(body);

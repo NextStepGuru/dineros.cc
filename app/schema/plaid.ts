@@ -33,7 +33,7 @@ const metadataSchema = z.object({
 export const plaidRootSchema = z
   .object({
     item_id: z.string().optional(),
-    metadata: metadataSchema.passthrough().optional(),
+    metadata: metadataSchema.optional(),
     isEnabled: z.boolean().default(false),
     request_id: z.string().optional(),
     access_token: z.string().optional(),

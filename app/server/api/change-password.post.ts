@@ -1,18 +1,41 @@
 import type { H3Event } from "h3";
+import { createError } from "h3";
 import HashService from "../services/HashService";
-import { passwordSchema } from "~/schema/zod";
+import { changePasswordSchema } from "~/schema/zod";
 import { getUser } from "../lib/getUser";
 import { prisma } from "../clients/prismaClient";
 import { postmarkClient } from "../clients/postmarkClient";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { rotateUserJwtKey } from "~/server/lib/rotateUserJwtKey";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
     const body = await readBody(event);
     const { userId } = getUser(event);
 
-    // Validate the request body
-    const { newPassword } = passwordSchema.parse(body);
+    const { newPassword, currentPassword } = changePasswordSchema.parse(body);
+
+    const existing = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+
+    if (!existing.password) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Password change not available for this account.",
+      });
+    }
+
+    const ok = await new HashService().verify(
+      existing.password,
+      currentPassword,
+    );
+    if (!ok) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: "Current password is incorrect.",
+      });
+    }
 
     const hashedPassword = await new HashService().hash(newPassword);
 
@@ -20,6 +43,8 @@ export default defineEventHandler(async (event: H3Event) => {
       where: { id: userId },
       data: { password: hashedPassword },
     });
+
+    await rotateUserJwtKey(userId);
 
     await postmarkClient.sendEmail({
       From: "Mr. Pepe Dineros <pepe@dineros.cc>",

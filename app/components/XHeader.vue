@@ -98,14 +98,6 @@ function budgetMenuItems(b: Budget) {
   ];
 }
 
-const authTokenCookie = useCookie("authToken", {
-  secure: false,
-  httpOnly: false,
-  sameSite: "lax",
-  maxAge: 86400, // 24 hours
-  path: "/",
-});
-
 const registerHref = computed(() => {
   const sorted = formatAccountRegisters(listStore.getAccountRegisters);
   const firstId = sorted[0]?.id;
@@ -295,7 +287,6 @@ async function pollData() {
 
     if (data && "token" in data) {
       const token = data.token;
-      authTokenCookie.value = token;
       authStore.setToken(token);
       if (data.user) {
         authStore.setUser(data.user);

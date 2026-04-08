@@ -266,7 +266,16 @@ describe("JwtService", () => {
         jwtKey: jwtKey,
       });
 
+      const verifySpy = vi.spyOn(jwt, "verify");
+
       const decoded = await jwtService.verify(validToken);
+
+      expect(verifySpy).toHaveBeenCalledWith(
+        validToken,
+        testKeyPair.publicKey,
+        expect.objectContaining({ algorithms: ["PS512"] }),
+      );
+      verifySpy.mockRestore();
 
       expect(decoded).toMatchObject({
         userId,

@@ -1,13 +1,12 @@
 /**
- * Runs Hash/Jwt/Rsa service tests excluded from the default node project
- * (`vitestSlowTestExcludes` in vitest.test-globs.ts).
+ * Runs Hash/Rsa service tests excluded from the default node project
+ * (`vitestSlowTestExcludes` in vitest.test-globs.ts). JwtService tests run under `pnpm test`.
  */
 import { defineConfig } from "vitest/config";
 import { vitestResolveAliases } from "./vitest.resolve-aliases";
 
 const cryptoServiceTests = [
   "server/services/__tests__/HashService.test.ts",
-  "server/services/__tests__/JwtService.test.ts",
   "server/services/__tests__/RsaService.test.ts",
 ] as const;
 

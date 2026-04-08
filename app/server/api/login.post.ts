@@ -17,6 +17,11 @@ import {
 } from "~/server/lib/mfa";
 import { completeLogin } from "~/server/lib/completeLogin";
 import type { User } from "@prisma/client";
+import { sharedRedisConnection } from "~/server/clients/redisClient";
+import {
+  clientIpFromEvent,
+  rateLimitByKey,
+} from "~/server/lib/rateLimitRedis";
 
 type PrivateUser = z.infer<typeof privateUserSchema>;
 
@@ -206,7 +211,7 @@ async function runMfaFlow(
     const totpResult = await verify({
       secret: totpSecret,
       token: tokenChallenge,
-      epochTolerance: 300,
+      epochTolerance: 30,
     });
     verificationResult = totpResult.valid;
   }
@@ -233,6 +238,33 @@ async function runMfaFlow(
   return { ok: true };
 }
 
+function redisFailCountIndicatesLockout(
+  failStr: string | null | undefined,
+): boolean {
+  if (failStr == null || failStr === "") return false;
+  const n = Number.parseInt(String(failStr), 10);
+  return !Number.isNaN(n) && n >= 5;
+}
+
+async function isLoginTemporarilyLockedOut(failKey: string): Promise<boolean> {
+  if (process.env.NODE_ENV === "test") return false;
+  const failStr = await sharedRedisConnection.get(failKey);
+  return redisFailCountIndicatesLockout(failStr);
+}
+
+async function recordLoginFailureInRedis(failKey: string): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+  const n = await sharedRedisConnection.incr(failKey);
+  if (n === 1) {
+    await sharedRedisConnection.expire(failKey, 900);
+  }
+}
+
+async function clearLoginFailureKeyInRedis(failKey: string): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+  await sharedRedisConnection.del(failKey);
+}
+
 async function loginHandler(event: any) {
   const body = await readBody(event);
   const normalizedBody = normalizeLoginBody(body);
@@ -246,6 +278,17 @@ async function loginHandler(event: any) {
 
   const loginDebugData = buildLoginDebugData();
   logLoginAttempt(email, tokenChallenge, loginDebugData);
+
+  const ip = clientIpFromEvent(event);
+  const ipRl = await rateLimitByKey({
+    key: `login:ip:${ip}`,
+    limit: 80,
+    windowSeconds: 900,
+  });
+  if (!ipRl.allowed) {
+    setResponseStatus(event, 429);
+    return { errors: "Too many login attempts. Please try again later." };
+  }
 
   const lookup = await findUserForLogin(email, lowerCaseEmail);
 
@@ -263,6 +306,14 @@ async function loginHandler(event: any) {
   }
 
   const user = privateUserSchema.parse({ ...lookup, email });
+
+  const failKey = `login:fail:${createHash("sha256").update(lowerCaseEmail).digest("hex")}`;
+  if (await isLoginTemporarilyLockedOut(failKey)) {
+    setResponseStatus(event, 429);
+    return {
+      errors: "Too many failed attempts. Please try again in a few minutes.",
+    };
+  }
 
   if (!user?.password) {
     log({
@@ -304,9 +355,12 @@ async function loginHandler(event: any) {
   });
 
   if (!isPasswordValid) {
+    await recordLoginFailureInRedis(failKey);
     setResponseStatus(event, 401);
     return { errors: "Invalid email or password." };
   }
+
+  await clearLoginFailureKeyInRedis(failKey);
 
   const mfaMethods = getEnabledMfaMethods(user.settings);
   const mfaResult = await runMfaFlow(

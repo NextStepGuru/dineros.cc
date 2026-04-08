@@ -188,19 +188,21 @@ const privateUserSettingsSchema = z.preprocess(
   })
 );
 
+/** API/client profile shape — never includes password (hashes must not leave the server). */
 export const publicProfileSchema = z.object({
   id: z.number(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.email("Invalid email address"),
-  password: z.string(),
   countryId: z.number().nullable().optional(),
   timezoneOffset: z.number().nullable().optional(),
   isDaylightSaving: z.boolean().nullable().optional(),
   settings: publicUserSettingsSchema,
 });
 
+/** Prisma user row with optional password hash for server-side parsing only. */
 export const privateUserSchema = publicProfileSchema.extend({
+  password: z.string().nullable().optional(),
   settings: privateUserSettingsSchema,
 });
 
@@ -216,15 +218,21 @@ export const passwordSchema = z
   .object({
     newPassword: z
       .string()
-      .min(6, "Password must be at least 6 characters long"),
+      .min(8, "Password must be at least 8 characters long")
+      .max(128, "Password must be at most 128 characters"),
     confirmPassword: z
       .string()
-      .min(6, "Confirm password must be at least 6 characters long"),
+      .min(8, "Confirm password must be at least 8 characters long")
+      .max(128, "Confirm password must be at most 128 characters"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
+
+export const changePasswordSchema = passwordSchema.extend({
+  currentPassword: z.string().min(1, "Current password is required"),
+});
 
 export const adminUsersQuerySchema = z.object({
   q: z.string().trim().max(255).optional().default(""),
@@ -252,7 +260,7 @@ export const adminUserPasswordResetSchema = passwordSchema;
 /** Admin audit log actions (server constants; not exhaustive). */
 export const ADMIN_AUDIT_ACTIONS = {
   USER_UPDATE: "user.update",
-  USER_PASSWORD_RESET: "user.password_reset",
+  USER_PASSWORD_RESET: "user.password_reset", // NOSONAR S2068 — audit action slug
   ACCOUNT_RECALCULATE_QUEUED: "account.recalculate_queued",
   ACCOUNT_PLAID_SYNC_QUEUED: "account.plaid_sync_queued",
   ACCOUNT_BALANCE_ENTRIES_CLEANUP: "account.balance_entries_cleanup",
@@ -325,7 +333,7 @@ export const adminIntegrationAlertsQuerySchema = z.object({
 });
 
 export const adminPostmarkMessagesQuerySchema = z.object({
-  recipient: z.string().email().max(500),
+  recipient: z.email().max(500),
   count: z.coerce.number().int().min(1).max(50).default(20),
 });
 
@@ -340,10 +348,11 @@ export const registerSchema = z
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: z.email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters long"),
+    password: z.string().min(8, "Password must be at least 8 characters long").max(128),
     confirmPassword: z
       .string()
-      .min(6, "Confirm password must be at least 6 characters long"),
+      .min(8, "Confirm password must be at least 8 characters long")
+      .max(128),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -456,9 +465,9 @@ export const vehicleValueEstimateRequestSchema = z.object({
 
 /** Parsed JSON from the model for vehicle valuation */
 export const vehicleValueEstimateAiResultSchema = z.object({
-  estimatedValueMid: z.number().finite(),
-  estimatedValueLow: z.number().finite(),
-  estimatedValueHigh: z.number().finite(),
+  estimatedValueMid: z.number(),
+  estimatedValueLow: z.number(),
+  estimatedValueHigh: z.number(),
   currency: z.string().min(1).max(16).default("USD"),
   rationale: z.string().max(800),
   disclaimer: z.string().min(1).max(2000),
@@ -627,7 +636,7 @@ export const savingsGoalSchema = z.object({
   targetAccountRegisterId: z.number(),
   priorityOverDebt: z.boolean(),
   ignoreMinBalance: z.boolean(),
-  categoryId: z.string().uuid().nullable(),
+  categoryId: z.uuid().nullable(),
   sortOrder: z.number(),
   isArchived: z.boolean(),
 });
@@ -639,7 +648,7 @@ export const createSavingsGoalSchema = z.object({
   targetAccountRegisterId: z.coerce.number(),
   priorityOverDebt: z.boolean().default(false),
   ignoreMinBalance: z.boolean().default(false),
-  categoryId: z.union([z.string().uuid(), z.null()]).optional(),
+  categoryId: z.union([z.uuid(), z.null()]).optional(),
 });
 
 export const updateSavingsGoalSchema = createSavingsGoalSchema.partial();
@@ -700,10 +709,12 @@ export const passwordAndCodeSchema = z
     resetCode: z.string(),
     newPassword: z
       .string()
-      .min(6, "Password must be at least 6 characters long"),
+      .min(8, "Password must be at least 8 characters long")
+      .max(128, "Password must be at most 128 characters"),
     confirmPassword: z
       .string()
-      .min(6, "Confirm password must be at least 6 characters long"),
+      .min(8, "Confirm password must be at least 8 characters long")
+      .max(128, "Confirm password must be at most 128 characters"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",

@@ -39,6 +39,9 @@ test.txt
 app/prisma/backup
 output.txt
 
+# SonarScanner CLI local cache
+.scannerwork/
+
 # Test coverage reports
 coverage/
 *.json

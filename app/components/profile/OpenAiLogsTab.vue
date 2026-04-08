@@ -110,7 +110,11 @@ function exportCsv() {
   if (filters.purpose.trim()) params.set("purpose", filters.purpose.trim());
   if (filters.from.trim()) params.set("from", filters.from.trim());
   if (filters.to.trim()) params.set("to", filters.to.trim());
-  window.open(`/api/admin/openai-request-logs?${params.toString()}`, "_blank");
+  window.open(
+    `/api/admin/openai-request-logs?${params.toString()}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 onMounted(() => {

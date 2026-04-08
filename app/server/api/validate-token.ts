@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
       maxAge: 86400, // 24 hours - match client-side configuration
       path: "/",
       sameSite: "lax",
-      httpOnly: false, // Allow client-side access
+      httpOnly: true,
     });
 
     setResponseStatus(event, 200);

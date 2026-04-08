@@ -19,7 +19,7 @@ export async function completeLogin(event: any, userId: number) {
     maxAge: 86400,
     path: "/",
     sameSite: "lax",
-    httpOnly: false,
+    httpOnly: true,
   });
 
   return { token, message: null, user: sessionUserFromDb(updatedUser) };

@@ -78,8 +78,8 @@ describe("User GET API Endpoint", () => {
       "~/server/lib/sessionUserProfile"
     );
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
 
     const result = await userGetHandler(mockEvent);
 
@@ -97,8 +97,8 @@ describe("User GET API Endpoint", () => {
     const { prisma } = await import("~/server/clients/prismaClient");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 999 });
-    (prisma.user.findUniqueOrThrow as any).mockRejectedValue(
+    getUser.mockReturnValue({ userId: 999 });
+    prisma.user.findUniqueOrThrow.mockRejectedValue(
       new Error("User not found")
     );
 
@@ -114,16 +114,16 @@ describe("User GET API Endpoint", () => {
   it("should handle schema validation errors", async () => {
     const mockEvent = {};
     const { password: _omit, ...row } = dbUserForSession();
-    const mockUser = row as Record<string, unknown>;
+    const mockUser = { ...row, firstName: "" } as Record<string, unknown>;
 
     const { getUser } = await import("~/server/lib/getUser");
     const { prisma } = await import("~/server/clients/prismaClient");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockResolvedValue(mockUser);
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
 
-    (handleApiError as any).mockImplementation((err: unknown) => {
+    handleApiError.mockImplementation((err: unknown) => {
       throw err;
     });
 
@@ -143,8 +143,8 @@ describe("User GET API Endpoint", () => {
     const { prisma } = await import("~/server/clients/prismaClient");
     const { handleApiError } = await import("~/server/lib/handleApiError");
 
-    (getUser as any).mockReturnValue({ userId: 123 });
-    (prisma.user.findUniqueOrThrow as any).mockRejectedValue(
+    getUser.mockReturnValue({ userId: 123 });
+    prisma.user.findUniqueOrThrow.mockRejectedValue(
       new Error("Database connection failed")
     );
 

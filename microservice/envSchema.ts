@@ -10,6 +10,7 @@ const envSchema = z.object({
     .string()
     .transform((val) => Number.parseInt(val, 10))
     .default(6379),
+  REDIS_PASSWORD: z.string().optional(),
   PORT: z
     .string()
     .transform((val) => Number.parseInt(val, 10))

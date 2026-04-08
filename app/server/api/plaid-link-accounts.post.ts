@@ -4,6 +4,7 @@ import { z } from "zod";
 import { privateUserSchema, publicProfileSchema } from "~/schema/zod";
 import { mapPlaidTypesToAccountTypes } from "~/lib/utils";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { resolvePlaidAccessTokenFromStored } from "~/server/lib/plaidAccessTokenCrypto";
 import { dateTimeService } from "~/server/services/forecast";
 import { accountWhereUserIsMember } from "~/server/lib/accountAccess";
 
@@ -85,7 +86,9 @@ export default defineEventHandler(async (event) => {
       const plaidAccount = plaidAccounts.find(
         (a) => a.id === linkAccount.plaidId
       );
-      const plaidAccessToken = user.settings.plaid.access_token;
+      const plaidAccessToken =
+        resolvePlaidAccessTokenFromStored(user.settings.plaid.access_token) ??
+        "";
       const plaidJson = {
         accessToken: plaidAccessToken,
         plaidAccount: plaidAccount || {},
@@ -131,7 +134,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const settings = JSON.parse(JSON.stringify(user.settings));
+    const settings = structuredClone(user.settings);
     settings.plaid.isEnabled = false;
 
     const updatedUser = await prisma.user.update({

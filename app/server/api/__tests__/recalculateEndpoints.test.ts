@@ -68,6 +68,11 @@ vi.mock("~/consts", () => ({
   MAX_YEARS: 2,
 }));
 
+const authCtx = { userId: 123, jwtKey: "k", iat: 1, exp: 999 };
+function withAuthContext(ev: Record<string, unknown> = {}) {
+  return { ...ev, context: { user: authCtx } };
+}
+
 describe("Recalculate API Endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,10 +94,16 @@ describe("Recalculate API Endpoints", () => {
     beforeEach(async () => {
       const module = await import("~/server/api/recalculate.post");
       recalculatePostHandler = module.default;
+      (mockPrisma.userAccount.findFirstOrThrow as any).mockResolvedValue({
+        userId: 123,
+        accountId: "account-123",
+      });
     });
 
     it("should successfully recalculate for valid account ID", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -133,7 +144,7 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle missing account ID", async () => {
-      const mockEvent = { body: { accountId: "" } } as any;
+      const mockEvent = withAuthContext({ body: { accountId: "" } }) as any;
       const mockBody = { accountId: "" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -145,7 +156,7 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle null account ID", async () => {
-      const mockEvent = {} as any;
+      const mockEvent = withAuthContext() as any;
       const mockBody = {};
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -156,7 +167,9 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle forecast calculation failure", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -173,7 +186,9 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle forecast calculation failure without errors", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -189,7 +204,7 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle schema validation errors", async () => {
-      const mockEvent = {} as any;
+      const mockEvent = withAuthContext() as any;
 
       (globalThis as any).readBody.mockResolvedValue(123);
 
@@ -198,7 +213,9 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle engine creation errors", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -215,7 +232,9 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should handle database connection errors", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
@@ -234,7 +253,9 @@ describe("Recalculate API Endpoints", () => {
     });
 
     it("should use correct date range for calculation", async () => {
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
       const mockBody = { accountId: "account-123" };
 
       const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
@@ -651,7 +672,13 @@ describe("Recalculate API Endpoints", () => {
       // Reset engine factory to return working engine
       mockEngineFactory.create.mockReturnValue(mockEngine);
 
-      const mockEvent = { body: { accountId: "account-123" } } as any;
+      const mockEvent = withAuthContext({
+        body: { accountId: "account-123" },
+      }) as any;
+      (mockPrisma.userAccount.findFirstOrThrow as any).mockResolvedValue({
+        userId: 123,
+        accountId: "account-123",
+      });
       (globalThis as any).readBody.mockResolvedValue({ accountId: "account-123" });
       mockRecalculateSchema.parse.mockReturnValue({ accountId: "account-123" });
       mockEngine.recalculate.mockResolvedValue({

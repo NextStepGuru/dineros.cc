@@ -63,12 +63,44 @@ export default defineEventHandler(async (event: H3Event) => {
 
     const cuid = createId();
 
-    let registerEntry = await PrismaDb.registerEntry
-      .upsert({
-        where: {
-          id: id || cuid,
+    let registerEntry: Awaited<
+      ReturnType<typeof PrismaDb.registerEntry.update>
+    >;
+
+    if (id) {
+      const existing = await PrismaDb.registerEntry.findFirst({
+        where: { id, accountRegisterId: lookup.id },
+      });
+      if (!existing) {
+        throw createError({
+          statusCode: 404,
+          statusMessage: "Register entry not found",
+        });
+      }
+      registerEntry = await PrismaDb.registerEntry.update({
+        where: { id },
+        data: {
+          accountRegisterId,
+          description,
+          reoccurrenceId,
+          amount,
+          balance,
+          isProjected,
+          isReconciled,
+          isCleared,
+          isPending,
+          isBalanceEntry,
+          isManualEntry: true,
+          plaidId,
+          plaidJson,
+          createdAt,
+          hasBalanceReCalc: true,
+          categoryId: categoryId ?? null,
         },
-        create: {
+      });
+    } else {
+      registerEntry = await PrismaDb.registerEntry.create({
+        data: {
           id: cuid,
           accountRegisterId,
           description,
@@ -87,31 +119,8 @@ export default defineEventHandler(async (event: H3Event) => {
           hasBalanceReCalc: true,
           categoryId: categoryId ?? null,
         },
-        update: {
-          accountRegisterId,
-          description,
-          reoccurrenceId,
-          amount,
-          balance,
-          isProjected,
-          isReconciled,
-          isCleared,
-          isPending,
-          isBalanceEntry,
-          isManualEntry: true,
-          plaidId,
-          plaidJson,
-          createdAt,
-          hasBalanceReCalc: true,
-          categoryId: categoryId ?? null,
-        },
-      })
-      .catch(() => {
-        throw createError({
-          statusCode: 400,
-          statusMessage: "Failed to update register entry",
-        });
       });
+    }
 
     if (registerEntry.isManualEntry) {
       if (

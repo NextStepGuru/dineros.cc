@@ -24,11 +24,13 @@ export const vitestNodeTestIncludes = [
 
 export const vitestSlowTestExcludes = [
   "server/services/__tests__/HashService.test.ts",
-  "server/services/__tests__/JwtService.test.ts",
   "server/services/__tests__/RsaService.test.ts",
 ] as const;
 
-/** Node project must not run Nuxt-runtime tests (overlap with tests/ and tests/nuxt globs). */
+/**
+ * Node project must not run Nuxt-runtime tests (overlap with tests/ and tests/nuxt globs).
+ * `microservice/` has its own package and is not part of `pnpm test`; internal API token checks are covered in `tests/server/middleware.auth.test.ts`.
+ */
 export const vitestNodeProjectExcludes = [
   ...vitestSlowTestExcludes,
   "tests/nuxt/**",
