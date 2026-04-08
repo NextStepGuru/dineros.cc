@@ -49,14 +49,31 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const data = cashOnHandSchema.parse(body);
 
-    await PrismaDb.cashOnHand.upsert({
-      where: { accountRegisterId: registerId },
-      create: {
-        accountRegisterId: registerId,
-        ...data,
-      },
-      update: data,
-    });
+    const totalDollars =
+      data.ones * 1 +
+      data.fives * 5 +
+      data.tens * 10 +
+      data.twenties * 20 +
+      data.fifties * 50 +
+      data.hundreds * 100;
+
+    await PrismaDb.$transaction([
+      PrismaDb.cashOnHand.upsert({
+        where: { accountRegisterId: registerId },
+        create: {
+          accountRegisterId: registerId,
+          ...data,
+        },
+        update: data,
+      }),
+      PrismaDb.accountRegister.update({
+        where: { id: registerId },
+        data: {
+          balance: totalDollars,
+          latestBalance: totalDollars,
+        },
+      }),
+    ]);
 
     return { ok: true as const };
   } catch (error) {
