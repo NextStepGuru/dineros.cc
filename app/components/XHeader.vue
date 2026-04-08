@@ -247,6 +247,7 @@ watch(
     if (
       p.startsWith("/reoccurrences") ||
       p.startsWith("/account-registers") ||
+      p.startsWith("/cash-on-hand") ||
       p.startsWith("/reports")
     ) {
       setWorkflowMode("forecasting");

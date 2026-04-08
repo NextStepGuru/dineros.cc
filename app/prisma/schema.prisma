@@ -380,10 +380,28 @@ model AccountRegister {
   snapshotRows          AccountRegisterSnapshot[]
   sourceForSavingsGoals SavingsGoal[]                @relation("SavingsGoalSource")
   targetForSavingsGoals SavingsGoal[]                @relation("SavingsGoalTarget")
+  cashOnHand            CashOnHand?
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
   @@map("account_register")
+}
+
+model CashOnHand {
+  id                Int             @id @default(autoincrement()) @db.UnsignedInt
+  accountRegisterId Int             @unique @map("account_register_id") @db.UnsignedInt
+  ones              Int             @default(0)
+  fives             Int             @default(0)
+  tens              Int             @default(0)
+  twenties          Int             @default(0)
+  fifties           Int             @default(0)
+  hundreds          Int             @default(0)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  accountRegister AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+
+  @@map("cash_on_hand")
 }
 
 model AccountSnapshot {

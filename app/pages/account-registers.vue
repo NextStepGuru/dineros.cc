@@ -1847,6 +1847,14 @@ watch(workflowMode, (w) => {
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
                   div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text truncate min-w-0") {{ row.name }}
+                  NuxtLink(
+                    v-if="!isSnapshotMode"
+                    :to="`/cash-on-hand/${row.id}`"
+                    class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
+                    aria-label="Cash count"
+                    @click.stop
+                  )
+                    UIcon(name="i-lucide-banknote" class="text-base")
                   div(
                     v-if="riskAlertForRegister(row.id)"
                     class="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
@@ -1890,10 +1898,19 @@ watch(workflowMode, (w) => {
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
                 td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
-                  div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center min-w-0 frog-text")
-                    div(class="w-4 h-4 mr-2 shrink-0 flex items-center justify-center frog-status-positive" aria-hidden="true")
-                      UIcon(name="i-lucide-corner-down-right" class="text-xs")
-                    span(class="truncate min-w-0") {{ subRow.name }}
+                  div(class="flex items-center min-w-0 flex-1")
+                    div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center min-w-0 frog-text flex-1")
+                      div(class="w-4 h-4 mr-2 shrink-0 flex items-center justify-center frog-status-positive" aria-hidden="true")
+                        UIcon(name="i-lucide-corner-down-right" class="text-xs")
+                      span(class="truncate min-w-0") {{ subRow.name }}
+                    NuxtLink(
+                      v-if="!isSnapshotMode"
+                      :to="`/cash-on-hand/${subRow.id}`"
+                      class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
+                      aria-label="Cash count"
+                      @click.stop
+                    )
+                      UIcon(name="i-lucide-banknote" class="text-base")
                 template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")
                   td(v-if="showDebitCreditColumns" class="p-2 sm:p-4 text-xs sm:text-sm whitespace-nowrap text-right border-b border-default")
                     DollarFormat(:amount="dcn.debit != null ? -Math.abs(dcn.debit) : null")
