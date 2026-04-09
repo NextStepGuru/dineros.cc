@@ -172,6 +172,7 @@ describe("listStore", () => {
     };
     const mockApi = vi.fn().mockResolvedValue(mockData);
     vi.stubGlobal("useNuxtApp", vi.fn(() => ({ $api: mockApi })));
+    vi.stubGlobal("useAppFetch", vi.fn(() => mockApi));
 
     await store.fetchLists();
 
@@ -183,6 +184,7 @@ describe("listStore", () => {
     const store = useListStore();
     const mockApi = vi.fn().mockRejectedValue(new Error("Network error"));
     vi.stubGlobal("useNuxtApp", vi.fn(() => ({ $api: mockApi })));
+    vi.stubGlobal("useAppFetch", vi.fn(() => mockApi));
 
     await expect(store.fetchLists()).rejects.toThrow("Network error");
     expect(store.getIsListsLoading).toBe(false);

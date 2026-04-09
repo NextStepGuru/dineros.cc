@@ -186,11 +186,12 @@ export const useListStore = defineStore("listStore", {
         this.reoccurrences.push(reoccurrence);
       }
     },
-    async fetchLists() {
+    async fetchLists(ssrRequestFetch?: typeof $fetch) {
       this.isLoading = true;
-      // Use $api (not useAPI) when called after mount to avoid Nuxt 4 useFetch warning
+      // Pass useRequestFetch from initStore on SSR; calling useRequestFetch inside Pinia has no request context.
       try {
-        const data = await (useNuxtApp().$api as typeof $fetch)<Lists>("/api/lists");
+        const $f = ssrRequestFetch ?? useAppFetch();
+        const data = await $f<Lists>("/api/lists");
         if (data) {
           this.setReoccurrences(data.reoccurrences);
           this.setIntervals(data.intervals);
