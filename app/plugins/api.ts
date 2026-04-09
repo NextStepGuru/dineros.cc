@@ -17,14 +17,14 @@ export default defineNuxtPlugin((nuxtApp) => {
           }
         },
         async onResponseError({ response }) {
-          if (response.status === 401) {
+          if (response.status === 401 && import.meta.client) {
             // Run logout within Nuxt context to avoid composable errors
             await nuxtApp.runWithContext(() => {
               authStore.logout();
             });
 
             // Only redirect if we're not already on a public page
-            const currentPath = globalThis.window === undefined ? '/' : globalThis.location.pathname;
+            const currentPath = globalThis.location.pathname;
             const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password-with-code', '/'];
 
             if (!publicRoutes.includes(currentPath)) {

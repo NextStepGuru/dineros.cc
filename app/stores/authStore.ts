@@ -36,16 +36,44 @@ export const useAuthStore = defineStore("authStore", {
     setBudgetId(budgetId: number | string) {
       this.budgetId = +budgetId;
     },
-    async validateLogin() {
+    async validateLogin(ssrRequestFetch?: typeof $fetch) {
       try {
-        const headers =
-          import.meta.server && import.meta.prerender === false
-            ? useRequestHeaders(["cookie"])
-            : undefined;
+        if (import.meta.server && !import.meta.prerender && ssrRequestFetch) {
+          try {
+            const user = await ssrRequestFetch<User>("/api/user");
+            if (user) {
+              this.user = user;
+              this.isLoggedIn = true;
+              return;
+            }
+          } catch (e: unknown) {
+            const err = e as {
+              statusCode?: number;
+              status?: number;
+              response?: { status?: number };
+            };
+            const code =
+              err.statusCode ?? err.status ?? err.response?.status;
+            if (code === 401 || code === 403) {
+              this.isLoggedIn = false;
+              this.token = "";
+              this.user = null;
+              return;
+            }
+            console.log({
+              message: "SSR validateLogin fetch failed:",
+              data: e,
+              level: "warn",
+            });
+          }
+          this.isLoggedIn = false;
+          this.token = "";
+          this.user = null;
+          return;
+        }
 
         const { data: user, error } = await useAPI<User>("/api/user", {
           server: true,
-          headers: headers as Record<string, string> | undefined,
           credentials: "include",
         });
 

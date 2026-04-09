@@ -11,7 +11,7 @@ export function useAPI<T>(
 
   return useFetch(url, {
     ...options,
-    $fetch: useNuxtApp().$api as typeof $fetch,
+    $fetch: useAppFetch(),
     // Default to client-side execution to avoid SSR caching issues
     server: options?.server ?? false,
     // Keep keys stable to preserve dedupe/cache behavior.

@@ -98,7 +98,7 @@ async function completePasswordLoginRedirect(
     readWorkflowModeFromStorage() ?? "forecasting",
   );
   toast.add({ color: "success", description: "Login successful!" });
-  globalThis.location.assign(redirectPath);
+  await navigateTo(redirectPath);
   return true;
 }
 
@@ -257,7 +257,7 @@ async function startPasskeySignIn() {
         readWorkflowModeFromStorage() ?? "forecasting",
       );
       toast.add({ color: "success", description: "Login successful!" });
-      globalThis.location.assign(redirectPath);
+      await navigateTo(redirectPath);
       return;
     }
     toast.add({
