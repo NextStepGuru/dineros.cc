@@ -719,7 +719,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
           ) Clear
           UButton(
             color="secondary"
-            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            v-if="formState.id && (!formState.isProjected || formState.isPending)"
             @click="initiateApply"
             :loading="state.isApplying"
             :disabled="isDisabled || isPlaidTabActive"
@@ -730,7 +730,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
             @click="confirmDelete"
             :loading="state.isDeleting"
             :disabled="isDisabled || isPlaidTabActive || showDeleteConfirm"
-            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            v-if="formState.id && (!formState.isProjected || formState.isPending)"
             class="modal-action-button"
           ) Delete
           UButton(

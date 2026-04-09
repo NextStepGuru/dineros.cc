@@ -390,14 +390,15 @@ input:-webkit-autofill:active {
 }
 
 /*
- * Nuxt UI modal: theme sets position without z-index; the backdrop can paint above
+ * Nuxt UI UModal: theme sets position without z-index; the backdrop can paint above
  * the dialog panel. Keep overlay below and content above (e.g. Forecasting toolbar is z-38).
+ * Scope to dialog overlays / modal dialog content only — not Select menus, Popovers, etc.
  */
-[data-slot="overlay"] {
+[data-slot="overlay"]:not([data-vaul-overlay]) {
   z-index: 40;
 }
 
-[data-slot="content"] {
+[data-slot="content"][role="dialog"][aria-describedby]:not([data-vaul-drawer]) {
   z-index: 50;
 }
 
