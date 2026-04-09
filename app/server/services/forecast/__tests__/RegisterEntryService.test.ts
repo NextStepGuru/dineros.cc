@@ -14,6 +14,7 @@ function minimalAccountRegister(
 ): CacheAccountRegister {
   return {
     id: 1,
+    subAccountRegisterId: null,
     typeId: 1,
     budgetId: 1,
     accountId: "acct-1",
@@ -104,7 +105,7 @@ describe("RegisterEntryService.createEntry", () => {
     });
     const inserted = cache.registerEntry.find({ accountRegisterId: 1 });
     expect(inserted).toHaveLength(1);
-    expect(inserted[0]!.reoccurrenceId).toBeNull();
+    expect(inserted[0]?.reoccurrenceId).toBeNull();
   });
 
   it("preserves a real reoccurrence id when non-zero", () => {
@@ -118,7 +119,7 @@ describe("RegisterEntryService.createEntry", () => {
       reoccurrence: syntheticLoanReoccurrence({ id: 42 }),
     });
     const inserted = cache.registerEntry.find({ accountRegisterId: 1 });
-    expect(inserted[0]!.reoccurrenceId).toBe(42);
+    expect(inserted[0]?.reoccurrenceId).toBe(42);
   });
 
   it("uses explicit reoccurrenceId param when provided (overrides reoccurrence.id)", () => {
@@ -133,7 +134,7 @@ describe("RegisterEntryService.createEntry", () => {
       reoccurrence: syntheticLoanReoccurrence({ id: 0 }),
     });
     const inserted = cache.registerEntry.find({ accountRegisterId: 1 });
-    expect(inserted[0]!.reoccurrenceId).toBe(99);
+    expect(inserted[0]?.reoccurrenceId).toBe(99);
   });
 
   it("stores null when there is no reoccurrence object", () => {
@@ -146,6 +147,6 @@ describe("RegisterEntryService.createEntry", () => {
       forecastDate: future,
     });
     const inserted = cache.registerEntry.find({ accountRegisterId: 1 });
-    expect(inserted[0]!.reoccurrenceId).toBeNull();
+    expect(inserted[0]?.reoccurrenceId).toBeNull();
   });
 });

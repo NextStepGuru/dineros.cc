@@ -17,9 +17,30 @@ import { calculateNextOccurrenceDate } from "./reoccurrenceIntervals";
 
 const { Prisma } = prismaPkg;
 
+function persisterBudgetField(
+  budgetId?: number | null,
+): { budgetId: number } | Record<string, never> {
+  if (budgetId === undefined || budgetId === null) {
+    return {};
+  }
+  return { budgetId };
+}
+
+function persisterRegisterWhere(
+  accountId: string,
+  budgetId?: number | null,
+) {
+  return {
+    register: {
+      accountId,
+      ...persisterBudgetField(budgetId),
+    },
+  };
+}
+
 export class DataPersisterService implements IDataPersisterService {
-  private rateLimiter: DatabaseRateLimiter;
-  private db: PrismaClient;
+  private readonly rateLimiter: DatabaseRateLimiter;
+  private readonly db: PrismaClient;
 
   constructor(db: PrismaClient) {
     this.db = db;
@@ -73,25 +94,27 @@ export class DataPersisterService implements IDataPersisterService {
           ? row.proposedLastRunAt
           : null;
       let finalLastAt = row.existingLastAt;
-      if (
-        candidateFromExisting &&
-        (!finalLastAt ||
+      if (candidateFromExisting) {
+        const takeCandidate =
+          finalLastAt === null ||
           dateTimeService.isAfter(
             dateTimeService.createUTC(candidateFromExisting),
-            dateTimeService.createUTC(finalLastAt)
-          ))
-      ) {
-        finalLastAt = candidateFromExisting;
+            dateTimeService.createUTC(finalLastAt),
+          );
+        if (takeCandidate) {
+          finalLastAt = candidateFromExisting;
+        }
       }
-      if (
-        proposedPastRunAt &&
-        (!finalLastAt ||
+      if (proposedPastRunAt) {
+        const takeProposed =
+          finalLastAt === null ||
           dateTimeService.isAfter(
             dateTimeService.createUTC(proposedPastRunAt),
-            dateTimeService.createUTC(finalLastAt)
-          ))
-      ) {
-        finalLastAt = proposedPastRunAt;
+            dateTimeService.createUTC(finalLastAt),
+          );
+        if (takeProposed) {
+          finalLastAt = proposedPastRunAt;
+        }
       }
       return {
         id: row.id,
@@ -108,7 +131,7 @@ export class DataPersisterService implements IDataPersisterService {
     );
     const idList = rows.map((r) => Prisma.sql`${r.id}`);
 
-    await (db as PrismaClient).$executeRaw(
+    await db.$executeRaw(
       Prisma.sql`UPDATE reoccurrence SET last_at = CASE id ${Prisma.join(lastAtCases, " ")} END, updated_at = CASE id ${Prisma.join(updatedAtCases, " ")} END WHERE id IN (${Prisma.join(idList)})`
     );
   }
@@ -120,7 +143,9 @@ export class DataPersisterService implements IDataPersisterService {
     intervalName: string | null | undefined,
     nowMoment: ReturnType<typeof dateTimeService.createUTC>
   ): Date | null {
-    if (!existingLastAt) return null;
+    if (existingLastAt === null) {
+      return null;
+    }
     let lastRun = dateTimeService.toDate(existingLastAt);
     let nextRun = calculateNextOccurrenceDate({
       lastAt: lastRun,
@@ -154,7 +179,9 @@ export class DataPersisterService implements IDataPersisterService {
     const idMap = new Map<string, string>();
     const insertData = results.map((item) => {
       const newId = item.isBalanceEntry ? item.id : createId();
-      if (!item.isBalanceEntry) idMap.set(item.id, newId);
+      if (item.isBalanceEntry !== true) {
+        idMap.set(item.id, newId);
+      }
       return {
         ...item,
         createdAt: dateTimeService
@@ -210,7 +237,7 @@ export class DataPersisterService implements IDataPersisterService {
     );
     const idList = accountRegisters.map((r) => Prisma.sql`${r.id}`);
 
-    await (db as PrismaClient).$executeRaw(
+    await db.$executeRaw(
       Prisma.sql`UPDATE account_register SET latest_balance = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
     );
 
@@ -231,7 +258,7 @@ export class DataPersisterService implements IDataPersisterService {
     );
     const idList = updates.map((u) => Prisma.sql`${u.id}`);
 
-    await (db as PrismaClient).$executeRaw(
+    await db.$executeRaw(
       Prisma.sql`UPDATE account_register SET statement_at = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
     );
 
@@ -261,12 +288,101 @@ export class DataPersisterService implements IDataPersisterService {
     );
     const idList = idBalancePairs.map((p) => Prisma.sql`${p.id}`);
 
-    await (db as PrismaClient).$executeRaw(
+    await db.$executeRaw(
       Prisma.sql`UPDATE register_entry SET balance = CASE id ${Prisma.join(caseParts, " ")} END WHERE id IN (${Prisma.join(idList)})`
     );
 
     forecastLogger.info(
       `[DataPersisterService] Updated balance for ${idBalancePairs.length} register entries (bulk)`
+    );
+  }
+
+  async autoApplyPastPocketEntries(
+    pocketRegisterIds: number[],
+    tx?: ForecastTransactionClient,
+  ): Promise<void> {
+    if (pocketRegisterIds.length === 0) return;
+
+    const db = this.client(tx);
+    const now = dateTimeService.toDate(dateTimeService.now());
+
+    const pocketWhere = {
+      accountRegisterId: { in: pocketRegisterIds },
+      createdAt: { lte: now },
+      isCleared: false,
+      isBalanceEntry: false,
+    };
+
+    const pocketSums = await db.registerEntry.groupBy({
+      by: ["accountRegisterId"],
+      where: pocketWhere,
+      _sum: { amount: true },
+    });
+
+    if (pocketSums.length > 0) {
+      await db.registerEntry.updateMany({
+        where: pocketWhere,
+        data: {
+          isCleared: true,
+          isProjected: false,
+          isPending: false,
+          hasBalanceReCalc: true,
+        },
+      });
+
+      for (const row of pocketSums) {
+        const delta = Number(row._sum.amount ?? 0);
+        if (delta === 0) continue;
+        await db.accountRegister.update({
+          where: { id: row.accountRegisterId },
+          data: {
+            balance: { increment: delta },
+            latestBalance: { increment: delta },
+          },
+        });
+      }
+    }
+
+    const transferWhere = {
+      sourceAccountRegisterId: { in: pocketRegisterIds },
+      accountRegisterId: { notIn: pocketRegisterIds },
+      createdAt: { lte: now },
+      isCleared: false,
+      isBalanceEntry: false,
+    };
+
+    const transferSums = await db.registerEntry.groupBy({
+      by: ["accountRegisterId"],
+      where: transferWhere,
+      _sum: { amount: true },
+    });
+
+    if (transferSums.length > 0) {
+      await db.registerEntry.updateMany({
+        where: transferWhere,
+        data: {
+          isCleared: true,
+          isProjected: false,
+          isPending: false,
+          hasBalanceReCalc: true,
+        },
+      });
+
+      for (const row of transferSums) {
+        const delta = Number(row._sum.amount ?? 0);
+        if (delta === 0) continue;
+        await db.accountRegister.update({
+          where: { id: row.accountRegisterId },
+          data: {
+            balance: { increment: delta },
+            latestBalance: { increment: delta },
+          },
+        });
+      }
+    }
+
+    forecastLogger.info(
+      `[DataPersisterService] autoApplyPastPocketEntries: pockets=${pocketSums.length} register(s), transfer partners=${transferSums.length} register(s)`
     );
   }
 
@@ -276,23 +392,18 @@ export class DataPersisterService implements IDataPersisterService {
     budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
-    const now = dateTimeService.toDateFromInput(dateTimeService.now());
+    const now = dateTimeService.toDate(dateTimeService.now());
     forecastLogger.info(
-      `[DataPersisterService] Current date for conversion: ${dateTimeService.formatDate(
+      `[DataPersisterService] Current date for conversion: ${dateTimeService.format(
+        "YYYY-MM-DD",
         now,
-        "YYYY-MM-DD"
-      )}`
+      )}`,
     );
 
     const registerScope =
-      accountId != null
-        ? {
-            register: {
-              accountId,
-              ...(budgetId != null ? { budgetId } : {}),
-            },
-          }
-        : {};
+      accountId === undefined || accountId === null
+        ? {}
+        : persisterRegisterWhere(accountId, budgetId);
 
     const updateResult = await db.registerEntry.updateMany({
       data: { isPending: true },
@@ -336,14 +447,9 @@ export class DataPersisterService implements IDataPersisterService {
     const db = this.client(tx);
     await db.registerEntry.deleteMany({
       where: {
-        ...(accountId != null
-          ? {
-              register: {
-                accountId,
-                ...(budgetId != null ? { budgetId } : {}),
-              },
-            }
-          : {}),
+        ...(accountId === undefined || accountId === null
+          ? {}
+          : persisterRegisterWhere(accountId, budgetId)),
         isProjected: true,
         isPending: false,
         isManualEntry: false,
@@ -359,14 +465,9 @@ export class DataPersisterService implements IDataPersisterService {
     const db = this.client(tx);
     await db.registerEntry.deleteMany({
       where: {
-        ...(accountId != null
-          ? {
-              register: {
-                accountId,
-                ...(budgetId != null ? { budgetId } : {}),
-              },
-            }
-          : {}),
+        ...(accountId === undefined || accountId === null
+          ? {}
+          : persisterRegisterWhere(accountId, budgetId)),
         isBalanceEntry: true,
         amount: 0,
         isProjected: false,
@@ -380,37 +481,41 @@ export class DataPersisterService implements IDataPersisterService {
     budgetId?: number,
   ): Promise<void> {
     const db = this.client(tx);
-    const now = dateTimeService.toDateFromInput(
-      dateTimeService.setDateUnits(dateTimeService.now(), {
-        hour: 0,
-        minute: 0,
-        second: 0,
-        milliseconds: 0,
-      })
+    const now = dateTimeService.toDate(
+      dateTimeService.set(
+        {
+          hour: 0,
+          minute: 0,
+          second: 0,
+          milliseconds: 0,
+        },
+        dateTimeService.now(),
+      ),
     );
 
-    if (accountId) {
-      if (budgetId != null) {
-        await (db as PrismaClient).$executeRaw(
-          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId} AND ar.budget_id = ${budgetId}`,
-        );
-      } else {
-        await (db as PrismaClient).$executeRaw(
-          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`,
-        );
-      }
-    } else {
+    if (accountId === undefined || accountId === null) {
       const accountRows = await db.accountRegister.findMany({
         select: { accountId: true },
         distinct: ["accountId"],
       });
-      const rows = Array.isArray(accountRows) ? accountRows : [];
-      for (const { accountId: id } of rows) {
-        await (db as PrismaClient).$executeRaw(
-          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${id}`
+      for (const { accountId: id } of accountRows) {
+        await db.$executeRaw(
+          Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${id}`,
         );
       }
+      return;
     }
+
+    if (budgetId === undefined || budgetId === null) {
+      await db.$executeRaw(
+        Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId}`,
+      );
+      return;
+    }
+
+    await db.$executeRaw(
+      Prisma.sql`UPDATE register_entry re INNER JOIN account_register ar ON re.account_register_id = ar.id SET re.is_pending = (re.created_at <= ${now}) WHERE re.is_cleared = 0 AND (re.is_projected = 1 OR re.is_manual_entry = 1) AND ar.account_id = ${accountId} AND ar.budget_id = ${budgetId}`,
+    );
   }
 
   async cleanupProjectedEntriesByAccount(
@@ -450,7 +555,7 @@ export class DataPersisterService implements IDataPersisterService {
           await db.accountRegister.findMany({
             where: {
               accountId,
-              ...(budgetId != null ? { budgetId } : {}),
+              ...persisterBudgetField(budgetId),
             },
             select: { id: true },
           })
@@ -505,14 +610,9 @@ export class DataPersisterService implements IDataPersisterService {
     balance: number;
   }> {
     const registerFilter =
-      accountId != null
-        ? {
-            register: {
-              accountId,
-              ...(budgetId != null ? { budgetId } : {}),
-            },
-          }
-        : {};
+      accountId === undefined || accountId === null
+        ? {}
+        : persisterRegisterWhere(accountId, budgetId);
     const [projected, pending, manual, balance] = await Promise.all([
       this.db.registerEntry.count({
         where: {

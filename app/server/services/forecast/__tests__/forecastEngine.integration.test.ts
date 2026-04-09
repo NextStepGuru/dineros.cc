@@ -50,6 +50,7 @@ const mockDb = {
     createMany: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
+    groupBy: vi.fn().mockResolvedValue([]),
     count: vi.fn(),
     create: vi.fn(),
   },
@@ -78,6 +79,7 @@ function setupMockData() {
     return Promise.resolve([
       {
         id: 1,
+        subAccountRegisterId: null,
         budgetId: 1,
         accountId: "test-account-123",
         name: "Checking Account",
@@ -106,6 +108,7 @@ function setupMockData() {
       },
       {
         id: 2,
+        subAccountRegisterId: null,
         budgetId: 1,
         accountId: "test-account-123",
         name: "Credit Card",
@@ -756,6 +759,81 @@ describe("ForecastEngine Integration Tests", () => {
 
       // 100 queries should be very fast
       expect(queryTime).toBeLessThan(10);
+    });
+  });
+
+  describe("Pocket auto-apply on recalculate", () => {
+    it("calls registerEntry.groupBy for pocket registers after persist", async () => {
+      mockDb.accountRegister.findMany.mockResolvedValue([
+        {
+          id: 1,
+          subAccountRegisterId: null,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "Checking Account",
+          balance: 1000,
+          latestBalance: 1000,
+          minPayment: null,
+          statementAt: dateTimeService.add(1, "month").toDate(),
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: 1,
+          savingsGoalSortOrder: 0,
+          minAccountBalance: 500,
+          allowExtraPayment: true,
+          isArchived: false,
+          typeId: 1,
+          plaidId: null,
+          type: { accruesBalanceGrowth: false },
+        },
+        {
+          id: 3,
+          subAccountRegisterId: 1,
+          budgetId: 1,
+          accountId: "test-account-123",
+          name: "Pocket",
+          balance: 0,
+          latestBalance: 0,
+          minPayment: null,
+          statementAt: dateTimeService.add(1, "month").toDate(),
+          apr1: null,
+          apr1StartAt: null,
+          apr2: null,
+          apr2StartAt: null,
+          apr3: null,
+          apr3StartAt: null,
+          targetAccountRegisterId: null,
+          loanStartAt: null,
+          loanPaymentsPerYear: null,
+          loanTotalYears: null,
+          loanOriginalAmount: null,
+          loanPaymentSortOrder: 1,
+          savingsGoalSortOrder: 0,
+          minAccountBalance: 0,
+          allowExtraPayment: false,
+          isArchived: false,
+          typeId: 1,
+          plaidId: null,
+          type: { accruesBalanceGrowth: false },
+        },
+      ]);
+
+      await engine.recalculate(testContext);
+
+      expect(mockDb.registerEntry.groupBy).toHaveBeenCalled();
+      const pocketCalls = vi.mocked(mockDb.registerEntry.groupBy).mock.calls.filter(
+        (call) => call[0]?.where?.accountRegisterId?.in?.includes(3),
+      );
+      expect(pocketCalls.length).toBeGreaterThan(0);
     });
   });
 });

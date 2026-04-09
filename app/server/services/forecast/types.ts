@@ -135,6 +135,11 @@ export interface IDataPersisterService {
     calculatedEntries: CacheRegisterEntry[],
     tx?: ForecastTransactionClient
   ): Promise<void>;
+  /** Auto-apply past uncleared entries on pocket registers and transfer partners (recalculate only). */
+  autoApplyPastPocketEntries(
+    pocketRegisterIds: number[],
+    tx?: ForecastTransactionClient,
+  ): Promise<void>;
   batchUpdateStatementDates(
     updates: { id: number; statementAt: Date }[],
     tx?: ForecastTransactionClient

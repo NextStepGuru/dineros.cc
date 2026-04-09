@@ -19,6 +19,7 @@ describe("ModernCacheService", () => {
     it("should insert and find account registers", () => {
       const account: CacheAccountRegister = {
         id: 1,
+        subAccountRegisterId: null,
         typeId: 1,
         budgetId: 1,
         accountId: "test-account",
@@ -67,6 +68,7 @@ describe("ModernCacheService", () => {
     it("should update account registers", () => {
       const account: CacheAccountRegister = {
         id: 1,
+        subAccountRegisterId: null,
         typeId: 1,
         budgetId: 1,
         accountId: "test-account",
@@ -111,12 +113,13 @@ describe("ModernCacheService", () => {
       cache.accountRegister.update(updatedAccount);
 
       const found = cache.accountRegister.find({ id: 1 });
-      expect(found[0]!.balance).toBe(1500);
+      expect(found[0]?.balance).toBe(1500);
     });
 
     it("should remove account registers", () => {
       const account: CacheAccountRegister = {
         id: 1,
+        subAccountRegisterId: null,
         typeId: 1,
         budgetId: 1,
         accountId: "test-account",
@@ -217,7 +220,7 @@ describe("ModernCacheService", () => {
       cache.registerEntry.update(updatedEntry);
 
       const found = cache.registerEntry.find({ id: "test-entry" });
-      expect(found[0]!.amount).toBe(150);
+      expect(found[0]?.amount).toBe(150);
     });
 
     it("should remove register entries", () => {
@@ -298,7 +301,7 @@ describe("ModernCacheService", () => {
       cache.reoccurrence.update(updatedReoccurrence);
 
       const found = cache.reoccurrence.find({ id: 1 });
-      expect(found[0]!.amount).toBe(150);
+      expect(found[0]?.amount).toBe(150);
     });
 
     it("should remove reoccurrences", () => {
@@ -359,7 +362,7 @@ describe("ModernCacheService", () => {
       cache.reoccurrenceSkip.update(updatedSkip);
 
       const found = cache.reoccurrenceSkip.find({ id: 1 });
-      expect(found[0]!.skippedAt).toBe("2024-01-02");
+      expect(found[0]?.skippedAt).toBe("2024-01-02");
     });
 
     it("should remove reoccurrence skips", () => {
@@ -384,6 +387,7 @@ describe("ModernCacheService", () => {
       // Insert some data
       const account: CacheAccountRegister = {
         id: 1,
+        subAccountRegisterId: null,
         typeId: 1,
         budgetId: 1,
         accountId: "test-account",
@@ -459,6 +463,7 @@ describe("ModernCacheService", () => {
       // Insert some data
       const account: CacheAccountRegister = {
         id: 1,
+        subAccountRegisterId: null,
         typeId: 1,
         budgetId: 1,
         accountId: "test-account",

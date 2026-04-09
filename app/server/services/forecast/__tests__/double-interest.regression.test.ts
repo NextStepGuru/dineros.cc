@@ -14,6 +14,7 @@ const dt = (input?: any) => dateTimeService.create(input);
 /** CacheAccountRegister fields not exercised by these tests (savings/credit interest timing). */
 const REGRESSION_REGISTER_DEFAULTS: Pick<
   CacheAccountRegister,
+  | "subAccountRegisterId"
   | "depreciationRate"
   | "depreciationMethod"
   | "assetOriginalValue"
@@ -24,6 +25,7 @@ const REGRESSION_REGISTER_DEFAULTS: Pick<
   | "interestCategoryId"
   | "accruesBalanceGrowth"
 > = {
+  subAccountRegisterId: null,
   depreciationRate: null,
   depreciationMethod: null,
   assetOriginalValue: null,

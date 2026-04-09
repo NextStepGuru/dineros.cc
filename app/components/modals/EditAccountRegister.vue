@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { nextTick } from "vue";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import {
   handleError,
   formatCurrencyOptions,
+  formatAccountRegisters,
 } from "~/lib/utils";
 import { formatMoneyUsd } from "~/lib/bankers-rounding";
 import {
   bumpCashDenomCount,
-  CASH_DENOM_CONFIG,
+  CASH_DENOM_CONFIG as cashDenomConfig,
   subtotalForCashDenom,
   totalDollarsFromCashCounts,
   ZERO_CASH_COUNTS,
@@ -21,6 +23,9 @@ import {
   vehicleValueEstimateAiResultSchema,
 } from "~/schema/zod";
 import type { AccountRegister } from "~/types/types";
+
+/** Script alias so linters see template use of cash denomination metadata. */
+const CASH_DENOM_CONFIG = cashDenomConfig;
 
 type VehicleDetailsForm = {
   year: number;
@@ -95,6 +100,8 @@ export type ModelAccountRegisterProps = {
   title: string;
   description: string;
   accountRegister: AccountRegister;
+  /** When set (e.g. `"cash"`), selects that tab if present for the account type. */
+  initialTab?: string;
   callback: (data: AccountRegister) => void;
   cancel: () => void;
 };
@@ -262,6 +269,8 @@ const persistedAccountIsCashType = computed(() => {
 
 const cashCounts = ref<CashDenomCounts>({ ...ZERO_CASH_COUNTS });
 
+const cashCountsDirty = ref(false);
+
 const cashLoading = ref(false);
 const activeTab = ref<string | number>("account");
 
@@ -275,12 +284,25 @@ function resetCashCounts() {
 
 function syncCashBalanceFromCounts() {
   if (!isSelectedAccountTypeCash.value) return;
+  if (cashLoading.value) return;
   const t = cashTotal.value;
-  formState.value.balance = t;
-  formState.value.latestBalance = t;
+  if (t > 0) {
+    formState.value.balance = t;
+    formState.value.latestBalance = t;
+    return;
+  }
+  if (cashCountsDirty.value) {
+    formState.value.balance = 0;
+    formState.value.latestBalance = 0;
+  }
+}
+
+function markCashCountsUserEdited() {
+  cashCountsDirty.value = true;
 }
 
 function bumpCashCount(key: CashDenomKey, delta: number) {
+  cashCountsDirty.value = true;
   bumpCashDenomCount(cashCounts, key, delta);
 }
 
@@ -308,7 +330,6 @@ async function loadCashOnHand(registerId: number) {
       fifties: res.fifties,
       hundreds: res.hundreds,
     };
-    syncCashBalanceFromCounts();
   } catch {
     toast.add({
       color: "error",
@@ -388,12 +409,25 @@ const tabItems = computed((): AccountRegisterTabItem[] => {
 });
 
 watch(
-  [cashCounts, isSelectedAccountTypeCash],
+  [cashCounts, isSelectedAccountTypeCash, cashLoading],
   () => {
     syncCashBalanceFromCounts();
   },
   { deep: true },
 );
+
+const cashAccountBalanceDisplay = computed(() => {
+  if (!isSelectedAccountTypeCash.value) {
+    return formatMoneyUsd(formState.value.balance);
+  }
+  if (cashLoading.value) {
+    return formatMoneyUsd(formState.value.balance);
+  }
+  if (cashTotal.value > 0 || cashCountsDirty.value) {
+    return formatMoneyUsd(cashTotal.value);
+  }
+  return formatMoneyUsd(formState.value.balance);
+});
 
 watch([activeTab, tabItems], () => {
   const valid = new Set(
@@ -571,7 +605,15 @@ const loanPaymentsPerYearItems = [
   { id: 52, name: "52 (Weekly)" },
 ];
 
-watch(props, () => {
+function applyInitialTabFromProps() {
+  const want = props.initialTab ?? "account";
+  const valid = new Set(
+    tabItems.value.map((i) => i.value as string | number),
+  );
+  activeTab.value = valid.has(want) ? want : "account";
+}
+
+function applyPropsToFormAndTab() {
   formState.value = normalizeAccountRegisterState(props.accountRegister);
   Object.assign(
     vehicleDetailsLocal,
@@ -581,19 +623,29 @@ watch(props, () => {
     ),
   );
   lastVehicleEstimate.value = null;
-  activeTab.value = "account";
+  cashCountsDirty.value = false;
   resetCashCounts();
   const t = listStore.getAccountTypes.find(
     (x) => x.id === formState.value.typeId,
   );
-  if (
+  const loadCash =
     t?.type === "cash" &&
     persistedAccountIsCashType.value &&
-    formState.value.id > 0
-  ) {
-    void loadCashOnHand(formState.value.id);
+    formState.value.id > 0;
+  if (loadCash) {
+    loadCashOnHand(formState.value.id).finally(() => {
+      nextTick(applyInitialTabFromProps);
+    });
+    return;
   }
-});
+  nextTick(applyInitialTabFromProps);
+}
+
+watch(
+  [() => props.accountRegister, () => props.initialTab],
+  applyPropsToFormAndTab,
+  { deep: true, immediate: true },
+);
 
 watch(
   vehicleDetailsLocal,
@@ -723,6 +775,7 @@ watch(
       if (formState.value.id > 0 && persistedAccountIsCashType.value) {
         void loadCashOnHand(formState.value.id);
       } else {
+        cashCountsDirty.value = false;
         resetCashCounts();
         syncCashBalanceFromCounts();
       }
@@ -788,39 +841,73 @@ const collateralAssetSelectItems = computed(() => {
   return items;
 });
 
+/** Master account options for Pocket (type 15); include current parent if filtered out of `formatAccountRegisters`. */
+const pocketParentRegisterSelectItems = computed((): AccountRegister[] => {
+  const regs = listStore.getAccountRegisters;
+  const base = formatAccountRegisters(regs).filter(
+    (register) =>
+      register.typeId !== 15 && register.id !== formState.value.id,
+  );
+  const sid = formState.value.subAccountRegisterId;
+  if (sid == null || sid < 1) return base;
+  if (base.some((r) => r.id === sid)) return base;
+  const parent = regs.find((r) => r.id === sid);
+  if (!parent) return base;
+  return [...base, { ...parent }];
+});
+
+function accountRegisterSubmitErrorMessage(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "An error occurred during account register update.";
+}
+
+async function uploadRegisterCsvIfAny(
+  input: { inputRef?: HTMLInputElement | null } | null | undefined,
+  accountRegisterId: number,
+): Promise<void> {
+  const el = input?.inputRef;
+  const file = el?.files?.[0];
+  if (file === undefined) return;
+  const fileInputData = new FormData();
+  fileInputData.append("fileData", file);
+  fileInputData.append("accountRegisterId", String(accountRegisterId));
+  await $api("/api/upload-file", {
+    method: "POST",
+    body: fileInputData,
+  });
+}
+
 async function handleSubmit({
   data: formData,
 }: FormSubmitEvent<AccountRegister>) {
-  try {
-    if (
-      isSelectedAccountTypeCash.value &&
-      formState.value.id > 0 &&
-      cashLoading.value
-    ) {
-      return;
-    }
+  const blockCashWhileLoading =
+    isSelectedAccountTypeCash.value &&
+    formState.value.id > 0 &&
+    cashLoading.value;
+  if (blockCashWhileLoading) {
+    return;
+  }
 
+  try {
     isSaving.value = true;
 
-    if (isSelectedAccountTypeCash.value) {
-      syncCashBalanceFromCounts();
+    const cashUseBillTotal =
+      isSelectedAccountTypeCash.value &&
+      (cashCountsDirty.value || cashTotal.value > 0);
+
+    await uploadRegisterCsvIfAny(fileInput?.value, formData.id);
+
+    let balanceForPayload = formData.balance;
+    if (isSelectedAccountTypeCash.value && cashUseBillTotal) {
+      balanceForPayload = cashTotal.value;
     }
-
-    const fileInputData = new FormData();
-    const fileInputs = fileInput?.value?.inputRef as HTMLInputElement;
-    if (fileInputs && fileInputs.files?.[0]) {
-      fileInputData.append("fileData", fileInputs.files[0]);
-      fileInputData.append("accountRegisterId", formData.id.toString());
-
-      await $api("/api/upload-file", {
-        method: "POST",
-        body: fileInputData,
-      });
-    }
-
-    const balanceForPayload = isSelectedAccountTypeCash.value
-      ? cashTotal.value
-      : formData.balance;
     const payload = {
       ...formData,
       balance: balanceForPayload,
@@ -834,48 +921,42 @@ async function handleSubmit({
       },
     }).catch((error) => handleError(error, toast));
 
-    if (!responseData) {
-      isSaving.value = false;
-      toast.add({
-        color: "error",
-        description: "Failed to update account register.",
-      });
+    if (responseData) {
+      formState.value = accountRegisterSchema.parse(responseData);
+      props.callback(formState.value);
 
+      const persistCashCounts =
+        isSelectedAccountTypeCash.value &&
+        formState.value.id > 0 &&
+        cashUseBillTotal;
+      if (persistCashCounts) {
+        try {
+          await saveCashOnHand(formState.value.id);
+        } catch (e) {
+          handleError(e, toast);
+          isSaving.value = false;
+          return;
+        }
+      }
+
+      toast.add({
+        color: "success",
+        description: "Updated account register successfully.",
+      });
+      isSaving.value = false;
+      props.cancel();
       return;
     }
 
-    formState.value = accountRegisterSchema.parse(responseData);
-
-    props.callback(formState.value);
-
-    if (isSelectedAccountTypeCash.value && formState.value.id > 0) {
-      try {
-        await saveCashOnHand(formState.value.id);
-      } catch (e) {
-        handleError(e, toast);
-        isSaving.value = false;
-        return;
-      }
-    }
-
-    toast.add({
-      color: "success",
-      description: "Updated account register successfully.",
-    });
-
     isSaving.value = false;
-
-    props.cancel();
+    toast.add({
+      color: "error",
+      description: "Failed to update account register.",
+    });
   } catch (error) {
     toast.add({
       color: "error",
-      description:
-        error &&
-        typeof error === "object" &&
-        "message" in error &&
-        typeof error.message === "string"
-          ? error.message
-          : "An error occurred during account register update.",
+      description: accountRegisterSubmitErrorMessage(error),
     });
   }
   isSaving.value = false;
@@ -973,7 +1054,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
               USelect(v-model="formState.subAccountRegisterId"
                 class="w-full"
                 placeholder="Select a Sub Account"
-                :items="formatAccountRegisters(listStore.getAccountRegisters).filter(register => register.typeId !== 15 && register.id !== formState.id)"
+                :items="pocketParentRegisterSelectItems"
                 valueKey="id"
                 labelKey="name")
 
@@ -983,7 +1064,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
             template(v-if="isSelectedAccountTypeCash")
               UFormField(label="Account balance" name="balance" hint="Total from bill counts on the Cash Count tab")
                 UInput(
-                  :model-value="formatMoneyUsd(cashTotal)"
+                  :model-value="cashAccountBalanceDisplay"
                   type="text"
                   readonly
                   disabled
@@ -1027,6 +1108,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                     :step="1"
                     class="w-24"
                     :disabled="isSaving || isDeleting || cashLoading"
+                    @update:model-value="markCashCountsUserEdited"
                   )
                   UButton(
                     color="neutral"

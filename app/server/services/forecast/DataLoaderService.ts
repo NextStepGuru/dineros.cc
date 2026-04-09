@@ -7,6 +7,37 @@ import type {
 } from "./ModernCacheService";
 import { dateTimeService } from "./DateTimeService";
 
+function budgetIdWhere(
+  budgetId?: number | null,
+): { budgetId: number } | Record<string, never> {
+  if (budgetId === undefined || budgetId === null) {
+    return {};
+  }
+  return { budgetId };
+}
+
+function registerBudgetWhere(
+  budgetId?: number | null,
+):
+  | { register: { budgetId: number } }
+  | Record<string, never> {
+  if (budgetId === undefined || budgetId === null) {
+    return {};
+  }
+  return { register: { budgetId } };
+}
+
+function reoccurrenceSkipBudgetWhere(
+  budgetId?: number | null,
+):
+  | { reoccurrence: { register: { budgetId: number } } }
+  | Record<string, never> {
+  if (budgetId === undefined || budgetId === null) {
+    return {};
+  }
+  return { reoccurrence: { register: { budgetId } } };
+}
+
 export class DataLoaderService implements IDataLoaderService {
   private readonly db: PrismaClient;
   private readonly cache: ModernCacheService;
@@ -45,7 +76,10 @@ export class DataLoaderService implements IDataLoaderService {
     const minReoccurrenceDate = (() => {
       const dates = reoccurrences
         .map((r) => r.lastAt)
-        .filter((d): d is NonNullable<typeof d> => d != null);
+        .filter(
+          (d): d is NonNullable<typeof d> =>
+            d !== undefined && d !== null,
+        );
       if (dates.length === 0) return null;
       const minEpoch = Math.min(
         ...dates.map((d) => dateTimeService.createUTC(d).valueOf()),
@@ -69,10 +103,11 @@ export class DataLoaderService implements IDataLoaderService {
     const accountRegisters = await this.db.accountRegister.findMany({
       where: {
         accountId,
-        ...(budgetId != null ? { budgetId } : {}),
+        ...budgetIdWhere(budgetId),
       },
       select: {
         id: true,
+        subAccountRegisterId: true,
         budgetId: true,
         accountId: true,
         name: true,
@@ -173,7 +208,7 @@ export class DataLoaderService implements IDataLoaderService {
       where: {
         register: {
           accountId,
-          ...(budgetId != null ? { budgetId } : {}),
+          ...budgetIdWhere(budgetId),
         },
         isCleared: false, // Exclude cleared entries from active calculations
         OR: [
@@ -208,9 +243,7 @@ export class DataLoaderService implements IDataLoaderService {
     const reoccurrences = await this.db.reoccurrence.findMany({
       where: {
         accountId,
-        ...(budgetId != null
-          ? { register: { budgetId } }
-          : {}),
+        ...registerBudgetWhere(budgetId),
       },
       include: {
         interval: { select: { name: true } },
@@ -246,13 +279,7 @@ export class DataLoaderService implements IDataLoaderService {
     const reoccurrenceSkips = await this.db.reoccurrenceSkip.findMany({
       where: {
         accountId,
-        ...(budgetId != null
-          ? {
-              reoccurrence: {
-                register: { budgetId },
-              },
-            }
-          : {}),
+        ...reoccurrenceSkipBudgetWhere(budgetId),
       },
     });
 
@@ -278,9 +305,7 @@ export class DataLoaderService implements IDataLoaderService {
       where: {
         reoccurrence: {
           accountId,
-          ...(budgetId != null
-            ? { register: { budgetId } }
-            : {}),
+          ...registerBudgetWhere(budgetId),
         },
       },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -305,7 +330,7 @@ export class DataLoaderService implements IDataLoaderService {
       where: {
         accountId,
         isArchived: false,
-        ...(budgetId != null ? { budgetId } : {}),
+        ...budgetIdWhere(budgetId),
       },
       orderBy: { sortOrder: "asc" },
     });
