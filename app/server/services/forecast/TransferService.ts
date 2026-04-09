@@ -237,6 +237,48 @@ export class TransferService implements ITransferService {
   }
 
   /**
+   * Estimate net outflows from scheduled reoccurrences that will hit
+   * `accountRegisterId` between (afterDate, endDate].
+   * Only counts negative amounts (expenses/transfers out). Returns a non-positive number.
+   */
+  private estimateUpcomingReoccurrenceOutflows(
+    accountRegisterId: number,
+    afterDate: Date,
+    endDate: Date,
+  ): number {
+    const afterEpoch = dateTimeService.endOfDay(afterDate).valueOf();
+    const endEpoch = dateTimeService.endOfDay(endDate).valueOf();
+    const reoccurrences = this.cache.reoccurrence.find(
+      (r) => r.accountRegisterId === accountRegisterId,
+    );
+    let totalOutflow = 0;
+    for (const r of reoccurrences) {
+      const amt = Number(r.amount);
+      if (amt >= 0) continue;
+      if (r.lastAt == null) continue;
+      const approxMonthly = this.estimateMonthlyOccurrences(r);
+      const windowDays = Math.max(0, (endEpoch - afterEpoch) / 86_400_000);
+      totalOutflow += amt * approxMonthly * (windowDays / 30);
+    }
+    return totalOutflow;
+  }
+
+  private estimateMonthlyOccurrences(r: { intervalId: number; intervalCount: number }): number {
+    const count = Math.max(1, r.intervalCount);
+    switch (r.intervalId) {
+      case 1: return 30 / count;       // daily
+      case 2: return 4.33 / count;     // weekly
+      case 3: return 2.17 / count;     // bi-weekly
+      case 4: return 2;                // twice-monthly
+      case 5: return 1 / count;        // monthly
+      case 6: return 1 / (count * 3);  // quarterly
+      case 7: return 1 / (count * 6);  // semi-annual
+      case 8: return 1 / (count * 12); // annual
+      default: return 1 / count;
+    }
+  }
+
+  /**
    * Minimum projected balance over [fromDate - daysBack, fromDate + daysForward] (inclusive).
    * Used so extra debt payment never drives the account below min in that window.
    * For the fromDate day (offset 0), todayBalanceOverride is used when provided.
@@ -682,48 +724,64 @@ export class TransferService implements ITransferService {
     }
 
     for (const sourceAccount of sourceAccounts) {
-      const goals = this.cache.savingsGoal.find(
-        (g) =>
-          g.sourceAccountRegisterId === sourceAccount.id &&
-          g.priorityOverDebt === true,
-      );
-      if (goals.length === 0) continue;
+      this.fundHighPriorityGoalsForAccount(sourceAccount, targetDate);
+    }
+  }
 
-      const sorted = [...goals].sort((a, b) => a.sortOrder - b.sortOrder);
-      let projectedBalance = this.calculateProjectedBalanceAtDate(
-        sourceAccount.id,
+  private fundHighPriorityGoalsForAccount(
+    sourceAccount: CacheAccountRegister,
+    targetDate: Date,
+  ): void {
+    const goals = this.cache.savingsGoal.find(
+      (g) =>
+        g.sourceAccountRegisterId === sourceAccount.id &&
+        g.priorityOverDebt === true,
+    );
+    if (goals.length === 0) return;
+
+    const sorted = [...goals].sort((a, b) => a.sortOrder - b.sortOrder);
+    const projectedBalanceToday = this.calculateProjectedBalanceAtDate(
+      sourceAccount.id,
+      targetDate,
+    );
+    const eom = dateTimeService.toDate(
+      dateTimeService.endOf("month", targetDate),
+    );
+    const upcomingOutflows = this.estimateUpcomingReoccurrenceOutflows(
+      sourceAccount.id,
+      targetDate,
+      eom,
+    );
+    let projectedBalance = projectedBalanceToday + upcomingOutflows;
+    const sourceMinBalance = Number(sourceAccount.minAccountBalance ?? 0);
+
+    for (const goal of sorted) {
+      const available = goal.ignoreMinBalance
+        ? projectedBalance
+        : Math.max(0, projectedBalance - sourceMinBalance);
+      if (available <= TransferService.MONEY_EPSILON) break;
+
+      const targetProjected = this.calculateProjectedBalanceAtDate(
+        goal.targetAccountRegisterId,
         targetDate,
       );
-      const sourceMinBalance = Number(sourceAccount.minAccountBalance ?? 0);
+      const remainingToGoal = Math.max(
+        0,
+        goal.targetAmount - targetProjected,
+      );
+      if (remainingToGoal <= TransferService.MONEY_EPSILON) continue;
 
-      for (const goal of sorted) {
-        const available = goal.ignoreMinBalance
-          ? projectedBalance
-          : Math.max(0, projectedBalance - sourceMinBalance);
-        if (available <= TransferService.MONEY_EPSILON) break;
+      const amount = Math.min(available, remainingToGoal);
+      this.transferBetweenAccountsWithDate({
+        targetAccountRegisterId: goal.targetAccountRegisterId,
+        sourceAccountRegisterId: sourceAccount.id,
+        amount,
+        description: `Goal: ${goal.name}`,
+        categoryId: goal.categoryId ?? null,
+        forecastDate: targetDate,
+      });
 
-        const targetProjected = this.calculateProjectedBalanceAtDate(
-          goal.targetAccountRegisterId,
-          targetDate,
-        );
-        const remainingToGoal = Math.max(
-          0,
-          goal.targetAmount - targetProjected,
-        );
-        if (remainingToGoal <= TransferService.MONEY_EPSILON) continue;
-
-        const amount = Math.min(available, remainingToGoal);
-        this.transferBetweenAccountsWithDate({
-          targetAccountRegisterId: goal.targetAccountRegisterId,
-          sourceAccountRegisterId: sourceAccount.id,
-          amount,
-          description: `Goal: ${goal.name}`,
-          categoryId: goal.categoryId ?? null,
-          forecastDate: targetDate,
-        });
-
-        projectedBalance -= amount;
-      }
+      projectedBalance -= amount;
     }
   }
 
@@ -794,11 +852,21 @@ export class TransferService implements ITransferService {
       return false;
     }
 
-    // Calculate the projected balance at the forecast date
-    const projectedBalance = this.calculateProjectedBalanceAtDate(
+    // Calculate the projected balance at the forecast date, capped by 30-day look-ahead
+    // so goal transfers don't overdraw when upcoming expenses haven't been created yet.
+    const projectedBalanceToday = this.calculateProjectedBalanceAtDate(
       sourceAccountId,
       targetDate,
     );
+    const eom = dateTimeService.toDate(
+      dateTimeService.endOf("month", targetDate),
+    );
+    const upcomingOutflows = this.estimateUpcomingReoccurrenceOutflows(
+      sourceAccountId,
+      targetDate,
+      eom,
+    );
+    const projectedBalance = projectedBalanceToday + upcomingOutflows;
 
     forecastLogger.serviceDebug(
       "TransferService",
@@ -807,7 +875,9 @@ export class TransferService implements ITransferService {
         sourceAccountId: sourceAccountRegister.id,
         sourceAccountName: sourceAccountRegister.name,
         currentCacheBalance: sourceAccountRegister.balance,
-        projectedBalanceAtDate: projectedBalance,
+        projectedBalanceAtDate: projectedBalanceToday,
+        upcomingOutflows,
+        effectiveProjectedBalance: projectedBalance,
         targetDate: targetDate.toISOString().split("T")[0],
         minBalance: sourceAccountRegister.minAccountBalance,
       },
