@@ -14,6 +14,14 @@ export const getAccountTypeLabel = (
   return type?.name || "Unknown";
 };
 
+export const isCryptoAccountType = (
+  typeId: number,
+  accountTypes: AccountType[]
+): boolean => {
+  const type = accountTypes.find((t) => t.id === typeId);
+  return type?.registerClass === "crypto";
+};
+
 export const getAccountRegisterLabel = (
   accountRegisterId: number,
   accountRegisters: AccountRegister[]

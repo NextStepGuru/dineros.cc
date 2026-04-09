@@ -2,7 +2,11 @@
 import type { TableColumn } from "@nuxt/ui";
 import type { AccountRegister } from "~/types/types";
 import { useListStore } from "../stores/listStore";
-import { formatDate, getAccountTypeLabel } from "~/lib/utils";
+import {
+  formatDate,
+  getAccountTypeLabel,
+  isCryptoAccountType,
+} from "~/lib/utils";
 import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
 import ModalsEditAccountRegister from "~/components/modals/EditAccountRegister.vue";
@@ -856,8 +860,24 @@ const columns: TableColumn<AccountRegister>[] = [
   {
     accessorKey: "typeId",
     header: () => h("div", {}, "Type"),
-    cell: ({ row }) =>
-      getAccountTypeLabel(row.getValue("typeId"), listStore.getAccountTypes),
+    cell: ({ row }) => {
+      const typeId = row.getValue("typeId") as number;
+      const label = getAccountTypeLabel(typeId, listStore.getAccountTypes);
+      if (!isCryptoAccountType(typeId, listStore.getAccountTypes)) {
+        return label;
+      }
+      return h("div", { class: "flex items-center gap-2 flex-wrap" }, [
+        h("span", label),
+        h(
+          "span",
+          {
+            class:
+              "text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200",
+          },
+          "Crypto",
+        ),
+      ]);
+    },
   },
   {
     accessorKey: "name",
@@ -1757,7 +1777,12 @@ watch(workflowMode, (w) => {
                   role="button"
                   class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                   UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
-              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default") {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+              td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
+                div(class="flex items-center gap-2 flex-wrap")
+                  span {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
+                  span(
+                    v-if="isCryptoAccountType(row.typeId, listStore.getAccountTypes)"
+                    class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200") Crypto
               td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
                 div(class="flex items-center min-w-0")
                   button(
@@ -1817,10 +1842,13 @@ watch(workflowMode, (w) => {
                     class="cursor-grab drag-handle transition-all duration-200 hover:scale-110 frog-link active:cursor-grabbing touch-manipulation p-1 sm:p-0")
                     UIcon(name="i-lucide-grip-vertical" class="frog-text-muted text-lg sm:text-base")
                 td(class="p-2 sm:p-4 text-xs sm:text-sm text-muted whitespace-nowrap border-b border-default")
-                  div(class="flex items-center")
-                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive" aria-hidden="true")
+                  div(class="flex items-center gap-2 flex-wrap")
+                    div(class="w-4 h-4 mr-2 flex items-center justify-center frog-status-positive shrink-0" aria-hidden="true")
                       UIcon(name="i-lucide-corner-down-right" class="text-xs")
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
+                    span(
+                      v-if="isCryptoAccountType(subRow.typeId, listStore.getAccountTypes)"
+                      class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200") Crypto
                 td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
                   div(class="flex items-center min-w-0 flex-1")
                     div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center min-w-0 frog-text flex-1")

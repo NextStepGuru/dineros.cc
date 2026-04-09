@@ -7,6 +7,7 @@ export type RawListAggregates = {
   budgets: Awaited<ReturnType<PrismaClient["budget"]["findMany"]>>;
   intervals: Awaited<ReturnType<PrismaClient["interval"]["findMany"]>>;
   accountTypes: Awaited<ReturnType<PrismaClient["accountType"]["findMany"]>>;
+  evmChains: Awaited<ReturnType<PrismaClient["evmChain"]["findMany"]>>;
   accountRegisters: Awaited<
     ReturnType<PrismaClient["accountRegister"]["findMany"]>
   >;
@@ -55,6 +56,7 @@ export function createPrismaAccountListsRepository(
         budgets,
         intervals,
         accountTypes,
+        evmChains,
         accountRegisters,
         accounts,
         categories,
@@ -79,6 +81,7 @@ export function createPrismaAccountListsRepository(
         }),
         db.interval.findMany({}),
         db.accountType.findMany({}),
+        db.evmChain.findMany({ orderBy: { id: "asc" } }),
         db.accountRegister.findMany({
           where: {
             isArchived: false,
@@ -88,6 +91,7 @@ export function createPrismaAccountListsRepository(
           omit: {
             plaidAccessToken: true,
             plaidJson: true,
+            alchemyJson: true,
           },
         }),
         db.account.findMany({
@@ -120,6 +124,7 @@ export function createPrismaAccountListsRepository(
         budgets,
         intervals,
         accountTypes,
+        evmChains,
         accountRegisters,
         accounts,
         categories,

@@ -41,12 +41,16 @@ const envSchema = z.object({
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally
   TEST_DATE: z.string().optional(),
   TEST_TIMEZONE: z.string().optional(),
+  /** Alchemy API key; if unset, crypto wallet sync is skipped. */
+  ALCHEMY_API_KEY: z.string().optional(),
   /** OpenAI API key; if unset, Plaid transaction enrichment is skipped. */
   OPENAI_API_KEY: z.string().optional(),
   /** Model for Plaid register-entry enrichment (default gpt-5-nano). */
   OPENAI_PLAID_TX_MODEL: z.string().default("gpt-5-nano"),
-  /** Model for vehicle value estimate (default gpt-5-nano). */
+  /** Model for vehicle value estimate (default gpt-5-nano). Legacy; prefer OPENAI_ASSET_VALUE_MODEL. */
   OPENAI_VEHICLE_VALUE_MODEL: z.string().default("gpt-5-nano"),
+  /** Model for AI asset value estimates (vehicle, house, boat, RV, motorcycle). */
+  OPENAI_ASSET_VALUE_MODEL: z.string().default("gpt-5-nano"),
 });
 
 export default envSchema;

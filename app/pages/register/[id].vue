@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { h, resolveComponent, watch } from "vue";
-import { formatAccountRegisters, formatDate } from "~/lib/utils";
+import {
+  formatAccountRegisters,
+  formatDate,
+  isCryptoAccountType,
+} from "~/lib/utils";
+import { formatMoneyUsd } from "~/lib/bankers-rounding";
 import {
   buildSortedCategorySelectItems,
   categoryDropdownLabel,
@@ -331,6 +336,17 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
     return null;
   }
 
+  const regType = listStore.getAccountTypes.find((t) => t.id === reg.typeId);
+  if (regType?.registerClass === "crypto") {
+    return {
+      entries: [],
+      lowest: {} as RegisterEntry,
+      highest: {} as RegisterEntry,
+      hasMore: false,
+      currentSkip: 0,
+    };
+  }
+
   try {
     const data = await appFetch<{
       entries: RegisterEntry[];
@@ -372,6 +388,11 @@ const registerInitialDataKey = computed(() => {
   const snapId = snapshotMode.isSnapshotMode.value
     ? snapshotMode.registerSnapshotIdByRegisterId.value[rid] ?? 0
     : 0;
+  const regTypeClass =
+    reg == null
+      ? ""
+      : (listStore.getAccountTypes.find((t) => t.id === reg.typeId)
+          ?.registerClass ?? "");
   return [
     "register-initial",
     authStore.getBudgetId,
@@ -380,6 +401,7 @@ const registerInitialDataKey = computed(() => {
     snapshotMode.isSnapshotMode.value ? "snap" : "live",
     snapId,
     reg?.accountId ?? 0,
+    regTypeClass,
   ].join(":");
 });
 
@@ -470,6 +492,7 @@ watch(registerInitialDataKey, (_key, oldKey) => {
 
 const showRegisterOnboarding = computed(() => {
   if (snapshotMode.isSnapshotMode.value) return false;
+  if (isCurrentRegisterCrypto.value) return false;
   if (onboardingDismissed.value) return false;
   if (!listStore.getAccountRegisters.length) return false;
   if (registerPagePending.value) return false;
@@ -479,6 +502,7 @@ const showRegisterOnboarding = computed(() => {
 // Load more data for infinite scrolling
 const loadMoreEntries = async () => {
   if (snapshotMode.isSnapshotMode.value) return;
+  if (isCurrentRegisterCrypto.value) return;
   if (isLoadingMore.value || !hasMoreData.value) return;
 
   const generationAtStart = registerLoadGeneration.value;
@@ -688,6 +712,85 @@ const currentType = computed(() =>
   listStore.getAccountTypes.find(
     (item) => item.id === currentAccountRegister.value?.typeId,
   ),
+);
+
+const isCurrentRegisterCrypto = computed(() => {
+  const reg = currentAccountRegister.value;
+  if (!reg) return false;
+  return isCryptoAccountType(reg.typeId, listStore.getAccountTypes);
+});
+
+type CryptoPortfolioResponse = {
+  accountRegisterId: number;
+  alchemyLastSyncAt: string | null;
+  totalUsd: number;
+  tokens: Array<{
+    id: number;
+    network: string;
+    tokenName: string;
+    tokenSymbol: string;
+    displayBalance: number;
+    priceUsd: number | null;
+    valueUsd: number | null;
+    logoUrl: string | null;
+    syncedAt: string;
+  }>;
+};
+
+const cryptoPortfolio = ref<CryptoPortfolioResponse | null>(null);
+const cryptoPortfolioPending = ref(false);
+const cryptoSyncLoading = ref(false);
+
+async function loadCryptoPortfolio() {
+  if (!isCurrentRegisterCrypto.value || snapshotMode.isSnapshotMode.value) {
+    cryptoPortfolio.value = null;
+    return;
+  }
+  const id = accountRegisterId.value;
+  if (!id) return;
+  cryptoPortfolioPending.value = true;
+  try {
+    cryptoPortfolio.value = await appFetch<CryptoPortfolioResponse>(
+      `/api/crypto-tokens/${id}`,
+    );
+  } catch {
+    toast.add({
+      color: "error",
+      description: "Failed to load on-chain portfolio.",
+    });
+  } finally {
+    cryptoPortfolioPending.value = false;
+  }
+}
+
+async function syncCryptoPortfolio() {
+  const id = accountRegisterId.value;
+  if (!id || !isCurrentRegisterCrypto.value) return;
+  cryptoSyncLoading.value = true;
+  try {
+    await appFetch("/api/crypto-sync", {
+      method: "POST",
+      body: { accountRegisterId: id },
+    });
+    await listStore.fetchLists();
+    await loadCryptoPortfolio();
+    toast.add({ color: "success", description: "Wallet synced." });
+  } catch {
+    toast.add({
+      color: "error",
+      description: "Sync failed. Check ALCHEMY_API_KEY and try again.",
+    });
+  } finally {
+    cryptoSyncLoading.value = false;
+  }
+}
+
+watch(
+  [accountRegisterId, isCurrentRegisterCrypto, () => snapshotMode.isSnapshotMode.value],
+  () => {
+    void loadCryptoPortfolio();
+  },
+  { immediate: true },
 );
 
 const isLoading = computed(
@@ -1366,7 +1469,7 @@ async function recalcAccount() {
               UButton(size="xs" color="info" @click="handleAddEntry") Add entry
 
     //- Skeleton loading state (shell matches loaded register-table-outer + merged thead)
-    template(v-else-if="isLoading && tableEntries.length === 0")
+    template(v-else-if="isLoading && tableEntries.length === 0 && !isCurrentRegisterCrypto")
       div(class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
         div(class="flex flex-col min-h-0")
           div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
@@ -1415,7 +1518,56 @@ async function recalcAccount() {
             div(class="p-2 sm:p-4 min-w-0 flex justify-end")
               USkeleton(class="h-4 w-20")
 
-    div(v-else-if="tableEntries.length > 0" class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
+    div(v-else-if="isCurrentRegisterCrypto && !isSnapshotMode" class="mt-4 min-w-0 w-full")
+      UCard
+        template(#header)
+          div(class="flex flex-wrap gap-2 items-center justify-between w-full")
+            div
+              h3(class="font-semibold") On-chain portfolio
+              p(v-if="cryptoPortfolio?.alchemyLastSyncAt" class="text-xs frog-text-muted mt-1")
+                span Last synced {{ formatDate(cryptoPortfolio.alchemyLastSyncAt) }}
+            UButton(
+              size="sm"
+              color="primary"
+              :loading="cryptoSyncLoading"
+              @click="syncCryptoPortfolio") Sync wallet
+        USkeleton(v-if="cryptoPortfolioPending" class="h-32 w-full rounded-md")
+        div(v-else class="space-y-3")
+          div(class="flex justify-between items-baseline gap-2 border-b border-default pb-3")
+            span(class="text-sm frog-text-muted") Total (USD)
+            span(class="text-xl font-semibold tabular-nums") {{ formatMoneyUsd(cryptoPortfolio?.totalUsd ?? currentAccountRegister?.latestBalance ?? 0) }}
+          div(v-if="!(cryptoPortfolio?.tokens?.length)" class="text-sm frog-text-muted py-4 text-center") No token balances yet — tap Sync wallet.
+
+          table(v-else class="w-full text-sm border-collapse")
+            thead
+              tr(class="border-b border-default text-left text-muted")
+                th(class="py-2 pr-2") Asset
+                th(class="py-2 pr-2 hidden sm:table-cell") Network
+                th(class="py-2 text-right") Balance
+                th(class="py-2 text-right") Value (USD)
+            tbody
+              tr(
+                v-for="t in cryptoPortfolio.tokens"
+                :key="t.id"
+                class="border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+              )
+                td(class="py-2 pr-2 min-w-0")
+                  div(class="flex items-center gap-2 min-w-0")
+                    img(
+                      v-if="t.logoUrl"
+                      :src="t.logoUrl"
+                      :alt="t.tokenSymbol"
+                      class="size-7 rounded-full shrink-0"
+                      loading="lazy"
+                    )
+                    div(class="min-w-0")
+                      div(class="font-medium truncate") {{ t.tokenName }}
+                      div(class="text-xs text-muted") {{ t.tokenSymbol }}
+                td(class="py-2 pr-2 hidden sm:table-cell text-muted whitespace-nowrap") {{ t.network }}
+                td(class="py-2 text-right tabular-nums whitespace-nowrap") {{ t.displayBalance }}
+                td(class="py-2 text-right tabular-nums whitespace-nowrap") {{ t.valueUsd != null ? formatMoneyUsd(t.valueUsd) : "—" }}
+
+    div(v-else-if="tableEntries.length > 0 && !isCurrentRegisterCrypto" class="register-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
       table(
         ref="tableRef"
         :key="tableKey"
@@ -1584,7 +1736,7 @@ async function recalcAccount() {
                 DollarFormat(:amount="Number(entry.amount)")
               td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
                 DollarFormat(:amount="displayBalance")
-    UCard(v-else class="my-4 max-w-lg mx-auto")
+    UCard(v-else-if="!isCurrentRegisterCrypto" class="my-4 max-w-lg mx-auto")
       template(#header)
         h3(class="font-semibold") No entries in this register
       p(class="frog-text-muted mb-4") Add your opening balance or first transaction to start forecasting this account.

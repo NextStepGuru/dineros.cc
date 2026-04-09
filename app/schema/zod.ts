@@ -440,7 +440,22 @@ export const accountRegisterSchema = z.object({
   paymentCategoryId: z.uuid().nullable().optional(),
   interestCategoryId: z.uuid().nullable().optional(),
   vehicleDetails: z.unknown().nullable().optional(),
+  walletAddress: z
+    .preprocess(
+      (v) => (v === "" || v === undefined ? null : v),
+      z.string().nullable().optional(),
+    )
+    .optional(),
+  selectedChainIds: z.array(z.number().int().positive()).optional(),
+  alchemyLastSyncAt: z.coerce.date().nullable().optional(),
 });
+
+const assetEstimateConditionSchema = z.enum([
+  "excellent",
+  "good",
+  "fair",
+  "poor",
+]);
 
 /** Body for POST /api/vehicle-value-estimate */
 export const vehicleValueEstimateRequestSchema = z.object({
@@ -451,7 +466,7 @@ export const vehicleValueEstimateRequestSchema = z.object({
   model: z.string().min(1).max(100),
   trim: z.string().max(100).optional(),
   mileage: z.coerce.number().nonnegative(),
-  condition: z.enum(["excellent", "good", "fair", "poor"]),
+  condition: assetEstimateConditionSchema,
   zip: z.preprocess(
     (v) => (v === "" || v == null ? undefined : v),
     z.string().regex(/^\d{5}$/).optional(),
@@ -463,7 +478,100 @@ export const vehicleValueEstimateRequestSchema = z.object({
   ),
 });
 
-/** Parsed JSON from the model for vehicle valuation */
+export const houseValueEstimateRequestSchema = z.object({
+  category: z.literal("house"),
+  accountId: z.string().min(1),
+  accountRegisterId: z.coerce.number().int().positive().optional(),
+  bedrooms: z.coerce.number().nonnegative(),
+  bathrooms: z.coerce.number().nonnegative(),
+  squareFootage: z.coerce.number().positive(),
+  yearBuilt: z.coerce.number().int().min(1800).max(2100),
+  lotSizeAcres: z.coerce.number().positive().optional(),
+  zip: z.string().regex(/^\d{5}$/),
+  propertyType: z.enum([
+    "single-family",
+    "condo",
+    "townhouse",
+    "multi-family",
+  ]),
+  condition: assetEstimateConditionSchema,
+  purchasePriceHint: z.coerce.number().nonnegative().optional(),
+});
+
+export const boatValueEstimateRequestSchema = z.object({
+  category: z.literal("boat"),
+  accountId: z.string().min(1),
+  accountRegisterId: z.coerce.number().int().positive().optional(),
+  year: z.coerce.number().int().min(1900).max(2100),
+  make: z.string().min(1).max(100),
+  model: z.string().min(1).max(100),
+  lengthFeet: z.coerce.number().positive(),
+  engineType: z.enum(["outboard", "inboard", "sail", "jet"]),
+  engineHours: z.coerce.number().nonnegative().optional(),
+  condition: assetEstimateConditionSchema,
+  zip: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().regex(/^\d{5}$/).optional(),
+  ),
+  purchasePriceHint: z.coerce.number().nonnegative().optional(),
+});
+
+export const rvValueEstimateRequestSchema = z.object({
+  category: z.literal("rv"),
+  accountId: z.string().min(1),
+  accountRegisterId: z.coerce.number().int().positive().optional(),
+  year: z.coerce.number().int().min(1900).max(2100),
+  make: z.string().min(1).max(100),
+  model: z.string().min(1).max(100),
+  rvClass: z.enum([
+    "class-a",
+    "class-b",
+    "class-c",
+    "travel-trailer",
+    "fifth-wheel",
+  ]),
+  lengthFeet: z.coerce.number().positive(),
+  mileage: z.coerce.number().nonnegative(),
+  condition: assetEstimateConditionSchema,
+  zip: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().regex(/^\d{5}$/).optional(),
+  ),
+  purchasePriceHint: z.coerce.number().nonnegative().optional(),
+});
+
+export const motorcycleValueEstimateRequestSchema = z.object({
+  category: z.literal("motorcycle"),
+  accountId: z.string().min(1),
+  accountRegisterId: z.coerce.number().int().positive().optional(),
+  year: z.coerce.number().int().min(1900).max(2100),
+  make: z.string().min(1).max(100),
+  model: z.string().min(1).max(100),
+  mileage: z.coerce.number().nonnegative(),
+  engineCC: z.coerce.number().positive().optional(),
+  condition: assetEstimateConditionSchema,
+  zip: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().regex(/^\d{5}$/).optional(),
+  ),
+  purchasePriceHint: z.coerce.number().nonnegative().optional(),
+});
+
+export const vehicleAssetEstimateRequestSchema =
+  vehicleValueEstimateRequestSchema.extend({
+    category: z.literal("vehicle"),
+  });
+
+/** Discriminated union for POST /api/asset-value-estimate */
+export const assetValueEstimateRequestSchema = z.discriminatedUnion("category", [
+  vehicleAssetEstimateRequestSchema,
+  houseValueEstimateRequestSchema,
+  boatValueEstimateRequestSchema,
+  rvValueEstimateRequestSchema,
+  motorcycleValueEstimateRequestSchema,
+]);
+
+/** Parsed JSON from the model for asset valuation (all categories) */
 export const vehicleValueEstimateAiResultSchema = z.object({
   estimatedValueMid: z.number(),
   estimatedValueLow: z.number(),
