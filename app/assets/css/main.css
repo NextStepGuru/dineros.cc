@@ -389,6 +389,18 @@ input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s !important;
 }
 
+/*
+ * Nuxt UI modal: theme sets position without z-index; the backdrop can paint above
+ * the dialog panel. Keep overlay below and content above (e.g. Forecasting toolbar is z-38).
+ */
+[data-slot="overlay"] {
+  z-index: 40;
+}
+
+[data-slot="content"] {
+  z-index: 50;
+}
+
 /* Shared Nuxt UI UModal mobile fullscreen (matches Tailwind max-sm / 639px) */
 @media (width < 40rem) {
   .modal-mobile-fullscreen {

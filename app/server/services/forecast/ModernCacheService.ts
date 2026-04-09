@@ -34,6 +34,8 @@ export type CacheReoccurrence = {
 
 export type CacheAccountRegister = {
   id: number;
+  /** Non-null when this register is a pocket (child of another register). */
+  subAccountRegisterId: number | null;
   typeId: number;
   budgetId: number;
   accountId: string;
@@ -143,9 +145,56 @@ interface Collection<T> {
   chain(): ChainableCollection<T>;
 }
 
+function tryMatchOperators(
+  itemValue: unknown,
+  operators: object,
+): boolean | null {
+  const o = operators as Record<string, unknown>;
+  if ("$eq" in o) return itemValue === o.$eq;
+  if ("$ne" in o) return itemValue !== o.$ne;
+  if ("$lt" in o) return (itemValue as number) < (o.$lt as number);
+  if ("$lte" in o) return (itemValue as number) <= (o.$lte as number);
+  if ("$gt" in o) return (itemValue as number) > (o.$gt as number);
+  if ("$gte" in o) return (itemValue as number) >= (o.$gte as number);
+  if ("$in" in o) return (o.$in as unknown[]).includes(itemValue);
+  if ("$nin" in o) return !(o.$nin as unknown[]).includes(itemValue);
+  return null;
+}
+
+function matchesQueryItem<T>(item: T, query: Partial<T>): boolean {
+  const raw = query as Record<string, unknown>;
+  if ("$and" in query) {
+    return (raw.$and as Partial<T>[]).every((condition) =>
+      matchesQueryItem(item, condition),
+    );
+  }
+  if ("$or" in query) {
+    return (raw.$or as Partial<T>[]).some((condition) =>
+      matchesQueryItem(item, condition),
+    );
+  }
+
+  return Object.entries(query).every(([key, value]) => {
+    const itemValue = (item as Record<string, unknown>)[key];
+
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      const opMatch = tryMatchOperators(itemValue, value);
+      if (opMatch !== null) {
+        return opMatch;
+      }
+    }
+
+    return itemValue === value;
+  });
+}
+
 // Chainable operations for complex queries
 class ChainableCollection<T> {
-  constructor(private items: T[]) {}
+  constructor(private readonly items: T[]) {}
 
   find(query: Partial<T> | ((item: T) => boolean)): ChainableCollection<T> {
     const filtered = this.items.filter((item) =>
@@ -185,41 +234,7 @@ class ChainableCollection<T> {
   }
 
   private matchesQuery(item: T, query: Partial<T>): boolean {
-    // Handle top-level $and and $or operators
-    if ("$and" in query) {
-      return (query as any).$and.every((condition: any) =>
-        this.matchesQuery(item, condition)
-      );
-    }
-    if ("$or" in query) {
-      return (query as any).$or.some((condition: any) =>
-        this.matchesQuery(item, condition)
-      );
-    }
-
-    return Object.entries(query).every(([key, value]) => {
-      const itemValue = (item as any)[key];
-
-      // Handle complex query operators
-      if (
-        typeof value === "object" &&
-        value !== null &&
-        !Array.isArray(value)
-      ) {
-        const operators = value as any;
-
-        if ("$eq" in operators) return itemValue === operators.$eq;
-        if ("$ne" in operators) return itemValue !== operators.$ne;
-        if ("$lt" in operators) return itemValue < operators.$lt;
-        if ("$lte" in operators) return itemValue <= operators.$lte;
-        if ("$gt" in operators) return itemValue > operators.$gt;
-        if ("$gte" in operators) return itemValue >= operators.$gte;
-        if ("$in" in operators) return operators.$in.includes(itemValue);
-        if ("$nin" in operators) return !operators.$nin.includes(itemValue);
-      }
-
-      return itemValue === value;
-    });
+    return matchesQueryItem(item, query);
   }
 }
 
@@ -227,21 +242,29 @@ class ChainableCollection<T> {
 class ModernCollection<T extends { id: number | string }>
   implements Collection<T>
 {
-  private items = new Map<number | string, T>();
-  private indexes = new Map<string, Map<any, Set<number | string>>>();
+  private readonly items = new Map<number | string, T>();
+  private readonly indexes = new Map<
+    string,
+    Map<any, Set<number | string>>
+  >();
 
   constructor(
-    private getIdField: (item: T) => number | string = (item) => item.id
+    private readonly getIdField: (item: T) => number | string = (item) =>
+      item.id,
   ) {}
 
   // Create index for fast querying
   createIndex(field: keyof T): void {
-    if (!this.indexes.has(field as string)) {
-      this.indexes.set(field as string, new Map());
+    const fieldKey = String(field);
+    if (!this.indexes.has(fieldKey)) {
+      this.indexes.set(fieldKey, new Map());
     }
 
     // Rebuild index
-    const index = this.indexes.get(field as string)!;
+    const index = this.indexes.get(fieldKey);
+    if (!index) {
+      return;
+    }
     index.clear();
 
     for (const [id, item] of this.items) {
@@ -249,7 +272,10 @@ class ModernCollection<T extends { id: number | string }>
       if (!index.has(value)) {
         index.set(value, new Set());
       }
-      index.get(value)!.add(id);
+      const bucket = index.get(value);
+      if (bucket) {
+        bucket.add(id);
+      }
     }
   }
 
@@ -281,9 +307,10 @@ class ModernCollection<T extends { id: number | string }>
       const index = this.indexes.get(field);
       if (index && typeof value !== "object") {
         const ids = index.get(value) || new Set();
-        return Array.from(ids)
-          .map((id) => this.items.get(id)!)
-          .filter(Boolean);
+        return Array.from(ids).flatMap((lookupId) => {
+          const entry = this.items.get(lookupId);
+          return entry ? [entry] : [];
+        });
       }
     }
 
@@ -343,63 +370,35 @@ class ModernCollection<T extends { id: number | string }>
   }
 
   private matchesQuery(item: T, query: Partial<T>): boolean {
-    // Handle top-level $and and $or operators
-    if ("$and" in query) {
-      return (query as any).$and.every((condition: any) =>
-        this.matchesQuery(item, condition)
-      );
-    }
-    if ("$or" in query) {
-      return (query as any).$or.some((condition: any) =>
-        this.matchesQuery(item, condition)
-      );
-    }
-
-    return Object.entries(query).every(([key, value]) => {
-      const itemValue = (item as any)[key];
-
-      // Handle complex query operators (same as ChainableCollection)
-      if (
-        typeof value === "object" &&
-        value !== null &&
-        !Array.isArray(value)
-      ) {
-        const operators = value as any;
-
-        if ("$eq" in operators) return itemValue === operators.$eq;
-        if ("$ne" in operators) return itemValue !== operators.$ne;
-        if ("$lt" in operators) return itemValue < operators.$lt;
-        if ("$lte" in operators) return itemValue <= operators.$lte;
-        if ("$gt" in operators) return itemValue > operators.$gt;
-        if ("$gte" in operators) return itemValue >= operators.$gte;
-        if ("$in" in operators) return operators.$in.includes(itemValue);
-        if ("$nin" in operators) return !operators.$nin.includes(itemValue);
-      }
-
-      return itemValue === value;
-    });
+    return matchesQueryItem(item, query);
   }
 
   private updateIndexes(item: T): void {
+    const record = item as Record<string, unknown>;
     for (const [field, index] of this.indexes) {
-      const value = (item as any)[field];
+      const value = record[field];
       const id = this.getIdField(item);
 
       if (!index.has(value)) {
         index.set(value, new Set());
       }
-      index.get(value)!.add(id);
+      const bucket = index.get(value);
+      if (bucket) {
+        bucket.add(id);
+      }
     }
   }
 
   private removeFromIndexes(item: T): void {
+    const record = item as Record<string, unknown>;
     for (const [field, index] of this.indexes) {
-      const value = (item as any)[field];
+      const value = record[field];
       const id = this.getIdField(item);
 
-      if (index.has(value)) {
-        index.get(value)!.delete(id);
-        if (index.get(value)!.size === 0) {
+      const bucket = index.get(value);
+      if (bucket) {
+        bucket.delete(id);
+        if (bucket.size === 0) {
           index.delete(value);
         }
       }

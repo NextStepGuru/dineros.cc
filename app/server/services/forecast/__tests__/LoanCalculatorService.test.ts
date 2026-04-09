@@ -8,6 +8,7 @@ function createAccount(
 ): CacheAccountRegister {
   return {
     id: 1,
+    subAccountRegisterId: null,
     typeId: 5,
     budgetId: 1,
     accountId: "acct",

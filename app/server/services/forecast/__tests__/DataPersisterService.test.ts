@@ -656,6 +656,277 @@ describe("DataPersisterService", () => {
       expect(mockDb.$executeRaw).not.toHaveBeenCalled();
     });
   });
+
+  describe("autoApplyPastPocketEntries", () => {
+    afterEach(() => {
+      dateTimeService.clearNowOverride();
+    });
+
+    it("is a no-op when pocketRegisterIds is empty", async () => {
+      const groupBy = vi.spyOn(mockDb.registerEntry, "groupBy");
+      await service.autoApplyPastPocketEntries([]);
+      expect(groupBy).not.toHaveBeenCalled();
+    });
+
+    it("applies past uncleared pocket entries and increments register balances", async () => {
+      dateTimeService.setNowOverride(new Date("2024-06-15T12:00:00.000Z"));
+
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-pocket-test",
+          budgetId: 1,
+          name: "Master",
+          typeId: 1,
+          balance: 1000,
+          latestBalance: 1000,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const masterId = 1;
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-pocket-test",
+          budgetId: 1,
+          name: "Pocket",
+          typeId: 1,
+          balance: 0,
+          latestBalance: 0,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          subAccountRegisterId: masterId,
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const pocketId = 2;
+
+      await mockDb.registerEntry.create({
+        data: {
+          accountRegisterId: pocketId,
+          amount: 25,
+          balance: 0,
+          description: "Past pocket",
+          createdAt: new Date("2024-06-01T00:00:00.000Z"),
+          isCleared: false,
+          isProjected: true,
+          isPending: true,
+          isBalanceEntry: false,
+          isManualEntry: false,
+          isReconciled: false,
+          sourceAccountRegisterId: null,
+        },
+      });
+
+      await service.autoApplyPastPocketEntries([pocketId]);
+
+      const entries = await mockDb.registerEntry.findMany({});
+      const applied = entries.find(
+        (e: { description: string }) => e.description === "Past pocket",
+      );
+      expect(applied?.isCleared).toBe(true);
+      expect(applied?.isPending).toBe(false);
+      expect(applied?.isProjected).toBe(false);
+
+      const pocketReg = (await mockDb.accountRegister.findMany({})).find(
+        (r: { id: number }) => r.id === pocketId,
+      );
+      expect(Number(pocketReg?.balance)).toBe(25);
+      expect(Number(pocketReg?.latestBalance)).toBe(25);
+    });
+
+    it("does not apply future pocket entries", async () => {
+      dateTimeService.setNowOverride(new Date("2024-06-15T12:00:00.000Z"));
+
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-pocket-future",
+          budgetId: 1,
+          name: "Master",
+          typeId: 1,
+          balance: 1000,
+          latestBalance: 1000,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-pocket-future",
+          budgetId: 1,
+          name: "Pocket",
+          typeId: 1,
+          balance: 0,
+          latestBalance: 0,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          subAccountRegisterId: 1,
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const pocketId = 2;
+
+      await mockDb.registerEntry.create({
+        data: {
+          accountRegisterId: pocketId,
+          amount: 40,
+          balance: 0,
+          description: "Future pocket",
+          createdAt: new Date("2024-07-01T00:00:00.000Z"),
+          isCleared: false,
+          isProjected: true,
+          isPending: false,
+          isBalanceEntry: false,
+          isManualEntry: false,
+          isReconciled: false,
+        },
+      });
+
+      await service.autoApplyPastPocketEntries([pocketId]);
+
+      const entries = await mockDb.registerEntry.findMany({});
+      const row = entries.find(
+        (e: { description: string }) => e.description === "Future pocket",
+      );
+      expect(row?.isCleared).toBe(false);
+      const pocketReg = (await mockDb.accountRegister.findMany({})).find(
+        (r: { id: number }) => r.id === pocketId,
+      );
+      expect(Number(pocketReg?.balance)).toBe(0);
+    });
+
+    it("skips balance rows", async () => {
+      dateTimeService.setNowOverride(new Date("2024-06-15T12:00:00.000Z"));
+
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-bal-skip",
+          budgetId: 1,
+          name: "Master",
+          typeId: 1,
+          balance: 100,
+          latestBalance: 100,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-bal-skip",
+          budgetId: 1,
+          name: "Pocket",
+          typeId: 1,
+          balance: 0,
+          latestBalance: 0,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          subAccountRegisterId: 1,
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const pocketId = 2;
+
+      await mockDb.registerEntry.create({
+        data: {
+          accountRegisterId: pocketId,
+          amount: 0,
+          balance: 0,
+          description: "Opening",
+          createdAt: new Date("2024-05-01T00:00:00.000Z"),
+          isCleared: false,
+          isProjected: false,
+          isPending: false,
+          isBalanceEntry: true,
+          isManualEntry: false,
+          isReconciled: false,
+        },
+      });
+
+      await service.autoApplyPastPocketEntries([pocketId]);
+
+      const entries = await mockDb.registerEntry.findMany({});
+      const row = entries.find(
+        (e: { description: string }) => e.description === "Opening",
+      );
+      expect(row?.isBalanceEntry).toBe(true);
+      expect(row?.isCleared).toBe(false);
+    });
+
+    it("applies transfer partner entries on non-pocket registers", async () => {
+      dateTimeService.setNowOverride(new Date("2024-06-15T12:00:00.000Z"));
+
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-tx",
+          budgetId: 1,
+          name: "Checking",
+          typeId: 1,
+          balance: 500,
+          latestBalance: 500,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const checkingId = 1;
+      await mockDb.accountRegister.create({
+        data: {
+          accountId: "acct-tx",
+          budgetId: 1,
+          name: "Pocket",
+          typeId: 1,
+          balance: 0,
+          latestBalance: 0,
+          statementIntervalId: 1,
+          statementAt: new Date("2024-01-01T00:00:00.000Z"),
+          subAccountRegisterId: checkingId,
+          loanPaymentSortOrder: 0,
+          savingsGoalSortOrder: 0,
+        },
+      });
+      const pocketId = 2;
+
+      await mockDb.registerEntry.create({
+        data: {
+          accountRegisterId: checkingId,
+          amount: 100,
+          balance: 0,
+          description: "Transfer in",
+          createdAt: new Date("2024-06-01T00:00:00.000Z"),
+          isCleared: false,
+          isProjected: true,
+          isPending: true,
+          isBalanceEntry: false,
+          isManualEntry: false,
+          isReconciled: false,
+          sourceAccountRegisterId: pocketId,
+        },
+      });
+
+      await service.autoApplyPastPocketEntries([pocketId]);
+
+      const entries = await mockDb.registerEntry.findMany({});
+      const transferIn = entries.find(
+        (e: { description: string }) => e.description === "Transfer in",
+      );
+      expect(transferIn?.isCleared).toBe(true);
+
+      const checking = (await mockDb.accountRegister.findMany({})).find(
+        (r: { id: number }) => r.id === checkingId,
+      );
+      expect(Number(checking?.balance)).toBe(600);
+      expect(Number(checking?.latestBalance)).toBe(600);
+    });
+  });
 });
 
 describe("DataPersisterService - Error Handling and Edge Cases", () => {

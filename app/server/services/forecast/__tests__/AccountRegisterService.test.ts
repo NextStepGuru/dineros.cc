@@ -9,6 +9,7 @@ function createMockAccount(
 ): CacheAccountRegister {
   return {
     id: 1,
+    subAccountRegisterId: null,
     typeId: 1,
     budgetId: 1,
     accountId: "test-account",

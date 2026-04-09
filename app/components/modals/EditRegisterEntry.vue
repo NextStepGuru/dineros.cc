@@ -69,14 +69,15 @@ const isPlaidTabActive = computed(
 );
 
 const plaidJsonText = computed(() => {
-  if (!plaidSyncData.value?.plaidJson) {
-    return "(no Plaid JSON stored)";
+  const raw = plaidSyncData.value?.plaidJson;
+  if (raw !== undefined && raw !== null) {
+    try {
+      return JSON.stringify(raw, null, 2);
+    } catch {
+      return String(raw);
+    }
   }
-  try {
-    return JSON.stringify(plaidSyncData.value.plaidJson, null, 2);
-  } catch {
-    return String(plaidSyncData.value.plaidJson);
-  }
+  return "(no Plaid JSON stored)";
 });
 
 function resetPlaidSyncPanel() {
@@ -89,7 +90,13 @@ function resetPlaidSyncPanel() {
 async function loadPlaidSyncIfNeeded() {
   const id = formState.value.id;
   const accountRegisterId = formState.value.accountRegisterId;
-  if (!id || !formState.value.plaidId) return;
+  if (
+    id === undefined ||
+    id === "" ||
+    formState.value.plaidId == null
+  ) {
+    return;
+  }
 
   const key = `${id}:${accountRegisterId}`;
   if (plaidSyncFetchKey.value === key && plaidSyncData.value) return;
@@ -132,9 +139,18 @@ async function copyPlaidJson() {
   }
 }
 
-const isNewEntry = computed(() => {
-  const isNew = !formState.value.id;
-  return isNew;
+const isNewEntry = computed(
+  () => formState.value.id === undefined || formState.value.id === "",
+);
+
+const { todayISOString } = useToday();
+
+/** Past recurrence rows: hide Skip Reoccurrence only (YYYY-MM-DD vs app "today"). */
+const hideRecurrencePastSkip = computed(() => {
+  if (formState.value.reoccurrenceId == null) return false;
+  const day = formState.value.createdAt;
+  if (day === "" || day == null) return false;
+  return day < todayISOString.value;
 });
 
 watch(props, () => {
@@ -199,22 +215,21 @@ async function handleSubmit({
         },
       }).catch((error) => handleError(error, toast));
 
-      if (!responseData) {
-        state.isSaving = false;
+      if (responseData) {
+        props.callback();
         toast.add({
-          color: "error",
-          description: "Failed to create transfer.",
+          color: "success",
+          description: "Transfer created successfully.",
         });
+        state.isSaving = false;
+        props.cancel();
         return;
       }
-
-      props.callback();
-      toast.add({
-        color: "success",
-        description: "Transfer created successfully.",
-      });
       state.isSaving = false;
-      props.cancel();
+      toast.add({
+        color: "error",
+        description: "Failed to create transfer.",
+      });
       return;
     }
 
@@ -227,29 +242,28 @@ async function handleSubmit({
       },
     }).catch((error) => handleError(error, toast));
 
-    if (!responseData) {
-      state.isSaving = false;
-      toast.add({
-        color: "error",
-        description: "Failed to update register entry.",
-      });
+    if (responseData) {
+      const parsedData = registerEntrySchema.parse(responseData);
+      formState.value = {
+        ...parsedData,
+        createdAt: new Date(parsedData.createdAt).toISOString(),
+      } as RegisterEntry;
 
+      props.callback();
+
+      toast.add({
+        color: "success",
+        description: "Updated register entry successfully.",
+      });
+      state.isSaving = false;
+      props.cancel();
       return;
     }
-    const parsedData = registerEntrySchema.parse(responseData);
-    formState.value = {
-      ...parsedData,
-      createdAt: new Date(parsedData.createdAt).toISOString(),
-    } as RegisterEntry;
-
-    props.callback();
-
-    toast.add({
-      color: "success",
-      description: "Updated register entry successfully.",
-    });
     state.isSaving = false;
-    props.cancel();
+    toast.add({
+      color: "error",
+      description: "Failed to update register entry.",
+    });
   } catch (error) {
     toast.add({
       color: "error",
@@ -278,16 +292,7 @@ async function deleteRegisterEntry() {
     },
   }).catch((error) => handleError(error, toast));
 
-  if (!deleteEntry) {
-    state.isDeleting = false;
-    showDeleteConfirm.value = false;
-    toast.add({
-      color: "error",
-      description: "Failed to delete register entry.",
-    });
-
-    return;
-  } else {
+  if (deleteEntry) {
     toast.add({
       color: "success",
       description: "Deleted register entry successfully.",
@@ -298,8 +303,14 @@ async function deleteRegisterEntry() {
     state.isDeleting = false;
     showDeleteConfirm.value = false;
     props.cancel();
+    return;
   }
   state.isDeleting = false;
+  showDeleteConfirm.value = false;
+  toast.add({
+    color: "error",
+    description: "Failed to delete register entry.",
+  });
 }
 
 function confirmDelete() {
@@ -324,15 +335,7 @@ async function markAsCleared() {
     },
   }).catch((error) => handleError(error, toast));
 
-  if (!isMarked) {
-    state.isClearing = false;
-    toast.add({
-      color: "error",
-      description: "Failed to mark as cleared",
-    });
-
-    return;
-  } else {
+  if (isMarked) {
     toast.add({
       color: "success",
       description: "Marked as cleared successfully.",
@@ -342,8 +345,13 @@ async function markAsCleared() {
 
     state.isClearing = false;
     props.cancel();
+    return;
   }
   state.isClearing = false;
+  toast.add({
+    color: "error",
+    description: "Failed to mark as cleared",
+  });
 }
 
 async function markAsApplied() {
@@ -358,7 +366,7 @@ async function markAsApplied() {
     ? "/api/register-entry-transfer"
     : "/api/register-entry-applied";
 
-  await $api(endpoint, {
+  const applied = await $api(endpoint, {
     method: "post",
     body: {
       registerEntryId: formState.value.id,
@@ -370,16 +378,28 @@ async function markAsApplied() {
     },
   }).catch((error) => handleError(error, toast));
 
-  toast.add({
-    color: "success",
-    description: isTransfer
-      ? "Transferred successfully."
-      : "Marked as cleared successfully.",
-  });
+  if (applied) {
+    toast.add({
+      color: "success",
+      description: isTransfer
+        ? "Transferred successfully."
+        : "Marked as cleared successfully.",
+    });
 
-  props.callback();
+    await listStore.fetchLists();
+    props.callback();
+    state.isApplying = false;
+    state.showApplySelection = false;
+    return;
+  }
+
   state.isApplying = false;
-  state.showApplySelection = false;
+  toast.add({
+    color: "error",
+    description: isTransfer
+      ? "Transfer failed."
+      : "Failed to apply payment.",
+  });
 }
 
 function initiateApply() {
@@ -423,15 +443,7 @@ async function skipRegisterEntry() {
     },
   }).catch((error) => handleError(error, toast));
 
-  if (!isSkipped) {
-    state.isSkipping = false;
-    toast.add({
-      color: "error",
-      description: "Failed to skip register entry",
-    });
-
-    return;
-  } else {
+  if (isSkipped) {
     toast.add({
       color: "success",
       description: "Skipped register entry successfully.",
@@ -442,16 +454,25 @@ async function skipRegisterEntry() {
     listStore.fetchLists();
     state.isSkipping = false;
     props.cancel();
+    return;
   }
 
   state.isSkipping = false;
+  toast.add({
+    color: "error",
+    description: "Failed to skip register entry",
+  });
 }
 
 function canSubmitRegularEdit(): boolean {
   if (isDisabled.value || isPlaidTabActive.value || showDeleteConfirm.value) {
     return false;
   }
-  if (state.isTransferMode && isNewEntry.value && !selectedTransferAccountRegisterId.value) {
+  const transferMissingTarget =
+    state.isTransferMode &&
+    isNewEntry.value &&
+    selectedTransferAccountRegisterId.value === 0;
+  if (transferMissingTarget) {
     return false;
   }
   return true;
@@ -460,17 +481,17 @@ function canSubmitRegularEdit(): boolean {
 defineShortcuts({
   enter: () => {
     if (state.showApplySelection) {
-      if (
-        state.isApplying ||
-        !selectedApplyAccountRegisterId.value
-      ) {
-        return;
+      const canApplyNow =
+        state.isApplying !== true &&
+        selectedApplyAccountRegisterId.value !== 0;
+      if (canApplyNow) {
+        void markAsApplied();
       }
-      void markAsApplied();
       return;
     }
-    if (!canSubmitRegularEdit()) return;
-    form.value?.submit?.();
+    if (canSubmitRegularEdit()) {
+      form.value?.submit?.();
+    }
   },
   escape: () => {
     if (isDisabled.value) return;
@@ -690,14 +711,14 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
           ) {{ state.isTransferMode && isNewEntry ? 'Create Transfer' : 'Save' }}
           UButton(
             color="info"
-            v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
+            v-if="formState.id && (!formState.isProjected || formState.isPending)"
             @click="markAsCleared"
             :loading="state.isClearing"
             :disabled="isDisabled || isPlaidTabActive"
             class="modal-action-button"
           ) Clear
           UButton(
-            color="info"
+            color="secondary"
             v-if="formState.id && !formState.isProjected || formState.id && formState.isPending"
             @click="initiateApply"
             :loading="state.isApplying"
@@ -713,12 +734,12 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
             class="modal-action-button"
           ) Delete
           UButton(
-            color="error"
+            color="warning"
             @click="skipRegisterEntry"
             :loading="state.isSkipping"
             :disabled="isDisabled || isPlaidTabActive"
             class="modal-action-button"
-            v-if="formState.id && formState.reoccurrenceId && formState.isProjected"
+            v-if="formState.id && formState.reoccurrenceId && formState.isProjected && !hideRecurrencePastSkip"
           ) Skip Reoccurrence
         UButton(@click="cancel" color="neutral" :disabled="isDisabled" class="modal-action-button") Close
 </template>

@@ -5,6 +5,47 @@ const FIXED_TEST_DATE = new Date('2024-01-01T00:00:00.000Z');
 const FIXED_TEST_ISO = FIXED_TEST_DATE.toISOString();
 let nextSyntheticId = 1;
 
+function mockIntervalName(intervalId: number): string {
+  if (intervalId === 1) return 'Day';
+  if (intervalId === 2) return 'Week';
+  if (intervalId === 3) return 'Month';
+  return 'Month';
+}
+
+function registerEntryCreatedAtLte(entry: any, lteRaw: unknown): boolean {
+  const lte =
+    lteRaw instanceof Date ? lteRaw : new Date(lteRaw as string | number);
+  const ca =
+    entry.createdAt instanceof Date
+      ? entry.createdAt
+      : new Date(entry.createdAt);
+  return ca.getTime() <= lte.getTime();
+}
+
+function matchesRegisterEntryWhere(entry: any, where: any): boolean {
+  if (!where || Object.keys(where).length === 0) return true;
+  const accountRegisterIdIn = where.accountRegisterId?.in;
+  if (
+    accountRegisterIdIn &&
+    !accountRegisterIdIn.includes(entry.accountRegisterId)
+  ) {
+    return false;
+  }
+  if (where.accountRegisterId?.notIn?.includes(entry.accountRegisterId)) {
+    return false;
+  }
+  const sourceIn = where.sourceAccountRegisterId?.in;
+  if (sourceIn && !sourceIn.includes(entry.sourceAccountRegisterId)) {
+    return false;
+  }
+  if (where.createdAt?.lte && !registerEntryCreatedAtLte(entry, where.createdAt.lte)) {
+    return false;
+  }
+  if (where.isCleared === false && entry.isCleared) return false;
+  if (where.isBalanceEntry === false && entry.isBalanceEntry) return false;
+  return true;
+}
+
 // Mock test database setup
 export async function createTestDatabase(): Promise<PrismaClient> {
   nextSyntheticId = 1;
@@ -25,18 +66,21 @@ export async function createTestDatabase(): Promise<PrismaClient> {
     accountRegister: {
       create: vi.fn().mockImplementation(async (data: any) => {
         const d = data.data;
-        const lb =
-          d.latestBalance !== undefined && d.latestBalance !== null
-            ? Number(d.latestBalance)
-            : (d.balance !== undefined && d.balance !== null ? Number(d.balance) : 0);
-        const bal =
-          d.balance !== undefined && d.balance !== null
-            ? Number(d.balance)
-            : lb;
+        let lb = 0;
+        if (d.latestBalance !== undefined && d.latestBalance !== null) {
+          lb = Number(d.latestBalance);
+        } else if (d.balance !== undefined && d.balance !== null) {
+          lb = Number(d.balance);
+        }
+        let bal = lb;
+        if (d.balance !== undefined && d.balance !== null) {
+          bal = Number(d.balance);
+        }
         const accountRegister = {
           ...d,
           id: d.id || nextSyntheticId++,
           budgetId: d.budgetId ?? 1,
+          subAccountRegisterId: d.subAccountRegisterId ?? null,
           balance: bal,
           latestBalance: lb,
           depreciationRate: d.depreciationRate ?? null,
@@ -72,7 +116,18 @@ export async function createTestDatabase(): Promise<PrismaClient> {
           interestCategoryId: ar.interestCategoryId ?? null,
         }));
       }),
-      update: vi.fn(),
+      update: vi.fn().mockImplementation(async ({ where, data }: any) => {
+        const ar = accountRegisters.find((a: any) => a.id === where.id);
+        if (!ar) return null;
+        if (data.balance?.increment != null) {
+          ar.balance = Number(ar.balance) + Number(data.balance.increment);
+        }
+        if (data.latestBalance?.increment != null) {
+          ar.latestBalance =
+            Number(ar.latestBalance) + Number(data.latestBalance.increment);
+        }
+        return ar;
+      }),
       updateMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
@@ -82,7 +137,7 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         const row = {
           ...data.data,
           id: data.data.id ?? reoccurrences.length + 1,
-          interval: { name: data.data.intervalId === 3 ? "Month" : data.data.intervalId === 2 ? "Week" : data.data.intervalId === 1 ? "Day" : "Month" },
+          interval: { name: mockIntervalName(data.data.intervalId) },
         };
         reoccurrences.push(row);
         return row;
@@ -133,8 +188,34 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         }
         return registerEntries;
       }),
+      groupBy: vi.fn().mockImplementation(async (args: any) => {
+        const { by, where } = args;
+        const filtered = registerEntries.filter((e) =>
+          matchesRegisterEntryWhere(e, where),
+        );
+        const key = by[0];
+        const map = new Map<number, number>();
+        for (const e of filtered) {
+          const k = Number(e[key]);
+          const amt = Number(e.amount);
+          map.set(k, (map.get(k) ?? 0) + amt);
+        }
+        return Array.from(map.entries()).map(([k, sum]) => ({
+          [key]: k,
+          _sum: { amount: sum },
+        }));
+      }),
       update: vi.fn(),
-      updateMany: vi.fn(),
+      updateMany: vi.fn().mockImplementation(async ({ where, data }: any) => {
+        let count = 0;
+        for (const e of registerEntries) {
+          if (matchesRegisterEntryWhere(e, where)) {
+            Object.assign(e, data);
+            count++;
+          }
+        }
+        return { count };
+      }),
       delete: vi.fn(),
       deleteMany: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
@@ -164,11 +245,13 @@ export async function createTestDatabase(): Promise<PrismaClient> {
       findMany: vi.fn().mockImplementation(async (query: any) => {
         if (query?.where?.reoccurrence?.accountId) {
           const accountId = query.where.reoccurrence.accountId;
-          const reoccurrenceIds = reoccurrences
-            .filter((r) => r.accountId === accountId)
-            .map((r) => r.id);
+          const reoccurrenceIds = new Set(
+            reoccurrences
+              .filter((r) => r.accountId === accountId)
+              .map((r) => r.id),
+          );
           return reoccurrenceSplits.filter((s) =>
-            reoccurrenceIds.includes(s.reoccurrenceId)
+            reoccurrenceIds.has(s.reoccurrenceId),
           );
         }
         if (query?.where?.reoccurrenceId) {
@@ -188,9 +271,9 @@ export async function createTestDatabase(): Promise<PrismaClient> {
     },
     $executeRaw: vi.fn().mockResolvedValue(undefined),
     $transaction: vi.fn((callback) => callback(mockDb)),
-  } as any;
+  };
 
-  return mockDb;
+  return mockDb as unknown as PrismaClient;
 }
 
 export async function cleanupTestDatabase(db: any): Promise<void> {

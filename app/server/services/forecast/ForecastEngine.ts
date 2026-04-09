@@ -26,17 +26,17 @@ const FORECAST_DB_TRANSACTION_OPTIONS = {
 } as const;
 
 export class ForecastEngine implements IForecastEngine {
-  private cache: ModernCacheService;
-  private dataLoader: DataLoaderService;
-  private accountService: AccountRegisterService;
-  private reoccurrenceService: ReoccurrenceService;
-  private entryService: RegisterEntryService;
-  private loanCalculator: LoanCalculatorService;
-  private transferService: TransferService;
-  private assetService: AssetDepreciationService;
-  private dataPersister: DataPersisterService;
+  private readonly cache: ModernCacheService;
+  private readonly dataLoader: DataLoaderService;
+  private readonly accountService: AccountRegisterService;
+  private readonly reoccurrenceService: ReoccurrenceService;
+  private readonly entryService: RegisterEntryService;
+  private readonly loanCalculator: LoanCalculatorService;
+  private readonly transferService: TransferService;
+  private readonly assetService: AssetDepreciationService;
+  private readonly dataPersister: DataPersisterService;
 
-  constructor(private db: PrismaClient) {
+  constructor(private readonly db: PrismaClient) {
     this.cache = new ModernCacheService();
     this.dataLoader = new DataLoaderService(db, this.cache);
     this.loanCalculator = new LoanCalculatorService();
@@ -224,6 +224,16 @@ export class ForecastEngine implements IForecastEngine {
             context.budgetId,
           );
 
+          const pocketRegisterIds = activeAccountRegisters
+            .filter((r) => r.subAccountRegisterId != null)
+            .map((r) => r.id);
+          if (pocketRegisterIds.length > 0) {
+            await this.dataPersister.autoApplyPastPocketEntries(
+              pocketRegisterIds,
+              tx,
+            );
+          }
+
           // 15. Final cleanup
           await this.dataPersister.performFinalCleanup(
             context.accountId,
@@ -247,7 +257,7 @@ export class ForecastEngine implements IForecastEngine {
         accountRegisters: accountData.accountRegisters.map((acc) => ({
           ...acc,
           statementAt: dateTimeService.toDate(acc.statementAt),
-        })) as any[], // TODO: Fix type mapping for AccountRegister
+        })) as any[], // Cache vs. client AccountRegister shapes differ at this boundary.
         isSuccess: true,
         datesProcessed,
       };
@@ -362,9 +372,10 @@ export class ForecastEngine implements IForecastEngine {
           ...reoccurrence,
           amount: new Prisma.Decimal(reoccurrence.amount),
           amountAdjustmentValue:
-            reoccurrence.amountAdjustmentValue != null
-              ? new Prisma.Decimal(reoccurrence.amountAdjustmentValue)
-              : null,
+            reoccurrence.amountAdjustmentValue === null ||
+            reoccurrence.amountAdjustmentValue === undefined
+              ? null
+              : new Prisma.Decimal(reoccurrence.amountAdjustmentValue),
           lastAt: reoccurrence.lastAt || dateTimeService.nowDate(),
           updatedAt: reoccurrence.updatedAt || dateTimeService.nowDate(),
         })),
@@ -466,25 +477,25 @@ export class ForecastEngine implements IForecastEngine {
   }
 
   private convertToFinalFormat(results: CacheRegisterEntry[]): RegisterEntry[] {
-    return results
-      .sort((a, b) => (a.seq && b.seq ? a.seq - b.seq : 0))
-      .map((item) => ({
-        id: item.id === "new" ? undefined : item.id,
-        accountRegisterId: item.accountRegisterId,
-        sourceAccountRegisterId: item.sourceAccountRegisterId || undefined,
-        createdAt: dateTimeService.toDate(item.createdAt).toISOString(),
-        description: item.description,
-        reoccurrenceId: item.reoccurrenceId,
-        amount: item.amount,
-        balance: item.balance,
-        typeId: item.typeId,
-        categoryId: item.categoryId ?? null,
-        isCleared: item.isCleared,
-        isReconciled: item.isReconciled,
-        isProjected: item.isProjected,
-        isBalanceEntry: item.isBalanceEntry,
-        isPending: item.isPending,
-      }));
+    const ordered = [...results];
+    ordered.sort((a, b) => (a.seq && b.seq ? a.seq - b.seq : 0));
+    return ordered.map((item) => ({
+      id: item.id === "new" ? undefined : item.id,
+      accountRegisterId: item.accountRegisterId,
+      sourceAccountRegisterId: item.sourceAccountRegisterId || undefined,
+      createdAt: dateTimeService.toDate(item.createdAt).toISOString(),
+      description: item.description,
+      reoccurrenceId: item.reoccurrenceId,
+      amount: item.amount,
+      balance: item.balance,
+      typeId: item.typeId,
+      categoryId: item.categoryId ?? null,
+      isCleared: item.isCleared,
+      isReconciled: item.isReconciled,
+      isProjected: item.isProjected,
+      isBalanceEntry: item.isBalanceEntry,
+      isPending: item.isPending,
+    }));
   }
 
   // Public methods for testing and debugging

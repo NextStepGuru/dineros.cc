@@ -5,6 +5,7 @@ import { useListStore } from "../stores/listStore";
 import { formatDate, getAccountTypeLabel } from "~/lib/utils";
 import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
+import ModalsEditAccountRegister from "~/components/modals/EditAccountRegister.vue";
 import {
   dispatchNotificationsRefresh,
   dismissNotification,
@@ -23,10 +24,6 @@ type ForecastRiskAlert = {
   riskAt: string;
   daysUntilRisk: number;
 };
-
-const ModalsEditAccountRegister = defineAsyncComponent(
-  () => import("~/components/modals/EditAccountRegister.vue"),
-);
 
 const ModalsManageCategories = defineAsyncComponent(
   () => import("~/components/modals/ManageCategories.vue"),
@@ -829,7 +826,10 @@ const categoriesModal = overlay.create(ModalsManageCategories);
 
 const selectedAccountRegisterId = ref<number | null>(null);
 
-function handleTableClick(data: AccountRegister) {
+function openAccountRegisterModal(
+  data: AccountRegister,
+  initialTab?: string,
+) {
   if (snapshotMode.isSnapshotMode.value) return;
   selectedAccountRegisterId.value = data.id;
   const editAccountRegister: ModelAccountRegisterProps = {
@@ -837,6 +837,7 @@ function handleTableClick(data: AccountRegister) {
     title: `Edit '${data.name}' Account`,
     description: "",
     accountRegister: data,
+    initialTab: initialTab ?? "account",
     callback: (data: AccountRegister) => {
       listStore.patchAccountRegister(data);
       modal.close();
@@ -845,6 +846,10 @@ function handleTableClick(data: AccountRegister) {
   };
 
   modal.open(editAccountRegister);
+}
+
+function handleTableClick(data: AccountRegister) {
+  openAccountRegisterModal(data);
 }
 
 const columns: TableColumn<AccountRegister>[] = [
@@ -1766,12 +1771,12 @@ watch(workflowMode, (w) => {
                   )
                     UIcon(name="i-lucide-chevron-right" class="frog-text-muted text-sm")
                   div(@click.prevent="handleTableClick(row)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(row)" class="cursor-pointer font-semibold frog-text truncate min-w-0") {{ row.name }}
-                  NuxtLink(
+                  button(
                     v-if="!isSnapshotMode && isCashAccountType(row.typeId)"
-                    :to="`/cash-on-hand/${row.id}`"
+                    type="button"
                     class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
                     aria-label="Cash count"
-                    @click.stop
+                    @click.stop="openAccountRegisterModal(row, 'cash')"
                   )
                     UIcon(name="i-lucide-banknote" class="text-base")
                   div(
@@ -1822,12 +1827,12 @@ watch(workflowMode, (w) => {
                       div(class="w-4 h-4 mr-2 shrink-0 flex items-center justify-center frog-status-positive" aria-hidden="true")
                         UIcon(name="i-lucide-corner-down-right" class="text-xs")
                       span(class="truncate min-w-0") {{ subRow.name }}
-                    NuxtLink(
+                    button(
                       v-if="!isSnapshotMode && isCashAccountType(subRow.typeId)"
-                      :to="`/cash-on-hand/${subRow.id}`"
+                      type="button"
                       class="shrink-0 ml-1.5 inline-flex p-1 rounded-md frog-link hover:bg-elevated"
                       aria-label="Cash count"
-                      @click.stop
+                      @click.stop="openAccountRegisterModal(subRow, 'cash')"
                     )
                       UIcon(name="i-lucide-banknote" class="text-base")
                 template(v-for="dcn in [subRowDcn(subRow)]" :key="`sub-dcn-${subRow.id}`")
