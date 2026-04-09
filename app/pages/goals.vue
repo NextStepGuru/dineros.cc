@@ -24,7 +24,7 @@ useHead({ title: "Goals | Dineros" });
 const listStore = useListStore();
 const overlay = useOverlay();
 const modal = overlay.create(ModalsEditSavingsGoal);
-const globalFilter = ref("");
+const globalFilter = useSharedTableGlobalFilter();
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 const combinedTableFilterRef = ref<{
   collapse: () => void;

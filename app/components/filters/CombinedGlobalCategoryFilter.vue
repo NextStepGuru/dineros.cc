@@ -27,20 +27,87 @@ const props = withDefaults(
   },
 );
 
-const expanded = ref(false);
+/** True after opening via the sliders control until cleared, blurred out, or all filters are empty. */
+const manuallyExpanded = ref(false);
+
+/** True while focus is in the search input, category menu, or reset control (incl. portaled menus). */
+const focusInsideExpandedChrome = ref(false);
+
+const expandedChromeRef = ref<HTMLElement | null>(null);
+
+const hasActiveFilter = computed(
+  () =>
+    globalFilter.value.trim().length > 0 ||
+    categoryFilter.value !== CATEGORY_FILTER_ALL,
+);
+
+const expanded = computed(
+  () =>
+    hasActiveFilter.value ||
+    manuallyExpanded.value ||
+    focusInsideExpandedChrome.value,
+);
+
+function focusInPortaledOverlay(el: Element | null): boolean {
+  if (!el || typeof el.closest !== "function") return false;
+  return Boolean(
+    el.closest('[role="listbox"]') ||
+      el.closest('[role="menu"]') ||
+      el.closest("[data-reka-popper-content-wrapper]"),
+  );
+}
+
+function focusStillInFilterChrome(active: Element | null): boolean {
+  const root = expandedChromeRef.value;
+  if (!active || !root) return false;
+  if (root.contains(active)) return true;
+  return focusInPortaledOverlay(active);
+}
+
+function onExpandedChromeFocusIn() {
+  focusInsideExpandedChrome.value = true;
+}
+
+function onExpandedChromeFocusOut() {
+  requestAnimationFrame(() => {
+    const ae = document.activeElement;
+    if (focusStillInFilterChrome(ae)) return;
+    focusInsideExpandedChrome.value = false;
+    if (!hasActiveFilter.value) {
+      manuallyExpanded.value = false;
+    }
+  });
+}
+
+watch(hasActiveFilter, (active, wasActive) => {
+  if (wasActive && !active && !focusInsideExpandedChrome.value) {
+    manuallyExpanded.value = false;
+  }
+});
+
+function blurFilterInputIfFocused() {
+  const el = document.getElementById(props.filterInputId);
+  if (el && document.activeElement === el) {
+    (el as HTMLElement).blur();
+  }
+}
 
 function collapse() {
-  expanded.value = false;
+  manuallyExpanded.value = false;
+  focusInsideExpandedChrome.value = false;
+  blurFilterInputIfFocused();
 }
 
 function resetAndCollapse() {
   globalFilter.value = "";
   categoryFilter.value = CATEGORY_FILTER_ALL;
-  expanded.value = false;
+  manuallyExpanded.value = false;
+  focusInsideExpandedChrome.value = false;
+  blurFilterInputIfFocused();
 }
 
 async function expandAndFocus() {
-  expanded.value = true;
+  manuallyExpanded.value = true;
   await nextTick();
   document.getElementById(props.filterInputId)?.focus();
 }
@@ -66,40 +133,47 @@ defineExpose({
       </UTooltip>
     </template>
     <template v-else>
-      <UInput
-        :id="props.filterInputId"
-        v-model="globalFilter"
-        size="sm"
-        :class="props.inputClass"
-        placeholder="Filter..."
-        aria-label="Filter table by text"
-      />
-      <UTooltip
-        v-if="showCategoryFilter"
-        text="Filter by category"
-        :delay-duration="150"
+      <div
+        ref="expandedChromeRef"
+        class="flex flex-wrap xl:flex-nowrap items-center gap-1 min-w-0"
+        @focusin="onExpandedChromeFocusIn"
+        @focusout="onExpandedChromeFocusOut"
       >
-        <USelectMenu
-          v-model="categoryFilter"
-          :items="props.categoryItems"
-          value-key="value"
-          label-key="label"
-          :filter-fields="['label', 'name']"
+        <UInput
+          :id="props.filterInputId"
+          v-model="globalFilter"
           size="sm"
-          :class="props.menuClass"
-          placeholder="All categories"
-          search-placeholder="Search…"
-          aria-label="Filter by category"
+          :class="props.inputClass"
+          placeholder="Filter..."
+          aria-label="Filter table by text"
         />
-      </UTooltip>
-      <UTooltip text="Reset filters" :delay-duration="150">
-        <BaseIconButton
-          icon="i-lucide-x"
-          title="Reset filters"
-          aria-label="Reset filters"
-          @click="resetAndCollapse()"
-        />
-      </UTooltip>
+        <UTooltip
+          v-if="showCategoryFilter"
+          text="Filter by category"
+          :delay-duration="150"
+        >
+          <USelectMenu
+            v-model="categoryFilter"
+            :items="props.categoryItems"
+            value-key="value"
+            label-key="label"
+            :filter-fields="['label', 'name']"
+            size="sm"
+            :class="props.menuClass"
+            placeholder="All categories"
+            search-placeholder="Search…"
+            aria-label="Filter by category"
+          />
+        </UTooltip>
+        <UTooltip text="Reset filters" :delay-duration="150">
+          <BaseIconButton
+            icon="i-lucide-x"
+            title="Reset filters"
+            aria-label="Reset filters"
+            @click="resetAndCollapse()"
+          />
+        </UTooltip>
+      </div>
     </template>
   </div>
 </template>

@@ -1271,7 +1271,7 @@ async function handlePocketDragEnd(updatedPockets: AccountRegister[]) {
   }
 }
 
-const globalFilter = ref("");
+const globalFilter = useSharedTableGlobalFilter();
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 /** Satisfies `FiltersCombinedGlobalCategoryFilter` props when category dropdown is hidden. */
 const accountRegistersCategoryFilterItems: {
@@ -1448,7 +1448,7 @@ watch(workflowMode, (w) => {
     )
       template(#description)
         span.frog-text-muted Live balances for monitoring. Use Register (Past) and Reconciliation for statement matching — forecast tools are hidden in this workflow.
-    div(v-if="draggableAccountRegisters.length === 0" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
+    div(class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
         v-model:show-shortcuts="showShortcuts"
@@ -1702,94 +1702,6 @@ watch(workflowMode, (w) => {
             )
               div.accounts-sticky-head
                 div(class="flex flex-col min-h-0")
-                  div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
-                    div(class="min-w-0 flex-1 flex items-center gap-2")
-                      RegisterListToolbar(
-                        v-model:global-filter="globalFilter"
-                        v-model:show-shortcuts="showShortcuts"
-                        :show-add="!isSnapshotMode"
-                        :show-refresh="false"
-                        add-tooltip="Add account"
-                        add-title="Add account"
-                        add-aria-label="Add account"
-                        @add="handleAddAccountRegister"
-                      )
-                        template(#middle)
-                          UTooltip(text="Manage categories" :delay-duration="150")
-                            BaseIconButton(
-                              icon="i-lucide-tags"
-                              title="Manage categories"
-                              aria-label="Manage categories"
-                              :disabled="!listStore.getAccountRegisters[0]?.accountId && !listStore.getAccounts?.[0]?.id"
-                              @click="handleManageCategories"
-                            )
-                          UTooltip(v-if="workflowMode === 'forecasting'" text="Save snapshot" :delay-duration="150")
-                            BaseIconButton(
-                              icon="i-lucide-save"
-                              title="Save snapshot"
-                              aria-label="Save snapshot"
-                              :loading="isSavingSnapshot"
-                              :disabled="!currentBudgetAccountId || !!isSnapshotMode"
-                              @click="handleSaveSnapshotClick"
-                            )
-                          UDropdownMenu(:items="sortMenuItems")
-                            UTooltip(text="Sort accounts" :delay-duration="150")
-                              BaseIconButton(
-                                icon="i-lucide-arrow-up-down"
-                                title="Sort accounts"
-                                aria-label="Sort accounts"
-                                :disabled="!!isSnapshotMode"
-                              )
-                          UDropdownMenu(:items="snapshotMenuItems")
-                            UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
-                              BaseIconButton(
-                                icon="i-lucide-camera"
-                                :active="!!isSnapshotMode"
-                                :title="`Snapshot view: ${selectedSnapshotLabel}`"
-                                :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
-                              )
-                          UTooltip(v-if="workflowMode === 'forecasting'" text="Projected balance (end of month)" :delay-duration="150")
-                            BaseIconButton(
-                              icon="i-lucide-line-chart"
-                              :active="showProjectedBalanceTimeline"
-                              title="Projected balance timeline"
-                              aria-label="Toggle projected balance timeline"
-                              :disabled="!!isSnapshotMode || draggableAccountRegisters.length === 0"
-                              @click="showProjectedBalanceTimeline = !showProjectedBalanceTimeline"
-                            )
-                        template(#filter)
-                          FiltersCombinedGlobalCategoryFilter(
-                            ref="combinedTableFilterRef"
-                            v-model:global-filter="globalFilter"
-                            v-model:category-filter="categoryFilter"
-                            :category-items="accountRegistersCategoryFilterItems"
-                            :show-category-filter="false"
-                            filter-input-id="search"
-                            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
-                          )
-                        template(#trailing)
-                          .ml-auto(
-                            v-if="workflowMode === 'forecasting'"
-                            class="text-muted text-right cursor-pointer select-none hover:opacity-80 transition-opacity text-sm shrink-0"
-                            role="button"
-                            tabindex="0"
-                            @click="showCrossAccountSnapshot = !showCrossAccountSnapshot"
-                            @keydown.enter.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
-                            @keydown.space.prevent="showCrossAccountSnapshot = !showCrossAccountSnapshot"
-                          )
-                            span Your estimated net worth
-                            b.text-nowrap
-                              | &nbsp;
-                              DollarFormat(:amount="estimatedNetWorth")
-                              | &nbsp;
-                          .ml-auto(
-                            v-else
-                            class="text-muted text-right text-sm shrink-0")
-                            span Your estimated net worth
-                            b.text-nowrap
-                              | &nbsp;
-                              DollarFormat(:amount="estimatedNetWorth")
-                              | &nbsp;
                   div(
                     v-if="showDebitCreditColumns"
                     class="accounts-inner-head-grid accounts-inner-head-grid--6 w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
