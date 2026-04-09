@@ -1026,7 +1026,7 @@ function scrollToLowestBalance() {
   }
 }
 
-const globalFilter = ref("");
+const globalFilter = useSharedTableGlobalFilter();
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 /** Pick category id from `USelectMenu` model (string or item object). */
 function registerCategoryFilterKey(raw: unknown): string {

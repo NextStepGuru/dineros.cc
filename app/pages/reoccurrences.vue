@@ -251,7 +251,7 @@ const columns: TableColumn<Reoccurrence>[] = [
   },
 ];
 
-const globalFilter = ref("");
+const globalFilter = useSharedTableGlobalFilter();
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
 const combinedTableFilterRef = ref<{
   collapse: () => void;
@@ -418,7 +418,7 @@ watch(
 <template lang="pug">
   section(class="my-4 mx-2")
     h1(class="sr-only") Recurring Entries
-    div(v-if="reoccurrencesForTable.length === 0" class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
+    div(class="w-full min-w-0 flex flex-wrap xl:flex-nowrap items-center gap-2 mb-4")
       RegisterListToolbar(
         v-model:global-filter="globalFilter"
         v-model:show-shortcuts="showShortcuts"
@@ -500,11 +500,6 @@ watch(
         v-else-if="listStore.getIsListsLoading && reoccurrencesForTable.length === 0"
         class="flex flex-col min-h-0"
       )
-        div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
-          div(class="min-w-0 flex-1 flex items-center gap-2")
-            USkeleton(class="h-9 grow min-w-32 sm:max-w-48 rounded-md")
-            USkeleton(class="h-9 w-9 rounded-md shrink-0")
-            USkeleton(class="h-9 w-9 rounded-md shrink-0")
         div(
           class="reoccurrences-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
         )
@@ -558,37 +553,6 @@ watch(
             )
               div.reoccurrences-sticky-head
                 div(class="flex flex-col min-h-0")
-                  div(class="flex gap-2 border-b border-default px-2 py-2 items-center flex-wrap xl:flex-nowrap")
-                    div(class="min-w-0 flex-1 flex items-center gap-2")
-                      RegisterListToolbar(
-                        v-model:global-filter="globalFilter"
-                        v-model:show-shortcuts="showShortcuts"
-                        :show-refresh="false"
-                        filter-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
-                        add-tooltip="Add recurring entry"
-                        add-title="Add recurring entry"
-                        add-aria-label="Add recurring entry"
-                        @add="handleAddReoccurrence"
-                      )
-                        template(#middle)
-                          UTooltip(text="Recalculate forecast" :delay-duration="150")
-                            BaseIconButton(
-                              icon="i-lucide-calculator"
-                              title="Recalculate forecast"
-                              aria-label="Recalculate forecast"
-                              @click="handleRecalculate"
-                              :loading="isRecalculating"
-                              :disabled="isRecalculating"
-                            )
-                        template(#filter)
-                          FiltersCombinedGlobalCategoryFilter(
-                            ref="combinedTableFilterRef"
-                            v-model:global-filter="globalFilter"
-                            v-model:category-filter="categoryFilter"
-                            :category-items="categoryFilterSelectItems"
-                            filter-input-id="search"
-                            input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
-                          )
                   div(
                     class="reoccurrences-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
                   )
