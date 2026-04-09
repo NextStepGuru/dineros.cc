@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { expect, describe, it } from "vitest";
 import {
   recalculateRunningBalanceAndSort,
@@ -412,7 +411,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     expect(pendingBeforeBalance[1].balance).toBe(830); // Jan 17: 830
   });
 
-  it("should handle manual entries with isMatched=true before balance entry", () => {
+  it("should keep posted import before balance and all manuals after balance", () => {
     const balance = 1000;
     const type = "debit";
 
@@ -429,7 +428,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=true (should go before balance)
+      // Manual entry with isMatched=true (after balance row)
       {
         amount: -50,
         balance: 0,
@@ -441,7 +440,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=false (still after balance when not pending)
+      // Manual entry with isMatched=false (after balance row)
       {
         amount: -75,
         balance: 0,
@@ -478,27 +477,23 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntry = result[balanceEntryIndex];
     const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
 
-    // Matched manual + posted import before balance (chrono)
-    expect(entriesBeforeBalance.length).toBe(2);
-    expect(entriesBeforeBalance[0].amount).toBe(-50);
-    expect(entriesBeforeBalance[0].isManualEntry).toBe(true);
-    expect(entriesBeforeBalance[0].isMatched).toBe(true);
-    expect(entriesBeforeBalance[1].amount).toBe(-100);
-    expect(entriesBeforeBalance[1].isManualEntry).toBe(false);
+    expect(entriesBeforeBalance.length).toBe(1);
+    expect(entriesBeforeBalance[0].amount).toBe(-100);
+    expect(entriesBeforeBalance[0].isManualEntry).toBe(false);
 
     expect(balanceEntry.isBalanceEntry).toBe(true);
     expect(balanceEntry.balance).toBe(balance);
 
-    expect(entriesAfterBalance.length).toBe(1);
+    expect(entriesAfterBalance.length).toBe(2);
+    expect(entriesAfterBalance[0].amount).toBe(-50);
     expect(entriesAfterBalance[0].isManualEntry).toBe(true);
-    expect(entriesAfterBalance[0].isMatched).toBe(false);
-    expect(entriesAfterBalance[0].amount).toBe(-75);
+    expect(entriesAfterBalance[1].amount).toBe(-75);
+    expect(entriesAfterBalance[1].isManualEntry).toBe(true);
 
-    // Backward (newest first in stack): Jan 18 -100 then Jan 16 -50 → 1100, then 1150
-    expect(entriesBeforeBalance[0].balance).toBe(1150); // Jan 16 row
-    expect(entriesBeforeBalance[1].balance).toBe(1100); // Jan 18 row
+    expect(entriesBeforeBalance[0].balance).toBe(1100);
 
-    expect(entriesAfterBalance[0].balance).toBe(balance - 75);
+    expect(entriesAfterBalance[0].balance).toBe(950);
+    expect(entriesAfterBalance[1].balance).toBe(875);
   });
 
   it("should handle multiple manual entries with mixed isMatched values", () => {
@@ -518,7 +513,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=true (before balance)
+      // Manual entry with isMatched=true (after balance)
       {
         amount: 25,
         balance: 0,
@@ -530,7 +525,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Another manual entry with isMatched=true (before balance)
+      // Another manual entry with isMatched=true (after balance)
       {
         amount: 50,
         balance: 0,
@@ -579,38 +574,22 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntry = result[balanceEntryIndex];
     const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
 
-    // Should have 2 manual entries before balance (both isMatched=true)
-    expect(entriesBeforeBalance.length).toBe(2);
-    expect(
-      entriesBeforeBalance.every((r) => r.isManualEntry && r.isMatched),
-    ).toBe(true);
+    expect(entriesBeforeBalance.length).toBe(0);
 
-    // Verify chronological order for entries before balance (older first)
-    expect(entriesBeforeBalance[0].amount).toBe(25); // Jan 16 (older)
-    expect(entriesBeforeBalance[1].amount).toBe(50); // Jan 17 (newer)
-
-    // Balance entry should be present
     expect(balanceEntry.isBalanceEntry).toBe(true);
     expect(balanceEntry.balance).toBe(balance);
 
-    // Should have 2 manual entries after balance (both isMatched=false)
-    expect(entriesAfterBalance.length).toBe(2);
-    expect(
-      entriesAfterBalance.every((r) => r.isManualEntry && !r.isMatched),
-    ).toBe(true);
+    expect(entriesAfterBalance.length).toBe(4);
+    expect(entriesAfterBalance.every((r) => r.isManualEntry)).toBe(true);
+    expect(entriesAfterBalance[0].amount).toBe(25);
+    expect(entriesAfterBalance[1].amount).toBe(50);
+    expect(entriesAfterBalance[2].amount).toBe(75);
+    expect(entriesAfterBalance[3].amount).toBe(100);
 
-    // Verify chronological order for entries after balance (older first)
-    expect(entriesAfterBalance[0].amount).toBe(75); // Jan 18 (older)
-    expect(entriesAfterBalance[1].amount).toBe(100); // Jan 19 (newer)
-
-    // Verify running balance calculations for entries before balance
-    // Working backwards: 500 - 50 = 450, then 450 - 25 = 425
-    expect(entriesBeforeBalance[0].balance).toBe(425); // Jan 16: 425
-    expect(entriesBeforeBalance[1].balance).toBe(450); // Jan 17: 450
-
-    // Verify running balance calculations for entries after balance
-    expect(entriesAfterBalance[0].balance).toBe(balance + 75); // 575
-    expect(entriesAfterBalance[1].balance).toBe(balance + 75 + 100); // 675
+    expect(entriesAfterBalance[0].balance).toBe(525);
+    expect(entriesAfterBalance[1].balance).toBe(575);
+    expect(entriesAfterBalance[2].balance).toBe(650);
+    expect(entriesAfterBalance[3].balance).toBe(750);
   });
 
   it("should handle manual entries combined with pending entries", () => {
@@ -642,7 +621,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: true,
         isProjected: false,
       },
-      // Manual entry with isMatched=true (before balance)
+      // Manual entry with isMatched=true (after balance row)
       {
         amount: -40,
         balance: 0,
@@ -654,7 +633,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=false (after balance)
+      // Manual entry with isMatched=false (after balance row)
       {
         amount: -50,
         balance: 0,
@@ -691,56 +670,30 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceEntry = result[balanceEntryIndex];
     const entriesAfterBalance = result.slice(balanceEntryIndex + 1);
 
-    // Should have 2 entries before balance: pending entry + manual entry (isMatched=true)
-    expect(entriesBeforeBalance.length).toBe(2);
+    expect(entriesBeforeBalance.length).toBe(1);
+    expect(entriesBeforeBalance[0].amount).toBe(-30);
+    expect(entriesBeforeBalance[0].isPending).toBe(true);
+    expect(entriesBeforeBalance[0].isManualEntry).toBe(false);
 
-    // Find pending and manual entries before balance
-    const pendingBeforeBalance = entriesBeforeBalance.find(
-      (r) => !r.isProjected && r.isPending,
-    );
-    const manualBeforeBalance = entriesBeforeBalance.find(
-      (r) => r.isManualEntry && r.isMatched,
-    );
-
-    assert(pendingBeforeBalance);
-    expect(pendingBeforeBalance.amount).toBe(-30);
-
-    assert(manualBeforeBalance);
-    expect(manualBeforeBalance.amount).toBe(-40);
-
-    // Verify chronological order (older first)
-    expect(entriesBeforeBalance[0].amount).toBe(-30); // Jan 16 (pending)
-    expect(entriesBeforeBalance[1].amount).toBe(-40); // Jan 17 (manual matched)
-
-    // Balance entry should be present
     expect(balanceEntry.isBalanceEntry).toBe(true);
     expect(balanceEntry.balance).toBe(balance);
 
-    // Should have 2 entries after balance: manual entry (isMatched=false) + projected entry
-    expect(entriesAfterBalance.length).toBe(2);
+    expect(entriesAfterBalance.length).toBe(3);
+    expect(entriesAfterBalance[0].amount).toBe(-40);
+    expect(entriesAfterBalance[0].isManualEntry).toBe(true);
+    expect(entriesAfterBalance[1].amount).toBe(-50);
+    expect(entriesAfterBalance[1].isManualEntry).toBe(true);
+    expect(entriesAfterBalance[2].amount).toBe(-60);
+    expect(entriesAfterBalance[2].isProjected).toBe(true);
 
-    const manualAfterBalance = entriesAfterBalance.find(
-      (r) => r.isManualEntry && !r.isMatched,
-    );
-    const projectedEntry = entriesAfterBalance.find((r) => r.isProjected);
+    expect(entriesBeforeBalance[0].balance).toBe(830);
 
-    assert(manualAfterBalance);
-    expect(manualAfterBalance.amount).toBe(-50);
-
-    assert(projectedEntry);
-    expect(projectedEntry.amount).toBe(-60);
-
-    // Verify running balance calculations for entries before balance
-    // Working backwards: 800 - (-40) = 840, then 840 - (-30) = 870
-    expect(entriesBeforeBalance[0].balance).toBe(870); // Jan 16 (pending): 870
-    expect(entriesBeforeBalance[1].balance).toBe(840); // Jan 17 (manual): 840
-
-    // Verify running balance calculations for entries after balance
-    expect(entriesAfterBalance[0].balance).toBe(balance - 50); // 750 (manual)
-    expect(entriesAfterBalance[1].balance).toBe(balance - 50 - 60); // 690 (projected)
+    expect(entriesAfterBalance[0].balance).toBe(760);
+    expect(entriesAfterBalance[1].balance).toBe(710);
+    expect(entriesAfterBalance[2].balance).toBe(650);
   });
 
-  it("should explicitly test manual entry placement - isMatched=false goes after balance", () => {
+  it("should place non-pending manual entries after balance row", () => {
     const balance = 1000;
     const type = "debit";
 
@@ -757,7 +710,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=false (SHOULD go AFTER balance)
+      // Manual entry with isMatched=false (after balance row)
       {
         amount: -100,
         balance: 0,
@@ -765,7 +718,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: true,
-        isMatched: false, // This is the key: FALSE means AFTER balance
+        isMatched: false,
         isPending: false,
         isProjected: false,
       },
@@ -777,21 +730,18 @@ describe("recalculateRunningBalanceAndSort", () => {
       type,
     });
 
-    // Find positions
     const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
     const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
 
-    // Manual entry with isMatched=false should come AFTER balance entry
     expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
     expect(result[manualEntryIndex].isMatched).toBe(false);
     expect(result[manualEntryIndex].isManualEntry).toBe(true);
-
-    // Verify the actual order
     expect(result[balanceIndex].isBalanceEntry).toBe(true);
     expect(result[manualEntryIndex].amount).toBe(-100);
+    expect(result[manualEntryIndex].balance).toBe(900);
   });
 
-  it("should explicitly test manual entry placement - isMatched=true goes before balance", () => {
+  it("should place isMatched=true manual entries after balance row", () => {
     const balance = 1000;
     const type = "debit";
 
@@ -808,7 +758,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual entry with isMatched=true (SHOULD go BEFORE balance)
+      // Manual entry with isMatched=true (after balance row)
       {
         amount: -100,
         balance: 0,
@@ -816,7 +766,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isBalanceEntry: false,
         isCleared: false,
         isManualEntry: true,
-        isMatched: true, // This is the key: TRUE means BEFORE balance
+        isMatched: true,
         isPending: false,
         isProjected: false,
       },
@@ -832,8 +782,7 @@ describe("recalculateRunningBalanceAndSort", () => {
     const balanceIndex = result.findIndex((r) => r.isBalanceEntry);
     const manualEntryIndex = result.findIndex((r) => r.isManualEntry);
 
-    // Manual entry with isMatched=true should come BEFORE balance entry
-    expect(manualEntryIndex).toBeLessThan(balanceIndex);
+    expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
     expect(result[manualEntryIndex].isMatched).toBe(true);
     expect(result[manualEntryIndex].isManualEntry).toBe(true);
 
@@ -859,7 +808,7 @@ describe("recalculateRunningBalanceAndSort", () => {
         isPending: false,
         isProjected: false,
       },
-      // Manual pending (unmatched) — before balance with bank-held activity
+      // Manual pending (unmatched) — after balance row with non-manual pending before
       {
         amount: -100,
         balance: 0,
@@ -897,15 +846,106 @@ describe("recalculateRunningBalanceAndSort", () => {
       (r) => !r.isManualEntry && r.isPending,
     );
 
-    expect(manualEntryIndex).toBeLessThan(balanceIndex);
+    expect(manualEntryIndex).toBeGreaterThan(balanceIndex);
     expect(regularPendingIndex).toBeLessThan(balanceIndex);
     expect(result[manualEntryIndex].isPending).toBe(true);
     expect(result[manualEntryIndex].isManualEntry).toBe(true);
 
-    expect(regularPendingIndex).toBeGreaterThan(manualEntryIndex);
+    expect(regularPendingIndex).toBeLessThan(manualEntryIndex);
     expect(result[regularPendingIndex].amount).toBe(-50);
     expect(result[balanceIndex].isBalanceEntry).toBe(true);
     expect(result[manualEntryIndex].amount).toBe(-100);
+    expect(result[regularPendingIndex].balance).toBe(1050);
+    expect(result[manualEntryIndex].balance).toBe(900);
+  });
+
+  it("should interleave manual and non-manual entries after balance by date", () => {
+    const balance = 1000;
+    const type = "debit";
+
+    const testEntries: PartialRegisterEntry[] = [
+      {
+        amount: 1000,
+        balance: 1000,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Non-manual projected (Apr 5)
+      {
+        amount: -9,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-04-05"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: true,
+      },
+      // Manual entry (May 15) — later date than non-manual above
+      {
+        amount: -500,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-05-15"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      // Non-manual projected (Apr 6)
+      {
+        amount: -10,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-04-06"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: true,
+      },
+      // Non-manual projected (Apr 7)
+      {
+        amount: -250,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-04-07"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: true,
+      },
+    ];
+
+    const result = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(testEntries)),
+      balance,
+      type,
+    });
+
+    const balanceEntryIndex = result.findIndex((r) => r.isBalanceEntry);
+    const afterBalance = result.slice(balanceEntryIndex + 1);
+
+    expect(afterBalance.length).toBe(4);
+    // All entries sorted by date regardless of manual vs non-manual
+    expect(afterBalance[0].amount).toBe(-9);   // Apr 5 (non-manual)
+    expect(afterBalance[1].amount).toBe(-10);  // Apr 6 (non-manual)
+    expect(afterBalance[2].amount).toBe(-250); // Apr 7 (non-manual)
+    expect(afterBalance[3].amount).toBe(-500); // May 15 (manual)
+
+    // Forward running balance from 1000
+    expect(afterBalance[0].balance).toBe(991);
+    expect(afterBalance[1].balance).toBe(981);
+    expect(afterBalance[2].balance).toBe(731);
+    expect(afterBalance[3].balance).toBe(231);
   });
 
   it("should return sorted entries when balance entry is missing", () => {

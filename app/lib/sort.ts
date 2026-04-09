@@ -13,16 +13,15 @@ export type PartialRegisterEntry = {
   isCleared: boolean;
 };
 
-// Clear helper functions to determine entry placement
+// Clear helper functions to determine entry placement (relative to synthetic balance row).
 const shouldGoBeforeBalance = (entry: PartialRegisterEntry): boolean => {
   if (entry.isManualEntry) {
-    // Matched manual lines align with the bank; pending manual lines have hit the account
-    // but are not accepted yet — same side of the anchor as matched.
-    return entry.isMatched === true || entry.isPending === true;
+    // Manual lines render below the balance row; running balance continues forward after anchor.
+    return false;
   }
 
-  // Non-manual: any real (non-projected) uncleared activity is before the balance anchor,
-  // including posted imports where isPending is false but the user has not cleared yet.
+  // Non-manual: any real (non-projected) uncleared activity is before the balance anchor
+  // (e.g. pending bank activity not yet cleared), including posted imports not cleared yet.
   return !entry.isProjected;
 };
 
@@ -175,11 +174,15 @@ export const recalculateRunningBalanceAndSort = <
   const clearedEntries = registerEntries.filter(isCleared);
   const entriesBeforeBalance = registerEntries.filter(
     (entry) =>
-      !isCleared(entry) && !isBalance(entry) && shouldGoBeforeBalance(entry),
+      !isCleared(entry) &&
+      !isBalance(entry) &&
+      shouldGoBeforeBalance(entry),
   );
   const entriesAfterBalance = registerEntries.filter(
     (entry) =>
-      !isCleared(entry) && !isBalance(entry) && !shouldGoBeforeBalance(entry),
+      !isCleared(entry) &&
+      !isBalance(entry) &&
+      !shouldGoBeforeBalance(entry),
   );
 
   // Process each category
@@ -194,10 +197,20 @@ export const recalculateRunningBalanceAndSort = <
     type,
     "oldest-first",
   );
-  const processedEntriesBeforeBalance = calculateBackwardBalance(
-    sortedEntriesBeforeBalance,
-    startingBalance,
-  );
+  // Pending rows strictly before the anchor timestamp are not yet reflected in
+  // `startingBalance`; backward walk (pre-anchor ledger) would show an inflated
+  // "balance before debit". Use the same forward accumulation as post-anchor rows.
+  const onlyPendingStrictlyBeforeAnchor =
+    sortedEntriesBeforeBalance.length > 0 &&
+    sortedEntriesBeforeBalance.every(
+      (e) =>
+        e.isPending &&
+        dateTimeService.isBefore(e.createdAt, balanceEntry.createdAt),
+    );
+  const useForwardBeforeBalance = onlyPendingStrictlyBeforeAnchor;
+  const processedEntriesBeforeBalance = useForwardBeforeBalance
+    ? calculateForwardBalance(sortedEntriesBeforeBalance, startingBalance)
+    : calculateBackwardBalance(sortedEntriesBeforeBalance, startingBalance);
 
   const sortedEntriesAfterBalance = sortEntriesChronologically(
     entriesAfterBalance,

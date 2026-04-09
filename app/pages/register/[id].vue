@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, resolveComponent } from "vue";
+import { h, resolveComponent, watch } from "vue";
 import { formatAccountRegisters, formatDate } from "~/lib/utils";
 import {
   buildSortedCategorySelectItems,
@@ -21,6 +21,7 @@ import type {
 import type { ModalRegisterEntryProps } from "~/components/modals/EditRegisterEntry.vue";
 import type { ModalReoccurrenceProps } from "~/components/modals/EditReoccurrence.vue";
 import type { MatchRegisterEntryReoccurrenceProps } from "~/components/modals/MatchRegisterEntryReoccurrence.vue";
+import { useAppFetch } from "~/composables/useAppFetch";
 import { useSnapshotMode } from "~/composables/useSnapshotMode";
 
 const ModalsEditRegisterEntry = defineAsyncComponent(
@@ -53,7 +54,7 @@ useHead({ title: "Register | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
-const { $api } = useNuxtApp();
+const appFetch = useAppFetch();
 const snapshotMode = useSnapshotMode();
 const {
   isSnapshotMode,
@@ -223,6 +224,27 @@ const currentSkip = ref(0);
 const pageSize = 500; // Number of records per page
 const hasMoreData = ref(true);
 const isLoadingMore = ref(false);
+/** Bumped when the register list is reset (account/tab change or refresh) so in-flight load-more does not append stale slices. */
+const registerLoadGeneration = ref(0);
+
+function bumpRegisterLoadGeneration() {
+  registerLoadGeneration.value += 1;
+}
+
+/** Debit-only: credit ledgers clamp each row balance with `min(balance, 0)` on the server, so displayed balances may not satisfy `prev + amount`. */
+function registerEntryChainsFromLast(
+  last: RegisterEntry | undefined,
+  next: RegisterEntry | undefined,
+): boolean {
+  if (last == null || next == null) return true;
+  const expected = Number(last.balance) + Number(next.amount);
+  const actual = Number(next.balance);
+  return (
+    Number.isFinite(expected) &&
+    Number.isFinite(actual) &&
+    Math.abs(expected - actual) <= 0.011
+  );
+}
 
 const accountEntries = shallowRef<{
   entries: RegisterEntry[];
@@ -257,8 +279,6 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
     };
   }
 
-  const $fetchApi = useNuxtApp().$api as typeof $fetch;
-
   if (snapshotMode.isSnapshotMode.value) {
     const rsid =
       snapshotMode.registerSnapshotIdByRegisterId.value[id];
@@ -272,7 +292,7 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
       };
     }
     try {
-      const data = await $fetchApi<{
+      const data = await appFetch<{
         entries: RegisterEntry[];
         lowest?: RegisterEntry;
         highest?: RegisterEntry;
@@ -312,7 +332,7 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
   }
 
   try {
-    const data = await $fetchApi<{
+    const data = await appFetch<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
@@ -373,6 +393,50 @@ const {
   { watch: [registerInitialDataKey] },
 );
 
+async function loadMoreChainAllowsAppend(
+  lastLoaded: RegisterEntry | undefined,
+  firstNew: RegisterEntry | undefined,
+): Promise<boolean> {
+  const regForAppend = registersForRegisterPage.value.find(
+    (r) => r.id === accountRegisterId.value,
+  );
+  const tid = regForAppend?.typeId;
+  const typeForAppend =
+    tid == null
+      ? undefined
+      : listStore.getAccountTypes.find((t) => t.id === tid);
+  if (typeForAppend?.isCredit === true) return true;
+  if (registerEntryChainsFromLast(lastLoaded, firstNew)) return true;
+  bumpRegisterLoadGeneration();
+  await refreshRegisterPageData();
+  return false;
+}
+
+function applyRegisterLoadMoreAppend(data: {
+  entries: RegisterEntry[];
+  hasMore: boolean;
+  lowest: RegisterEntry;
+  highest: RegisterEntry;
+}) {
+  tableEntries.value = [...tableEntries.value, ...data.entries];
+  hasMoreData.value = data.hasMore || false;
+  currentSkip.value += data.entries.length;
+  if (
+    data.lowest &&
+    (!accountEntries.value.lowest ||
+      data.lowest.balance < accountEntries.value.lowest.balance)
+  ) {
+    accountEntries.value.lowest = data.lowest;
+  }
+  if (
+    data.highest &&
+    (!accountEntries.value.highest ||
+      data.highest.balance > accountEntries.value.highest.balance)
+  ) {
+    accountEntries.value.highest = data.highest;
+  }
+}
+
 function applyRegisterPageData(payload: RegisterPagePayload | null) {
   if (payload == null) return;
   accountEntries.value = {
@@ -393,6 +457,7 @@ watch(registerPageData, (payload) => applyRegisterPageData(payload), {
 
 watch(registerInitialDataKey, (_key, oldKey) => {
   if (oldKey === undefined) return;
+  bumpRegisterLoadGeneration();
   currentSkip.value = 0;
   hasMoreData.value = true;
   tableEntries.value = [];
@@ -416,9 +481,10 @@ const loadMoreEntries = async () => {
   if (snapshotMode.isSnapshotMode.value) return;
   if (isLoadingMore.value || !hasMoreData.value) return;
 
+  const generationAtStart = registerLoadGeneration.value;
   isLoadingMore.value = true;
   try {
-    const data = await (useNuxtApp().$api as typeof $fetch)<{
+    const data = await appFetch<{
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
@@ -437,26 +503,16 @@ const loadMoreEntries = async () => {
       },
     });
 
-    if (data?.entries?.length > 0) {
-      // Append new entries to existing ones
-      tableEntries.value = [...tableEntries.value, ...data.entries];
-      hasMoreData.value = data.hasMore || false;
-      currentSkip.value += data.entries.length;
+    if (generationAtStart !== registerLoadGeneration.value) {
+      return;
+    }
 
-      // Update lowest/highest if needed
-      if (
-        data.lowest &&
-        (!accountEntries.value.lowest ||
-          data.lowest.balance < accountEntries.value.lowest.balance)
-      ) {
-        accountEntries.value.lowest = data.lowest;
-      }
-      if (
-        data.highest &&
-        (!accountEntries.value.highest ||
-          data.highest.balance > accountEntries.value.highest.balance)
-      ) {
-        accountEntries.value.highest = data.highest;
+    if (data?.entries?.length > 0) {
+      const lastLoaded = tableEntries.value[tableEntries.value.length - 1];
+      const firstNew = data.entries[0];
+      const chainOk = await loadMoreChainAllowsAppend(lastLoaded, firstNew);
+      if (chainOk) {
+        applyRegisterLoadMoreAppend(data);
       }
     } else {
       hasMoreData.value = false;
@@ -490,6 +546,7 @@ watch([() => tableEntries.value.length, hasMoreData], () => {
 });
 
 const refreshAccountEntries = async () => {
+  bumpRegisterLoadGeneration();
   isRefreshLoading.value = true;
   try {
     await refreshRegisterPageData();
@@ -567,7 +624,7 @@ function openReoccurrenceFromPlaidEntry(entry: RegisterEntry) {
       listStore.patchReoccurrence(created);
       listStore.fetchLists();
       try {
-        await ($api as typeof $fetch)("/api/register-entry", {
+        await appFetch("/api/register-entry", {
           method: "patch",
           body: {
             registerEntryId: entry.id,
@@ -971,6 +1028,23 @@ function scrollToLowestBalance() {
 
 const globalFilter = ref("");
 const categoryFilter = ref(CATEGORY_FILTER_ALL);
+/** Pick category id from `USelectMenu` model (string or item object). */
+function registerCategoryFilterKey(raw: unknown): string {
+  if (raw == null || raw === "") return CATEGORY_FILTER_ALL;
+  if (typeof raw === "string") return raw;
+  if (typeof raw !== "object" || raw === null) {
+    const s = String(raw);
+    return s === "[object Object]" ? CATEGORY_FILTER_ALL : s;
+  }
+  const o = raw as Record<string, unknown>;
+  for (const k of ["value", "id"] as const) {
+    if (!(k in o)) continue;
+    const inner = o[k];
+    if (inner == null || inner === "") continue;
+    return typeof inner === "string" ? inner : String(inner);
+  }
+  return CATEGORY_FILTER_ALL;
+}
 const tableRef = ref<HTMLElement | null>(null);
 const combinedTableFilterRef = ref<{
   collapse: () => void;
@@ -1023,7 +1097,7 @@ const registerRowsForTable = computed(() =>
   tableEntries.value.filter((e) => {
     const matchesCategory = entryMatchesCategoryFilter(
       e.categoryId,
-      categoryFilter.value,
+      registerCategoryFilterKey(categoryFilter.value),
       listStore.getCategories,
     );
     if (!matchesCategory) return false;
@@ -1050,6 +1124,14 @@ const registerRowsForTable = computed(() =>
         .includes(q)
     );
   }),
+);
+
+/** Running balance per row always matches the API (`entry.balance`). Forward-chaining only visible amounts was wrong when hidden rows fall between consecutive visible rows (e.g. category/search filters). */
+const registerRowsForDisplay = computed(() =>
+  registerRowsForTable.value.map((entry) => ({
+    entry,
+    displayBalance: Number(entry.balance),
+  })),
 );
 
 watch(accountRegisterId, () => {
@@ -1084,7 +1166,7 @@ async function recalcAccount() {
 
   isRecalcAccountLoading.value = true;
   try {
-    const data = await (useNuxtApp().$api as typeof $fetch)<{
+    const data = await appFetch<{
       success: boolean;
       entriesCalculated: number;
       entriesBalance: number;
@@ -1442,7 +1524,7 @@ async function recalcAccount() {
                       div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Amount
                       div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Balance
         tbody
-          template(v-if="registerRowsForTable.length === 0")
+          template(v-if="registerRowsForDisplay.length === 0")
             tr
               td(colspan="6" class="p-2 sm:p-4 align-top")
                 UAlert(
@@ -1452,7 +1534,7 @@ async function recalcAccount() {
                   description="Choose All categories, Uncategorized, or another category.")
           template(v-else)
             tr(
-              v-for="(entry, index) in registerRowsForTable"
+              v-for="({ entry, displayBalance }, index) in registerRowsForDisplay"
               :key="entry.id ?? `reg-entry-${index}-${entry.createdAt}`"
               :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700`")
               td(class="p-2 sm:p-4 border-b border-default w-7")
@@ -1501,7 +1583,7 @@ async function recalcAccount() {
               td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
                 DollarFormat(:amount="Number(entry.amount)")
               td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
-                DollarFormat(:amount="Number(entry.balance)")
+                DollarFormat(:amount="displayBalance")
     UCard(v-else class="my-4 max-w-lg mx-auto")
       template(#header)
         h3(class="font-semibold") No entries in this register
