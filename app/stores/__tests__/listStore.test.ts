@@ -166,6 +166,7 @@ describe("listStore", () => {
       reoccurrences: [],
       intervals: [{ id: 1, type: "m", name: "Month" }],
       accountTypes: [],
+      evmChains: [],
       accountRegisters: [],
       budgets: [],
       accounts: [],

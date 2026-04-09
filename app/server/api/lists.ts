@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
       reoccurrences: filtered.reoccurrences,
       intervals: raw.intervals,
       accountTypes: raw.accountTypes,
+      evmChains: raw.evmChains,
       accountRegisters: filtered.accountRegisters,
       budgets: filtered.budgets,
       accounts: filtered.accounts,

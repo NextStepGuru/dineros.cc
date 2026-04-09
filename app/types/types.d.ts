@@ -17,8 +17,34 @@ export type AccountType = {
   id: number;
   name: string;
   type: string;
+  /** `"fiat"` | `"crypto"` — matches DB `account_type.class` */
+  registerClass: string;
   isCredit: boolean;
   accruesBalanceGrowth: boolean;
+};
+
+export type EvmChain = {
+  id: number;
+  name: string;
+  networkId: string;
+  symbol: string;
+  explorer: string | null;
+  isDefault: boolean;
+};
+
+export type CryptoTokenBalanceRow = {
+  id: number;
+  accountRegisterId: number;
+  network: string;
+  tokenAddress: string | null;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  displayBalance: number;
+  priceUsd: number | null;
+  valueUsd: number | null;
+  logoUrl: string | null;
+  syncedAt: string;
 };
 
 export type ReoccurrenceBase = z.infer<typeof reoccurrenceSchema>;
@@ -71,6 +97,7 @@ export type Lists = {
   reoccurrences: Reoccurrence[];
   intervals: Interval[];
   accountTypes: AccountType[];
+  evmChains: EvmChain[];
   accountRegisters: AccountRegister[];
   budgets: Budget[];
   accounts: Account[];

@@ -5,6 +5,7 @@ import {
   handleError,
   formatCurrencyOptions,
   formatAccountRegisters,
+  isCryptoAccountType,
 } from "~/lib/utils";
 import { formatMoneyUsd } from "~/lib/bankers-rounding";
 import {
@@ -23,6 +24,13 @@ import {
   vehicleValueEstimateAiResultSchema,
 } from "~/schema/zod";
 import type { AccountRegister } from "~/types/types";
+import {
+  APPRECIATING_ASSET_TYPE_IDS,
+  ASSET_TYPE_CATEGORY_MAP,
+  DEPRECIATING_ASSET_TYPE_IDS,
+  ESTIMATABLE_ASSET_TYPE_IDS,
+} from "~/consts";
+import type { AssetEstimateCategory } from "~/consts";
 
 /** Script alias so linters see template use of cash denomination metadata. */
 const CASH_DENOM_CONFIG = cashDenomConfig;
@@ -93,6 +101,331 @@ function parseVehicleDetails(raw: unknown): VehicleDetailsForm {
     vinLast4,
     purchasePriceHint,
   };
+}
+
+type HouseDetailsForm = {
+  bedrooms: number;
+  bathrooms: number;
+  squareFootage: number;
+  yearBuilt: number;
+  lotSizeAcres: number | null;
+  zip: string;
+  propertyType: "single-family" | "condo" | "townhouse" | "multi-family";
+  condition: "excellent" | "good" | "fair" | "poor";
+  purchasePriceHint: number | null;
+};
+
+type BoatDetailsForm = {
+  year: number;
+  make: string;
+  model: string;
+  lengthFeet: number;
+  engineType: "outboard" | "inboard" | "sail" | "jet";
+  engineHours: number | null;
+  condition: "excellent" | "good" | "fair" | "poor";
+  zip: string;
+  purchasePriceHint: number | null;
+};
+
+type RvDetailsForm = {
+  year: number;
+  make: string;
+  model: string;
+  rvClass: "class-a" | "class-b" | "class-c" | "travel-trailer" | "fifth-wheel";
+  lengthFeet: number;
+  mileage: number;
+  condition: "excellent" | "good" | "fair" | "poor";
+  zip: string;
+  purchasePriceHint: number | null;
+};
+
+type MotorcycleDetailsForm = {
+  year: number;
+  make: string;
+  model: string;
+  mileage: number;
+  engineCC: number | null;
+  condition: "excellent" | "good" | "fair" | "poor";
+  zip: string;
+  purchasePriceHint: number | null;
+};
+
+function defaultHouseDetails(): HouseDetailsForm {
+  return {
+    bedrooms: 3,
+    bathrooms: 2,
+    squareFootage: 1500,
+    yearBuilt: new Date().getFullYear() - 10,
+    lotSizeAcres: null,
+    zip: "",
+    propertyType: "single-family",
+    condition: "good",
+    purchasePriceHint: null,
+  };
+}
+
+function defaultBoatDetails(): BoatDetailsForm {
+  return {
+    year: new Date().getFullYear() - 5,
+    make: "",
+    model: "",
+    lengthFeet: 20,
+    engineType: "outboard",
+    engineHours: null,
+    condition: "good",
+    zip: "",
+    purchasePriceHint: null,
+  };
+}
+
+function defaultRvDetails(): RvDetailsForm {
+  return {
+    year: new Date().getFullYear() - 3,
+    make: "",
+    model: "",
+    rvClass: "class-c",
+    lengthFeet: 28,
+    mileage: 0,
+    condition: "good",
+    zip: "",
+    purchasePriceHint: null,
+  };
+}
+
+function defaultMotorcycleDetails(): MotorcycleDetailsForm {
+  return {
+    year: new Date().getFullYear() - 2,
+    make: "",
+    model: "",
+    mileage: 0,
+    engineCC: null,
+    condition: "good",
+    zip: "",
+    purchasePriceHint: null,
+  };
+}
+
+function parseHouseDetails(raw: unknown): HouseDetailsForm {
+  const d = defaultHouseDetails();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return d;
+  }
+  const o = raw as Record<string, unknown>;
+  const bedrooms =
+    typeof o.bedrooms === "number" && Number.isFinite(o.bedrooms) && o.bedrooms >= 0
+      ? o.bedrooms
+      : d.bedrooms;
+  const bathrooms =
+    typeof o.bathrooms === "number" && Number.isFinite(o.bathrooms) && o.bathrooms >= 0
+      ? o.bathrooms
+      : d.bathrooms;
+  const squareFootage =
+    typeof o.squareFootage === "number" &&
+    Number.isFinite(o.squareFootage) &&
+    o.squareFootage > 0
+      ? o.squareFootage
+      : d.squareFootage;
+  const yearBuilt =
+    typeof o.yearBuilt === "number" && Number.isFinite(o.yearBuilt)
+      ? o.yearBuilt
+      : d.yearBuilt;
+  const lotSizeAcres =
+    typeof o.lotSizeAcres === "number" && Number.isFinite(o.lotSizeAcres) && o.lotSizeAcres > 0
+      ? o.lotSizeAcres
+      : null;
+  const zip = typeof o.zip === "string" ? o.zip : d.zip;
+  const propertyType =
+    o.propertyType === "single-family" ||
+    o.propertyType === "condo" ||
+    o.propertyType === "townhouse" ||
+    o.propertyType === "multi-family"
+      ? o.propertyType
+      : d.propertyType;
+  const condition =
+    o.condition === "excellent" ||
+    o.condition === "good" ||
+    o.condition === "fair" ||
+    o.condition === "poor"
+      ? o.condition
+      : d.condition;
+  const purchasePriceHint =
+    typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
+      ? o.purchasePriceHint
+      : null;
+  return {
+    bedrooms,
+    bathrooms,
+    squareFootage,
+    yearBuilt,
+    lotSizeAcres,
+    zip,
+    propertyType,
+    condition,
+    purchasePriceHint,
+  };
+}
+
+function parseBoatDetails(raw: unknown): BoatDetailsForm {
+  const d = defaultBoatDetails();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return d;
+  }
+  const o = raw as Record<string, unknown>;
+  const year =
+    typeof o.year === "number" && Number.isFinite(o.year) ? o.year : d.year;
+  const make = typeof o.make === "string" ? o.make : d.make;
+  const model = typeof o.model === "string" ? o.model : d.model;
+  const lengthFeet =
+    typeof o.lengthFeet === "number" && Number.isFinite(o.lengthFeet) && o.lengthFeet > 0
+      ? o.lengthFeet
+      : d.lengthFeet;
+  const engineType =
+    o.engineType === "outboard" ||
+    o.engineType === "inboard" ||
+    o.engineType === "sail" ||
+    o.engineType === "jet"
+      ? o.engineType
+      : d.engineType;
+  const engineHours =
+    typeof o.engineHours === "number" && Number.isFinite(o.engineHours) && o.engineHours >= 0
+      ? o.engineHours
+      : null;
+  const condition =
+    o.condition === "excellent" ||
+    o.condition === "good" ||
+    o.condition === "fair" ||
+    o.condition === "poor"
+      ? o.condition
+      : d.condition;
+  const zip = typeof o.zip === "string" ? o.zip : d.zip;
+  const purchasePriceHint =
+    typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
+      ? o.purchasePriceHint
+      : null;
+  return {
+    year,
+    make,
+    model,
+    lengthFeet,
+    engineType,
+    engineHours,
+    condition,
+    zip,
+    purchasePriceHint,
+  };
+}
+
+function parseRvDetails(raw: unknown): RvDetailsForm {
+  const d = defaultRvDetails();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return d;
+  }
+  const o = raw as Record<string, unknown>;
+  const year =
+    typeof o.year === "number" && Number.isFinite(o.year) ? o.year : d.year;
+  const make = typeof o.make === "string" ? o.make : d.make;
+  const model = typeof o.model === "string" ? o.model : d.model;
+  const rvClass =
+    o.rvClass === "class-a" ||
+    o.rvClass === "class-b" ||
+    o.rvClass === "class-c" ||
+    o.rvClass === "travel-trailer" ||
+    o.rvClass === "fifth-wheel"
+      ? o.rvClass
+      : d.rvClass;
+  const lengthFeet =
+    typeof o.lengthFeet === "number" && Number.isFinite(o.lengthFeet) && o.lengthFeet > 0
+      ? o.lengthFeet
+      : d.lengthFeet;
+  const mileage =
+    typeof o.mileage === "number" && Number.isFinite(o.mileage) && o.mileage >= 0
+      ? o.mileage
+      : d.mileage;
+  const condition =
+    o.condition === "excellent" ||
+    o.condition === "good" ||
+    o.condition === "fair" ||
+    o.condition === "poor"
+      ? o.condition
+      : d.condition;
+  const zip = typeof o.zip === "string" ? o.zip : d.zip;
+  const purchasePriceHint =
+    typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
+      ? o.purchasePriceHint
+      : null;
+  return {
+    year,
+    make,
+    model,
+    rvClass,
+    lengthFeet,
+    mileage,
+    condition,
+    zip,
+    purchasePriceHint,
+  };
+}
+
+function parseMotorcycleDetails(raw: unknown): MotorcycleDetailsForm {
+  const d = defaultMotorcycleDetails();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return d;
+  }
+  const o = raw as Record<string, unknown>;
+  const year =
+    typeof o.year === "number" && Number.isFinite(o.year) ? o.year : d.year;
+  const make = typeof o.make === "string" ? o.make : d.make;
+  const model = typeof o.model === "string" ? o.model : d.model;
+  const mileage =
+    typeof o.mileage === "number" && Number.isFinite(o.mileage) && o.mileage >= 0
+      ? o.mileage
+      : d.mileage;
+  const engineCC =
+    typeof o.engineCC === "number" && Number.isFinite(o.engineCC) && o.engineCC > 0
+      ? o.engineCC
+      : null;
+  const condition =
+    o.condition === "excellent" ||
+    o.condition === "good" ||
+    o.condition === "fair" ||
+    o.condition === "poor"
+      ? o.condition
+      : d.condition;
+  const zip = typeof o.zip === "string" ? o.zip : d.zip;
+  const purchasePriceHint =
+    typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
+      ? o.purchasePriceHint
+      : null;
+  return {
+    year,
+    make,
+    model,
+    mileage,
+    engineCC,
+    condition,
+    zip,
+    purchasePriceHint,
+  };
+}
+
+function parseAssetDetailsBlob(typeId: number, raw: unknown): unknown {
+  const cat: AssetEstimateCategory | undefined = ASSET_TYPE_CATEGORY_MAP[typeId];
+  if (cat === "vehicle") {
+    return { category: "vehicle" as const, ...parseVehicleDetails(raw) };
+  }
+  if (cat === "house") {
+    return { category: "house" as const, ...parseHouseDetails(raw) };
+  }
+  if (cat === "boat") {
+    return { category: "boat" as const, ...parseBoatDetails(raw) };
+  }
+  if (cat === "rv") {
+    return { category: "rv" as const, ...parseRvDetails(raw) };
+  }
+  if (cat === "motorcycle") {
+    return { category: "motorcycle" as const, ...parseMotorcycleDetails(raw) };
+  }
+  return parseVehicleDetails(raw);
 }
 
 export type ModelAccountRegisterProps = {
@@ -191,9 +524,17 @@ function normalizeAccountRegisterState(
     assetStartAt: toNullableDate(accountRegister.assetStartAt),
     paymentCategoryId: accountRegister.paymentCategoryId ?? null,
     interestCategoryId: accountRegister.interestCategoryId ?? null,
-    vehicleDetails: parseVehicleDetails(
+    vehicleDetails: parseAssetDetailsBlob(
+      toNullableNumber(accountRegister.typeId) ?? 0,
       (accountRegister as AccountRegister & { vehicleDetails?: unknown })
         .vehicleDetails,
+    ) as AccountRegister["vehicleDetails"],
+    walletAddress:
+      (accountRegister as AccountRegister & { walletAddress?: string | null })
+        .walletAddress ?? null,
+    alchemyLastSyncAt: toNullableDate(
+      (accountRegister as AccountRegister & { alchemyLastSyncAt?: unknown })
+        .alchemyLastSyncAt,
     ),
   };
 }
@@ -209,8 +550,61 @@ const vehicleDetailsLocal = reactive<VehicleDetailsForm>(
   ),
 );
 
-const isEstimatingVehicle = ref(false);
-const lastVehicleEstimate = ref<VehicleEstimateResult | null>(null);
+const houseDetailsLocal = reactive<HouseDetailsForm>(
+  parseHouseDetails(
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
+  ),
+);
+
+const boatDetailsLocal = reactive<BoatDetailsForm>(
+  parseBoatDetails(
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
+  ),
+);
+
+const rvDetailsLocal = reactive<RvDetailsForm>(
+  parseRvDetails(
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
+  ),
+);
+
+const motorcycleDetailsLocal = reactive<MotorcycleDetailsForm>(
+  parseMotorcycleDetails(
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
+  ),
+);
+
+function syncEstimateDetailLocals(typeId: number, raw: unknown) {
+  const cat = ASSET_TYPE_CATEGORY_MAP[typeId];
+  if (cat === "vehicle") {
+    Object.assign(vehicleDetailsLocal, parseVehicleDetails(raw));
+    return;
+  }
+  if (cat === "house") {
+    Object.assign(houseDetailsLocal, parseHouseDetails(raw));
+    return;
+  }
+  if (cat === "boat") {
+    Object.assign(boatDetailsLocal, parseBoatDetails(raw));
+    return;
+  }
+  if (cat === "rv") {
+    Object.assign(rvDetailsLocal, parseRvDetails(raw));
+    return;
+  }
+  if (cat === "motorcycle") {
+    Object.assign(motorcycleDetailsLocal, parseMotorcycleDetails(raw));
+    return;
+  }
+  Object.assign(vehicleDetailsLocal, parseVehicleDetails(raw));
+}
+
+const isEstimatingAsset = ref(false);
+const lastAssetEstimate = ref<VehicleEstimateResult | null>(null);
 
 const fileInput = ref<any>(null);
 
@@ -244,21 +638,79 @@ const isSelectedAccountTypeWithInterest = computed(() => {
   );
 });
 
-const isSelectedAccountTypeVehicleAsset = computed(
-  () => selectedAccountType.value?.id === 20,
-);
-const isSelectedAccountTypeCollectableVehicle = computed(
-  () => selectedAccountType.value?.id === 21,
-);
-const isSelectedAccountTypeDepreciatingOrAppreciatingAsset = computed(
-  () =>
-    isSelectedAccountTypeVehicleAsset.value ||
-    isSelectedAccountTypeCollectableVehicle.value,
-);
+const isSelectedAccountTypeEstimatable = computed(() => {
+  const id = selectedAccountType.value?.id;
+  return id != null && ESTIMATABLE_ASSET_TYPE_IDS.includes(id);
+});
+const currentAssetCategory = computed((): AssetEstimateCategory | null => {
+  const id = selectedAccountType.value?.id;
+  if (id == null) return null;
+  return ASSET_TYPE_CATEGORY_MAP[id] ?? null;
+});
+const isSelectedAccountTypeDepreciatingAsset = computed(() => {
+  const id = selectedAccountType.value?.id;
+  return id != null && DEPRECIATING_ASSET_TYPE_IDS.includes(id);
+});
+const isSelectedAccountTypeDepreciatingOrAppreciatingAsset = computed(() => {
+  const id = selectedAccountType.value?.id;
+  if (id == null) return false;
+  return (
+    DEPRECIATING_ASSET_TYPE_IDS.includes(id) ||
+    APPRECIATING_ASSET_TYPE_IDS.includes(id)
+  );
+});
 
 const isSelectedAccountTypeCash = computed(
   () => selectedAccountType.value?.type === "cash",
 );
+
+const isSelectedAccountTypeCrypto = computed(() =>
+  isCryptoAccountType(
+    formState.value.typeId,
+    listStore.getAccountTypes,
+  ),
+);
+
+const cryptoChainIds = ref<number[]>([]);
+
+function defaultCryptoChainIds(): number[] {
+  const chains = listStore.getEvmChains;
+  const defs = chains.filter((c) => c.isDefault).map((c) => c.id);
+  if (defs.length > 0) {
+    return defs;
+  }
+  return chains.length > 0 ? [chains[0]!.id] : [];
+}
+
+function toggleCryptoChain(chainId: number, checked: boolean) {
+  if (checked) {
+    if (!cryptoChainIds.value.includes(chainId)) {
+      cryptoChainIds.value = [...cryptoChainIds.value, chainId];
+    }
+  } else {
+    cryptoChainIds.value = cryptoChainIds.value.filter((x) => x !== chainId);
+  }
+}
+
+async function loadCryptoChainsForForm() {
+  if (!isSelectedAccountTypeCrypto.value) {
+    cryptoChainIds.value = [];
+    return;
+  }
+  if (formState.value.id > 0) {
+    try {
+      const res = await $api<{ evmChainIds: number[] }>(
+        `/api/crypto-register-chains/${formState.value.id}`,
+      );
+      cryptoChainIds.value =
+        res.evmChainIds?.length > 0 ? res.evmChainIds : defaultCryptoChainIds();
+    } catch {
+      cryptoChainIds.value = defaultCryptoChainIds();
+    }
+  } else {
+    cryptoChainIds.value = defaultCryptoChainIds();
+  }
+}
 
 const persistedAccountIsCashType = computed(() => {
   const t = listStore.getAccountTypes.find(
@@ -350,6 +802,7 @@ async function saveCashOnHand(registerId: number) {
 
 const showRatesTab = computed(() => {
   if (isSelectedAccountTypeCash.value) return false;
+  if (isSelectedAccountTypeCrypto.value) return false;
   return (
     isSelectedAccountTypeCredit.value ||
     isSelectedAccountTypeWithInterest.value ||
@@ -389,7 +842,10 @@ const tabItems = computed((): AccountRegisterTabItem[] => {
       slot: "rates",
     });
   }
-  if (isSelectedAccountTypeDepreciatingOrAppreciatingAsset.value) {
+  if (
+    isSelectedAccountTypeDepreciatingOrAppreciatingAsset.value &&
+    !isSelectedAccountTypeCrypto.value
+  ) {
     items.push({
       label: "Asset",
       value: "asset",
@@ -397,7 +853,7 @@ const tabItems = computed((): AccountRegisterTabItem[] => {
       slot: "asset",
     });
   }
-  if (formState.value.id > 0) {
+  if (formState.value.id > 0 && !isSelectedAccountTypeCrypto.value) {
     items.push({
       label: "Import",
       value: "import",
@@ -439,11 +895,21 @@ watch([activeTab, tabItems], () => {
 });
 
 const assetSectionLabel = computed(() =>
-  isSelectedAccountTypeVehicleAsset.value ? "Depreciation" : "Appreciation",
+  isSelectedAccountTypeDepreciatingAsset.value ? "Depreciation" : "Appreciation",
 );
 
+const estimateSectionTitle = computed(() => {
+  const c = currentAssetCategory.value;
+  if (c === "vehicle") return "Vehicle details (for AI estimate)";
+  if (c === "house") return "House details (for AI estimate)";
+  if (c === "boat") return "Boat details (for AI estimate)";
+  if (c === "rv") return "RV details (for AI estimate)";
+  if (c === "motorcycle") return "Motorcycle details (for AI estimate)";
+  return "Asset details (for AI estimate)";
+});
+
 const estimateRangeLabel = computed(() => {
-  const e = lastVehicleEstimate.value;
+  const e = lastAssetEstimate.value;
   if (!e) return "";
   const f = new Intl.NumberFormat(undefined, formatCurrencyOptions);
   return `${f.format(e.estimatedValueLow)} – ${f.format(e.estimatedValueHigh)} (mid ${f.format(e.estimatedValueMid)})`;
@@ -615,14 +1081,12 @@ function applyInitialTabFromProps() {
 
 function applyPropsToFormAndTab() {
   formState.value = normalizeAccountRegisterState(props.accountRegister);
-  Object.assign(
-    vehicleDetailsLocal,
-    parseVehicleDetails(
-      (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
-        .vehicleDetails,
-    ),
+  syncEstimateDetailLocals(
+    formState.value.typeId,
+    (props.accountRegister as AccountRegister & { vehicleDetails?: unknown })
+      .vehicleDetails,
   );
-  lastVehicleEstimate.value = null;
+  lastAssetEstimate.value = null;
   cashCountsDirty.value = false;
   resetCashCounts();
   const t = listStore.getAccountTypes.find(
@@ -638,6 +1102,7 @@ function applyPropsToFormAndTab() {
     });
     return;
   }
+  void loadCryptoChainsForForm();
   nextTick(applyInitialTabFromProps);
 }
 
@@ -647,14 +1112,24 @@ watch(
   { deep: true, immediate: true },
 );
 
-watch(
-  vehicleDetailsLocal,
-  () => {
-    (formState.value as AccountRegister & { vehicleDetails?: unknown }).vehicleDetails =
-      { ...vehicleDetailsLocal };
-  },
-  { deep: true },
-);
+watchEffect(() => {
+  const tid = formState.value.typeId;
+  const cat = ASSET_TYPE_CATEGORY_MAP[tid];
+  const fs = formState.value as AccountRegister & { vehicleDetails?: unknown };
+  if (cat === "vehicle") {
+    fs.vehicleDetails = { category: "vehicle", ...vehicleDetailsLocal };
+  } else if (cat === "house") {
+    fs.vehicleDetails = { category: "house", ...houseDetailsLocal };
+  } else if (cat === "boat") {
+    fs.vehicleDetails = { category: "boat", ...boatDetailsLocal };
+  } else if (cat === "rv") {
+    fs.vehicleDetails = { category: "rv", ...rvDetailsLocal };
+  } else if (cat === "motorcycle") {
+    fs.vehicleDetails = { category: "motorcycle", ...motorcycleDetailsLocal };
+  } else {
+    fs.vehicleDetails = { ...vehicleDetailsLocal };
+  }
+});
 
 const vehicleConditionItems = [
   { id: "excellent", name: "Excellent" },
@@ -663,46 +1138,204 @@ const vehicleConditionItems = [
   { id: "poor", name: "Poor" },
 ];
 
-async function runVehicleEstimate() {
-  if (!vehicleDetailsLocal.make.trim() || !vehicleDetailsLocal.model.trim()) {
-    toast.add({
-      color: "error",
-      description: "Make and model are required to estimate.",
-    });
-    return;
+const propertyTypeItems = [
+  { id: "single-family", name: "Single-family" },
+  { id: "condo", name: "Condo" },
+  { id: "townhouse", name: "Townhouse" },
+  { id: "multi-family", name: "Multi-family" },
+];
+
+const boatEngineTypeItems = [
+  { id: "outboard", name: "Outboard" },
+  { id: "inboard", name: "Inboard" },
+  { id: "sail", name: "Sail" },
+  { id: "jet", name: "Jet" },
+];
+
+const rvClassItems = [
+  { id: "class-a", name: "Class A" },
+  { id: "class-b", name: "Class B" },
+  { id: "class-c", name: "Class C" },
+  { id: "travel-trailer", name: "Travel trailer" },
+  { id: "fifth-wheel", name: "Fifth wheel" },
+];
+
+async function runAssetEstimate() {
+  const cat = currentAssetCategory.value;
+  if (!cat) return;
+
+  if (cat === "vehicle") {
+    if (!vehicleDetailsLocal.make.trim() || !vehicleDetailsLocal.model.trim()) {
+      toast.add({
+        color: "error",
+        description: "Make and model are required to estimate.",
+      });
+      return;
+    }
+  } else if (cat === "house") {
+    if (houseDetailsLocal.zip.trim().length !== 5) {
+      toast.add({
+        color: "error",
+        description: "A valid 5-digit ZIP is required to estimate.",
+      });
+      return;
+    }
+  } else if (cat === "boat") {
+    if (!boatDetailsLocal.make.trim() || !boatDetailsLocal.model.trim()) {
+      toast.add({
+        color: "error",
+        description: "Make and model are required to estimate.",
+      });
+      return;
+    }
+  } else if (cat === "rv") {
+    if (!rvDetailsLocal.make.trim() || !rvDetailsLocal.model.trim()) {
+      toast.add({
+        color: "error",
+        description: "Make and model are required to estimate.",
+      });
+      return;
+    }
+  } else if (cat === "motorcycle") {
+    if (!motorcycleDetailsLocal.make.trim() || !motorcycleDetailsLocal.model.trim()) {
+      toast.add({
+        color: "error",
+        description: "Make and model are required to estimate.",
+      });
+      return;
+    }
   }
-  isEstimatingVehicle.value = true;
-  lastVehicleEstimate.value = null;
+
+  isEstimatingAsset.value = true;
+  lastAssetEstimate.value = null;
   try {
-    const body: Record<string, unknown> = {
+    const base: Record<string, unknown> = {
+      category: cat,
       accountId: formState.value.accountId,
-      year: vehicleDetailsLocal.year,
-      make: vehicleDetailsLocal.make.trim(),
-      model: vehicleDetailsLocal.model.trim(),
-      mileage: vehicleDetailsLocal.mileage,
-      condition: vehicleDetailsLocal.condition,
     };
     if (formState.value.id > 0) {
-      body.accountRegisterId = formState.value.id;
+      base.accountRegisterId = formState.value.id;
     }
-    const trim = vehicleDetailsLocal.trim.trim();
-    if (trim) body.trim = trim;
-    const zip = vehicleDetailsLocal.zip.trim();
-    if (zip) body.zip = zip;
-    const vin = vehicleDetailsLocal.vinLast4.trim();
-    if (vin) body.vinLast4 = vin;
-    if (
-      vehicleDetailsLocal.purchasePriceHint != null &&
-      Number.isFinite(vehicleDetailsLocal.purchasePriceHint)
-    ) {
-      body.purchasePriceHint = vehicleDetailsLocal.purchasePriceHint;
+
+    let body: Record<string, unknown> = base;
+
+    if (cat === "vehicle") {
+      body = {
+        ...base,
+        year: vehicleDetailsLocal.year,
+        make: vehicleDetailsLocal.make.trim(),
+        model: vehicleDetailsLocal.model.trim(),
+        mileage: vehicleDetailsLocal.mileage,
+        condition: vehicleDetailsLocal.condition,
+      };
+      const trim = vehicleDetailsLocal.trim.trim();
+      if (trim) body.trim = trim;
+      const zip = vehicleDetailsLocal.zip.trim();
+      if (zip) body.zip = zip;
+      const vin = vehicleDetailsLocal.vinLast4.trim();
+      if (vin) body.vinLast4 = vin;
+      if (
+        vehicleDetailsLocal.purchasePriceHint != null &&
+        Number.isFinite(vehicleDetailsLocal.purchasePriceHint)
+      ) {
+        body.purchasePriceHint = vehicleDetailsLocal.purchasePriceHint;
+      }
+    } else if (cat === "house") {
+      body = {
+        ...base,
+        bedrooms: houseDetailsLocal.bedrooms,
+        bathrooms: houseDetailsLocal.bathrooms,
+        squareFootage: houseDetailsLocal.squareFootage,
+        yearBuilt: houseDetailsLocal.yearBuilt,
+        zip: houseDetailsLocal.zip.trim(),
+        propertyType: houseDetailsLocal.propertyType,
+        condition: houseDetailsLocal.condition,
+      };
+      if (
+        houseDetailsLocal.lotSizeAcres != null &&
+        Number.isFinite(houseDetailsLocal.lotSizeAcres)
+      ) {
+        body.lotSizeAcres = houseDetailsLocal.lotSizeAcres;
+      }
+      if (
+        houseDetailsLocal.purchasePriceHint != null &&
+        Number.isFinite(houseDetailsLocal.purchasePriceHint)
+      ) {
+        body.purchasePriceHint = houseDetailsLocal.purchasePriceHint;
+      }
+    } else if (cat === "boat") {
+      body = {
+        ...base,
+        year: boatDetailsLocal.year,
+        make: boatDetailsLocal.make.trim(),
+        model: boatDetailsLocal.model.trim(),
+        lengthFeet: boatDetailsLocal.lengthFeet,
+        engineType: boatDetailsLocal.engineType,
+        condition: boatDetailsLocal.condition,
+      };
+      const z = boatDetailsLocal.zip.trim();
+      if (z) body.zip = z;
+      if (
+        boatDetailsLocal.engineHours != null &&
+        Number.isFinite(boatDetailsLocal.engineHours)
+      ) {
+        body.engineHours = boatDetailsLocal.engineHours;
+      }
+      if (
+        boatDetailsLocal.purchasePriceHint != null &&
+        Number.isFinite(boatDetailsLocal.purchasePriceHint)
+      ) {
+        body.purchasePriceHint = boatDetailsLocal.purchasePriceHint;
+      }
+    } else if (cat === "rv") {
+      body = {
+        ...base,
+        year: rvDetailsLocal.year,
+        make: rvDetailsLocal.make.trim(),
+        model: rvDetailsLocal.model.trim(),
+        rvClass: rvDetailsLocal.rvClass,
+        lengthFeet: rvDetailsLocal.lengthFeet,
+        mileage: rvDetailsLocal.mileage,
+        condition: rvDetailsLocal.condition,
+      };
+      const z = rvDetailsLocal.zip.trim();
+      if (z) body.zip = z;
+      if (
+        rvDetailsLocal.purchasePriceHint != null &&
+        Number.isFinite(rvDetailsLocal.purchasePriceHint)
+      ) {
+        body.purchasePriceHint = rvDetailsLocal.purchasePriceHint;
+      }
+    } else if (cat === "motorcycle") {
+      body = {
+        ...base,
+        year: motorcycleDetailsLocal.year,
+        make: motorcycleDetailsLocal.make.trim(),
+        model: motorcycleDetailsLocal.model.trim(),
+        mileage: motorcycleDetailsLocal.mileage,
+        condition: motorcycleDetailsLocal.condition,
+      };
+      const z = motorcycleDetailsLocal.zip.trim();
+      if (z) body.zip = z;
+      if (
+        motorcycleDetailsLocal.engineCC != null &&
+        Number.isFinite(motorcycleDetailsLocal.engineCC)
+      ) {
+        body.engineCC = motorcycleDetailsLocal.engineCC;
+      }
+      if (
+        motorcycleDetailsLocal.purchasePriceHint != null &&
+        Number.isFinite(motorcycleDetailsLocal.purchasePriceHint)
+      ) {
+        body.purchasePriceHint = motorcycleDetailsLocal.purchasePriceHint;
+      }
     }
 
     const res = await $api<{ estimate: VehicleEstimateResult }>(
-      "/api/vehicle-value-estimate",
+      "/api/asset-value-estimate",
       { method: "POST", body },
     );
-    lastVehicleEstimate.value = vehicleValueEstimateAiResultSchema.parse(
+    lastAssetEstimate.value = vehicleValueEstimateAiResultSchema.parse(
       res.estimate,
     );
     toast.add({
@@ -713,12 +1346,12 @@ async function runVehicleEstimate() {
   } catch (e) {
     handleError(e, toast);
   } finally {
-    isEstimatingVehicle.value = false;
+    isEstimatingAsset.value = false;
   }
 }
 
 function applyEstimateToBalance() {
-  const e = lastVehicleEstimate.value;
+  const e = lastAssetEstimate.value;
   if (!e) return;
   const v = Math.round(e.estimatedValueMid * 100) / 100;
   formState.value.balance = v;
@@ -730,7 +1363,7 @@ function applyEstimateToBalance() {
 }
 
 function applyEstimateToOriginal() {
-  const e = lastVehicleEstimate.value;
+  const e = lastAssetEstimate.value;
   if (!e) return;
   const v = Math.round(e.estimatedValueMid * 100) / 100;
   formState.value.assetOriginalValue = v;
@@ -780,6 +1413,28 @@ watch(
         syncCashBalanceFromCounts();
       }
     }
+
+    if (newType?.registerClass === "crypto") {
+      void loadCryptoChainsForForm();
+    } else {
+      cryptoChainIds.value = [];
+    }
+
+    const oldEstCat = ASSET_TYPE_CATEGORY_MAP[oldTypeId];
+    const newEstCat = ASSET_TYPE_CATEGORY_MAP[newTypeId];
+    if (oldEstCat !== newEstCat) {
+      if (newEstCat === "vehicle") {
+        Object.assign(vehicleDetailsLocal, defaultVehicleDetails());
+      } else if (newEstCat === "house") {
+        Object.assign(houseDetailsLocal, defaultHouseDetails());
+      } else if (newEstCat === "boat") {
+        Object.assign(boatDetailsLocal, defaultBoatDetails());
+      } else if (newEstCat === "rv") {
+        Object.assign(rvDetailsLocal, defaultRvDetails());
+      } else if (newEstCat === "motorcycle") {
+        Object.assign(motorcycleDetailsLocal, defaultMotorcycleDetails());
+      }
+    }
   },
 );
 
@@ -810,6 +1465,7 @@ const loanPaymentSourceSelectItems = computed(() => {
     if (r.subAccountRegisterId) continue;
     const t = listStore.getAccountTypes.find((x) => x.id === r.typeId);
     if (t?.isCredit) continue;
+    if (t?.registerClass === "crypto") continue;
     items.push({ id: r.id, name: r.name });
   }
   return items;
@@ -833,6 +1489,7 @@ const collateralAssetSelectItems = computed(() => {
     if (r.subAccountRegisterId) continue;
     const t = listStore.getAccountTypes.find((x) => x.id === r.typeId);
     if (t?.isCredit) continue;
+    if (t?.registerClass === "crypto") continue;
     if (taken.has(r.id) && formState.value.collateralAssetRegisterId !== r.id) {
       continue;
     }
@@ -898,6 +1555,25 @@ async function handleSubmit({
   try {
     isSaving.value = true;
 
+    if (isSelectedAccountTypeCrypto.value) {
+      if (!cryptoChainIds.value.length) {
+        toast.add({
+          color: "error",
+          description: "Select at least one EVM chain.",
+        });
+        isSaving.value = false;
+        return;
+      }
+      if (!formState.value.walletAddress?.trim()) {
+        toast.add({
+          color: "error",
+          description: "Enter a wallet address.",
+        });
+        isSaving.value = false;
+        return;
+      }
+    }
+
     const cashUseBillTotal =
       isSelectedAccountTypeCash.value &&
       (cashCountsDirty.value || cashTotal.value > 0);
@@ -912,6 +1588,12 @@ async function handleSubmit({
       ...formData,
       balance: balanceForPayload,
       latestBalance: balanceForPayload,
+      ...(isSelectedAccountTypeCrypto.value
+        ? {
+            walletAddress: formState.value.walletAddress ?? null,
+            selectedChainIds: cryptoChainIds.value,
+          }
+        : {}),
     };
     const responseData = await $api("/api/account-register", {
       method: "POST",
@@ -1061,6 +1743,30 @@ UModal(:title="props.title" :description="props.description || props.title" clas
             UFormField(label="Name" name="name")
               UInput(v-model="formState.name" type="text" id="name" class="w-full")
 
+            template(v-if="isSelectedAccountTypeCrypto")
+              UFormField(label="Wallet address" name="walletAddress")
+                UInput(v-model="formState.walletAddress" type="text" class="w-full" placeholder="0x…" autocomplete="off")
+              div(class="space-y-2")
+                p(class="text-sm text-muted") Chains to include
+                div(
+                  v-for="c in listStore.getEvmChains"
+                  :key="c.id"
+                  class="flex items-center gap-2"
+                )
+                  UCheckbox(
+                    :model-value="cryptoChainIds.includes(c.id)"
+                    @update:model-value="(v: boolean) => toggleCryptoChain(c.id, Boolean(v))"
+                    :label="`${c.name} (${c.symbol})`"
+                  )
+              UFormField(v-if="formState.id > 0" label="Portfolio value (USD)" hint="Updated from on-chain sync")
+                UInput(
+                  :model-value="formatMoneyUsd(formState.balance)"
+                  type="text"
+                  readonly
+                  disabled
+                  class="w-full"
+                )
+
             template(v-if="isSelectedAccountTypeCash")
               UFormField(label="Account balance" name="balance" hint="Total from bill counts on the Cash Count tab")
                 UInput(
@@ -1071,7 +1777,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   class="w-full"
                 )
 
-            template(v-else)
+            template(v-else-if="!isSelectedAccountTypeCrypto")
               UFormField(label="Account Balance" name="balance")
                 UInputNumber(
                   v-model="formState.balance"
@@ -1306,7 +2012,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   :max="100"
                   class="w-full")
 
-              UFormField(label="Method" name="depreciationMethod" v-if="isSelectedAccountTypeVehicleAsset" hint="declining-balance, straight-line, or compound")
+              UFormField(label="Method" name="depreciationMethod" v-if="isSelectedAccountTypeDepreciatingAsset" hint="declining-balance, straight-line, or compound")
                 USelect(
                   v-model="formState.depreciationMethod"
                   class="w-full"
@@ -1322,7 +2028,7 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   :step="0.01"
                   class="w-full")
 
-              UFormField(label="Useful life (years)" name="assetUsefulLifeYears" v-if="isSelectedAccountTypeVehicleAsset" hint="For straight-line method")
+              UFormField(label="Useful life (years)" name="assetUsefulLifeYears" v-if="isSelectedAccountTypeDepreciatingAsset" hint="For straight-line method")
                 UInputNumber(
                   v-model="formState.assetUsefulLifeYears"
                   :step="1"
@@ -1336,38 +2042,176 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   type="date"
                   class="w-full")
 
-            div(v-if="isSelectedAccountTypeVehicleAsset" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
-              h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") Vehicle details (for AI estimate)
+            div(v-if="isSelectedAccountTypeEstimatable" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
+              h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") {{ estimateSectionTitle }}
 
               p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
 
-              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-                UFormField(label="Year")
-                  UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
-                UFormField(label="ZIP (optional)" hint="5-digit US")
-                  UInput(v-model="vehicleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
-              UFormField(label="Make")
-                UInput(v-model="vehicleDetailsLocal.make" type="text" class="w-full")
-              UFormField(label="Model")
-                UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
-              UFormField(label="Trim (optional)")
-                UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
-              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-                UFormField(label="Mileage")
-                  UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+              template(v-if="currentAssetCategory === 'vehicle'")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Year")
+                    UInputNumber(v-model="vehicleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+                  UFormField(label="ZIP (optional)" hint="5-digit US")
+                    UInput(v-model="vehicleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+                UFormField(label="Make")
+                  UInput(v-model="vehicleDetailsLocal.make" type="text" class="w-full")
+                UFormField(label="Model")
+                  UInput(v-model="vehicleDetailsLocal.model" type="text" class="w-full")
+                UFormField(label="Trim (optional)")
+                  UInput(v-model="vehicleDetailsLocal.trim" type="text" class="w-full")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Mileage")
+                    UInputNumber(v-model="vehicleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+                  UFormField(label="Condition")
+                    USelect(
+                      v-model="vehicleDetailsLocal.condition"
+                      class="w-full"
+                      :items="vehicleConditionItems"
+                      valueKey="id"
+                      labelKey="name")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="VIN last 4 (optional)")
+                    UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
+                  UFormField(label="Purchase / MSRP hint (optional)")
+                    UInputNumber(
+                      v-model="vehicleDetailsLocal.purchasePriceHint"
+                      :format-options="formatCurrencyOptions"
+                      :step="0.01"
+                      class="w-full")
+
+              template(v-else-if="currentAssetCategory === 'house'")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Bedrooms")
+                    UInputNumber(v-model="houseDetailsLocal.bedrooms" :min="0" :step="0.5" class="w-full")
+                  UFormField(label="Bathrooms")
+                    UInputNumber(v-model="houseDetailsLocal.bathrooms" :min="0" :step="0.25" class="w-full")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Square footage")
+                    UInputNumber(v-model="houseDetailsLocal.squareFootage" :min="1" :step="1" class="w-full")
+                  UFormField(label="Year built")
+                    UInputNumber(v-model="houseDetailsLocal.yearBuilt" :min="1800" :max="2100" :step="1" class="w-full")
+                UFormField(label="ZIP" hint="5-digit US (required for estimate)")
+                  UInput(v-model="houseDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+                UFormField(label="Property type")
+                  USelect(
+                    v-model="houseDetailsLocal.propertyType"
+                    class="w-full"
+                    :items="propertyTypeItems"
+                    valueKey="id"
+                    labelKey="name")
+                UFormField(label="Lot size (acres, optional)")
+                  UInputNumber(v-model="houseDetailsLocal.lotSizeAcres" :min="0" :step="0.01" class="w-full")
                 UFormField(label="Condition")
                   USelect(
-                    v-model="vehicleDetailsLocal.condition"
+                    v-model="houseDetailsLocal.condition"
                     class="w-full"
                     :items="vehicleConditionItems"
                     valueKey="id"
                     labelKey="name")
-              div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
-                UFormField(label="VIN last 4 (optional)")
-                  UInput(v-model="vehicleDetailsLocal.vinLast4" type="text" maxlength="4" class="w-full")
-                UFormField(label="Purchase / MSRP hint (optional)")
+                UFormField(label="Purchase / value hint (optional)")
                   UInputNumber(
-                    v-model="vehicleDetailsLocal.purchasePriceHint"
+                    v-model="houseDetailsLocal.purchasePriceHint"
+                    :format-options="formatCurrencyOptions"
+                    :step="0.01"
+                    class="w-full")
+
+              template(v-else-if="currentAssetCategory === 'boat'")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Year")
+                    UInputNumber(v-model="boatDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+                  UFormField(label="Length (ft)")
+                    UInputNumber(v-model="boatDetailsLocal.lengthFeet" :min="0.1" :step="0.5" class="w-full")
+                UFormField(label="Make")
+                  UInput(v-model="boatDetailsLocal.make" type="text" class="w-full")
+                UFormField(label="Model")
+                  UInput(v-model="boatDetailsLocal.model" type="text" class="w-full")
+                UFormField(label="Engine type")
+                  USelect(
+                    v-model="boatDetailsLocal.engineType"
+                    class="w-full"
+                    :items="boatEngineTypeItems"
+                    valueKey="id"
+                    labelKey="name")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Engine hours (optional)")
+                    UInputNumber(v-model="boatDetailsLocal.engineHours" :min="0" :step="1" class="w-full")
+                  UFormField(label="ZIP (optional)" hint="5-digit US")
+                    UInput(v-model="boatDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+                UFormField(label="Condition")
+                  USelect(
+                    v-model="boatDetailsLocal.condition"
+                    class="w-full"
+                    :items="vehicleConditionItems"
+                    valueKey="id"
+                    labelKey="name")
+                UFormField(label="Purchase hint (optional)")
+                  UInputNumber(
+                    v-model="boatDetailsLocal.purchasePriceHint"
+                    :format-options="formatCurrencyOptions"
+                    :step="0.01"
+                    class="w-full")
+
+              template(v-else-if="currentAssetCategory === 'rv'")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Year")
+                    UInputNumber(v-model="rvDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+                  UFormField(label="Length (ft)")
+                    UInputNumber(v-model="rvDetailsLocal.lengthFeet" :min="0.1" :step="0.5" class="w-full")
+                UFormField(label="Make")
+                  UInput(v-model="rvDetailsLocal.make" type="text" class="w-full")
+                UFormField(label="Model")
+                  UInput(v-model="rvDetailsLocal.model" type="text" class="w-full")
+                UFormField(label="RV class")
+                  USelect(
+                    v-model="rvDetailsLocal.rvClass"
+                    class="w-full"
+                    :items="rvClassItems"
+                    valueKey="id"
+                    labelKey="name")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Mileage")
+                    UInputNumber(v-model="rvDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+                  UFormField(label="ZIP (optional)" hint="5-digit US")
+                    UInput(v-model="rvDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+                UFormField(label="Condition")
+                  USelect(
+                    v-model="rvDetailsLocal.condition"
+                    class="w-full"
+                    :items="vehicleConditionItems"
+                    valueKey="id"
+                    labelKey="name")
+                UFormField(label="Purchase hint (optional)")
+                  UInputNumber(
+                    v-model="rvDetailsLocal.purchasePriceHint"
+                    :format-options="formatCurrencyOptions"
+                    :step="0.01"
+                    class="w-full")
+
+              template(v-else-if="currentAssetCategory === 'motorcycle'")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Year")
+                    UInputNumber(v-model="motorcycleDetailsLocal.year" :min="1900" :max="2100" :step="1" class="w-full")
+                  UFormField(label="Mileage")
+                    UInputNumber(v-model="motorcycleDetailsLocal.mileage" :min="0" :step="1" class="w-full")
+                UFormField(label="Make")
+                  UInput(v-model="motorcycleDetailsLocal.make" type="text" class="w-full")
+                UFormField(label="Model")
+                  UInput(v-model="motorcycleDetailsLocal.model" type="text" class="w-full")
+                div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
+                  UFormField(label="Engine CC (optional)")
+                    UInputNumber(v-model="motorcycleDetailsLocal.engineCC" :min="1" :step="1" class="w-full")
+                  UFormField(label="ZIP (optional)" hint="5-digit US")
+                    UInput(v-model="motorcycleDetailsLocal.zip" type="text" maxlength="5" class="w-full")
+                UFormField(label="Condition")
+                  USelect(
+                    v-model="motorcycleDetailsLocal.condition"
+                    class="w-full"
+                    :items="vehicleConditionItems"
+                    valueKey="id"
+                    labelKey="name")
+                UFormField(label="Purchase hint (optional)")
+                  UInputNumber(
+                    v-model="motorcycleDetailsLocal.purchasePriceHint"
                     :format-options="formatCurrencyOptions"
                     :step="0.01"
                     class="w-full")
@@ -1375,17 +2219,17 @@ UModal(:title="props.title" :description="props.description || props.title" clas
               UButton(
                 color="primary"
                 variant="subtle"
-                :loading="isEstimatingVehicle"
-                :disabled="isSaving || isDeleting || isEstimatingVehicle"
-                @click.prevent="runVehicleEstimate"
+                :loading="isEstimatingAsset"
+                :disabled="isSaving || isDeleting || isEstimatingAsset"
+                @click.prevent="runAssetEstimate"
               ) Get estimate
 
-              div(v-if="lastVehicleEstimate" class="space-y-2 text-sm")
+              div(v-if="lastAssetEstimate" class="space-y-2 text-sm")
                 p(class="font-medium text-emerald-900 dark:text-emerald-100") {{ estimateRangeLabel }}
-                p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastVehicleEstimate.rationale }}
-                p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastVehicleEstimate.disclaimer }}
+                p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastAssetEstimate.rationale }}
+                p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastAssetEstimate.disclaimer }}
 
-              .flex.flex-wrap.gap-2(v-if="lastVehicleEstimate")
+              .flex.flex-wrap.gap-2(v-if="lastAssetEstimate")
                 UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToBalance" :disabled="isSaving || isDeleting") Apply mid to balance
                 UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToOriginal" :disabled="isSaving || isDeleting") Apply mid to original value
 

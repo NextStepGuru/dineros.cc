@@ -10,6 +10,7 @@ import type {
   Account,
   SavingsGoal,
   AccountMembershipSummary,
+  EvmChain,
 } from "../types/types";
 
 export const useListStore = defineStore("listStore", {
@@ -17,6 +18,7 @@ export const useListStore = defineStore("listStore", {
     reoccurrences: [] as Reoccurrence[],
     intervals: [] as Interval[],
     accountTypes: [] as AccountType[],
+    evmChains: [] as EvmChain[],
     accountRegisters: [] as AccountRegister[],
     budgets: [] as Budget[],
     accounts: [] as Account[],
@@ -57,6 +59,7 @@ export const useListStore = defineStore("listStore", {
     },
     getIntervals: (state) => state.intervals,
     getAccountTypes: (state) => state.accountTypes,
+    getEvmChains: (state) => state.evmChains,
     getAccountRegisters: (state) => {
       const authStore = useAuthStore();
 
@@ -94,6 +97,9 @@ export const useListStore = defineStore("listStore", {
     },
     setAccountTypes(accountTypes: AccountType[]) {
       this.accountTypes = accountTypes;
+    },
+    setEvmChains(evmChains: EvmChain[]) {
+      this.evmChains = evmChains;
     },
     setAccountRegisters(accountRegisters: AccountRegister[]) {
       this.accountRegisters = accountRegisters;
@@ -196,6 +202,7 @@ export const useListStore = defineStore("listStore", {
           this.setReoccurrences(data.reoccurrences);
           this.setIntervals(data.intervals);
           this.setAccountTypes(data.accountTypes);
+          this.setEvmChains(data.evmChains ?? []);
           this.setAccountRegisters(data.accountRegisters);
           this.setBudgets(data.budgets);
           this.setAccounts(data.accounts);
@@ -211,6 +218,7 @@ export const useListStore = defineStore("listStore", {
       this.reoccurrences = [];
       this.intervals = [];
       this.accountTypes = [];
+      this.evmChains = [];
       this.accountRegisters = [];
       this.budgets = [];
       this.accounts = [];

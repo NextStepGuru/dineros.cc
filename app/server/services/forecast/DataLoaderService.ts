@@ -104,6 +104,7 @@ export class DataLoaderService implements IDataLoaderService {
       where: {
         accountId,
         ...budgetIdWhere(budgetId),
+        type: { registerClass: { not: "crypto" } },
       },
       select: {
         id: true,
@@ -146,6 +147,7 @@ export class DataLoaderService implements IDataLoaderService {
         type: {
           select: {
             accruesBalanceGrowth: true,
+            registerClass: true,
           },
         },
       },
@@ -209,6 +211,7 @@ export class DataLoaderService implements IDataLoaderService {
         register: {
           accountId,
           ...budgetIdWhere(budgetId),
+          type: { registerClass: { not: "crypto" } },
         },
         isCleared: false, // Exclude cleared entries from active calculations
         OR: [

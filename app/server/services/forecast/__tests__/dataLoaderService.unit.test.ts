@@ -215,7 +215,10 @@ describe("DataLoaderService", () => {
       // Should call with filter for cleared entries
       expect(mockDb.registerEntry.findMany).toHaveBeenCalledWith({
         where: {
-          register: { accountId: "test-account" },
+          register: {
+            accountId: "test-account",
+            type: { registerClass: { not: "crypto" } },
+          },
           isCleared: false,
           OR: [{ isProjected: false }],
         },

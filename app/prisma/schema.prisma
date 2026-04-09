@@ -357,6 +357,10 @@ model AccountRegister {
   paymentCategoryId         String?   @map("payment_category_id")
   interestCategoryId        String?   @map("interest_category_id")
   vehicleDetails            Json?     @map("vehicle_details")
+  walletAddress             String?   @map("wallet_address") @db.VarChar(500) /// @encrypted
+  walletAddressHash         String?   @map("wallet_address_hash") @db.VarChar(128) /// @encryption:hash(walletAddress)?algorithm=sha512
+  alchemyLastSyncAt         DateTime? @map("alchemy_last_sync_at")
+  alchemyJson               Json?     @map("alchemy_json")
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at")
 
   budget              Budget            @relation(fields: [budgetId], references: [id])
@@ -381,6 +385,8 @@ model AccountRegister {
   sourceForSavingsGoals SavingsGoal[]                @relation("SavingsGoalSource")
   targetForSavingsGoals SavingsGoal[]                @relation("SavingsGoalTarget")
   cashOnHand            CashOnHand?
+  cryptoRegisterChains  CryptoRegisterChain[]
+  cryptoTokenBalances   CryptoTokenBalance[]
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
@@ -739,6 +745,7 @@ model AccountType {
   id                   Int      @id @default(autoincrement()) @db.UnsignedInt
   type                 String
   name                 String
+  registerClass        String   @default("fiat") @map("class") @db.VarChar(20)
   isCredit             Boolean  @default(false) @map("is_credit")
   accruesBalanceGrowth Boolean  @default(false) @map("accrues_balance_growth")
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
@@ -746,6 +753,51 @@ model AccountType {
   registers AccountRegister[]
 
   @@map("account_type")
+}
+
+model EvmChain {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  name      String   @db.VarChar(100)
+  networkId String   @unique @map("network_id") @db.VarChar(50)
+  symbol    String   @db.VarChar(10)
+  explorer  String?  @db.VarChar(500)
+  isDefault Boolean  @default(false) @map("is_default")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  cryptoRegisterChains CryptoRegisterChain[]
+
+  @@map("evm_chain")
+}
+
+model CryptoRegisterChain {
+  id                Int             @id @default(autoincrement()) @db.UnsignedInt
+  accountRegisterId Int             @map("account_register_id") @db.UnsignedInt
+  evmChainId        Int             @map("evm_chain_id") @db.UnsignedInt
+  accountRegister   AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  evmChain          EvmChain        @relation(fields: [evmChainId], references: [id], onDelete: Cascade)
+
+  @@unique([accountRegisterId, evmChainId])
+  @@map("crypto_register_chain")
+}
+
+model CryptoTokenBalance {
+  id                Int             @id @default(autoincrement()) @db.UnsignedInt
+  accountRegisterId Int             @map("account_register_id") @db.UnsignedInt
+  network           String          @db.VarChar(50)
+  tokenAddress      String?         @map("token_address") @db.VarChar(100)
+  tokenName         String          @map("token_name") @db.VarChar(200)
+  tokenSymbol       String          @map("token_symbol") @db.VarChar(20)
+  tokenDecimals     Int             @default(18) @map("token_decimals")
+  tokenBalance      String          @map("token_balance") @db.VarChar(100)
+  displayBalance    Decimal         @map("display_balance") @db.Decimal(36, 18)
+  priceUsd          Decimal?        @map("price_usd") @db.Decimal(19, 8)
+  valueUsd          Decimal?        @map("value_usd") @db.Decimal(19, 2)
+  logoUrl           String?         @map("logo_url") @db.VarChar(500)
+  syncedAt          DateTime        @default(now()) @map("synced_at")
+  accountRegister   AccountRegister @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+
+  @@index([accountRegisterId])
+  @@map("crypto_token_balance")
 }
 
 model Interval {

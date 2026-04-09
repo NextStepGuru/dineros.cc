@@ -9,5 +9,29 @@ export default defineAppConfig({
     main: {
       base: "min-h-0",
     },
+    /**
+     * Popper-based menus (Select, etc.) must stack above `UModal` (fixed overlay + dialog).
+     * Reka copies z-index from the content node onto the popper wrapper; without this, lists render behind modals.
+     */
+    select: {
+      slots: {
+        content: "z-[100]",
+      },
+    },
+    selectMenu: {
+      slots: {
+        content: "z-[100]",
+      },
+    },
+    popover: {
+      slots: {
+        content: "z-[100]",
+      },
+    },
+    dropdownMenu: {
+      slots: {
+        content: "z-[100]",
+      },
+    },
   },
 });
