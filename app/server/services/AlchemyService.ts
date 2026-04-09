@@ -48,7 +48,7 @@ function usdPriceFromRow(row: AlchemyTokenRow): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Prefer total USD from API; else approximate from unit price * display balance. */
+/** Position USD from Alchemy per-unit USD price × display balance; else from fallback price. */
 function valueUsdForToken(
   row: AlchemyTokenRow,
   displayBalance: number,
@@ -59,8 +59,8 @@ function valueUsdForToken(
     const usd = prices.find((p) => p.currency?.toLowerCase() === "usd");
     if (usd?.value) {
       const v = Number(usd.value);
-      if (Number.isFinite(v) && v > 0) {
-        return v;
+      if (Number.isFinite(v) && v > 0 && Number.isFinite(displayBalance)) {
+        return displayBalance * v;
       }
     }
   }
