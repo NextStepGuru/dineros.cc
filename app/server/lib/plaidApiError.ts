@@ -26,7 +26,16 @@ export function extractPlaidErrorInfo(err: unknown): PlaidErrorInfo {
     if ("status" in o && typeof o.status === "number") {
       httpStatus = o.status;
     }
-    const response = o.response as { data?: Record<string, unknown> } | undefined;
+    const response = o.response as
+      | { status?: number; data?: Record<string, unknown> }
+      | undefined;
+    if (
+      httpStatus === null &&
+      response &&
+      typeof response.status === "number"
+    ) {
+      httpStatus = response.status;
+    }
     if (response?.data && typeof response.data === "object") {
       const d = response.data as Record<string, unknown>;
       if (typeof d.error_message === "string" && d.error_message.length > 0) {
