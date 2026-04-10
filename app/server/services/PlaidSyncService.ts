@@ -27,6 +27,7 @@ import {
 import { notifyIntegrationAlert } from "~/server/services/integrationOpsAlert";
 import { markPlaidItemReauthRequired } from "~/server/services/plaidReauthService";
 import { resolvePlaidAccessTokenFromStored } from "~/server/lib/plaidAccessTokenCrypto";
+import { recordPlaidSyncLog } from "~/server/lib/recordPlaidSyncLog";
 
 const DAYS_REQUESTED = 3;
 
@@ -54,6 +55,8 @@ interface SyncResult {
   errors: string[];
   byRegister: RegisterSyncStatsRow[];
   ownerUserId: number | null;
+  /** Raw transaction count returned from Plaid (legacy `transactionsGet`). */
+  fetchedTransactionCount: number;
 }
 
 class PlaidSyncService {
@@ -565,6 +568,7 @@ class PlaidSyncService {
       errors: allErrors,
       byRegister,
       ownerUserId,
+      fetchedTransactionCount: transactions.length,
     };
   }
 
@@ -713,6 +717,7 @@ class PlaidSyncService {
     >,
     itemOwnerUserId: number | null,
     bumpRegister: (_id: number, _kind: "new" | "updated") => void,
+    itemSyncErrors: string[],
   ): Promise<void> {
     for (const tx of added) {
       const ar = registerByPlaidAccountId.get(tx.account_id);
@@ -725,6 +730,8 @@ class PlaidSyncService {
           bumpRegister,
         );
       } catch (err) {
+        const msg = `added ${tx.transaction_id}: ${err instanceof Error ? err.message : String(err)}`;
+        itemSyncErrors.push(msg);
         log({
           message: "syncItemWithTransactionsSync added error",
           data: { tx: tx.transaction_id, err },
@@ -741,6 +748,7 @@ class PlaidSyncService {
       AccountRegister & { type: AccountType }
     >,
     bumpRegister: (_id: number, _kind: "new" | "updated") => void,
+    itemSyncErrors: string[],
   ): Promise<void> {
     for (const tx of modified) {
       const ar = registerByPlaidAccountId.get(tx.account_id);
@@ -759,6 +767,8 @@ class PlaidSyncService {
           bumpRegister(ar.id, "updated");
         }
       } catch (err) {
+        const msg = `modified ${tx.transaction_id}: ${err instanceof Error ? err.message : String(err)}`;
+        itemSyncErrors.push(msg);
         log({
           message: "syncItemWithTransactionsSync modified error",
           data: { tx: tx.transaction_id, err },
@@ -815,88 +825,170 @@ class PlaidSyncService {
    * Applies added, modified, removed; persists cursor.
    */
   async syncItemWithTransactionsSync(itemId: string): Promise<void> {
-    const accessToken = await this.getAccessTokenForItemId(itemId);
-    if (!accessToken) {
-      log({
-        message: "syncItemWithTransactionsSync: no access token",
-        data: { itemId },
-        level: "warn",
+    const syncStart = dateTimeService.nowDate().getTime();
+    const itemSyncErrors: string[] = [];
+    let txAdded = 0;
+    let txModified = 0;
+    let txRemoved = 0;
+    let itemOwnerUserId: number | null = null;
+
+    try {
+      const accessToken = await this.getAccessTokenForItemId(itemId);
+      if (!accessToken) {
+        log({
+          message: "syncItemWithTransactionsSync: no access token",
+          data: { itemId },
+          level: "warn",
+        });
+        await recordPlaidSyncLog({
+          syncMode: "item_cursor",
+          status: "failed",
+          itemId,
+          userId: null,
+          durationMs: dateTimeService.nowDate().getTime() - syncStart,
+          errorCount: 1,
+          errorSummary: "no access token",
+          metadata: { reason: "missing_access_token" },
+        });
+        return;
+      }
+
+      itemOwnerUserId = await this.getItemOwnerUserId(itemId);
+
+      const cursorRow = await PrismaDb.plaidSyncCursor.findUnique({
+        where: { itemId },
       });
-      return;
-    }
+      let cursor = cursorRow?.cursor ?? "";
 
-    const itemOwnerUserId = await this.getItemOwnerUserId(itemId);
+      const accountRegisters = await this.db.accountRegister.findMany({
+        where: {
+          plaidAccessToken: accessToken,
+          plaidId: { not: null },
+          isArchived: false,
+        },
+        include: { type: true },
+      });
+      const registerByPlaidAccountId = new Map(
+        accountRegisters.map((r) => [r.plaidId!, r]),
+      );
 
-    const cursorRow = await PrismaDb.plaidSyncCursor.findUnique({
-      where: { itemId },
-    });
-    let cursor = cursorRow?.cursor ?? "";
+      const registerStats = new Map<number, { new: number; updated: number }>();
+      for (const ar of accountRegisters) {
+        registerStats.set(ar.id, { new: 0, updated: 0 });
+      }
+      const bumpRegister = (id: number, kind: "new" | "updated") => {
+        const row = registerStats.get(id);
+        if (!row) return;
+        if (kind === "new") row.new += 1;
+        else row.updated += 1;
+      };
 
-    const accountRegisters = await this.db.accountRegister.findMany({
-      where: {
-        plaidAccessToken: accessToken,
-        plaidId: { not: null },
-        isArchived: false,
-      },
-      include: { type: true },
-    });
-    const registerByPlaidAccountId = new Map(
-      accountRegisters.map((r) => [r.plaidId!, r]),
-    );
+      let hasMore = true;
+      while (hasMore) {
+        const data = await this.fetchTransactionsSyncPage(
+          accessToken,
+          cursor,
+          itemId,
+        );
+        txAdded += data.added.length;
+        txModified += data.modified.length;
+        txRemoved += data.removed.length;
+        await this.processTransactionsSyncPageAdded(
+          data.added,
+          registerByPlaidAccountId,
+          itemOwnerUserId,
+          bumpRegister,
+          itemSyncErrors,
+        );
+        await this.processTransactionsSyncPageModified(
+          data.modified,
+          registerByPlaidAccountId,
+          bumpRegister,
+          itemSyncErrors,
+        );
+        await this.syncItemApplyRemovedTransactions(
+          data.removed,
+          accountRegisters,
+        );
+        cursor = data.next_cursor;
+        hasMore = data.has_more;
+      }
 
-    const registerStats = new Map<number, { new: number; updated: number }>();
-    for (const ar of accountRegisters) {
-      registerStats.set(ar.id, { new: 0, updated: 0 });
-    }
-    const bumpRegister = (id: number, kind: "new" | "updated") => {
-      const row = registerStats.get(id);
-      if (!row) return;
-      if (kind === "new") row.new += 1;
-      else row.updated += 1;
-    };
+      await PrismaDb.plaidSyncCursor.upsert({
+        where: { itemId },
+        create: { itemId, cursor },
+        update: { cursor, updatedAt: dateTimeService.now().toDate() },
+      });
 
-    let hasMore = true;
-    while (hasMore) {
-      const data = await this.fetchTransactionsSyncPage(
-        accessToken,
-        cursor,
+      await this.maybeSendTransactionsSyncSummaryEmail(
         itemId,
-      );
-      await this.processTransactionsSyncPageAdded(
-        data.added,
-        registerByPlaidAccountId,
         itemOwnerUserId,
-        bumpRegister,
-      );
-      await this.processTransactionsSyncPageModified(
-        data.modified,
-        registerByPlaidAccountId,
-        bumpRegister,
-      );
-      await this.syncItemApplyRemovedTransactions(
-        data.removed,
+        registerStats,
         accountRegisters,
       );
-      cursor = data.next_cursor;
-      hasMore = data.has_more;
-    }
 
-    await PrismaDb.plaidSyncCursor.upsert({
-      where: { itemId },
-      create: { itemId, cursor },
-      update: { cursor, updatedAt: dateTimeService.now().toDate() },
-    });
+      for (const ar of accountRegisters) {
+        addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
+        addRecalculateJob({ accountId: ar.accountId });
+      }
 
-    await this.maybeSendTransactionsSyncSummaryEmail(
-      itemId,
-      itemOwnerUserId,
-      registerStats,
-      accountRegisters,
-    );
+      let newEntries = 0;
+      let matchedEntries = 0;
+      const byRegisterRows: Array<{
+        accountRegisterId: number;
+        name: string;
+        newCount: number;
+        updatedCount: number;
+      }> = [];
+      for (const ar of accountRegisters) {
+        const s = registerStats.get(ar.id) ?? { new: 0, updated: 0 };
+        newEntries += s.new;
+        matchedEntries += s.updated;
+        if (s.new > 0 || s.updated > 0) {
+          byRegisterRows.push({
+            accountRegisterId: ar.id,
+            name: ar.name,
+            newCount: s.new,
+            updatedCount: s.updated,
+          });
+        }
+      }
 
-    for (const ar of accountRegisters) {
-      addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
-      addRecalculateJob({ accountId: ar.accountId });
+      await recordPlaidSyncLog({
+        syncMode: "item_cursor",
+        status: itemSyncErrors.length === 0 ? "success" : "partial",
+        itemId,
+        userId: itemOwnerUserId,
+        durationMs: dateTimeService.nowDate().getTime() - syncStart,
+        txAdded,
+        txModified,
+        txRemoved,
+        newEntries,
+        matchedEntries,
+        errorCount: itemSyncErrors.length,
+        errorSummary:
+          itemSyncErrors.length > 0
+            ? itemSyncErrors.join("\n").slice(0, 8000)
+            : null,
+        metadata: {
+          byRegister: byRegisterRows,
+        },
+      });
+    } catch (err) {
+      await recordPlaidSyncLog({
+        syncMode: "item_cursor",
+        status: "failed",
+        itemId,
+        userId: itemOwnerUserId,
+        durationMs: dateTimeService.nowDate().getTime() - syncStart,
+        txAdded,
+        txModified,
+        txRemoved,
+        errorCount: 1,
+        errorSummary: err instanceof Error ? err.message : String(err),
+        metadata: { phase: "syncItemWithTransactionsSync" },
+      });
+      throw err;
     }
   }
 
@@ -960,6 +1052,7 @@ class PlaidSyncService {
       accountRegisterId: number;
     }[],
   ): Promise<void> {
+    const legacyStart = dateTimeService.nowDate().getTime();
     const startDate = this.minPlaidSyncStartDateFromTokenAccounts(accountsForToken);
     const startStr = startDate.toISOString().slice(0, 10);
     const endStr = dateTimeService
@@ -1004,6 +1097,29 @@ class PlaidSyncService {
         registers: syncResult.byRegister,
       });
     }
+
+    const accountRegisterIds = accountsForToken.map((a) => a.accountRegisterId);
+    await recordPlaidSyncLog({
+      syncMode: "legacy_token_batch",
+      status: syncResult.errors.length === 0 ? "success" : "partial",
+      itemId: null,
+      userId: syncResult.ownerUserId,
+      durationMs: dateTimeService.nowDate().getTime() - legacyStart,
+      txAdded: syncResult.fetchedTransactionCount,
+      txModified: 0,
+      txRemoved: 0,
+      newEntries: syncResult.newTransactions,
+      matchedEntries: syncResult.matchedTransactions,
+      errorCount: syncResult.errors.length,
+      errorSummary:
+        syncResult.errors.length > 0
+          ? syncResult.errors.join("\n").slice(0, 8000)
+          : null,
+      metadata: {
+        byRegister: syncResult.byRegister,
+        accountRegisterIds,
+      },
+    });
   }
 
   /**
@@ -1060,6 +1176,7 @@ class PlaidSyncService {
     for (const accessToken in plaidAccounts) {
       const accountsForToken = plaidAccounts[accessToken];
       if (!accountsForToken?.length) continue;
+      const legacySyncStart = dateTimeService.nowDate().getTime();
       try {
         await this.syncLegacyPlaidTransactionsForToken(
           accessToken,
@@ -1074,6 +1191,19 @@ class PlaidSyncService {
             accountRegisterIds: accountsForToken.map((a) => a.accountRegisterId),
           },
           level: "error",
+        });
+        await recordPlaidSyncLog({
+          syncMode: "legacy_token_batch",
+          status: "failed",
+          itemId: null,
+          userId: null,
+          durationMs: dateTimeService.nowDate().getTime() - legacySyncStart,
+          errorCount: 1,
+          errorSummary:
+            error instanceof Error ? error.message.slice(0, 8000) : String(error),
+          metadata: {
+            accountRegisterIds: accountsForToken.map((a) => a.accountRegisterId),
+          },
         });
       }
     }

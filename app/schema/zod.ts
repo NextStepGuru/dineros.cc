@@ -343,6 +343,14 @@ export const adminIntegrationJobLogsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const adminPlaidSyncLogsQuerySchema = z.object({
+  syncMode: z.enum(["item_cursor", "legacy_token_batch"]).optional(),
+  status: z.enum(["success", "partial", "failed"]).optional(),
+  userId: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
 export const registerSchema = z
   .object({
     firstName: z.string().min(1, "First name is required"),
