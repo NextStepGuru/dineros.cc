@@ -62,13 +62,14 @@ export default defineEventHandler(async (event) => {
         level: "error",
         data: { ...info, userId: user.userId },
       });
-      const statusMessage =
-        info.errorCode && info.message
-          ? `${info.errorCode}: ${info.message}`
-          : info.message;
+      const isProd = process.env.NODE_ENV === "production";
       throw createError({
-        statusCode: info.httpStatus,
-        statusMessage,
+        statusCode: 500,
+        statusMessage: isProd
+          ? "Something went wrong"
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong",
       });
     }
 
