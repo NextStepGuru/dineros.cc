@@ -1,6 +1,7 @@
 # Render with: source .deploy/profiles/<profile>.env && export GCP_PROJECT_ID IMAGE_TAG && envsubst < .deploy/dineros.template.yaml
 # Required env: profile exports + GCP_PROJECT_ID, IMAGE_TAG (CI also sets GCP_PROJECT_ID for the GCP_PROJECT_ID env var in containers).
 # Image URLs: Google Container Registry gcr.io/PROJECT/IMAGE:tag
+# ${SECRET_DB} must contain only DB field-encryption material (DB_ENCRYPTION_KEY, DB_DECRYPTION_KEY_*). Do not put DATABASE_URL here — it lives in ${SECRET_DATABASE_MAIN} / ${SECRET_DATABASE_MICRO}.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -60,6 +61,9 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          envFrom:
+            - secretRef:
+                name: ${SECRET_DB}
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -113,36 +117,6 @@ spec:
                 secretKeyRef:
                   name: ${SECRET_APP}
                   key: POSTMARK_WEBHOOK_SECRET
-            - name: DB_DECRYPTION_KEY_1
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_1
-            - name: DB_DECRYPTION_KEY_2
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_2
-            - name: DB_DECRYPTION_KEY_3
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_3
-            - name: DB_DECRYPTION_KEY_4
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_4
-            - name: DB_DECRYPTION_KEY_5
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_5
-            - name: DB_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_ENCRYPTION_KEY
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -250,6 +224,9 @@ spec:
             - name: http
               containerPort: 3050
               protocol: TCP
+          envFrom:
+            - secretRef:
+                name: ${SECRET_DB}
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -271,36 +248,6 @@ spec:
                 secretKeyRef:
                   name: ${SECRET_APP}
                   key: INTERNAL_API_TOKEN
-            - name: DB_DECRYPTION_KEY_1
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_1
-            - name: DB_DECRYPTION_KEY_2
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_2
-            - name: DB_DECRYPTION_KEY_3
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_3
-            - name: DB_DECRYPTION_KEY_4
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_4
-            - name: DB_DECRYPTION_KEY_5
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_DECRYPTION_KEY_5
-            - name: DB_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: ${SECRET_DB}
-                  key: DB_ENCRYPTION_KEY
       volumes:
         - name: service-account-volume
           secret:

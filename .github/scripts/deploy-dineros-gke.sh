@@ -21,3 +21,9 @@ source "${ROOT}/.deploy/profiles/${PROFILE}.env"
 RENDERED="${TMPDIR:-/tmp}/dineros.rendered.${PROFILE}.yaml"
 envsubst < "${ROOT}/.deploy/dineros.template.yaml" > "${RENDERED}"
 kubectl apply -f "${RENDERED}"
+
+if [[ "${PROFILE}" == "staging" ]]; then
+  ROTATION_RENDERED="${TMPDIR:-/tmp}/dineros.key-rotation.${PROFILE}.yaml"
+  envsubst < "${ROOT}/.deploy/key-rotation-cronjob.template.yaml" > "${ROTATION_RENDERED}"
+  kubectl apply -f "${ROTATION_RENDERED}"
+fi

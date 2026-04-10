@@ -160,6 +160,14 @@ jobs:
           pre_build_command: cd microservice && ./copy-files.sh
           tags: |
             gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+      - uses: ./.github/actions/build-push-gcr
+        with:
+          dockerfile: ./microservice/Dockerfile
+          context: .
+          pre_build_command: cd microservice && ./copy-files.sh
+          target: runner-keyrotate
+          tags: |
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:pr-${{ github.event.pull_request.number }}-${{ github.sha }}-keyrotate
 
   staging-deploy:
     if: github.event.pull_request.head.repo.full_name == github.repository
