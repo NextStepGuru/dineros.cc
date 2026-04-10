@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { PlaidLinkOptions } from "@jcss/vue-plaid-link";
+import { PlaidLink, type PlaidLinkOptions } from "@jcss/vue-plaid-link";
 import type { TableColumn } from "@nuxt/ui";
-import { h, resolveComponent } from "vue";
+import { computed, h, resolveComponent } from "vue";
 import type { PlaidAccount, User } from "../../types/types";
 
 const UButton = resolveComponent("UButton");
@@ -23,6 +23,7 @@ const stripedTheme = ref({
 const toast = useToast();
 const authStore = useAuthStore();
 const listStore = useListStore();
+const appFetch = useAppFetch();
 
 const isLoaded = ref(false);
 const publicToken = ref("");
@@ -74,33 +75,37 @@ async function connectToPlaid() {
 
 // Currently synced accounts
 const syncedAccounts = ref<SyncedAccountRow[]>([]);
+const syncedAccountsTableKey = computed(() =>
+  syncedAccounts.value.map((a) => a.id).join("-"),
+);
+function messageFromFetchError(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "data" in error) {
+    const data = (error as { data?: { message?: string } }).data;
+    if (data?.message) return data.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 async function loadSyncedAccounts() {
   isLoading.value = true;
   try {
-    const { data: res, error } = await useAPI<{ accounts: any[] }>(
+    const res = await appFetch<{ accounts: SyncedAccountRow[] }>(
       "/api/plaid-synced-accounts",
+      { cache: "no-store" },
     );
-
-    if (res?.value && !error?.value) {
-      syncedAccounts.value = res.value.accounts as SyncedAccountRow[];
-    } else if (error?.value) {
-      // Only show error if it's not a "Plaid not enabled" error
-      if (!error.value.message?.includes("not enabled")) {
-        toast.add({
-          color: "error",
-          description: error.value.message || "Failed to load synced accounts.",
-        });
-      }
-    }
+    syncedAccounts.value = res.accounts;
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "Failed to load synced accounts.";
-    toast.add({
-      color: "error",
-      description: message,
-    });
+    const message = messageFromFetchError(
+      error,
+      "Failed to load synced accounts.",
+    );
+    if (!message.includes("not enabled")) {
+      toast.add({
+        color: "error",
+        description: message,
+      });
+    }
   } finally {
     isLoading.value = false;
   }
@@ -112,20 +117,18 @@ async function loadAvailablePlaidAccounts() {
   if (!authStore.hasPlaidConnected) return;
 
   try {
-    const { data: res, error } = await useAPI<{ accounts: PlaidAccount[] }>(
+    const res = await appFetch<{ accounts: PlaidAccount[] }>(
       "/api/plaid-list-accounts",
     );
-
-    if (res?.value && !error?.value) {
-      availablePlaidAccounts.value = res.value.accounts;
-    } else if (error?.value) {
-      // Only show error if it's not a "Plaid not enabled" error
-      if (!error.value.message?.includes("not enabled")) {
-        console.error("Failed to load available Plaid accounts:", error.value);
-      }
-    }
+    availablePlaidAccounts.value = res.accounts;
   } catch (error) {
-    console.error("Failed to load available Plaid accounts:", error);
+    const message = messageFromFetchError(
+      error,
+      "Failed to load available Plaid accounts.",
+    );
+    if (!message.includes("not enabled")) {
+      console.error("Failed to load available Plaid accounts:", message);
+    }
   }
 }
 
@@ -153,33 +156,30 @@ const isDisconnecting = ref<number | null>(null);
 async function disconnectAccount(accountRegisterId: number) {
   isDisconnecting.value = accountRegisterId;
   try {
-    const { data: res, error } = await useAPI("/api/plaid-disconnect-account", {
+    await appFetch("/api/plaid-disconnect-account", {
       method: "POST",
       body: { accountRegisterId },
     });
 
-    if (res?.value && !error?.value) {
-      toast.add({
-        color: "success",
-        description: "Account disconnected successfully.",
-      });
-      await loadSyncedAccounts();
-      await loadAvailablePlaidAccounts();
-      listStore.fetchLists();
-    } else if (error?.value) {
-      toast.add({
-        color: "error",
-        description: error.value.message || "Failed to disconnect account.",
-      });
-    }
+    syncedAccounts.value = syncedAccounts.value.filter(
+      (a) => a.id !== accountRegisterId,
+    );
+
+    toast.add({
+      color: "success",
+      description: "Account disconnected successfully.",
+    });
+
+    await loadSyncedAccounts();
+    await loadAvailablePlaidAccounts();
+    listStore.fetchLists();
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "Failed to disconnect account.";
     toast.add({
       color: "error",
-      description: message,
+      description: messageFromFetchError(
+        error,
+        "Failed to disconnect account.",
+      ),
     });
   } finally {
     isDisconnecting.value = null;
@@ -391,8 +391,10 @@ div
       v-if="!plaidLinkOptions.token"
       @click="connectToPlaid()"
     ) Link Plaid (Debug)
-    PlaidLink(v-bind="plaidLinkOptions" v-else-if="!isLoaded")
-      UButton(color="primary" size="lg" type="button" block) Connect to Plaid
+    //- :is binds script-setup import (Pug SFC does not resolve PlaidLink as a tag)
+    ClientOnly(v-else-if="!isLoaded")
+      component.plaid-link-root(:is="PlaidLink" v-bind="plaidLinkOptions")
+        UButton(color="primary" size="lg" type="button" block) Connect to Plaid
 
   // Main content when Plaid is connected OR when there are synced accounts
   .pt-5(v-if="authStore.hasPlaidConnected || syncedAccounts.length > 0")
@@ -401,6 +403,7 @@ div
       h3(class="text-lg font-semibold mb-4") Currently Synced Accounts
       .overflow-x-auto.mb-6
         UTable(
+          :key="syncedAccountsTableKey"
           class="w-full"
           :data="syncedAccounts"
           :columns="syncedColumns"

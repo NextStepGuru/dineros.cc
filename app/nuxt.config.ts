@@ -155,7 +155,7 @@ export default defineNuxtConfig({
       },
     },
     optimizeDeps: {
-      include: ["zod", "@simplewebauthn/browser"],
+      include: ["zod", "@simplewebauthn/browser", "@jcss/vue-plaid-link"],
       exclude: ["fsevents"],
     },
   },

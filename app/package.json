@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "predev": "prisma generate",
     "dev": "nuxt dev",
     "test": "TZ=UTC vitest --run --config vitest.config.ts",
     "test:crypto": "TZ=UTC vitest --run --config vitest.crypto.config.ts",

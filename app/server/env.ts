@@ -1,8 +1,14 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import envSchema from "./envSchema";
 
-dotenv.config();
+const appRoot = path.resolve(fileURLToPath(import.meta.url), "../..");
+const repoRoot = path.resolve(appRoot, "..");
+// Monorepo: root `.env` then `app/.env` (override) so `pnpm dev` from repo root still picks up shared vars.
+dotenv.config({ path: path.join(repoRoot, ".env") });
+dotenv.config({ path: path.join(appRoot, ".env"), override: true });
 
 export const getDbDecryptionKeyValues = (): string[] => {
   return Object.keys(process.env)

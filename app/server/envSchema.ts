@@ -5,8 +5,13 @@ const envSchema = z.object({
   DEPLOY_ENV: z.enum(["staging", "production", "local"]).default("production"),
   DB_ENCRYPTION_KEY: z.string(),
   DB_DECRYPTION_KEYS: z.string().transform((a: string) => a.split(",")),
-  PLAID_CLIENT_ID: z.string(),
-  PLAID_SECRET: z.string(),
+  PLAID_CLIENT_ID: z.string().transform((s) => s.trim()),
+  PLAID_SECRET: z.string().transform((s) => s.trim()),
+  /**
+   * Force Plaid API host when local/staging keys are production (or the reverse).
+   * If unset: production when DEPLOY_ENV=production, else sandbox.
+   */
+  PLAID_API_HOST: z.enum(["sandbox", "production"]).optional(),
   /** Plaid webhook URL (e.g. https://your-domain.com/api/webhook/plaid). Optional; if unset, link token is created without webhook. */
   PLAID_WEBHOOK_URL: z.url().optional(),
   POSTMARK_SERVER_TOKEN: z.string().optional().default(""),
