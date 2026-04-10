@@ -1,4 +1,4 @@
-# Build and deploy only. PR checks (lint, test, build, pre-commit) run in .github/workflows/pr.yml; staging E2E + manual snapshot workflows are separate.
+# Build and deploy only; deploy job waits for GKE rollouts and GET /health/ready on the public URL. PR checks (lint, test, build, pre-commit) run in .github/workflows/pr.yml; staging E2E + manual snapshot workflows are separate.
 #
 # Container images: Docker Buildx on GitHub Actions, pushed to Google Container Registry (gcr.io/PROJECT/IMAGE), then GKE.
 #
@@ -92,3 +92,5 @@ jobs:
           image_tag: ${{ github.sha }}
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Verify production rollout and public health
+        run: bash "${GITHUB_WORKSPACE}/.github/scripts/verify-dineros-gke-deploy.sh" production
