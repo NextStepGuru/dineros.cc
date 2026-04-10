@@ -26,4 +26,10 @@ if [[ "${PROFILE}" == "staging" ]]; then
   ROTATION_RENDERED="${TMPDIR:-/tmp}/dineros.key-rotation.${PROFILE}.yaml"
   envsubst < "${ROOT}/.deploy/key-rotation-cronjob.template.yaml" > "${ROTATION_RENDERED}"
   kubectl apply -f "${ROTATION_RENDERED}"
+
+  RBAC_RENDERED="${TMPDIR:-/tmp}/dineros.key-rotation-rbac.${PROFILE}.yaml"
+  envsubst < "${ROOT}/.deploy/key-rotation-rbac.template.yaml" > "${RBAC_RENDERED}"
+  if ! kubectl apply -f "${RBAC_RENDERED}"; then
+    echo "::warning::Key rotation RBAC was not applied (Roles/RoleBindings require container.roles.create and container.roleBindings.create on the deploy identity, e.g. project role roles/container.admin). Apply ${ROOT}/.deploy/key-rotation-rbac.template.yaml once as a cluster admin, or widen IAM and re-run deploy. Rendered file: ${RBAC_RENDERED}"
+  fi
 fi

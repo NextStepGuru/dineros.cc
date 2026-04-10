@@ -42,6 +42,15 @@ See `README.md` for standard commands. Key notes:
 - `npx prisma generate` — regenerate Prisma client after schema changes
 - `npx prisma migrate deploy` — apply pending migrations (requires `DATABASE_URL` override)
 
+### GKE deploy and staging key-rotation RBAC
+
+The GitHub Actions service account that runs `kubectl apply` for staging must be able to create **Roles** and **RoleBindings** in `dineros-staging`, or those resources will fail with `Forbidden` while Deployments/CronJob apply. Grant one of:
+
+- Project role **`roles/container.admin`** (broad), or
+- A custom role including **`container.roles.create`** and **`container.roleBindings.create`** on the GKE cluster.
+
+Alternatively apply [`.deploy/key-rotation-rbac.template.yaml`](.deploy/key-rotation-rbac.template.yaml) once (rendered with the same `envsubst` as deploy) using an account with cluster admin. The deploy script applies it best-effort and emits a GitHub Actions warning if RBAC apply fails.
+
 ### Test notes
 
 - Tests (`pnpm test`) run purely in Node with mocks — no MySQL/Redis needed.
