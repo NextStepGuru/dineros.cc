@@ -59,6 +59,11 @@ const navItems = computed<NavItem[]>(() => [
     active: route.path.startsWith("/admin/integration-job-logs"),
   },
   {
+    label: "Plaid sync logs",
+    to: "/admin/plaid-sync-logs",
+    active: route.path.startsWith("/admin/plaid-sync-logs"),
+  },
+  {
     label: "Integration alerts",
     to: "/admin/integration-alerts",
     active: route.path.startsWith("/admin/integration-alerts"),
