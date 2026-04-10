@@ -1,9 +1,15 @@
 import type { Prisma } from "@prisma/client";
-import { formatUnits } from "viem";
 import env from "~/server/env";
 import { log } from "~/server/logger";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
 import { dateTimeService } from "~/server/services/forecast";
+/** Decimal-shift a bigint by `decimals` places (same as viem's `formatUnits`). */
+function formatUnits(value: bigint, decimals: number): string {
+  const s = value.toString().padStart(decimals + 1, "0");
+  const intPart = s.slice(0, s.length - decimals);
+  const fracPart = s.slice(s.length - decimals);
+  return fracPart ? `${intPart}.${fracPart}` : intPart;
+}
 
 type AlchemyTokenPrice = {
   currency?: string;
@@ -74,7 +80,10 @@ export async function syncWalletPortfolio(
   accountRegisterId: number,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!env?.ALCHEMY_API_KEY) {
-    return { ok: false, message: "Alchemy is not configured (ALCHEMY_API_KEY)." };
+    return {
+      ok: false,
+      message: "Alchemy is not configured (ALCHEMY_API_KEY).",
+    };
   }
 
   const register = await PrismaDb.accountRegister.findFirst({
@@ -95,7 +104,9 @@ export async function syncWalletPortfolio(
     return { ok: false, message: "Wallet address is not set." };
   }
 
-  const networks = register.cryptoRegisterChains.map((c) => c.evmChain.networkId);
+  const networks = register.cryptoRegisterChains.map(
+    (c) => c.evmChain.networkId,
+  );
   if (networks.length === 0) {
     return { ok: false, message: "No EVM chains selected for this wallet." };
   }
@@ -144,59 +155,16 @@ export async function syncWalletPortfolio(
   }
 
   const rawTokens = json.data?.tokens ?? [];
+  const { rows, totalUsd } = buildTokenRows(rawTokens, accountRegisterId);
+
+  const now = dateTimeService.nowDate();
   await PrismaDb.$transaction(async (tx) => {
     await tx.cryptoTokenBalance.deleteMany({ where: { accountRegisterId } });
-
-    const rows: Prisma.CryptoTokenBalanceCreateManyInput[] = [];
-    let totalUsd = 0;
-    const now = dateTimeService.nowDate();
-
-    for (const row of rawTokens) {
-      if (row.error) continue;
-      if (row.tokenMetadata?.spam === true) continue;
-
-      const decimals = row.tokenMetadata?.decimals ?? 18;
-      let displayBalance = 0;
-      try {
-        const raw = (row.tokenBalance ?? "0").trim();
-        displayBalance = Number(formatUnits(BigInt(raw), decimals));
-      } catch {
-        continue;
-      }
-
-      const priceUsd = usdPriceFromRow(row);
-      const valueUsd = valueUsdForToken(row, displayBalance, priceUsd);
-      if (valueUsd != null && valueUsd < DUST_USD) continue;
-
-      if (valueUsd != null && Number.isFinite(valueUsd)) {
-        totalUsd += valueUsd;
-      }
-
-      const sym = row.tokenMetadata?.symbol?.trim() || "???";
-      const name = row.tokenMetadata?.name?.trim() || sym;
-
-      rows.push({
-        accountRegisterId,
-        network: row.network ?? "",
-        tokenAddress: row.tokenAddress ?? null,
-        tokenName: name,
-        tokenSymbol: sym,
-        tokenDecimals: decimals,
-        tokenBalance: row.tokenBalance ?? "0",
-        displayBalance,
-        priceUsd:
-          priceUsd != null && Number.isFinite(priceUsd) ? priceUsd : null,
-        valueUsd:
-          valueUsd != null && Number.isFinite(valueUsd) ? valueUsd : null,
-        logoUrl: row.tokenMetadata?.logo ?? null,
-        syncedAt: now,
+    if (rows.length > 0) {
+      await tx.cryptoTokenBalance.createMany({
+        data: rows.map((r) => ({ ...r, syncedAt: now })),
       });
     }
-
-    if (rows.length > 0) {
-      await tx.cryptoTokenBalance.createMany({ data: rows });
-    }
-
     await tx.accountRegister.update({
       where: { id: accountRegisterId },
       data: {
@@ -209,4 +177,58 @@ export async function syncWalletPortfolio(
   });
 
   return { ok: true };
+}
+
+function finiteOrNull(v: number | null | undefined): number | null {
+  return v != null && Number.isFinite(v) ? v : null;
+}
+
+function buildTokenRows(
+  rawTokens: AlchemyTokenRow[],
+  accountRegisterId: number,
+): {
+  rows: Omit<Prisma.CryptoTokenBalanceCreateManyInput, "syncedAt">[];
+  totalUsd: number;
+} {
+  const rows: Omit<Prisma.CryptoTokenBalanceCreateManyInput, "syncedAt">[] = [];
+  let totalUsd = 0;
+
+  for (const row of rawTokens) {
+    if (row.error || row.tokenMetadata?.spam === true) continue;
+
+    const decimals = row.tokenMetadata?.decimals ?? 18;
+    let displayBalance = 0;
+    try {
+      displayBalance = Number(
+        formatUnits(BigInt((row.tokenBalance ?? "0").trim()), decimals),
+      );
+    } catch {
+      continue;
+    }
+
+    const priceUsd = usdPriceFromRow(row);
+    const valueUsd = valueUsdForToken(row, displayBalance, priceUsd);
+    if (valueUsd != null && valueUsd < DUST_USD) continue;
+
+    if (valueUsd != null && Number.isFinite(valueUsd)) {
+      totalUsd += valueUsd;
+    }
+
+    const sym = row.tokenMetadata?.symbol?.trim() || "???";
+    rows.push({
+      accountRegisterId,
+      network: row.network ?? "",
+      tokenAddress: row.tokenAddress ?? null,
+      tokenName: row.tokenMetadata?.name?.trim() || sym,
+      tokenSymbol: sym,
+      tokenDecimals: decimals,
+      tokenBalance: row.tokenBalance ?? "0",
+      displayBalance,
+      priceUsd: finiteOrNull(priceUsd),
+      valueUsd: finiteOrNull(valueUsd),
+      logoUrl: row.tokenMetadata?.logo ?? null,
+    });
+  }
+
+  return { rows, totalUsd };
 }

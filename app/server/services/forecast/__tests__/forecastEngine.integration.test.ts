@@ -366,6 +366,7 @@ describe("ForecastEngine Integration Tests", () => {
         cache.accountRegister.insert({
           ...INTEGRATION_REGISTER_DEFAULTS,
           id: i,
+          subAccountRegisterId: null,
           typeId: (i % 5) + 1,
           budgetId: 1,
           accountId: "test",
@@ -830,9 +831,19 @@ describe("ForecastEngine Integration Tests", () => {
       await engine.recalculate(testContext);
 
       expect(mockDb.registerEntry.groupBy).toHaveBeenCalled();
-      const pocketCalls = vi.mocked(mockDb.registerEntry.groupBy).mock.calls.filter(
-        (call) => call[0]?.where?.accountRegisterId?.in?.includes(3),
-      );
+      const pocketCalls = vi
+        .mocked(mockDb.registerEntry.groupBy)
+        .mock.calls.filter((call: unknown[]) =>
+          Boolean(
+            (
+              call[0] as
+                | {
+                    where?: { accountRegisterId?: { in?: number[] } };
+                  }
+                | undefined
+            )?.where?.accountRegisterId?.in?.includes(3),
+          ),
+        );
       expect(pocketCalls.length).toBeGreaterThan(0);
     });
   });
