@@ -164,6 +164,50 @@ function defaultHouseDetails(): HouseDetailsForm {
   };
 }
 
+const HOUSE_PROPERTY_TYPE_IDS = new Set<string>([
+  "single-family",
+  "condo",
+  "townhouse",
+  "multi-family",
+]);
+
+const SHARED_ASSET_CONDITION_IDS = new Set<string>([
+  "excellent",
+  "good",
+  "fair",
+  "poor",
+]);
+
+function finiteNonNegativeOr(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
+function positiveFiniteOr(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+function optionalPositiveFinite(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+function parseHousePropertyType(
+  v: unknown,
+  fallback: HouseDetailsForm["propertyType"],
+): HouseDetailsForm["propertyType"] {
+  return typeof v === "string" && HOUSE_PROPERTY_TYPE_IDS.has(v)
+    ? (v as HouseDetailsForm["propertyType"])
+    : fallback;
+}
+
+function parseHouseCondition(
+  v: unknown,
+  fallback: HouseDetailsForm["condition"],
+): HouseDetailsForm["condition"] {
+  return typeof v === "string" && SHARED_ASSET_CONDITION_IDS.has(v)
+    ? (v as HouseDetailsForm["condition"])
+    : fallback;
+}
+
 function defaultBoatDetails(): BoatDetailsForm {
   return {
     year: new Date().getFullYear() - 5,
@@ -211,43 +255,17 @@ function parseHouseDetails(raw: unknown): HouseDetailsForm {
     return d;
   }
   const o = raw as Record<string, unknown>;
-  const bedrooms =
-    typeof o.bedrooms === "number" && Number.isFinite(o.bedrooms) && o.bedrooms >= 0
-      ? o.bedrooms
-      : d.bedrooms;
-  const bathrooms =
-    typeof o.bathrooms === "number" && Number.isFinite(o.bathrooms) && o.bathrooms >= 0
-      ? o.bathrooms
-      : d.bathrooms;
-  const squareFootage =
-    typeof o.squareFootage === "number" &&
-    Number.isFinite(o.squareFootage) &&
-    o.squareFootage > 0
-      ? o.squareFootage
-      : d.squareFootage;
+  const bedrooms = finiteNonNegativeOr(o.bedrooms, d.bedrooms);
+  const bathrooms = finiteNonNegativeOr(o.bathrooms, d.bathrooms);
+  const squareFootage = positiveFiniteOr(o.squareFootage, d.squareFootage);
   const yearBuilt =
     typeof o.yearBuilt === "number" && Number.isFinite(o.yearBuilt)
       ? o.yearBuilt
       : d.yearBuilt;
-  const lotSizeAcres =
-    typeof o.lotSizeAcres === "number" && Number.isFinite(o.lotSizeAcres) && o.lotSizeAcres > 0
-      ? o.lotSizeAcres
-      : null;
+  const lotSizeAcres = optionalPositiveFinite(o.lotSizeAcres);
   const zip = typeof o.zip === "string" ? o.zip : d.zip;
-  const propertyType =
-    o.propertyType === "single-family" ||
-    o.propertyType === "condo" ||
-    o.propertyType === "townhouse" ||
-    o.propertyType === "multi-family"
-      ? o.propertyType
-      : d.propertyType;
-  const condition =
-    o.condition === "excellent" ||
-    o.condition === "good" ||
-    o.condition === "fair" ||
-    o.condition === "poor"
-      ? o.condition
-      : d.condition;
+  const propertyType = parseHousePropertyType(o.propertyType, d.propertyType);
+  const condition = parseHouseCondition(o.condition, d.condition);
   const purchasePriceHint =
     typeof o.purchasePriceHint === "number" && Number.isFinite(o.purchasePriceHint)
       ? o.purchasePriceHint
@@ -1160,50 +1178,199 @@ const rvClassItems = [
   { id: "fifth-wheel", name: "Fifth wheel" },
 ];
 
+function makeModelPairForAssetEstimate(cat: AssetEstimateCategory): {
+  make: string;
+  model: string;
+} {
+  switch (cat) {
+    case "vehicle":
+      return {
+        make: vehicleDetailsLocal.make,
+        model: vehicleDetailsLocal.model,
+      };
+    case "boat":
+      return { make: boatDetailsLocal.make, model: boatDetailsLocal.model };
+    case "rv":
+      return { make: rvDetailsLocal.make, model: rvDetailsLocal.model };
+    case "motorcycle":
+      return {
+        make: motorcycleDetailsLocal.make,
+        model: motorcycleDetailsLocal.model,
+      };
+    default:
+      return { make: "", model: "" };
+  }
+}
+
+function validateAssetEstimateInputs(cat: AssetEstimateCategory): boolean {
+  if (cat !== "house") {
+    const { make, model } = makeModelPairForAssetEstimate(cat);
+    if (!make.trim() || !model.trim()) {
+      toast.add({
+        color: "error",
+        description: "Make and model are required to estimate.",
+      });
+      return false;
+    }
+  }
+  if (cat === "house" && houseDetailsLocal.zip.trim().length !== 5) {
+    toast.add({
+      color: "error",
+      description: "A valid 5-digit ZIP is required to estimate.",
+    });
+    return false;
+  }
+  return true;
+}
+
+function appendOptionalTrimmedString(
+  body: Record<string, unknown>,
+  key: string,
+  value: string,
+): void {
+  const t = value.trim();
+  if (t) {
+    body[key] = t;
+  }
+}
+
+function appendFinitePurchaseHint(
+  body: Record<string, unknown>,
+  hint: number | null,
+): void {
+  if (hint != null && Number.isFinite(hint)) {
+    body.purchasePriceHint = hint;
+  }
+}
+
+function buildVehicleEstimateBody(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...base,
+    year: vehicleDetailsLocal.year,
+    make: vehicleDetailsLocal.make.trim(),
+    model: vehicleDetailsLocal.model.trim(),
+    mileage: vehicleDetailsLocal.mileage,
+    condition: vehicleDetailsLocal.condition,
+  };
+  appendOptionalTrimmedString(body, "trim", vehicleDetailsLocal.trim);
+  appendOptionalTrimmedString(body, "zip", vehicleDetailsLocal.zip);
+  appendOptionalTrimmedString(body, "vinLast4", vehicleDetailsLocal.vinLast4);
+  appendFinitePurchaseHint(body, vehicleDetailsLocal.purchasePriceHint);
+  return body;
+}
+
+function buildHouseEstimateBody(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...base,
+    bedrooms: houseDetailsLocal.bedrooms,
+    bathrooms: houseDetailsLocal.bathrooms,
+    squareFootage: houseDetailsLocal.squareFootage,
+    yearBuilt: houseDetailsLocal.yearBuilt,
+    zip: houseDetailsLocal.zip.trim(),
+    propertyType: houseDetailsLocal.propertyType,
+    condition: houseDetailsLocal.condition,
+  };
+  if (
+    houseDetailsLocal.lotSizeAcres != null &&
+    Number.isFinite(houseDetailsLocal.lotSizeAcres)
+  ) {
+    body.lotSizeAcres = houseDetailsLocal.lotSizeAcres;
+  }
+  appendFinitePurchaseHint(body, houseDetailsLocal.purchasePriceHint);
+  return body;
+}
+
+function buildBoatEstimateBody(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...base,
+    year: boatDetailsLocal.year,
+    make: boatDetailsLocal.make.trim(),
+    model: boatDetailsLocal.model.trim(),
+    lengthFeet: boatDetailsLocal.lengthFeet,
+    engineType: boatDetailsLocal.engineType,
+    condition: boatDetailsLocal.condition,
+  };
+  appendOptionalTrimmedString(body, "zip", boatDetailsLocal.zip);
+  if (
+    boatDetailsLocal.engineHours != null &&
+    Number.isFinite(boatDetailsLocal.engineHours)
+  ) {
+    body.engineHours = boatDetailsLocal.engineHours;
+  }
+  appendFinitePurchaseHint(body, boatDetailsLocal.purchasePriceHint);
+  return body;
+}
+
+function buildRvEstimateBody(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...base,
+    year: rvDetailsLocal.year,
+    make: rvDetailsLocal.make.trim(),
+    model: rvDetailsLocal.model.trim(),
+    rvClass: rvDetailsLocal.rvClass,
+    lengthFeet: rvDetailsLocal.lengthFeet,
+    mileage: rvDetailsLocal.mileage,
+    condition: rvDetailsLocal.condition,
+  };
+  appendOptionalTrimmedString(body, "zip", rvDetailsLocal.zip);
+  appendFinitePurchaseHint(body, rvDetailsLocal.purchasePriceHint);
+  return body;
+}
+
+function buildMotorcycleEstimateBody(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...base,
+    year: motorcycleDetailsLocal.year,
+    make: motorcycleDetailsLocal.make.trim(),
+    model: motorcycleDetailsLocal.model.trim(),
+    mileage: motorcycleDetailsLocal.mileage,
+    condition: motorcycleDetailsLocal.condition,
+  };
+  appendOptionalTrimmedString(body, "zip", motorcycleDetailsLocal.zip);
+  if (
+    motorcycleDetailsLocal.engineCC != null &&
+    Number.isFinite(motorcycleDetailsLocal.engineCC)
+  ) {
+    body.engineCC = motorcycleDetailsLocal.engineCC;
+  }
+  appendFinitePurchaseHint(body, motorcycleDetailsLocal.purchasePriceHint);
+  return body;
+}
+
+function assetEstimateRequestBodyForCategory(
+  cat: AssetEstimateCategory,
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  switch (cat) {
+    case "vehicle":
+      return buildVehicleEstimateBody(base);
+    case "house":
+      return buildHouseEstimateBody(base);
+    case "boat":
+      return buildBoatEstimateBody(base);
+    case "rv":
+      return buildRvEstimateBody(base);
+    case "motorcycle":
+      return buildMotorcycleEstimateBody(base);
+  }
+}
+
 async function runAssetEstimate() {
   const cat = currentAssetCategory.value;
   if (!cat) return;
 
-  if (cat === "vehicle") {
-    if (!vehicleDetailsLocal.make.trim() || !vehicleDetailsLocal.model.trim()) {
-      toast.add({
-        color: "error",
-        description: "Make and model are required to estimate.",
-      });
-      return;
-    }
-  } else if (cat === "house") {
-    if (houseDetailsLocal.zip.trim().length !== 5) {
-      toast.add({
-        color: "error",
-        description: "A valid 5-digit ZIP is required to estimate.",
-      });
-      return;
-    }
-  } else if (cat === "boat") {
-    if (!boatDetailsLocal.make.trim() || !boatDetailsLocal.model.trim()) {
-      toast.add({
-        color: "error",
-        description: "Make and model are required to estimate.",
-      });
-      return;
-    }
-  } else if (cat === "rv") {
-    if (!rvDetailsLocal.make.trim() || !rvDetailsLocal.model.trim()) {
-      toast.add({
-        color: "error",
-        description: "Make and model are required to estimate.",
-      });
-      return;
-    }
-  } else if (cat === "motorcycle") {
-    if (!motorcycleDetailsLocal.make.trim() || !motorcycleDetailsLocal.model.trim()) {
-      toast.add({
-        color: "error",
-        description: "Make and model are required to estimate.",
-      });
-      return;
-    }
+  if (!validateAssetEstimateInputs(cat)) {
+    return;
   }
 
   isEstimatingAsset.value = true;
@@ -1217,119 +1384,7 @@ async function runAssetEstimate() {
       base.accountRegisterId = formState.value.id;
     }
 
-    let body: Record<string, unknown> = base;
-
-    if (cat === "vehicle") {
-      body = {
-        ...base,
-        year: vehicleDetailsLocal.year,
-        make: vehicleDetailsLocal.make.trim(),
-        model: vehicleDetailsLocal.model.trim(),
-        mileage: vehicleDetailsLocal.mileage,
-        condition: vehicleDetailsLocal.condition,
-      };
-      const trim = vehicleDetailsLocal.trim.trim();
-      if (trim) body.trim = trim;
-      const zip = vehicleDetailsLocal.zip.trim();
-      if (zip) body.zip = zip;
-      const vin = vehicleDetailsLocal.vinLast4.trim();
-      if (vin) body.vinLast4 = vin;
-      if (
-        vehicleDetailsLocal.purchasePriceHint != null &&
-        Number.isFinite(vehicleDetailsLocal.purchasePriceHint)
-      ) {
-        body.purchasePriceHint = vehicleDetailsLocal.purchasePriceHint;
-      }
-    } else if (cat === "house") {
-      body = {
-        ...base,
-        bedrooms: houseDetailsLocal.bedrooms,
-        bathrooms: houseDetailsLocal.bathrooms,
-        squareFootage: houseDetailsLocal.squareFootage,
-        yearBuilt: houseDetailsLocal.yearBuilt,
-        zip: houseDetailsLocal.zip.trim(),
-        propertyType: houseDetailsLocal.propertyType,
-        condition: houseDetailsLocal.condition,
-      };
-      if (
-        houseDetailsLocal.lotSizeAcres != null &&
-        Number.isFinite(houseDetailsLocal.lotSizeAcres)
-      ) {
-        body.lotSizeAcres = houseDetailsLocal.lotSizeAcres;
-      }
-      if (
-        houseDetailsLocal.purchasePriceHint != null &&
-        Number.isFinite(houseDetailsLocal.purchasePriceHint)
-      ) {
-        body.purchasePriceHint = houseDetailsLocal.purchasePriceHint;
-      }
-    } else if (cat === "boat") {
-      body = {
-        ...base,
-        year: boatDetailsLocal.year,
-        make: boatDetailsLocal.make.trim(),
-        model: boatDetailsLocal.model.trim(),
-        lengthFeet: boatDetailsLocal.lengthFeet,
-        engineType: boatDetailsLocal.engineType,
-        condition: boatDetailsLocal.condition,
-      };
-      const z = boatDetailsLocal.zip.trim();
-      if (z) body.zip = z;
-      if (
-        boatDetailsLocal.engineHours != null &&
-        Number.isFinite(boatDetailsLocal.engineHours)
-      ) {
-        body.engineHours = boatDetailsLocal.engineHours;
-      }
-      if (
-        boatDetailsLocal.purchasePriceHint != null &&
-        Number.isFinite(boatDetailsLocal.purchasePriceHint)
-      ) {
-        body.purchasePriceHint = boatDetailsLocal.purchasePriceHint;
-      }
-    } else if (cat === "rv") {
-      body = {
-        ...base,
-        year: rvDetailsLocal.year,
-        make: rvDetailsLocal.make.trim(),
-        model: rvDetailsLocal.model.trim(),
-        rvClass: rvDetailsLocal.rvClass,
-        lengthFeet: rvDetailsLocal.lengthFeet,
-        mileage: rvDetailsLocal.mileage,
-        condition: rvDetailsLocal.condition,
-      };
-      const z = rvDetailsLocal.zip.trim();
-      if (z) body.zip = z;
-      if (
-        rvDetailsLocal.purchasePriceHint != null &&
-        Number.isFinite(rvDetailsLocal.purchasePriceHint)
-      ) {
-        body.purchasePriceHint = rvDetailsLocal.purchasePriceHint;
-      }
-    } else if (cat === "motorcycle") {
-      body = {
-        ...base,
-        year: motorcycleDetailsLocal.year,
-        make: motorcycleDetailsLocal.make.trim(),
-        model: motorcycleDetailsLocal.model.trim(),
-        mileage: motorcycleDetailsLocal.mileage,
-        condition: motorcycleDetailsLocal.condition,
-      };
-      const z = motorcycleDetailsLocal.zip.trim();
-      if (z) body.zip = z;
-      if (
-        motorcycleDetailsLocal.engineCC != null &&
-        Number.isFinite(motorcycleDetailsLocal.engineCC)
-      ) {
-        body.engineCC = motorcycleDetailsLocal.engineCC;
-      }
-      if (
-        motorcycleDetailsLocal.purchasePriceHint != null &&
-        Number.isFinite(motorcycleDetailsLocal.purchasePriceHint)
-      ) {
-        body.purchasePriceHint = motorcycleDetailsLocal.purchasePriceHint;
-      }
-    }
+    const body = assetEstimateRequestBodyForCategory(cat, base);
 
     const res = await $api<{ estimate: VehicleEstimateResult }>(
       "/api/asset-value-estimate",
@@ -1373,6 +1428,77 @@ function applyEstimateToOriginal() {
   });
 }
 
+function clearMortgageFieldsWhenLeavingMortgageType(
+  previousType: { type?: string } | undefined,
+): void {
+  const wasMortgage = previousType?.type === "mortgage";
+  if (!wasMortgage || isSelectedAccountTypeMortgage.value) {
+    return;
+  }
+  formState.value.apr2 = null;
+  formState.value.apr2StartAt = null;
+  formState.value.apr3 = null;
+  formState.value.apr3StartAt = null;
+  formState.value.loanStartAt = null;
+  formState.value.loanPaymentsPerYear = null;
+  formState.value.loanTotalYears = null;
+  formState.value.loanOriginalAmount = null;
+  formState.value.allowExtraPayment = false;
+}
+
+function handleSelectedCashRegisterType(
+  newType: { type?: string } | undefined,
+): void {
+  if (newType?.type !== "cash") {
+    return;
+  }
+  if (formState.value.id > 0 && persistedAccountIsCashType.value) {
+    void loadCashOnHand(formState.value.id);
+    return;
+  }
+  cashCountsDirty.value = false;
+  resetCashCounts();
+  syncCashBalanceFromCounts();
+}
+
+function syncCryptoChainsForRegisterClass(
+  registerClass: string | undefined,
+): void {
+  if (registerClass === "crypto") {
+    void loadCryptoChainsForForm();
+    return;
+  }
+  cryptoChainIds.value = [];
+}
+
+function resetLocalAssetDetailsForEstimateCategory(
+  cat: AssetEstimateCategory | undefined,
+): void {
+  if (cat === "vehicle") {
+    Object.assign(vehicleDetailsLocal, defaultVehicleDetails());
+  } else if (cat === "house") {
+    Object.assign(houseDetailsLocal, defaultHouseDetails());
+  } else if (cat === "boat") {
+    Object.assign(boatDetailsLocal, defaultBoatDetails());
+  } else if (cat === "rv") {
+    Object.assign(rvDetailsLocal, defaultRvDetails());
+  } else if (cat === "motorcycle") {
+    Object.assign(motorcycleDetailsLocal, defaultMotorcycleDetails());
+  }
+}
+
+function resetAssetDetailsIfEstimateCategoryChanged(
+  oldTypeId: number,
+  newTypeId: number,
+): void {
+  const oldEstCat = ASSET_TYPE_CATEGORY_MAP[oldTypeId];
+  const newEstCat = ASSET_TYPE_CATEGORY_MAP[newTypeId];
+  if (oldEstCat === newEstCat) {
+    return;
+  }
+  resetLocalAssetDetailsForEstimateCategory(newEstCat);
+}
+
 watch(
   () => formState.value.typeId,
   (newTypeId, oldTypeId) => {
@@ -1385,18 +1511,7 @@ watch(
     const previousType = listStore.getAccountTypes.find(
       (type) => type.id === oldTypeId,
     );
-    const wasMortgage = previousType?.type === "mortgage";
-    if (wasMortgage && !isSelectedAccountTypeMortgage.value) {
-      formState.value.apr2 = null;
-      formState.value.apr2StartAt = null;
-      formState.value.apr3 = null;
-      formState.value.apr3StartAt = null;
-      formState.value.loanStartAt = null;
-      formState.value.loanPaymentsPerYear = null;
-      formState.value.loanTotalYears = null;
-      formState.value.loanOriginalAmount = null;
-      formState.value.allowExtraPayment = false;
-    }
+    clearMortgageFieldsWhenLeavingMortgageType(previousType);
 
     const previousWasCash = previousType?.type === "cash";
     const newType = listStore.getAccountTypes.find((t) => t.id === newTypeId);
@@ -1404,37 +1519,9 @@ watch(
       activeTab.value = "account";
     }
 
-    if (newType?.type === "cash") {
-      if (formState.value.id > 0 && persistedAccountIsCashType.value) {
-        void loadCashOnHand(formState.value.id);
-      } else {
-        cashCountsDirty.value = false;
-        resetCashCounts();
-        syncCashBalanceFromCounts();
-      }
-    }
-
-    if (newType?.registerClass === "crypto") {
-      void loadCryptoChainsForForm();
-    } else {
-      cryptoChainIds.value = [];
-    }
-
-    const oldEstCat = ASSET_TYPE_CATEGORY_MAP[oldTypeId];
-    const newEstCat = ASSET_TYPE_CATEGORY_MAP[newTypeId];
-    if (oldEstCat !== newEstCat) {
-      if (newEstCat === "vehicle") {
-        Object.assign(vehicleDetailsLocal, defaultVehicleDetails());
-      } else if (newEstCat === "house") {
-        Object.assign(houseDetailsLocal, defaultHouseDetails());
-      } else if (newEstCat === "boat") {
-        Object.assign(boatDetailsLocal, defaultBoatDetails());
-      } else if (newEstCat === "rv") {
-        Object.assign(rvDetailsLocal, defaultRvDetails());
-      } else if (newEstCat === "motorcycle") {
-        Object.assign(motorcycleDetailsLocal, defaultMotorcycleDetails());
-      }
-    }
+    handleSelectedCashRegisterType(newType);
+    syncCryptoChainsForRegisterClass(newType?.registerClass);
+    resetAssetDetailsIfEstimateCategoryChanged(oldTypeId, newTypeId);
   },
 );
 
@@ -1541,6 +1628,54 @@ async function uploadRegisterCsvIfAny(
   });
 }
 
+function validateCryptoFieldsForSubmit(): boolean {
+  if (!isSelectedAccountTypeCrypto.value) {
+    return true;
+  }
+  if (!cryptoChainIds.value.length) {
+    toast.add({
+      color: "error",
+      description: "Select at least one EVM chain.",
+    });
+    return false;
+  }
+  if (!formState.value.walletAddress?.trim()) {
+    toast.add({
+      color: "error",
+      description: "Enter a wallet address.",
+    });
+    return false;
+  }
+  return true;
+}
+
+async function persistSuccessfulRegisterUpdate(
+  responseData: unknown,
+  cashUseBillTotal: boolean,
+): Promise<void> {
+  formState.value = accountRegisterSchema.parse(responseData);
+  props.callback(formState.value);
+
+  const persistCashCounts =
+    isSelectedAccountTypeCash.value &&
+    formState.value.id > 0 &&
+    cashUseBillTotal;
+  if (persistCashCounts) {
+    try {
+      await saveCashOnHand(formState.value.id);
+    } catch (e) {
+      handleError(e, toast);
+      return;
+    }
+  }
+
+  toast.add({
+    color: "success",
+    description: "Updated account register successfully.",
+  });
+  props.cancel();
+}
+
 async function handleSubmit({
   data: formData,
 }: FormSubmitEvent<AccountRegister>) {
@@ -1555,23 +1690,9 @@ async function handleSubmit({
   try {
     isSaving.value = true;
 
-    if (isSelectedAccountTypeCrypto.value) {
-      if (!cryptoChainIds.value.length) {
-        toast.add({
-          color: "error",
-          description: "Select at least one EVM chain.",
-        });
-        isSaving.value = false;
-        return;
-      }
-      if (!formState.value.walletAddress?.trim()) {
-        toast.add({
-          color: "error",
-          description: "Enter a wallet address.",
-        });
-        isSaving.value = false;
-        return;
-      }
+    if (!validateCryptoFieldsForSubmit()) {
+      isSaving.value = false;
+      return;
     }
 
     const cashUseBillTotal =
@@ -1604,29 +1725,8 @@ async function handleSubmit({
     }).catch((error) => handleError(error, toast));
 
     if (responseData) {
-      formState.value = accountRegisterSchema.parse(responseData);
-      props.callback(formState.value);
-
-      const persistCashCounts =
-        isSelectedAccountTypeCash.value &&
-        formState.value.id > 0 &&
-        cashUseBillTotal;
-      if (persistCashCounts) {
-        try {
-          await saveCashOnHand(formState.value.id);
-        } catch (e) {
-          handleError(e, toast);
-          isSaving.value = false;
-          return;
-        }
-      }
-
-      toast.add({
-        color: "success",
-        description: "Updated account register successfully.",
-      });
+      await persistSuccessfulRegisterUpdate(responseData, cashUseBillTotal);
       isSaving.value = false;
-      props.cancel();
       return;
     }
 

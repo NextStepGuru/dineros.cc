@@ -5,7 +5,6 @@ import {
   formatDate,
   isCryptoAccountType,
 } from "~/lib/utils";
-import { formatMoneyUsd } from "~/lib/bankers-rounding";
 import {
   buildSortedCategorySelectItems,
   categoryDropdownLabel,

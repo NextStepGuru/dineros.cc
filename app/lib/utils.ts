@@ -36,8 +36,7 @@ export const formatDate = (
   if (dt == null) return undefined;
   if (typeof dt === "string") {
     const date = new Date(dt);
-    const localDate = new Date(date.getTime());
-    return localDate.toISOString().split("T")[0];
+    return date.toISOString().split("T")[0];
   }
   if (dt instanceof Date) {
     return dt.toISOString().split("T")[0];
@@ -87,10 +86,10 @@ export const formatAccountRegisters = (
 
   // Single pass to separate parents and children
   for (const register of accountRegisters) {
-    if (!register.subAccountRegisterId) {
-      parentMap.set(register.id, register);
-    } else {
+    if (register.subAccountRegisterId) {
       children.push(register);
+    } else {
+      parentMap.set(register.id, register);
     }
   }
 
@@ -229,7 +228,7 @@ export const mapPlaidTypesToAccountTypes = (
     "variable annuity": 16,
   };
 
-  return plaidSubTypes[plaidType ? plaidType : "unknown"] || 16;
+  return plaidSubTypes[plaidType || "unknown"] || 16;
 };
 
 export const formatCurrencyOptions: Intl.NumberFormatOptions = {
@@ -238,17 +237,3 @@ export const formatCurrencyOptions: Intl.NumberFormatOptions = {
   currency: "USD",
   currencySign: "accounting",
 };
-
-// export const adjustBeforeIfOnWeekend = function (
-//   date: Date
-// ): Date {
-//   if (date.day() === 6) {
-//     // Saturday
-//     return date.subtract(1, "days");
-//   } else if (date.day() === 0) {
-//     // Sunday
-//     return date.subtract(2, "days");
-//   }
-
-//   return date;
-// };

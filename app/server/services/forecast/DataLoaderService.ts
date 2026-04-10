@@ -18,9 +18,7 @@ function budgetIdWhere(
 
 function registerBudgetWhere(
   budgetId?: number | null,
-):
-  | { register: { budgetId: number } }
-  | Record<string, never> {
+): { register: { budgetId: number } } | Record<string, never> {
   if (budgetId === undefined || budgetId === null) {
     return {};
   }
@@ -77,8 +75,7 @@ export class DataLoaderService implements IDataLoaderService {
       const dates = reoccurrences
         .map((r) => r.lastAt)
         .filter(
-          (d): d is NonNullable<typeof d> =>
-            d !== undefined && d !== null,
+          (d): d is NonNullable<typeof d> => d !== undefined && d !== null,
         );
       if (dates.length === 0) return null;
       const minEpoch = Math.min(
@@ -202,10 +199,7 @@ export class DataLoaderService implements IDataLoaderService {
     return lokiAccountRegisters;
   }
 
-  private async loadRegisterEntries(
-    accountId?: string,
-    budgetId?: number,
-  ) {
+  private async loadRegisterEntries(accountId?: string, budgetId?: number) {
     const registerEntries = await this.db.registerEntry.findMany({
       where: {
         register: {
@@ -239,10 +233,7 @@ export class DataLoaderService implements IDataLoaderService {
     return cacheEntries;
   }
 
-  private async loadReoccurrences(
-    accountId?: string,
-    budgetId?: number,
-  ) {
+  private async loadReoccurrences(accountId?: string, budgetId?: number) {
     const reoccurrences = await this.db.reoccurrence.findMany({
       where: {
         accountId,
@@ -275,10 +266,7 @@ export class DataLoaderService implements IDataLoaderService {
     return reoccurrences;
   }
 
-  private async loadReoccurrenceSkips(
-    accountId?: string,
-    budgetId?: number,
-  ) {
+  private async loadReoccurrenceSkips(accountId?: string, budgetId?: number) {
     const reoccurrenceSkips = await this.db.reoccurrenceSkip.findMany({
       where: {
         accountId,
@@ -300,10 +288,7 @@ export class DataLoaderService implements IDataLoaderService {
     return reoccurrenceSkips;
   }
 
-  private async loadReoccurrenceSplits(
-    accountId?: string,
-    budgetId?: number,
-  ) {
+  private async loadReoccurrenceSplits(accountId?: string, budgetId?: number) {
     const reoccurrenceSplits = await this.db.reoccurrenceSplit.findMany({
       where: {
         reoccurrence: {

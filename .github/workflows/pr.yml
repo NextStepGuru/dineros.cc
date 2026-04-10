@@ -1,4 +1,4 @@
-# Runs on PRs: unit tests, lint, pre-security checks, CodeQL; build/push app + microservice to gcr.io (same as main), deploy to GKE staging.
+# Runs on PRs: unit tests, lint, pre-security checks, CodeQL; build/push app + microservice to gcr.io (same as main), deploy to GKE staging, then kubectl rollout + https://staging.dineros.cc/health/ready.
 # Staging Playwright E2E is not run in CI (run locally: pnpm test:e2e with PLAYWRIGHT_BASE_URL).
 # Refresh Linux visual baselines vs staging: .github/workflows/e2e-update-staging-snapshots.yml (manual).
 # Staging deploy: .deploy/dineros.template.yaml + .deploy/profiles/staging.env. Fork PRs skip deploy (no WIF).
@@ -164,6 +164,7 @@ jobs:
   staging-deploy:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs:
       - lint
       - test
@@ -193,6 +194,8 @@ jobs:
           image_tag: pr-${{ github.event.pull_request.number }}-${{ github.sha }}
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Verify staging rollout and public health
+        run: bash "${GITHUB_WORKSPACE}/.github/scripts/verify-dineros-gke-deploy.sh" staging
 
   # Cursor Bugbot / Autofix are the Cursor GitHub App + dashboard; there is no `bugbot` CLI in Actions.
   # Implementation lives in cursor-bugbot-request.yml (declares optional PAT for Actions schema / linters).

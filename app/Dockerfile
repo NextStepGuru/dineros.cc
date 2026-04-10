@@ -25,7 +25,6 @@ RUN pnpm prisma generate
 ENV NODE_ENV=production
 # Build the application
 RUN pnpm run build
-
 # ---- Runtime stage (slim final image) ----
 FROM node:24-alpine AS runner
 WORKDIR /app
