@@ -1,0 +1,60 @@
+---
+description: CI/CD, Docker images, Kubernetes manifests, and environment settings
+---
+
+# Deployment and Operations
+
+## Docker
+
+- Main app image: app/Dockerfile
+  - Multi-stage: deps → build (pnpm prisma generate + nuxt build) → runner
+  - Runtime runs .output/server/index.mjs; includes prisma/ for field-encryption docs
+- Microservice image: microservice/Dockerfile
+  - Multi-stage with prisma generate during build
+  - Final runner uses pnpm start; supports NODE_ENV=test to run test-start
+  - Target runner-keyrotate adds kubectl/jq for CronJob container
+
+## Kubernetes manifests
+
+- .deploy/dineros.template.yaml
+  - Two Deployments: main app and microservice
+  - Services for app and microservice; Ingress for app
+  - Environment via Secrets (DATABASE_URL in separate secret refs; DB encryption keys grouped in SECRET_DB)
+  - Redis host/port injected (cluster service names)
+  - Readiness/liveness/startup probes on http endpoints (/health/ready, /health/live)
+- Staging-only manifests
+  - .deploy/key-rotation-cronjob.template.yaml — nightly DB field-encryption key rotation + microservice migrate call
+  - .deploy/key-rotation-rbac.template.yaml — Role/RoleBinding for rotating the SECRET_DB and patching Deployments
+
+Render manifests with envsubst using .deploy/profiles/<profile>.env and environment variables (GCP_PROJECT_ID, IMAGE_TAG, etc.).
+
+## CI/CD (GitHub Actions)
+
+- .github/workflows/main.yml
+  - On push to main/master: build app and microservice (push to gcr.io), then deploy to production GKE
+- .github/workflows/pr.yml
+  - PR checks: lint, tests, pre-commit security (TruffleHog), CodeQL
+  - If PR branch is in same repo: build images with tag pr-<N>-<SHA>, deploy to staging, verify rollout and health
+  - Posts optional Cursor Bugbot trigger comment
+- .github/actions/build-push-gcr/
+  - Composite action: authenticates to gcloud, configures Docker, and uses buildx to push tagged images
+- .github/actions/deploy-dineros-gke/
+  - Renders templates and applies with kubectl; staging applies key-rotation resources
+
+## Environments and configuration
+
+- app/server/envSchema.ts + env.ts define/parse required variables
+- .env.example lists expected variables (DB, Redis, Plaid, Postmark, JWT, etc.)
+- For Prisma codegen during Docker build, a placeholder DATABASE_URL is used; runtime sets actual via env/secret
+
+## Health endpoints
+
+- /health/ready — readiness probe
+- /health/live — liveness probe
+
+## Local development
+
+- docker-compose.yaml brings up MySQL 8.0.43 and Redis 8.4.0 locally (ports 3309, 6380)
+- Follow README for pnpm install, prisma migrate deploy, pnpm dev
+- In cloud CI agents (e.g., Cursor), see AGENTS.md for MySQL/Redis startup notes and DATABASE_URL override
+

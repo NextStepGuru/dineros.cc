@@ -1,0 +1,97 @@
+---
+description: Conventions, naming, validation, and safe-change guidelines
+---
+
+# Patterns and Conventions
+
+## General coding
+
+- Language: TypeScript throughout (Nuxt 4, server, services, tests)
+- Keep changes scoped; prefer existing idioms in nearby files
+- Follow lint rules via pnpm lint and ESLint configs in app/eslint.config.mjs
+
+## File naming and routing
+
+- Nuxt pages: app/pages/*.vue with route params in square brackets
+- Nitro API: app/server/api/<name>.<method>.ts or nested directories; example: account-register.post.ts, reoccurrence.delete.ts, reports/categories.get.ts
+- Admin endpoints under app/server/api/admin/*
+- Task endpoints under app/server/api/tasks/*
+- Webhooks under app/server/api/webhook/*
+- Health routes: app/server/routes/health/
+
+## Server patterns
+
+- Use server/clients/prismaClient.ts to obtain Prisma client (centralized extension/wrapping)
+- Validate env eagerly with app/server/envSchema.ts and consume via app/server/env.ts
+- Common helpers:
+  - withErrorHandler.ts and handleApiError.ts for consistent error mapping
+  - accountAccess.ts, accountMembership.ts, requireAdmin.ts for authorization patterns
+  - sessionUserProfile.ts, getUser.ts, completeLogin.ts for auth/session management
+  - recordAdminAudit.ts, recordIntegrationJobLog.ts, plaidWebhook.ts utilities
+  - rateLimitRedis.ts for Redis-based rate limiting (when used)
+- Responses: Nitro event handlers return JSON serializable objects; errors standardized via handleApiError
+
+## Input validation
+
+- Use app/schema/zod.ts and related modules to validate payloads where applicable
+- Server/env uses Zod to enforce presence/shape of environment variables
+
+## Database and Prisma
+
+- Primary schema in app/prisma/schema.prisma
+- Apply schema changes via SQL migrations under app/prisma/migrations/*
+- After editing the schema, run prisma generate (CI ensures this in tests)
+- Field-level encryption via prisma-field-encryption; encrypted columns annotated with /// @encrypted comments in schema
+- Generated re-encryption code in app/prisma/reencrypt/* — do not hand-edit generated files
+
+## Queues and cron
+
+- BullMQ queues live under app/server/queues/*; configure queue names and processors there
+- nuxt-cron schedules periodic jobs (app/server/cron/*). Keep jobs idempotent
+- Prefer pushing work to queues from API handlers rather than long blocking tasks
+
+## Forecast engine
+
+- Composition under app/server/services/forecast/*
+- Orchestrator (ForecastEngine) calls DataLoaderService, AccountRegisterService, ReoccurrenceService, RegisterEntryService, LoanCalculatorService, TransferService, DataPersisterService
+- Use ModernCacheService for in-memory caching; unit and integration tests cover behavior extensively
+
+## Frontend
+
+- Use composables (app/composables/*) for API calls and shared UI logic
+- Pinia stores in app/stores/*
+- Tailwind CSS classes co-exist with @nuxt/ui
+
+## Testing
+
+- Vitest: unit/integration lives alongside features (e.g., server/api/__tests__, server/services/__tests__)
+- Playwright: app/tests/e2e/* with snapshots under spec.ts-snapshots/
+- Forecast dedicated runner and suites via package scripts
+- Set TZ=UTC consistently for deterministic tests
+
+## Security and secrets
+
+- Never commit .env files; pre-commit hook blocks this (.pre-commit-config.yaml)
+- TruffleHog enhanced scanner runs in pre-commit
+- JWT and RSA services under app/server/services; MFA logic in app/server/lib/mfa.ts
+- Use prisma-field-encryption keys (DB_ENCRYPTION_KEY, DB_DECRYPTION_KEY_*) only via env; do not log secrets
+
+## Safe change workflow
+
+- For Prisma changes: add migration, run prisma generate, update tests/seed as needed
+- For API changes: update Zod schemas, write/adjust server/api/__tests__ coverage
+- For forecast changes: run test:forecast:unit, test:forecast:integration, and full forecast runner
+- For queues/cron: ensure idempotence and add unit coverage; keep handler execution bounded
+- For encrypted fields: if placeholders/re-encryption are needed locally, refer to scripts/reset-encrypted-users-after-restore.ts and docs/post-restore-encryption-plan.md
+
+## Naming
+
+- Branch names: feat/*, fix/*, docs/* — see CONTRIBUTING.md
+- Commit messages: conventional preferred (feat:, fix:, chore:, etc.)
+- API filenames: <resource>.<method>.ts (get, post, patch, delete) or nested paths
+
+## Cursor/AI specific
+
+- Follow .cursor/rules/*.mdc, especially 00-global-safety.mdc (do not run builds/servers without being asked)
+- Skills for branching/PR/push exist under .cursor/skills/*
+

@@ -1,0 +1,40 @@
+---
+description: High-level purpose, tech stack, and target audience of the dineros.cc codebase
+---
+
+# Dineros.cc — Overview
+
+Dineros.cc is a Nuxt 4 + TypeScript application for predictive budgeting, real‑time spending optimization, and simplified accounting. It combines a feature‑rich frontend with a server (Nuxt Nitro API routes) and a companion microservice. The system includes a forecasting engine, Plaid banking integration, encryption-at-rest, queue processing, and extensive automated tests.
+
+## Purpose
+
+- Help users plan and track personal finances across multiple accounts and categories
+- Forecast balances and cash flow using a modular forecasting engine
+- Integrate with Plaid for secure transaction and balance sync
+- Provide admin tools, notifications, and audit/logging facilities
+
+## Tech stack
+
+- Application framework: Nuxt 4 (Vue 3), TypeScript
+- ORM: Prisma (MySQL 8)
+- Cache/queues: Redis, BullMQ
+- Messaging and integrations: NATS (client present), Plaid, Postmark, OpenAI
+- Testing: Vitest (unit/integration), Playwright (E2E), CodeQL (security), SonarQube (optional workflow)
+- CI/CD: GitHub Actions (build, push to GCR, GKE deployment), K8s templates under .deploy/
+- Encryption: prisma-field-encryption (field-level), RSA/JWT services
+
+## Audience
+
+- Core contributors implementing features in the Nuxt app, API routes, and services
+- Backend engineers modifying Prisma schema, migrations, queues, and integrations
+- SRE/DevOps maintaining Docker/K8s, secrets, and CI/CD pipelines
+- Test engineers maintaining Vitest and Playwright suites
+- AI agents (Cursor-style) following project rules under .cursor/
+
+## Key capabilities
+
+- Forecasting engine (server/services/forecast/*) with rich test suite
+- Extensive domain: budgets, accounts, registers, reoccurrences, reconciliation, bills, savings goals, crypto wallets, notifications
+- Field-level encryption with re-encryption tooling and key rotation workflows
+- Microservice to support specialized operations and key-rotation/migration flows
+

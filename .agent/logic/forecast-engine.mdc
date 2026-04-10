@@ -1,0 +1,33 @@
+---
+description: Forecast engine modules, data flow, and testing guidance
+---
+
+# Forecast Engine
+
+## Modules (app/server/services/forecast)
+
+- ForecastEngine.ts — orchestrator
+- DataLoaderService.ts — DB→cache hydration
+- AccountRegisterService.ts — register operations in forecast context
+- ReoccurrenceService.ts — scheduling logic and splits
+- RegisterEntryService.ts — entry calculations and projection flags
+- LoanCalculatorService.ts — interest and amortization calculations
+- TransferService.ts — inter-account transfer validation and effects
+- DataPersisterService.ts — cache→DB persistence for projections/snapshots
+- DateTime.ts and DateTimeService.ts — date/time utilities and edge-case handling
+- ModernCacheService.ts — fast in-memory storage
+- getProjectedBalanceAtDate.ts — convenience function for at-date projections
+- lib/rateLimiter.ts, logger.ts, types.ts — support utilities and typings
+
+## Tests
+
+- Unit and integration suites cover edge cases, regression scenarios, and performance baselines under app/server/services/forecast/__tests__
+- Snapshot tests capture multi-month scenarios (e.g., threeMonthLoanAndReoccurrence)
+- Use scripts in app/package.json to run subsets or the full suite
+
+## Change guidance
+
+- Modify services with clear separation of concerns; prefer pure functions when possible for predictability
+- Extend types.ts and shared utilities rather than inlining ad‑hoc structures
+- Update or add tests for new edge cases (month boundaries, DST changes, interval adjustments, transfer cycles)
+

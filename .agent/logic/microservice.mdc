@@ -1,0 +1,32 @@
+---
+description: Companion microservice responsibilities, structure, and deploy notes
+---
+
+# Microservice
+
+## Purpose
+
+- Host specialized operations for database key rotation and re-encryption
+- Provide migrate endpoints (routes/migrate.get.ts, migrate.post.ts) invoked by CronJob or admin workflows
+- Share Prisma schema subset sufficient for operations on encrypted models
+
+## Structure
+
+- server.ts — Nitro/H3 entrypoint
+- routes/ — migrate and test endpoints
+- clients/ — prismaClient.ts, redisClient.ts (aligned with app behavior)
+- lib/bull.ts — BullMQ setup utilities
+- prisma/ — schema.prisma, migrations, reencrypt/ generated
+- scripts/k8s-rotate-db-key.sh — in-cluster script used by runner-keyrotate image
+
+## Docker targets
+
+- Default runner (production) — pnpm start (prestart runs migrate-with-retry.js)
+- runner-keyrotate — adds kubectl/jq; used only for the staging CronJob
+
+## Deployment
+
+- Built/pushed in PR and main workflows (gcr.io/.../dineros-microservice:<tag>)
+- Deployed alongside main app using .deploy/dineros.template.yaml; service on port 3050
+- ENV taken from K8s secrets; INTERNAL_API_TOKEN propagated for secure internal calls
+

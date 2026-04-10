@@ -1,0 +1,35 @@
+---
+description: Field-level encryption, re-encryption flows, and key rotation
+---
+
+# Encryption and Key Management
+
+## Field-level encryption
+
+- Implemented via prisma-field-encryption; see app/prisma/schema.prisma for /// @encrypted annotations
+- Encrypted fields include PII/secrets like User.email, AccountRegister.name, RegisterEntry.description, plaid secrets, wallet addresses, and Reoccurrence.description
+- generator fieldEncryptionMigrations writes app/prisma/reencrypt/* with migrate helpers
+
+## Re-encryption and local restore
+
+- docs/post-restore-encryption-plan.md documents dev restore behavior
+  - scripts/dump-and-restore.sh calls scripts/reset-encrypted-users-after-restore.ts
+  - Plan describes auto-generated re-encrypt path using prisma/reencrypt + placeholder fallback for missing source keys
+- app/prisma/reencrypt/* and microservice/prisma/reencrypt/* are generated; do not modify by hand
+
+## Key rotation (staging)
+
+- .deploy/key-rotation-cronjob.template.yaml runs nightly CronJob using the microservice runner-keyrotate image
+- .deploy/key-rotation-rbac.template.yaml grants Role/RoleBinding to patch the SECRET_DB and roll Deployments in namespace
+- Microservice exposes routes/migrate.* to run migrations post-rotation
+
+## Services
+
+- app/server/services/RsaService.ts and JwtService.ts provide asymmetric and JWT operations
+- app/server/lib/rotateUserJwtKey.ts supports per-user JWT key rotation
+
+## Environment variables
+
+- DB_ENCRYPTION_KEY and optional DB_DECRYPTION_KEY_* are read from secrets in Kubernetes
+- Never commit secrets; pre-commit hooks and TruffleHog detectors enforce hygiene (.trufflehog-detectors.yaml)
+
