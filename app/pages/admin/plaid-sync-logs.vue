@@ -34,6 +34,19 @@ const statusFilter = ref<"" | "success" | "partial" | "failed">("");
 const userIdFilter = ref("");
 const expandedId = ref<string | null>(null);
 
+const syncModeSelectItems = [
+  { label: "Any", value: "" },
+  { label: "item_cursor", value: "item_cursor" },
+  { label: "legacy_token_batch", value: "legacy_token_batch" },
+] as const;
+
+const statusSelectItems = [
+  { label: "Any", value: "" },
+  { label: "success", value: "success" },
+  { label: "partial", value: "partial" },
+  { label: "failed", value: "failed" },
+] as const;
+
 function statusBadgeColor(
   status: string,
 ): "success" | "warning" | "error" | "neutral" {
@@ -129,23 +142,14 @@ AdminPageShell(
         USelect(
           v-model="syncModeFilter"
           class="min-w-[160px]"
-          :items="[
-            { label: 'Any', value: '' },
-            { label: 'item_cursor', value: 'item_cursor' },
-            { label: 'legacy_token_batch', value: 'legacy_token_batch' },
-          ]"
+          :items="syncModeSelectItems"
           value-key="value"
           label-key="label")
       UFormField(label="Status")
         USelect(
           v-model="statusFilter"
           class="min-w-[140px]"
-          :items="[
-            { label: 'Any', value: '' },
-            { label: 'success', value: 'success' },
-            { label: 'partial', value: 'partial' },
-            { label: 'failed', value: 'failed' },
-          ]"
+          :items="statusSelectItems"
           value-key="value"
           label-key="label")
       UFormField(label="User ID")
