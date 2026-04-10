@@ -13,6 +13,7 @@
     "dev": "nodemon --exec tsx server.ts"
   },
   "dependencies": {
+    "@47ng/cloak": "^1.2.0",
     "@bull-board/api": "^6.7.4",
     "@bull-board/h3": "^6.7.4",
     "@prisma/adapter-mariadb": "^7.5.0",

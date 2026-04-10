@@ -2,6 +2,8 @@ name: Deploy Dineros to GKE
 description: |
   Sources .deploy/profiles/<profile>.env, renders .deploy/dineros.template.yaml with envsubst
   (expects GCP_* and IMAGE_TAG in the environment), then kubectl apply.
+  Staging also applies key rotation manifests; Role/RoleBinding need IAM permissions
+  container.roles.create and container.roleBindings.create (e.g. roles/container.admin) or a one-time admin kubectl apply of .deploy/key-rotation-rbac.template.yaml.
 inputs:
   profile:
     description: "staging or production"

@@ -1,0 +1,32 @@
+# Staging only: same envsubst as dineros.template.yaml.
+# Apply after key-rotation-cronjob.template.yaml (ServiceAccount must exist for RoleBinding).
+# IAM: the identity running kubectl needs Cloud IAM permissions container.roles.create and
+# container.roleBindings.create (e.g. roles/container.admin on the project), or apply this file once as a cluster admin.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dineros-staging-db-key-rotation
+  namespace: ${K8S_NAMESPACE}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["${SECRET_DB}"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["${MAIN_DEPLOYMENT_NAME}", "${MICRO_DEPLOYMENT_NAME}"]
+    verbs: ["get", "patch", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dineros-staging-db-key-rotation
+  namespace: ${K8S_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dineros-staging-db-key-rotation
+subjects:
+  - kind: ServiceAccount
+    name: ${KEY_ROTATION_SERVICE_ACCOUNT}
+    namespace: ${K8S_NAMESPACE}

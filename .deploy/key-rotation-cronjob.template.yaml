@@ -1,0 +1,59 @@
+# Staging only: render with the same envsubst as dineros.template.yaml (source .deploy/profiles/staging.env; export GCP_PROJECT_ID IMAGE_TAG).
+# Nightly append-only DB field-encryption key rotation + microservice GET /migrate.
+# RBAC is in key-rotation-rbac.template.yaml (requires broader GKE IAM than workload apply).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${KEY_ROTATION_SERVICE_ACCOUNT}
+  namespace: ${K8S_NAMESPACE}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dineros-staging-db-key-rotation
+  namespace: ${K8S_NAMESPACE}
+spec:
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 7200
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: ${KEY_ROTATION_SERVICE_ACCOUNT}
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            fsGroup: 1001
+          containers:
+            - name: rotate
+              image: gcr.io/${GCP_PROJECT_ID}/dineros-microservice:${IMAGE_TAG}-keyrotate
+              imagePullPolicy: Always
+              command: ["/repo/microservice/scripts/k8s-rotate-db-key.sh"]
+              env:
+                - name: K8S_NAMESPACE
+                  value: "${K8S_NAMESPACE}"
+                - name: SECRET_DB
+                  value: "${SECRET_DB}"
+                - name: MAIN_DEPLOYMENT_NAME
+                  value: "${MAIN_DEPLOYMENT_NAME}"
+                - name: MICRO_DEPLOYMENT_NAME
+                  value: "${MICRO_DEPLOYMENT_NAME}"
+                - name: MICRO_SERVICE_NAME
+                  value: "${MICRO_SERVICE_NAME}"
+                - name: INTERNAL_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${SECRET_APP}
+                      key: INTERNAL_API_TOKEN
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"

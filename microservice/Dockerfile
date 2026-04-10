@@ -51,3 +51,19 @@ USER appuser
 
 # Use test-start script for testing (skips migration)
 CMD ["sh", "-c", "if [ \"$NODE_ENV\" = \"test\" ]; then pnpm test-start; else pnpm start; fi"]
+
+# ---- Staging CronJob: kubectl + curl + jq for in-cluster DB key rotation (not the default image) ----
+FROM runner AS runner-keyrotate
+USER root
+RUN apk add --no-cache curl jq ca-certificates
+ARG KUBECTL_VERSION=v1.31.6
+RUN curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+  && install -m 0755 /tmp/kubectl /usr/local/bin/kubectl \
+  && rm -f /tmp/kubectl
+COPY microservice/scripts/k8s-rotate-db-key.sh /repo/microservice/scripts/k8s-rotate-db-key.sh
+RUN chmod 0555 /repo/microservice/scripts/k8s-rotate-db-key.sh \
+  && chown appuser:appgroup /repo/microservice/scripts/k8s-rotate-db-key.sh
+USER appuser
+
+# Default `docker build` target remains the main microservice image (duplicate final stage).
+FROM runner

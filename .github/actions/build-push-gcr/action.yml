@@ -25,6 +25,10 @@ inputs:
     description: Optional shell command to run before build (e.g. microservice copy-files)
     required: false
     default: ""
+  target:
+    description: Optional Dockerfile build target (e.g. runner-keyrotate)
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -49,10 +53,28 @@ runs:
       run: gcloud auth configure-docker "$REGISTRY_HOST"
 
     - name: Build and push
+      if: ${{ inputs.target == '' }}
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
+        push: true
+        tags: ${{ inputs.tags }}
+        platforms: linux/amd64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: true
+        sbom: true
+      env:
+        CI: true
+
+    - name: Build and push (target)
+      if: ${{ inputs.target != '' }}
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        target: ${{ inputs.target }}
         push: true
         tags: ${{ inputs.tags }}
         platforms: linux/amd64

@@ -63,6 +63,15 @@ jobs:
           tags: |
             gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:latest
             gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:${{ github.sha }}
+      - uses: ./.github/actions/build-push-gcr
+        with:
+          dockerfile: ./microservice/Dockerfile
+          context: .
+          pre_build_command: cd microservice && ./copy-files.sh
+          target: runner-keyrotate
+          tags: |
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:latest-keyrotate
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/dineros-microservice:${{ github.sha }}-keyrotate
 
   Deploy:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'

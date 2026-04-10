@@ -318,6 +318,9 @@ importers:
 
   microservice:
     dependencies:
+      '@47ng/cloak':
+        specifier: ^1.2.0
+        version: 1.2.0
       '@bull-board/api':
         specifier: ^6.7.4
         version: 6.20.5(@bull-board/ui@6.20.5)
