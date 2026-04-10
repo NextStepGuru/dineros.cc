@@ -975,6 +975,11 @@ class PlaidSyncService {
         },
       });
     } catch (err) {
+      const fatalMsg = err instanceof Error ? err.message : String(err);
+      const errorSummary =
+        itemSyncErrors.length > 0
+          ? `${itemSyncErrors.join("\n")}\n---\n${fatalMsg}`.slice(0, 8000)
+          : fatalMsg;
       await recordPlaidSyncLog({
         syncMode: "item_cursor",
         status: "failed",
@@ -984,8 +989,8 @@ class PlaidSyncService {
         txAdded,
         txModified,
         txRemoved,
-        errorCount: 1,
-        errorSummary: err instanceof Error ? err.message : String(err),
+        errorCount: itemSyncErrors.length + 1,
+        errorSummary,
         metadata: { phase: "syncItemWithTransactionsSync" },
       });
       throw err;
