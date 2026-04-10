@@ -139,6 +139,29 @@ model PlaidSyncCursor {
   @@map("plaid_sync_cursor")
 }
 
+model PlaidSyncLog {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now()) @map("created_at")
+  syncMode       String   @map("sync_mode") @db.VarChar(32)
+  status         String   @db.VarChar(16)
+  itemId         String?  @map("item_id") @db.VarChar(191)
+  userId         Int?     @map("user_id") @db.UnsignedInt
+  durationMs     Int?     @map("duration_ms")
+  txAdded        Int      @default(0) @map("tx_added")
+  txModified     Int      @default(0) @map("tx_modified")
+  txRemoved      Int      @default(0) @map("tx_removed")
+  newEntries     Int      @default(0) @map("new_entries")
+  matchedEntries Int      @default(0) @map("matched_entries")
+  errorCount     Int      @default(0) @map("error_count")
+  errorSummary   String?  @map("error_summary") @db.Text
+  metadata       Json?
+
+  @@index([createdAt])
+  @@index([syncMode])
+  @@index([userId])
+  @@map("plaid_sync_log")
+}
+
 model UserAccount {
   id                 Int      @id @default(autoincrement()) @db.UnsignedInt
   userId             Int      @map("user_id") @db.UnsignedInt
