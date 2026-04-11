@@ -8,6 +8,15 @@ vi.hoisted(() => {
 // Mock H3/Nuxt utilities before any imports
 vi.mock("h3", () => ({
   defineEventHandler: vi.fn((handler) => handler),
+  createError: vi.fn((error) => {
+    const statusCode = error.statusCode || 500;
+    const message = error.statusMessage || error.message || "Unknown error";
+    const fullMessage = `HTTP ${statusCode}: ${message}`;
+    const err = new Error(fullMessage) as any;
+    err.statusCode = statusCode;
+    err.statusMessage = message;
+    throw err;
+  }),
   readBody: vi.fn(),
   setResponseStatus: vi.fn(),
 }));
@@ -36,6 +45,11 @@ vi.mock("~/server/services/HashService", () => ({
 // Mock logger
 vi.mock("~/server/logger", () => ({
   log: vi.fn(),
+}));
+
+vi.mock("~/server/lib/rateLimitRedis", () => ({
+  clientIpFromEvent: vi.fn(() => "127.0.0.1"),
+  rateLimitByKey: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
 // Mock postmark client
