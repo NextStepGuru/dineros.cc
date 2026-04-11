@@ -1288,6 +1288,12 @@ const registerFilterEmptyAlert = computed(() => {
         "Try another term or clear the filter (⎋). The full register was searched.",
     };
   }
+  if (!hasText && !hasCat) {
+    return {
+      title: "No entries in this register",
+      description: "Add an entry to get started.",
+    };
+  }
   return {
     title: "No rows match this category filter",
     description:
@@ -1327,6 +1333,7 @@ async function hydrateRegisterForActiveFilters() {
   const id = accountRegisterId.value;
   if (!id || Number.isNaN(id)) return;
   if (registerPagePending.value) return;
+  if (isRegisterFilterHydrating.value) return;
 
   const genAtStart = registerLoadGeneration.value;
   isRegisterFilterHydrating.value = true;
@@ -1650,6 +1657,13 @@ async function recalcAccount() {
               USkeleton(class="h-4 w-16")
             div(class="p-2 sm:p-4 min-w-0 flex justify-end")
               USkeleton(class="h-4 w-20")
+
+    div(v-else-if="!isCurrentRegisterCrypto && !isLoading && tableEntries.length === 0" class="mt-4 min-w-0 w-full")
+      UCard
+        template(#header)
+          h3(class="font-semibold") No entries in this register
+        p(class="frog-text-muted mb-4") Add a transaction or forecast entry to see it here.
+        UButton(v-if="!isSnapshotMode" color="primary" size="sm" @click="handleAddEntry") Add entry
 
     div(v-else-if="isCurrentRegisterCrypto && !isSnapshotMode" class="mt-4 min-w-0 w-full")
       UCard
