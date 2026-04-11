@@ -12,6 +12,14 @@ export const futureRegisterEntryWhere = {
   OR: [{ isCleared: false, isReconciled: false }],
 };
 
+/** Prisma default interactive tx timeout is 5s; snapshot writes can exceed that on large accounts. */
+const SNAPSHOT_TRANSACTION_OPTIONS = {
+  timeout: 120_000,
+  maxWait: 30_000,
+} as const;
+
+const REGISTER_ENTRY_SNAPSHOT_CREATE_CHUNK = 2500;
+
 export async function createAccountSnapshot(accountId: string) {
   const registers = await PrismaDb.accountRegister.findMany({
     where: { accountId, isArchived: false },
@@ -86,24 +94,27 @@ export async function createAccountSnapshot(accountId: string) {
       });
 
       if (balanceUpdated.length > 0) {
-        await tx.registerEntrySnapshot.createMany({
-          data: balanceUpdated.map((e) => ({
-            registerSnapshotId: ars.id,
-            seq: e.seq ?? null,
-            createdAt: e.createdAt as Date,
-            description: String(e.description ?? ""),
-            amount: Number(e.amount),
-            balance: Number(e.balance),
-            isProjected: Boolean(e.isProjected),
-            isPending: Boolean(e.isPending),
-            isBalanceEntry: Boolean(e.isBalanceEntry),
-            isManualEntry: Boolean(e.isManualEntry),
-            categoryId: e.categoryId ?? null,
-          })),
-        });
+        const rows = balanceUpdated.map((e) => ({
+          registerSnapshotId: ars.id,
+          seq: e.seq ?? null,
+          createdAt: e.createdAt as Date,
+          description: String(e.description ?? ""),
+          amount: Number(e.amount),
+          balance: Number(e.balance),
+          isProjected: Boolean(e.isProjected),
+          isPending: Boolean(e.isPending),
+          isBalanceEntry: Boolean(e.isBalanceEntry),
+          isManualEntry: Boolean(e.isManualEntry),
+          categoryId: e.categoryId ?? null,
+        }));
+        for (let i = 0; i < rows.length; i += REGISTER_ENTRY_SNAPSHOT_CREATE_CHUNK) {
+          await tx.registerEntrySnapshot.createMany({
+            data: rows.slice(i, i + REGISTER_ENTRY_SNAPSHOT_CREATE_CHUNK),
+          });
+        }
       }
     }
 
     return snapshot;
-  });
+  }, SNAPSHOT_TRANSACTION_OPTIONS);
 }

@@ -4,6 +4,7 @@ import { privateUserSchema } from "~/schema/zod";
 import { plaidAccountSchema } from "~/schema/plaid";
 import { z } from "zod";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { plaidIsActiveForUser } from "~/server/lib/plaidUserAccess";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -15,7 +16,7 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    if (!user.settings.plaid.isEnabled) {
+    if (!(await plaidIsActiveForUser(userId, user))) {
       throw new Error("Plaid is not enabled for this user.");
     }
 

@@ -690,7 +690,8 @@ describe("Integration Regression Tests", () => {
       const finalBalance = Math.max(...allEntries.map((e: any) => e.balance));
       expect(typeof finalBalance).toBe("number");
       expect(finalBalance).toBeGreaterThan(50000);
-      expect(finalBalance).toBeLessThan(100000);
+      // Anchor uses real starting balance (50k); compound growth over 5y exceeds prior <100k bound that assumed a zeroed anchor
+      expect(finalBalance).toBeLessThan(125000);
 
       for (const entry of allEntries) {
         expect(entry.balance.toString()).not.toMatch(/\d{5,}\.\d+\d+\.\d+/);

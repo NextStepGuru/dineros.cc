@@ -5,8 +5,9 @@ import { forecastLogger } from "../logger";
 import { recalculateRunningBalanceAndSort } from "~/lib/sort";
 
 /**
- * ForecastEngine passes `0` into `calculateRunningBalances` (anchor comes from the balance row
- * after sort mutates it — same as `recalculateRunningBalanceAndSort(..., balance: 0, ...)`).
+ * Parity with ForecastEngine: `calculateRunningBalances` passes `undefined` so the ledger
+ * anchor comes from the synthetic balance row (same as `recalculateRunningBalanceAndSort` with
+ * omitted balance — not `balance: 0`, which is a real zero anchor).
  */
 type SortFlagOverrides = Map<
   string,
@@ -15,7 +16,7 @@ type SortFlagOverrides = Map<
 
 function expectBalancesMatchLedgerSort(
   entries: any[],
-  sortInitialBalance: number,
+  sortInitialBalance: number | undefined,
   type: "debit" | "credit",
   sortFlagOverrides?: SortFlagOverrides,
 ): void {
@@ -328,7 +329,7 @@ describe("Balance Arithmetic Regression Tests", () => {
       // ForecastEngine `convertToFinalFormat` omits `isManualEntry`; seed rows need flags for sort parity.
       expectBalancesMatchLedgerSort(
         entries,
-        0,
+        undefined,
         "debit",
         new Map([["entry-1", { isManualEntry: true }]]),
       );
@@ -443,7 +444,7 @@ describe("Balance Arithmetic Regression Tests", () => {
     const balanceEntries = entries.filter((e: any) => e.isBalanceEntry);
     expect(balanceEntries.length).toBeGreaterThan(0);
 
-    expectBalancesMatchLedgerSort(entries, 0, "credit");
+    expectBalancesMatchLedgerSort(entries, undefined, "credit");
   });
 
   it("should handle complex balance scenarios", async () => {
@@ -562,6 +563,6 @@ describe("Balance Arithmetic Regression Tests", () => {
     const balanceEntries = entries.filter((e: any) => e.isBalanceEntry);
     expect(balanceEntries.length).toBeGreaterThan(0);
 
-    expectBalancesMatchLedgerSort(entries, 0, "debit");
+    expectBalancesMatchLedgerSort(entries, undefined, "debit");
   });
 });

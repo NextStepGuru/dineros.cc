@@ -75,7 +75,8 @@ function assertBalanceRows(entries: RegisterEntry[]) {
   const balAmounts = balanceRows
     .map((e) => Number(e.amount))
     .sort((a, b) => a - b);
-  expect(balAmounts).toEqual([0, 0, 0]);
+  // Synthetic row amounts match account_register latest_balance (loan negative, savings zero, checking positive)
+  expect(balAmounts).toEqual([-8000, 0, 50000]);
 }
 
 function assertRecurringEntries(

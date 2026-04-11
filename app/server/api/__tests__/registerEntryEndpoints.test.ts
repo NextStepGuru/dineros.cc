@@ -486,37 +486,44 @@ describe("Register Entry API Endpoints", () => {
         },
       };
 
-      const mockReoccurrence = {
-        id: "reoccurrence-123",
-        lastAt: new Date("2024-01-01T00:00:00.000Z"),
-        intervalId: 1,
+      const mockUpdatedEntry = {
+        id: "entry-123",
+        accountRegisterId: 1,
+        description: "Test Entry",
+        amount: 100,
+        balance: 0,
+        isProjected: false,
+        isCleared: true,
+        isPending: false,
+        hasBalanceReCalc: true,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
       };
 
       const { getUser } = await import("~/server/lib/getUser");
       const { prisma } = await import("~/server/clients/prismaClient");
       const { addRecalculateJob } =
         await import("~/server/clients/queuesClient");
-      const { dateTimeService } = await import("~/server/services/forecast");
-
-      // Mock dateTimeService methods
-      dateTimeService.add = vi.fn().mockReturnValue({
-        toISOString: () => "2024-02-01T00:00:00.000Z",
-      });
-      dateTimeService.isSameOrBefore = vi.fn().mockReturnValue(true);
+      const { registerEntrySchema } = await import("~/schema/zod");
 
       (globalThis as any).readBody.mockResolvedValue(mockBody);
       getUser.mockReturnValue({ userId: 123 });
       prisma.registerEntry.findFirstOrThrow.mockResolvedValue(
         mockLookup,
       );
-      prisma.reoccurrence.findUniqueOrThrow.mockResolvedValue(
-        mockReoccurrence,
-      );
-      prisma.reoccurrence.update.mockResolvedValue(mockReoccurrence);
+      prisma.accountRegister.update.mockResolvedValue({});
+      prisma.registerEntry.update.mockResolvedValue(mockUpdatedEntry);
+      registerEntrySchema.parse.mockImplementation((x: unknown) => x);
 
       const result = await registerEntryAppliedHandler(mockEvent);
 
       expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalled();
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          balance: { increment: 100 },
+          latestBalance: { increment: 100 },
+        },
+      });
       expect(addRecalculateJob).toHaveBeenCalledWith({
         accountId: "account-123",
       });

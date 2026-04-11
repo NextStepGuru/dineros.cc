@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { handleError, formatCurrencyOptions } from "~/lib/utils";
+import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
 import type { RegisterEntry, Reoccurrence } from "~/types/types";
 
 export type MatchRegisterEntryReoccurrenceProps = {
@@ -27,10 +28,10 @@ const recurrencesForRegister = computed(() =>
 );
 
 const filteredRecurrences = computed(() => {
-  const q = filterText.value.trim().toLowerCase();
   const list = recurrencesForRegister.value;
-  if (!q) return list;
-  return list.filter((r) => r.description.toLowerCase().includes(q));
+  return list.filter((r) =>
+    matchesTableGlobalFilter(filterText.value, [r.description]),
+  );
 });
 
 function rowClasses(r: Reoccurrence) {

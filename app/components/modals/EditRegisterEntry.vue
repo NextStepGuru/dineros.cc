@@ -11,7 +11,7 @@ import type { RegisterEntry } from "~/types/types";
 export type ModalRegisterEntryProps = {
   title: string;
   description: string;
-  callback: () => void;
+  callback: () => void | Promise<void>;
   cancel: () => void;
   registerEntry: RegisterEntry;
 };
@@ -190,6 +190,8 @@ const categorySelectItems = computed(() => {
 async function handleSubmit({
   data: formData,
 }: FormSubmitEvent<RegisterEntry>) {
+  const onSuccess = props.callback;
+  const onClose = props.cancel;
   state.isSaving = true;
   try {
     let responseData;
@@ -216,13 +218,13 @@ async function handleSubmit({
       }).catch((error) => handleError(error, toast));
 
       if (responseData) {
-        props.callback();
+        await onSuccess();
         toast.add({
           color: "success",
           description: "Transfer created successfully.",
         });
         state.isSaving = false;
-        props.cancel();
+        onClose();
         return;
       }
       state.isSaving = false;
@@ -249,14 +251,14 @@ async function handleSubmit({
         createdAt: new Date(parsedData.createdAt).toISOString(),
       } as RegisterEntry;
 
-      props.callback();
+      await onSuccess();
 
       toast.add({
         color: "success",
         description: "Updated register entry successfully.",
       });
       state.isSaving = false;
-      props.cancel();
+      onClose();
       return;
     }
     state.isSaving = false;
@@ -280,6 +282,8 @@ async function handleSubmit({
 }
 
 async function deleteRegisterEntry() {
+  const onSuccess = props.callback;
+  const onClose = props.cancel;
   state.isDeleting = true;
   const deleteEntry = await $api("/api/register-entry", {
     method: "DELETE",
@@ -298,11 +302,11 @@ async function deleteRegisterEntry() {
       description: "Deleted register entry successfully.",
     });
 
-    props.callback();
+    await onSuccess();
 
     state.isDeleting = false;
     showDeleteConfirm.value = false;
-    props.cancel();
+    onClose();
     return;
   }
   state.isDeleting = false;
@@ -322,6 +326,8 @@ function cancelDeleteConfirmation() {
 }
 
 async function markAsCleared() {
+  const onSuccess = props.callback;
+  const onClose = props.cancel;
   state.isClearing = true;
   const isMarked = await $api("/api/register-entry", {
     method: "patch",
@@ -341,10 +347,10 @@ async function markAsCleared() {
       description: "Marked as cleared successfully.",
     });
 
-    props.callback();
+    await onSuccess();
 
     state.isClearing = false;
-    props.cancel();
+    onClose();
     return;
   }
   state.isClearing = false;
@@ -355,6 +361,7 @@ async function markAsCleared() {
 }
 
 async function markAsApplied() {
+  const onSuccess = props.callback;
   state.isApplying = true;
 
   const targetAccountRegisterId =
@@ -387,7 +394,7 @@ async function markAsApplied() {
     });
 
     await listStore.fetchLists();
-    props.callback();
+    await onSuccess();
     state.isApplying = false;
     state.showApplySelection = false;
     return;
@@ -431,6 +438,8 @@ function toggleTransferMode() {
 }
 
 async function skipRegisterEntry() {
+  const onSuccess = props.callback;
+  const onClose = props.cancel;
   state.isSkipping = true;
   const isSkipped = await $api("/api/register-entry-skip", {
     method: "post",
@@ -449,11 +458,11 @@ async function skipRegisterEntry() {
       description: "Skipped register entry successfully.",
     });
 
-    props.callback();
+    await onSuccess();
 
     listStore.fetchLists();
     state.isSkipping = false;
-    props.cancel();
+    onClose();
     return;
   }
 

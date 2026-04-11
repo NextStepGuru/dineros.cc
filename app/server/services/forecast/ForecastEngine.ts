@@ -463,7 +463,7 @@ export class ForecastEngine implements IForecastEngine {
 
       const sortedEntries = this.entryService.calculateRunningBalances(
         accountEntries, // Use all entries including balance entries
-        0, // Initial balance is now handled by the balance entry's amount
+        undefined, // Anchor from synthetic balance row (see recalculateRunningBalanceAndSort)
         accountType
       );
 

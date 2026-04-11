@@ -8,6 +8,7 @@ import {
   isCryptoAccountType,
 } from "~/lib/utils";
 import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
+import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
 import type { ModelAccountRegisterProps } from "~/components/modals/EditAccountRegister.vue";
 import ModalsEditAccountRegister from "~/components/modals/EditAccountRegister.vue";
 import {
@@ -1325,10 +1326,10 @@ defineShortcuts({
 });
 
 const filteredAccountRegisters = computed(() => {
-  const filterText = globalFilter.value.toLowerCase();
   const filtered = registersForUi.value.filter((f) => {
-    const matchesFilter =
-      !filterText || f.name.toLowerCase().includes(filterText);
+    const matchesFilter = matchesTableGlobalFilter(globalFilter.value, [
+      f.name ?? "",
+    ]);
     return matchesFilter && !f.subAccountRegisterId;
   });
   return sortAccounts(filtered);

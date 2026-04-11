@@ -4,6 +4,7 @@ import { privateUserSchema } from "~/schema/zod";
 import { plaidAccountSchema } from "~/schema/plaid";
 import { z } from "zod";
 import { handleApiError } from "~/server/lib/handleApiError";
+import { plaidIsActiveForUser } from "~/server/lib/plaidUserAccess";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -15,8 +16,7 @@ export default defineEventHandler(async (event) => {
 
     const user = privateUserSchema.parse(lookup);
 
-    // Check if Plaid is enabled, but still return synced accounts even if not enabled
-    const isPlaidEnabled = user.settings.plaid.isEnabled;
+    const isPlaidEnabled = await plaidIsActiveForUser(userId, user);
 
     const syncedAccounts = await prisma.accountRegister.findMany({
       where: {

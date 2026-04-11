@@ -987,6 +987,56 @@ describe("recalculateRunningBalanceAndSort", () => {
     expect(result[1].amount).toBe(50);
     expect(result[1].balance).toBe(950);
   });
+
+  /**
+   * Forecast passes `undefined` so the anchor comes from the synthetic balance row (negative pocket).
+   * Explicit `balance: 0` must not be treated as "omit" — that was the `??` bug (zeroed anchor).
+   */
+  it("uses synthetic balance row when balance omitted; explicit zero stays zero anchor (debit)", () => {
+    const pocketNegativeAnchor: PartialRegisterEntry[] = [
+      {
+        amount: -164.98,
+        balance: -164.98,
+        createdAt: dateTimeService.create("2025-01-15"),
+        isBalanceEntry: true,
+        isCleared: true,
+        isManualEntry: false,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+      {
+        amount: 100,
+        balance: 0,
+        createdAt: dateTimeService.create("2025-01-20"),
+        isBalanceEntry: false,
+        isCleared: false,
+        isManualEntry: true,
+        isMatched: false,
+        isPending: false,
+        isProjected: false,
+      },
+    ];
+
+    const fromRow = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(pocketNegativeAnchor)),
+      balance: undefined,
+      type: "debit",
+    });
+    const manualFromRow = fromRow.find((r) => !r.isBalanceEntry);
+    expect(manualFromRow?.balance).toBeCloseTo(-64.98, 2);
+
+    const zeroAnchor = recalculateRunningBalanceAndSort({
+      registerEntries: randomSort(cloneDeep(pocketNegativeAnchor)),
+      balance: 0,
+      type: "debit",
+    });
+    const manualZero = zeroAnchor.find((r) => !r.isBalanceEntry);
+    expect(manualZero?.balance).toBe(100);
+    const balZero = zeroAnchor.find((r) => r.isBalanceEntry);
+    expect(balZero?.amount).toBe(0);
+    expect(balZero?.balance).toBe(0);
+  });
 });
 
 function randomSort<T>(array: T[]): T[] {

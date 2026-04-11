@@ -16,6 +16,7 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
+import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
 import {
   dismissNotification,
   dispatchNotificationsRefresh,
@@ -293,9 +294,6 @@ const reoccurrencesForTable = computed(() =>
     );
     if (!matchesCategory) return false;
 
-    const q = globalFilter.value.trim().toLowerCase();
-    if (!q) return true;
-
     const accountLabel = getAccountRegisterLabel(
       r.accountRegisterId,
       listStore.getAccountRegisters,
@@ -310,16 +308,14 @@ const reoccurrencesForTable = computed(() =>
         : (listStore.getCategories.find((c) => c.id === r.categoryId)?.name ??
           "");
 
-    return (
-      (r.description ?? "").toLowerCase().includes(q) ||
-      accountLabel.toLowerCase().includes(q) ||
-      intervalLabel.toLowerCase().includes(q) ||
-      categoryLabel.toLowerCase().includes(q) ||
-      formatDate(r.lastAt)?.toLowerCase().includes(q) ||
-      String(r.amount ?? "")
-        .toLowerCase()
-        .includes(q)
-    );
+    return matchesTableGlobalFilter(globalFilter.value, [
+      r.description ?? "",
+      accountLabel,
+      intervalLabel,
+      categoryLabel,
+      formatDate(r.lastAt) ?? "",
+      String(r.amount ?? ""),
+    ]);
   }),
 );
 

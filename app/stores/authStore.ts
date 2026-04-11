@@ -13,9 +13,12 @@ export const useAuthStore = defineStore("authStore", {
     getUser: (state) => state.user,
     getBudgetId: (state) => state.budgetId,
 
-    hasPlaidConnected: (state) =>
-      state.user?.settings?.plaid?.isEnabled !== undefined &&
-      state.user.settings.plaid.isEnabled === true,
+    hasPlaidConnected: (state) => {
+      const p = state.user?.settings?.plaid;
+      if (!p) return false;
+      if (p.isEnabled === true) return true;
+      return typeof p.item_id === "string" && p.item_id.length > 0;
+    },
     has2faEnabled: (state) => {
       const mfa = state.user?.settings?.mfa;
       if (mfa) {
@@ -182,8 +185,12 @@ export const useAuthStore = defineStore("authStore", {
     disconnectPlaid() {
       if (this.user) {
         const settings = { ...this.user?.settings };
-        settings.plaid.isEnabled = false;
-        settings.plaid.public_token = undefined;
+        settings.plaid = {
+          ...settings.plaid,
+          isEnabled: false,
+          public_token: undefined,
+          item_id: undefined,
+        };
         this.user.settings = settings;
       }
     },
