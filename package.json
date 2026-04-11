@@ -29,7 +29,8 @@
     "ci:local:test": "pnpm --filter dineros-app ci:local:test",
     "ci:local:pre-commit": "pnpm --filter dineros-app ci:local:pre-commit",
     "sonar": "bash scripts/sonar-local.sh",
-    "sonar:quick": "bash scripts/sonar-local.sh --no-coverage"
+    "sonar:quick": "bash scripts/sonar-local.sh --no-coverage",
+    "restore": "./scripts/dump-and-restore.sh production --identical --persist"
   },
   "pnpm": {
     "overrides": {

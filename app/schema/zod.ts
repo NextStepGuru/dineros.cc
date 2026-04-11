@@ -152,6 +152,8 @@ const publicUserSettingsSchema = z.preprocess(
         .object({
           isEnabled: z.boolean().default(false),
           public_token: z.string().optional(),
+          /** Opaque Plaid item id; used to detect Link without relying on `isEnabled` alone. */
+          item_id: z.string().optional(),
           transactionSyncEmail: z.boolean().optional(),
           connectionIssueEmail: z.boolean().optional(),
         })

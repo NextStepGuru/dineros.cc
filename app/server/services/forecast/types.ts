@@ -75,7 +75,7 @@ export interface IRegisterEntryService {
   updateEntryStatuses(accountId: number): Promise<void>;
   calculateRunningBalances(
     entries: CacheRegisterEntry[],
-    initialBalance: number,
+    initialBalance: number | undefined,
     accountType: "credit" | "debit"
   ): CacheRegisterEntry[];
 }

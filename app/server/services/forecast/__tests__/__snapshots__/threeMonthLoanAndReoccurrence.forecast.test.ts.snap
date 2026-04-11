@@ -4,8 +4,8 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
 [
   {
     "accountRegisterId": 1,
-    "amount": 0,
-    "balance": 0,
+    "amount": 50000,
+    "balance": 50000,
     "date": "2024-01-01",
     "description": "Balance for Checking",
     "isBalanceEntry": true,
@@ -16,8 +16,8 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   },
   {
     "accountRegisterId": 2,
-    "amount": 0,
-    "balance": 0,
+    "amount": -8000,
+    "balance": -8000,
     "date": "2024-01-01",
     "description": "Balance for Test Loan",
     "isBalanceEntry": true,
@@ -41,7 +41,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": 3000,
-    "balance": 3000,
+    "balance": 53000,
     "date": "2024-02-01",
     "description": "Golden Salary",
     "isBalanceEntry": false,
@@ -53,7 +53,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -800,
-    "balance": 2200,
+    "balance": 52200,
     "date": "2024-02-05",
     "description": "Golden Rent",
     "isBalanceEntry": false,
@@ -65,7 +65,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -150,
-    "balance": 2050,
+    "balance": 52050,
     "date": "2024-02-10",
     "description": "Transfer for Golden Savings xfer",
     "isBalanceEntry": false,
@@ -89,7 +89,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -119.91,
-    "balance": 1930.09,
+    "balance": 51930.09,
     "date": "2024-02-15",
     "description": "Transfer for Payment to Test Loan",
     "isBalanceEntry": false,
@@ -101,7 +101,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": -39.55,
-    "balance": -39.55,
+    "balance": -8039.55,
     "date": "2024-02-15",
     "description": "Interest Charge",
     "isBalanceEntry": false,
@@ -113,7 +113,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": 119.91,
-    "balance": 80.36,
+    "balance": -7919.64,
     "date": "2024-02-15",
     "description": "Payment to Test Loan",
     "isBalanceEntry": false,
@@ -125,7 +125,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": 3000,
-    "balance": 4930.09,
+    "balance": 54930.09,
     "date": "2024-03-01",
     "description": "Golden Salary",
     "isBalanceEntry": false,
@@ -137,7 +137,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -800,
-    "balance": 4130.09,
+    "balance": 54130.09,
     "date": "2024-03-05",
     "description": "Golden Rent",
     "isBalanceEntry": false,
@@ -149,7 +149,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -150,
-    "balance": 3980.09,
+    "balance": 53980.09,
     "date": "2024-03-10",
     "description": "Transfer for Golden Savings xfer",
     "isBalanceEntry": false,
@@ -173,7 +173,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -119.91,
-    "balance": 3860.18,
+    "balance": 53860.18,
     "date": "2024-03-15",
     "description": "Transfer for Payment to Test Loan",
     "isBalanceEntry": false,
@@ -185,7 +185,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": -39.15,
-    "balance": 41.21,
+    "balance": -7958.79,
     "date": "2024-03-15",
     "description": "Interest Charge",
     "isBalanceEntry": false,
@@ -197,7 +197,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": 119.91,
-    "balance": 161.12,
+    "balance": -7838.88,
     "date": "2024-03-15",
     "description": "Payment to Test Loan",
     "isBalanceEntry": false,
@@ -209,7 +209,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": 3000,
-    "balance": 6860.18,
+    "balance": 56860.18,
     "date": "2024-04-01",
     "description": "Golden Salary",
     "isBalanceEntry": false,
@@ -221,7 +221,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -800,
-    "balance": 6060.18,
+    "balance": 56060.18,
     "date": "2024-04-05",
     "description": "Golden Rent",
     "isBalanceEntry": false,
@@ -233,7 +233,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -150,
-    "balance": 5910.18,
+    "balance": 55910.18,
     "date": "2024-04-10",
     "description": "Transfer for Golden Savings xfer",
     "isBalanceEntry": false,
@@ -257,7 +257,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 1,
     "amount": -119.91,
-    "balance": 5790.27,
+    "balance": 55790.27,
     "date": "2024-04-15",
     "description": "Transfer for Payment to Test Loan",
     "isBalanceEntry": false,
@@ -269,7 +269,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": -38.75,
-    "balance": 122.37,
+    "balance": -7877.63,
     "date": "2024-04-15",
     "description": "Interest Charge",
     "isBalanceEntry": false,
@@ -281,7 +281,7 @@ exports[`threeMonthLoanAndReoccurrence forecast golden > Feb–Apr 2024: loan pa
   {
     "accountRegisterId": 2,
     "amount": 119.91,
-    "balance": 242.28,
+    "balance": -7757.72,
     "date": "2024-04-15",
     "description": "Payment to Test Loan",
     "isBalanceEntry": false,

@@ -140,7 +140,8 @@ export const recalculateRunningBalanceAndSort = <
   type,
 }: {
   registerEntries: T[];
-  balance: number;
+  /** Omitted (or null) = anchor from the synthetic balance row’s amount. Explicit `0` is a real zero anchor. */
+  balance?: number | null;
   type: "credit" | "debit";
 }): T[] => {
   // Early exit for empty arrays
@@ -158,15 +159,23 @@ export const recalculateRunningBalanceAndSort = <
       type,
       "oldest-first",
     );
-    const processedEntries = calculateForwardBalance(sortedEntries, balance);
+    const processedEntries = calculateForwardBalance(
+      sortedEntries,
+      balance ?? 0,
+    );
     return processedEntries.map((entry, index) => ({
       ...entry,
       seq: index + 1,
     }));
   }
 
-  // Set up the starting balance (use explicit register amount when caller omits balance)
-  const startingBalance = balance ?? +balanceEntry.amount;
+  // Do not use `??` here: explicit `0` is a real zero anchor; only null/undefined use the balance row.
+  let startingBalance: number;
+  if (balance !== undefined && balance !== null) {
+    startingBalance = balance;
+  } else {
+    startingBalance = +balanceEntry.amount;
+  }
   balanceEntry.balance = startingBalance;
   balanceEntry.amount = startingBalance;
 

@@ -135,7 +135,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const settings = structuredClone(user.settings);
-    settings.plaid.isEnabled = false;
+    settings.plaid.isEnabled = true;
 
     const updatedUser = await prisma.user.update({
       where: {

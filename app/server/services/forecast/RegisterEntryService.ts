@@ -180,7 +180,7 @@ export class RegisterEntryService implements IRegisterEntryService {
 
   calculateRunningBalances(
     entries: CacheRegisterEntry[],
-    initialBalance: number,
+    initialBalance: number | undefined,
     accountType: "credit" | "debit"
   ): CacheRegisterEntry[] {
     forecastLogger.debug(

@@ -10,6 +10,7 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
+import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
 import { getAccountRegisterLabel } from "~/lib/utils";
 
 const ModalsEditSavingsGoal = defineAsyncComponent(
@@ -67,24 +68,21 @@ const savingsGoalsForTable = computed(() =>
     );
     if (!matchesCategory) return false;
 
-    const q = globalFilter.value.trim().toLowerCase();
-    if (!q) return true;
-
     const sourceLabel = getAccountRegisterLabel(g.sourceAccountRegisterId, registers.value);
     const pocketLabel = getAccountRegisterLabel(g.targetAccountRegisterId, registers.value);
     const categoryLabel = goalCategoryLabel(g);
     const overDebt = g.priorityOverDebt ? "yes" : "no";
     const ignoreMin = g.ignoreMinBalance ? "yes" : "no";
 
-    return (
-      (g.name ?? "").toLowerCase().includes(q) ||
-      categoryLabel.toLowerCase().includes(q) ||
-      sourceLabel.toLowerCase().includes(q) ||
-      pocketLabel.toLowerCase().includes(q) ||
-      overDebt.includes(q) ||
-      ignoreMin.includes(q) ||
-      String(g.targetAmount ?? "").toLowerCase().includes(q)
-    );
+    return matchesTableGlobalFilter(globalFilter.value, [
+      g.name ?? "",
+      categoryLabel,
+      sourceLabel,
+      pocketLabel,
+      overDebt,
+      ignoreMin,
+      String(g.targetAmount ?? ""),
+    ]);
   }),
 );
 

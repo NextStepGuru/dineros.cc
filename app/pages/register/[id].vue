@@ -16,6 +16,7 @@ import {
   CATEGORY_FILTER_UNCATEGORIZED,
   entryMatchesCategoryFilter,
 } from "~/lib/categoryFilter";
+import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
 import type { TableColumn } from "@nuxt/ui";
 import type {
   AccountRegister,
@@ -1033,18 +1034,27 @@ const columns: TableColumn<RegisterEntry>[] = [
     },
   },
 ];
+/** Incremented on each edit modal open; stale success paths must not close a newer session. */
+const registerEditModalSession = ref(0);
 const modal = overlay.create(ModalsEditRegisterEntry);
 
 function handleTableClick(data: RegisterEntry) {
   if (snapshotMode.isSnapshotMode.value) return;
+  const session = ++registerEditModalSession.value;
   const editRegistryEntryProps: ModalRegisterEntryProps = {
     title: `Edit Entry`,
     description: "",
     callback: async () => {
       await refreshAccountEntries();
-      modal.close();
+      if (session === registerEditModalSession.value) {
+        modal.close();
+      }
     },
-    cancel: () => modal.close(),
+    cancel: () => {
+      if (session === registerEditModalSession.value) {
+        modal.close();
+      }
+    },
     registerEntry: {
       ...data,
       createdAt: formatDate(data.createdAt) || "",
@@ -1204,9 +1214,6 @@ const registerRowsForTable = computed(() =>
     );
     if (!matchesCategory) return false;
 
-    const q = globalFilter.value.trim().toLowerCase();
-    if (!q) return true;
-
     const categoryName =
       e.categoryId == null
         ? "uncategorized"
@@ -1214,17 +1221,13 @@ const registerRowsForTable = computed(() =>
           "");
     const dateText = formatDate(e.createdAt) ?? "";
 
-    return (
-      (e.description ?? "").toLowerCase().includes(q) ||
-      categoryName.toLowerCase().includes(q) ||
-      dateText.toLowerCase().includes(q) ||
-      String(e.amount ?? "")
-        .toLowerCase()
-        .includes(q) ||
-      String(e.balance ?? "")
-        .toLowerCase()
-        .includes(q)
-    );
+    return matchesTableGlobalFilter(globalFilter.value, [
+      e.description ?? "",
+      categoryName,
+      dateText,
+      String(e.amount ?? ""),
+      String(e.balance ?? ""),
+    ]);
   }),
 );
 
@@ -1235,6 +1238,144 @@ const registerRowsForDisplay = computed(() =>
     displayBalance: Number(entry.balance),
   })),
 );
+
+const needsFullRegisterHydration = computed(() => {
+  if (snapshotMode.isSnapshotMode.value) return false;
+  if (isCurrentRegisterCrypto.value) return false;
+  if (globalFilter.value.trim().length > 0) return true;
+  return (
+    registerCategoryFilterKey(categoryFilter.value) !== CATEGORY_FILTER_ALL
+  );
+});
+
+const isRegisterFilterHydrating = ref(false);
+
+const showRegisterFilterHydrationBanner = computed(
+  () =>
+    needsFullRegisterHydration.value &&
+    hasMoreData.value &&
+    (isRegisterFilterHydrating.value || isLoadingMore.value) &&
+    tableEntries.value.length > 0 &&
+    registerRowsForDisplay.value.length > 0,
+);
+
+const registerFilterEmptyAlert = computed(() => {
+  const searching =
+    needsFullRegisterHydration.value &&
+    hasMoreData.value &&
+    (isRegisterFilterHydrating.value || isLoadingMore.value);
+  if (searching) {
+    return {
+      title: "Searching the full register…",
+      description:
+        "Loading more entries in batches. Matching rows will appear as they are found.",
+    };
+  }
+  const hasText = globalFilter.value.trim().length > 0;
+  const hasCat =
+    registerCategoryFilterKey(categoryFilter.value) !== CATEGORY_FILTER_ALL;
+  if (hasText && hasCat) {
+    return {
+      title: "No rows match these filters",
+      description:
+        "Try different search text, choose All categories, or clear filters (⎋).",
+    };
+  }
+  if (hasText) {
+    return {
+      title: "No rows match your search",
+      description:
+        "Try another term or clear the filter (⎋). The full register was searched.",
+    };
+  }
+  if (!hasText && !hasCat) {
+    return {
+      title: "No entries in this register",
+      description: "Add an entry to get started.",
+    };
+  }
+  return {
+    title: "No rows match this category filter",
+    description:
+      "Choose All categories, Uncategorized, or another category.",
+  };
+});
+
+let registerFilterHydrationDebounce: ReturnType<typeof setTimeout> | null =
+  null;
+const REGISTER_FILTER_HYDRATION_DEBOUNCE_MS = 320;
+
+async function drainRegisterPagesWhileFiltering(genAtStart: number) {
+  let consecutiveNoProgress = 0;
+  while (
+    needsFullRegisterHydration.value &&
+    hasMoreData.value &&
+    genAtStart === registerLoadGeneration.value
+  ) {
+    const lenBefore = tableEntries.value.length;
+    await loadMoreEntries();
+    if (genAtStart !== registerLoadGeneration.value) break;
+    const lenAfter = tableEntries.value.length;
+    if (lenAfter > lenBefore) {
+      consecutiveNoProgress = 0;
+    } else if (hasMoreData.value) {
+      consecutiveNoProgress += 1;
+      if (consecutiveNoProgress >= 3) break;
+    }
+  }
+}
+
+async function hydrateRegisterForActiveFilters() {
+  if (!import.meta.client) return;
+  if (!needsFullRegisterHydration.value) return;
+  if (snapshotMode.isSnapshotMode.value) return;
+  if (isCurrentRegisterCrypto.value) return;
+  const id = accountRegisterId.value;
+  if (!id || Number.isNaN(id)) return;
+  if (registerPagePending.value) return;
+  if (isRegisterFilterHydrating.value) return;
+
+  const genAtStart = registerLoadGeneration.value;
+  isRegisterFilterHydrating.value = true;
+  try {
+    await drainRegisterPagesWhileFiltering(genAtStart);
+  } finally {
+    isRegisterFilterHydrating.value = false;
+  }
+}
+
+function scheduleRegisterFilterHydration() {
+  if (!import.meta.client) return;
+  if (registerFilterHydrationDebounce) {
+    clearTimeout(registerFilterHydrationDebounce);
+  }
+  registerFilterHydrationDebounce = setTimeout(() => {
+    registerFilterHydrationDebounce = null;
+    void hydrateRegisterForActiveFilters();
+  }, REGISTER_FILTER_HYDRATION_DEBOUNCE_MS);
+}
+
+watch(
+  () => [
+    globalFilter.value,
+    registerCategoryFilterKey(categoryFilter.value),
+    needsFullRegisterHydration.value,
+    accountRegisterId.value,
+    defaultRegisterTab.value,
+    registerPagePending.value,
+    tableEntries.value.length,
+  ],
+  () => {
+    scheduleRegisterFilterHydration();
+  },
+);
+
+onBeforeUnmount(() => {
+  if (registerFilterHydrationDebounce) {
+    clearTimeout(registerFilterHydrationDebounce);
+    registerFilterHydrationDebounce = null;
+  }
+});
 
 watch(accountRegisterId, () => {
   categoryFilter.value = CATEGORY_FILTER_ALL;
@@ -1517,6 +1658,13 @@ async function recalcAccount() {
             div(class="p-2 sm:p-4 min-w-0 flex justify-end")
               USkeleton(class="h-4 w-20")
 
+    div(v-else-if="!isCurrentRegisterCrypto && !isLoading && tableEntries.length === 0" class="mt-4 min-w-0 w-full")
+      UCard
+        template(#header)
+          h3(class="font-semibold") No entries in this register
+        p(class="frog-text-muted mb-4") Add a transaction or forecast entry to see it here.
+        UButton(v-if="!isSnapshotMode" color="primary" size="sm" @click="handleAddEntry") Add entry
+
     div(v-else-if="isCurrentRegisterCrypto && !isSnapshotMode" class="mt-4 min-w-0 w-full")
       UCard
         template(#header)
@@ -1681,8 +1829,8 @@ async function recalcAccount() {
                 UAlert(
                   color="neutral"
                   variant="subtle"
-                  title="No rows match this category filter"
-                  description="Choose All categories, Uncategorized, or another category.")
+                  :title="registerFilterEmptyAlert.title"
+                  :description="registerFilterEmptyAlert.description")
           template(v-else)
             tr(
               v-for="({ entry, displayBalance }, index) in registerRowsForDisplay"
@@ -1735,20 +1883,12 @@ async function recalcAccount() {
                 DollarFormat(:amount="Number(entry.amount)")
               td(class="p-2 sm:p-4 border-b border-default text-right whitespace-nowrap")
                 DollarFormat(:amount="displayBalance")
-    UCard(v-else-if="!isCurrentRegisterCrypto" class="my-4 max-w-lg mx-auto")
-      template(#header)
-        h3(class="font-semibold") No entries in this register
-      p(class="frog-text-muted mb-4") Add your opening balance or first transaction to start forecasting this account.
-      div(class="flex gap-3")
-        UButton(color="primary" size="sm" @click="handleAddEntry") Add first entry
-        UButton(variant="soft" size="sm" @click="refreshAccountEntries()" :loading="isRefreshLoading") Refresh
-
-    // div(v-if="isLoadingMore" class="flex justify-center items-center py-4")
+    div(
+      v-if="showRegisterFilterHydrationBanner"
+      class="flex justify-center items-center gap-2 py-2.5 px-2 mb-2 rounded-md border border-primary/40 bg-default/90"
+    )
       USpinner(size="sm" color="primary")
-      span.ml-2.text-sm.frog-text-muted Loading more entries...
-
-    // div(v-if="!hasMoreData && tableEntries.length > 0" class="flex justify-center items-center py-4 text-sm text-gray-500 dark:text-gray-400")
-      span No more entries to load
+      span(class="text-sm frog-text-muted") Searching the full register… Matching rows appear as each batch loads.
 
     div(
       v-if="workflowMode === 'reconciliation' && tableEntries.length > 0 && !isSnapshotMode"
