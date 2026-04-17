@@ -1,97 +1,78 @@
 ---
-description: Conventions, naming, validation, and safe-change guidelines
+description: Conventions, naming, and safe-change guidance for this codebase
 ---
 
-# Patterns and Conventions
-
-## General coding
-
-- Language: TypeScript throughout (Nuxt 4, server, services, tests)
-- Keep changes scoped; prefer existing idioms in nearby files
-- Follow lint rules via pnpm lint and ESLint configs in app/eslint.config.mjs
-
-## File naming and routing
-
-- Nuxt pages: app/pages/*.vue with route params in square brackets
-- Nitro API: app/server/api/<name>.<method>.ts or nested directories; example: account-register.post.ts, reoccurrence.delete.ts, reports/categories.get.ts
-- Admin endpoints under app/server/api/admin/*
-- Task endpoints under app/server/api/tasks/*
-- Webhooks under app/server/api/webhook/*
-- Health routes: app/server/routes/health/
-
-## Server patterns
-
-- Use server/clients/prismaClient.ts to obtain Prisma client (centralized extension/wrapping)
-- Validate env eagerly with app/server/envSchema.ts and consume via app/server/env.ts
-- Common helpers:
-  - withErrorHandler.ts and handleApiError.ts for consistent error mapping
-  - accountAccess.ts, accountMembership.ts, requireAdmin.ts for authorization patterns
-  - sessionUserProfile.ts, getUser.ts, completeLogin.ts for auth/session management
-  - recordAdminAudit.ts, recordIntegrationJobLog.ts, plaidWebhook.ts utilities
-  - rateLimitRedis.ts for Redis-based rate limiting (when used)
-- Responses: Nitro event handlers return JSON serializable objects; errors standardized via handleApiError
-
-## Input validation
-
-- Use app/schema/zod.ts and related modules to validate payloads where applicable
-- Server/env uses Zod to enforce presence/shape of environment variables
-
-## Database and Prisma
-
-- Primary schema in app/prisma/schema.prisma
-- Apply schema changes via SQL migrations under app/prisma/migrations/*
-- After editing the schema, run prisma generate (CI ensures this in tests)
-- Field-level encryption via prisma-field-encryption; encrypted columns annotated with /// @encrypted comments in schema
-- Generated re-encryption code in app/prisma/reencrypt/* — do not hand-edit generated files
-
-## Queues and cron
-
-- BullMQ queues live under app/server/queues/*; configure queue names and processors there
-- nuxt-cron schedules periodic jobs (app/server/cron/*). Keep jobs idempotent
-- Prefer pushing work to queues from API handlers rather than long blocking tasks
-
-## Forecast engine
-
-- Composition under app/server/services/forecast/*
-- Orchestrator (ForecastEngine) calls DataLoaderService, AccountRegisterService, ReoccurrenceService, RegisterEntryService, LoanCalculatorService, TransferService, DataPersisterService
-- Use ModernCacheService for in-memory caching; unit and integration tests cover behavior extensively
-
-## Frontend
-
-- Use composables (app/composables/*) for API calls and shared UI logic
-- Pinia stores in app/stores/*
-- Tailwind CSS classes co-exist with @nuxt/ui
-
-## Testing
-
-- Vitest: unit/integration lives alongside features (e.g., server/api/__tests__, server/services/__tests__)
-- Playwright: app/tests/e2e/* with snapshots under spec.ts-snapshots/
-- Forecast dedicated runner and suites via package scripts
-- Set TZ=UTC consistently for deterministic tests
-
-## Security and secrets
-
-- Never commit .env files; pre-commit hook blocks this (.pre-commit-config.yaml)
-- TruffleHog enhanced scanner runs in pre-commit
-- JWT and RSA services under app/server/services; MFA logic in app/server/lib/mfa.ts
-- Use prisma-field-encryption keys (DB_ENCRYPTION_KEY, DB_DECRYPTION_KEY_*) only via env; do not log secrets
-
-## Safe change workflow
-
-- For Prisma changes: add migration, run prisma generate, update tests/seed as needed
-- For API changes: update Zod schemas, write/adjust server/api/__tests__ coverage
-- For forecast changes: run test:forecast:unit, test:forecast:integration, and full forecast runner
-- For queues/cron: ensure idempotence and add unit coverage; keep handler execution bounded
-- For encrypted fields: if placeholders/re-encryption are needed locally, refer to scripts/reset-encrypted-users-after-restore.ts and docs/post-restore-encryption-plan.md
+# Patterns and conventions
 
 ## Naming
 
-- Branch names: feat/*, fix/*, docs/* — see CONTRIBUTING.md
-- Commit messages: conventional preferred (feat:, fix:, chore:, etc.)
-- API filenames: <resource>.<method>.ts (get, post, patch, delete) or nested paths
+- API handlers: app/server/api/<segments>/<name>.<method>.ts (e.g., register-entry.post.ts)
+- Tests mirror feature area:
+  - API: app/server/api/__tests__/*
+  - Services: app/server/services/**/__tests__/*
+  - Forecast: app/server/services/forecast/**/__tests__/* (plus TS test-runner)
+  - App libs: app/lib/__tests__/*
+  - E2E: app/tests/e2e/**
+- Prisma migrations under app/prisma/migrations/YYYYMMDDHHMMSS_<name>/migration.sql
+- Monetary values are Decimal; never use JS floating point for persisted money. When rounding in code, use bankers-rounding utilities (app/lib/bankers-rounding.ts)
 
-## Cursor/AI specific
+## Validation and error handling
 
-- Follow .cursor/rules/*.mdc, especially 00-global-safety.mdc (do not run builds/servers without being asked)
-- Skills for branching/PR/push exist under .cursor/skills/*
+- Prefer Zod schemas in app/schema/* for payload parsing (see schema/zod.ts and usage in handlers)
+- Wrap handlers with withErrorHandler or use handleApiError utilities to normalize responses
+- Use accountAccess.ts and requireAdmin.ts for authorization gates
+- For 3rd-party errors (Plaid), normalize via plaidApiError.ts
 
+## Services and side effects
+
+- Place domain logic in app/server/services/*
+- If writes impact derived data (summaries, caches, forecasts), ensure you update via services or enqueue recalculation jobs (recalculateQueue)
+- For integration operations, record audit or job logs (recordAdminAudit.ts, recordIntegrationJobLog.ts, recordPlaidSyncLog.ts)
+
+## Forecast engine
+
+- Treat server/services/forecast/* as a module boundary
+- Data flow typically goes: DataLoaderService → ForecastEngine (orchestrates AccountRegisterService, ReoccurrenceService, RegisterEntryService, TransferService, LoanCalculatorService, etc.) → DataPersisterService
+- Reuse types (services/forecast/types.ts) and utility rateLimiter (lib/rateLimiter.ts)
+- Keep tests updated; there are extensive unit/integration/regression suites
+
+## Encryption-sensitive data
+
+- Fields annotated with /// @encrypted or /// @encryption:hash(...) in app/prisma/schema.prisma must be treated carefully
+- Use generated prisma/reencrypt/* when migrating/re-encrypting
+- For Plaid access tokens and identifiers, use server/lib/plaidAccessTokenCrypto.ts and never log raw values
+
+## Adding or changing API endpoints (safe checklist)
+
+- Create files under app/server/api/... with proper <method> suffix
+- Validate inputs (Zod) and enforce access checks early
+- Prefer services for logic; keep handlers thin
+- Add unit/integration tests under app/server/api/__tests__
+- If user-facing, wire composables/stores (useAPI/useAppFetch; update stores/* as needed)
+- Update E2E tests when UI flows change
+
+## Schema changes (safe checklist)
+
+- Edit app/prisma/schema.prisma; run prisma migrate dev (local) and generate
+- Update seed or reencrypt code as needed (reencrypt is generated)
+- Review microservice/prisma/schema.prisma — update if the migration surface is affected by your change
+- Run pnpm test and review API/service tests for breakage
+- Update .env.example when new env vars are required; update .deploy templates if secrets/config change in prod/staging
+
+## Code style and CI
+
+- TypeScript enforced with ESLint; see .cursor/rules/10-code-style-and-ts.mdc for detailed per-project guidance
+- Pre-commit hooks run TruffleHog and block committing .env files
+- Conventional commit style is encouraged (see CONTRIBUTING.md)
+
+## When to enqueue vs. inline execute
+
+- Inline for short, idempotent operations with predictable latency (<100ms)
+- Enqueue when:
+  - Integration calls (Plaid/Alchemy) or long DB work
+  - Potential retries required
+  - You need observability via IntegrationJobLog or queue introspection
+
+## Time and timezone
+
+- Tests and services often assume TZ=UTC; respect getTodayFromTestDate.ts and DateTimeService usage in forecast code

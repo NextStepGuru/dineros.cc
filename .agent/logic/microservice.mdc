@@ -1,32 +1,35 @@
 ---
-description: Companion microservice responsibilities, structure, and deploy notes
+description: Purpose and surfaces of the companion microservice
 ---
 
 # Microservice
 
-## Purpose
-
-- Host specialized operations for database key rotation and re-encryption
-- Provide migrate endpoints (routes/migrate.get.ts, migrate.post.ts) invoked by CronJob or admin workflows
-- Share Prisma schema subset sufficient for operations on encrypted models
+Purpose: host field-encryption migration and related maintenance endpoints, and act as a minimal H3 service for specialized operations (e.g., key rotation flows).
 
 ## Structure
 
-- server.ts — Nitro/H3 entrypoint
-- routes/ — migrate and test endpoints
-- clients/ — prismaClient.ts, redisClient.ts (aligned with app behavior)
-- lib/bull.ts — BullMQ setup utilities
-- prisma/ — schema.prisma, migrations, reencrypt/ generated
-- scripts/k8s-rotate-db-key.sh — in-cluster script used by runner-keyrotate image
+- Entry: microservice/server.ts (H3/listhen bootstrap)
+- Routes:
+  - routes/migrate.get.ts and migrate.post.ts — trigger prisma-field-encryption migration over active keys
+  - routes/test.get.ts — basic liveness-style endpoint
+- Prisma:
+  - prisma/schema.prisma — focused subset mirroring encrypted models required for migration
+  - prisma/reencrypt/* — generated migrators
+  - prisma/migrations/* — for the microservice DB shape
+- Clients: clients/prismaClient.ts, clients/redisClient.ts
+- Utilities: lib/normalizePrismaDmmf.ts, lib/bull.ts
+- Packaging:
+  - Dockerfile builds standard and runner-keyrotate targets
+  - copy-files.sh used during CI builds to prepare image context
 
-## Docker targets
+## Kubernetes integration
 
-- Default runner (production) — pnpm start (prestart runs migrate-with-retry.js)
-- runner-keyrotate — adds kubectl/jq; used only for the staging CronJob
+- Deployed alongside app (ClusterIP on port 3050)
+- CronJob (staging) uses runner-keyrotate image to rotate DB keys and call /migrate
+- App admin endpoint admin/microservice-reencrypt-migrate.post.ts can proxy migration commands
 
-## Deployment
+## Extending safely
 
-- Built/pushed in PR and main workflows (gcr.io/.../dineros-microservice:<tag>)
-- Deployed alongside main app using .deploy/dineros.template.yaml; service on port 3050
-- ENV taken from K8s secrets; INTERNAL_API_TOKEN propagated for secure internal calls
-
+- Keep routes small and auth-protected if adding mutating endpoints
+- Any new encrypted models involved in migration must be reflected in the microservice prisma/schema.prisma and regenerated
+- Avoid duplicating business logic here; it is primarily operational

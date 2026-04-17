@@ -1,35 +1,49 @@
 ---
-description: Field-level encryption, re-encryption flows, and key rotation
+description: Field-level encryption, key rotation, and sensitive key handling
 ---
 
-# Encryption and Key Management
+# Encryption and keys
 
-## Field-level encryption
+## Field-level encryption (database)
 
-- Implemented via prisma-field-encryption; see app/prisma/schema.prisma for /// @encrypted annotations
-- Encrypted fields include PII/secrets like User.email, AccountRegister.name, RegisterEntry.description, plaid secrets, wallet addresses, and Reoccurrence.description
-- generator fieldEncryptionMigrations writes app/prisma/reencrypt/* with migrate helpers
+- Implemented via prisma-field-encryption annotations in app/prisma/schema.prisma
+  - Examples: User.email, AccountRegister.name, RegisterEntry.description, Reoccurrence.description, Plaid tokens/ids, walletAddress
+  - Hash companions exist for lookup (e.g., plaidAccessTokenHash, walletAddressHash)
+- Codegen outputs app/prisma/reencrypt/* with migrate helpers
+- Microservice holds its own prisma/reencrypt/* to run re-encrypt operations server-side during key rotation
 
-## Re-encryption and local restore
+Runtime keys:
+- DB_ENCRYPTION_KEY — active encryption key
+- DB_DECRYPTION_KEY_* — additional decryption keys for previous versions (append-only during rotation)
 
-- docs/post-restore-encryption-plan.md documents dev restore behavior
-  - scripts/dump-and-restore.sh calls scripts/reset-encrypted-users-after-restore.ts
-  - Plan describes auto-generated re-encrypt path using prisma/reencrypt + placeholder fallback for missing source keys
-- app/prisma/reencrypt/* and microservice/prisma/reencrypt/* are generated; do not modify by hand
+## Rotation strategy
 
-## Key rotation (staging)
+- Staging has an automated nightly CronJob (key-rotation-cronjob.template.yaml) using the microservice keyrotate image
+  - Patches ${SECRET_DB} to add a new key
+  - Restarts Deployments
+  - Calls microservice migrate route to re-encrypt using the active key
+- Admin API: admin/microservice-reencrypt-migrate.post.ts exists in app for manual triggers
 
-- .deploy/key-rotation-cronjob.template.yaml runs nightly CronJob using the microservice runner-keyrotate image
-- .deploy/key-rotation-rbac.template.yaml grants Role/RoleBinding to patch the SECRET_DB and roll Deployments in namespace
-- Microservice exposes routes/migrate.* to run migrations post-rotation
+## Post-restore (local data hygiene)
 
-## Services
+- docs/post-restore-encryption-plan.md describes a restore-time strategy:
+  - Prefer using reencrypt/migrate with both source and local keys if available
+  - Fallback: overwrite sensitive values with placeholders (Users, Registers, Entries, Reoccurrences), null Plaid columns
+  - Script: scripts/reset-encrypted-users-after-restore.ts is wired from scripts/dump-and-restore.sh
 
-- app/server/services/RsaService.ts and JwtService.ts provide asymmetric and JWT operations
-- app/server/lib/rotateUserJwtKey.ts supports per-user JWT key rotation
+## RSA and JWT keying
 
-## Environment variables
+- Table Rsa stores DB-managed RSA key pairs; server/services/RsaService.ts for key mgmt
+- JWT secret provided via secrets (DINEROS_JWT_SECRET mapped to JWT_SECRET env). rotateUserJwtKey.ts exists to rotate per-user JWT key references
 
-- DB_ENCRYPTION_KEY and optional DB_DECRYPTION_KEY_* are read from secrets in Kubernetes
-- Never commit secrets; pre-commit hooks and TruffleHog detectors enforce hygiene (.trufflehog-detectors.yaml)
+## Integration secrets
 
+- Plaid CLIENT_ID and SECRET as env; server/lib/plaidAccessTokenCrypto.ts uses @47ng/cloak to protect tokens at rest
+- Postmark token and webhook secret from env
+- OpenAI key from env; all responses logged to OpenAiRequestLog with metadata
+
+## Do and don’t
+
+- Do not log decrypted values or raw secrets
+- Never commit .env; hooks and CI enforce this
+- When adding encrypted fields: annotate in schema, run prisma generate, ensure reencrypt code updates; update microservice schema if needed

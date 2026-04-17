@@ -1,31 +1,39 @@
 ---
-description: Background processing via BullMQ queues and scheduled jobs
+description: Background job queues and cron tasks overview
 ---
 
-# Queues and Cron Jobs
+# Queues and cron
 
-## BullMQ queues (app/server/queues)
+## Queues (BullMQ)
 
-- backupQueue.ts — handles backups (paired with tasks/backup API and cron)
-- plaidSyncQueue.ts — primary Plaid sync processing
-- plaidSyncBalanceQueue.ts — Plaid balance-only syncs
-- recalculateQueue.ts — schedule recalculation/forecast updates
+Location: app/server/queues/* and app/server/clients/queuesClient.ts
 
-Queue orchestration helpers in server/lib/queueManager.ts and server/clients/queuesClient.ts. Admin flag SHOW_BULL_MQ_ADMIN controls visibility of bull-board in production environment (set to false in deploy template by default).
+- backupQueue.ts — database or file backup orchestration (paired with /api/tasks/backup)
+- plaidSyncQueue.ts — primary Plaid transaction syncing
+- plaidSyncBalanceQueue.ts — Plaid balance refreshes
+- recalculateQueue.ts — forecast and derived-data recalculation
 
-## Cron (nuxt-cron) jobs (app/server/cron)
+Guidelines:
+- Enqueue from API or cron when work is non-trivial or external
+- Log integration operations with IntegrationJobLog (recordIntegrationJobLog.ts)
+- Keep job names stable; include dedupe keys where appropriate
 
-- backup.daily.ts — periodic backups
-- bill-reminders.hourly.ts — evaluate and send bill reminders
-- plaid.daily.ts, plaid-balance.hourly.ts — Plaid sync cadence
-- recalculate.hourly.ts — periodic recalculation tasks
-- crypto-balance.hourly.ts — sync crypto balances via AlchemyService
+## Cron (nuxt-cron)
 
-Cron jobs should be idempotent. For long-running work, enqueue jobs rather than running synchronously.
+Location: app/server/cron/*
 
-## Task endpoints (app/server/api/tasks)
+- backup.daily.ts
+- plaid.daily.ts
+- plaid-balance.hourly.ts
+- recalculate.hourly.ts
+- bill-reminders.hourly.ts
+- crypto-balance.hourly.ts
 
-- backup.ts, migrate.ts (internal), recalculate.ts, sync-all.ts
-- check-* and test-* endpoints exist for diagnostics in controlled environments
-- sync-google-sheet*.post.ts — spreadsheet import helpers
+Notes:
+- Cron tasks should be idempotent and quick to schedule; offload heavy work to queues
+- Use server/env.ts flags to disable certain crons in CI as needed (see tests covering cronDisabled)
 
+## Microservice background
+
+- microservice/lib/bull.ts present for job infra; the microservice focuses on migration/rotation routes
+- Key-rotation CronJob image (runner-keyrotate) bundles kubectl + script to patch secrets and call /migrate

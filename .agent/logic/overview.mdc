@@ -1,40 +1,47 @@
 ---
-description: High-level purpose, tech stack, and target audience of the dineros.cc codebase
+description: High-level purpose, tech stack, and audience for the dineros.cc monorepo
 ---
 
-# Dineros.cc — Overview
+# Overview
 
-Dineros.cc is a Nuxt 4 + TypeScript application for predictive budgeting, real‑time spending optimization, and simplified accounting. It combines a feature‑rich frontend with a server (Nuxt Nitro API routes) and a companion microservice. The system includes a forecasting engine, Plaid banking integration, encryption-at-rest, queue processing, and extensive automated tests.
+Dineros.cc is a predictive budgeting and financial management platform. It combines a Nuxt 4 web app, a Nitro/H3 server with REST endpoints, a forecasting engine, integrations (Plaid, Alchemy), and background processing. The repository is a PNPM workspace with two packages:
 
-## Purpose
+- app/ — primary Nuxt application (UI + API + services + Prisma schema, tests)
+- microservice/ — companion H3 service for specialized ops (notably field-encryption migrations / key rotation)
 
-- Help users plan and track personal finances across multiple accounts and categories
-- Forecast balances and cash flow using a modular forecasting engine
-- Integrate with Plaid for secure transaction and balance sync
-- Provide admin tools, notifications, and audit/logging facilities
+Key product capabilities (derived from code paths and tests):
+- Account registers and entries with forecasting and snapshots
+- Budgets, categories (hierarchical), savings goals
+- Bills (profiles and instances), reconciliation periods
+- Plaid bank sync (items, link flows, webhooks, sync logs)
+- Crypto wallet tracking via Alchemy (EVM chains, token balances)
+- Notifications and admin audit/logging
+- MFA (email codes, TOTP, passkeys)
 
 ## Tech stack
 
-- Application framework: Nuxt 4 (Vue 3), TypeScript
-- ORM: Prisma (MySQL 8)
-- Cache/queues: Redis, BullMQ
-- Messaging and integrations: NATS (client present), Plaid, Postmark, OpenAI
-- Testing: Vitest (unit/integration), Playwright (E2E), CodeQL (security), SonarQube (optional workflow)
-- CI/CD: GitHub Actions (build, push to GCR, GKE deployment), K8s templates under .deploy/
-- Encryption: prisma-field-encryption (field-level), RSA/JWT services
+- Frontend: Nuxt 4, Vue 3, Pinia, Tailwind CSS
+- Server: Nitro/H3 (Nuxt server), TypeScript
+- Data: Prisma ORM, MySQL 8 (Decimal for money), Redis
+- Background: BullMQ (queues), nuxt-cron (cron under app/server/cron)
+- Integrations: Plaid, Postmark, OpenAI (logging), Alchemy (EVM)
+- Tooling: Vitest, Playwright, ESLint, PNPM, Docker
+- Deploy: Docker images to GCR; GKE manifests in .deploy/
 
-## Audience
+## Audience and use
 
-- Core contributors implementing features in the Nuxt app, API routes, and services
-- Backend engineers modifying Prisma schema, migrations, queues, and integrations
-- SRE/DevOps maintaining Docker/K8s, secrets, and CI/CD pipelines
-- Test engineers maintaining Vitest and Playwright suites
-- AI agents (Cursor-style) following project rules under .cursor/
+- Maintainers and contributors: extend features, fix bugs, evolve schema/services
+- AI agents (Cursor): follow project rules under .cursor/rules/* and skills under .cursor/skills/*
+- Ops: build, ship, and rotate keys using provided GitHub Actions and k8s templates
 
-## Key capabilities
+## Quick start (local)
 
-- Forecasting engine (server/services/forecast/*) with rich test suite
-- Extensive domain: budgets, accounts, registers, reoccurrences, reconciliation, bills, savings goals, crypto wallets, notifications
-- Field-level encryption with re-encryption tooling and key rotation workflows
-- Microservice to support specialized operations and key-rotation/migration flows
+- Copy env: cp .env.example .env
+- Start DB/Redis: docker compose up -d
+- Generate Prisma: pnpm --filter dineros-app exec prisma generate
+- Run dev: pnpm dev (Nuxt on http://localhost:3000)
+- Tests: pnpm test (Vitest), pnpm test:e2e (Playwright)
 
+Notes:
+- Database is MySQL 8. Prisma schema lives at app/prisma/schema.prisma
+- Some tests require prisma generate; CI does this explicitly

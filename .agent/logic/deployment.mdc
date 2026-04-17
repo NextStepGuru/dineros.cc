@@ -1,60 +1,61 @@
 ---
-description: CI/CD, Docker images, Kubernetes manifests, and environment settings
+description: Local, CI, Docker, and GKE deployment model
 ---
 
-# Deployment and Operations
-
-## Docker
-
-- Main app image: app/Dockerfile
-  - Multi-stage: deps → build (pnpm prisma generate + nuxt build) → runner
-  - Runtime runs .output/server/index.mjs; includes prisma/ for field-encryption docs
-- Microservice image: microservice/Dockerfile
-  - Multi-stage with prisma generate during build
-  - Final runner uses pnpm start; supports NODE_ENV=test to run test-start
-  - Target runner-keyrotate adds kubectl/jq for CronJob container
-
-## Kubernetes manifests
-
-- .deploy/dineros.template.yaml
-  - Two Deployments: main app and microservice
-  - Services for app and microservice; Ingress for app
-  - Environment via Secrets (DATABASE_URL in separate secret refs; DB encryption keys grouped in SECRET_DB)
-  - Redis host/port injected (cluster service names)
-  - Readiness/liveness/startup probes on http endpoints (/health/ready, /health/live)
-- Staging-only manifests
-  - .deploy/key-rotation-cronjob.template.yaml — nightly DB field-encryption key rotation + microservice migrate call
-  - .deploy/key-rotation-rbac.template.yaml — Role/RoleBinding for rotating the SECRET_DB and patching Deployments
-
-Render manifests with envsubst using .deploy/profiles/<profile>.env and environment variables (GCP_PROJECT_ID, IMAGE_TAG, etc.).
-
-## CI/CD (GitHub Actions)
-
-- .github/workflows/main.yml
-  - On push to main/master: build app and microservice (push to gcr.io), then deploy to production GKE
-- .github/workflows/pr.yml
-  - PR checks: lint, tests, pre-commit security (TruffleHog), CodeQL
-  - If PR branch is in same repo: build images with tag pr-<N>-<SHA>, deploy to staging, verify rollout and health
-  - Posts optional Cursor Bugbot trigger comment
-- .github/actions/build-push-gcr/
-  - Composite action: authenticates to gcloud, configures Docker, and uses buildx to push tagged images
-- .github/actions/deploy-dineros-gke/
-  - Renders templates and applies with kubectl; staging applies key-rotation resources
-
-## Environments and configuration
-
-- app/server/envSchema.ts + env.ts define/parse required variables
-- .env.example lists expected variables (DB, Redis, Plaid, Postmark, JWT, etc.)
-- For Prisma codegen during Docker build, a placeholder DATABASE_URL is used; runtime sets actual via env/secret
-
-## Health endpoints
-
-- /health/ready — readiness probe
-- /health/live — liveness probe
+# Deployment and operations
 
 ## Local development
 
-- docker-compose.yaml brings up MySQL 8.0.43 and Redis 8.4.0 locally (ports 3309, 6380)
-- Follow README for pnpm install, prisma migrate deploy, pnpm dev
-- In cloud CI agents (e.g., Cursor), see AGENTS.md for MySQL/Redis startup notes and DATABASE_URL override
+- Requirements: Node >= 24.14, PNPM, Docker
+- Start dependencies: docker compose up -d (MySQL on 3309, Redis on 6380)
+- Generate Prisma: pnpm --filter dineros-app exec prisma generate
+- Run dev: pnpm dev
 
+Devcontainer option: .devcontainer/docker-compose.yml sets up MySQL/Redis in a devcontainer scenario with DATABASE_URL override.
+
+## Containers
+
+- App image: app/Dockerfile
+  - Multi-stage: pnpm fetch → prisma generate (placeholder DATABASE_URL) → nuxt build → runner with .output
+  - Exposes PORT (default 3000 in local; 80 in k8s via env)
+- Microservice image: microservice/Dockerfile
+  - Generates prisma client, runs H3 server via pnpm start; alternate target runner-keyrotate for CronJob utilities
+
+## CI pipelines (GitHub Actions)
+
+- PR workflow (.github/workflows/pr.yml)
+  - Lint, Vitest, pre-commit security, CodeQL
+  - If PR from same repo, build app and microservice images tagged pr-<N>-<SHA> and deploy to staging GKE via .deploy/dineros.template.yaml (profile=staging)
+  - Verify rollout, call health readiness endpoint
+  - Optional: request Cursor Bugbot comment
+- Main workflow (.github/workflows/main.yml)
+  - On push to main/master: build/push images with latest and SHA tags; deploy to production GKE; verify rollout + readiness
+- CodeQL scheduled weekly workflow also present
+- SonarQube manual workflow provided (sonar.yml)
+
+## Kubernetes manifests
+
+- Template: .deploy/dineros.template.yaml (render with envsubst using profile env in .deploy/profiles/*)
+- Deploys two Deployments (app and microservice), Services, and an Ingress
+- Secrets
+  - Database URL provided via separate Secret names for app and microservice
+  - DB field-encryption key material provided via ${SECRET_DB}
+  - App secrets (JWT, OpenAI, Postmark, Plaid, INTERNAL_API_TOKEN) via ${SECRET_APP}/${SECRET_JWT}
+- Health probes configured against /health/live and /health/ready
+
+## Key rotation CronJob (staging)
+
+- .deploy/key-rotation-cronjob.template.yaml builds with microservice image target runner-keyrotate
+- Requires Role/RoleBinding in .deploy/key-rotation-rbac.template.yaml (apply with sufficient GKE IAM)
+- Script microservice/scripts/k8s-rotate-db-key.sh:
+  - Patches Secret holding DB encryption keys (append-only), restarts Deployments to pick up env, then calls microservice migrate route
+
+## Verification
+
+- verify-dineros-gke-deploy.sh checks kubectl rollout and public readiness URL per environment
+
+## Notes
+
+- Images are pushed to gcr.io/${GCP_PROJECT_ID}
+- The microservice listens on port 3050 in k8s (ClusterIP service)
+- SHOW_BULL_MQ_ADMIN is false in production manifests

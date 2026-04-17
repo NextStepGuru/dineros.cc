@@ -1,117 +1,35 @@
 ---
-description: Prisma schema overview and key domain entities with relationships
+description: High-level Prisma data model map (app/prisma/schema.prisma)
 ---
 
-# Data Model (Prisma, MySQL)
+# Data model (selected)
 
-Primary schema: app/prisma/schema.prisma. The microservice has a subset schema under microservice/prisma/schema.prisma aligned with main models used for rotation/migration.
+This summarizes key models observed in app/prisma/schema.prisma. MySQL 8 provider; decimals for money.
 
-Note: Several string fields are annotated with prisma-field-encryption (/// @encrypted). The generator fieldEncryptionMigrations produces app/prisma/reencrypt/*.
+- User — core identity with role, settings, password (encrypted), email (encrypted + hash), JWT key; relations to accounts, notifications, plaid items, reconciliation periods
+- Account — logical workspace; relations to budgets, categories, account registers, snapshots, savings goals, bills, reconciliation periods
+- UserAccount — membership and permissions per account (allowed budgets/register-ids JSON)
+- AccountInvite + AccountInviteAccount — invite flows and permissions at invite time
+- Budget — scope for registers, notifications, bills, reconciliation periods
+- AccountRegister — the ledger register (type, balances, credit/loan fields, statement interval, Plaid info, crypto wallet fields, asset/depreciation fields). Relations to entries, reoccurrences, categories (default payment/interest), snapshots, savings goals, crypto chains/balances, CashOnHand
+- CashOnHand — per-register denominations and auditing timestamps
+- RegisterEntry — ledger row with amount, balance, types, flags (projected/pending/balance/manual), Plaid linkage, category
+- RegisterEntryType — classifier for entries
+- Category — hierarchical categories with parent/children, shared by entries/reoccurrences/splits and account defaults
+- Reoccurrence (+ ReoccurrenceSplit, ReoccurrenceSkip, ReoccurrencePlaidNameAlias) — recurring schedule, amount adjustment rules, splits to other registers, aliasing for Plaid matching
+- Interval — reference table for schedule/amount adjustment intervals and statement intervals
+- SavingsGoal — transfer between source and target registers with priority/sort rules and category
+- Snapshot models — AccountSnapshot, AccountRegisterSnapshot, RegisterEntrySnapshot capture point-in-time copies
+- ReconciliationPeriod + ReconciliationItem — statement reconciliation windows, closing adjustments, clear status
+- Bills — BillProfile (ties to Reoccurrence) and BillInstance with due dates, statuses, amounts, reminders
+- Notifications — NotificationEvent and NotificationDismissal per user/budget/kind
+- Integrations/logging — PlaidItem, PlaidSyncCursor, PlaidSyncLog; IntegrationAlert; IntegrationJobLog; OpenAiRequestLog
+- RSA keys — Rsa table (DB-held keys, default/archived flags)
+- AccountType — register classification flags (credit/accrues_balance_growth), class (fiat/crypto/etc.)
+- Crypto — EvmChain, CryptoRegisterChain (register to chain mapping), CryptoTokenBalance (network balances, price/value)
 
-## Core entities
-
-- Account
-  - Root container for a user's financial workspace; has many Budgets, AccountRegisters, Categories, Reoccurrences, Snapshots
-- User
-  - Encrypted email, optional password (hashed), role (USER/ADMIN), timezone/country
-  - Relations: UserAccount (membership), PlaidItem, Notifications, Dismissals
-- UserAccount
-  - Membership in Accounts with permission flags and allowlists (allowedBudgetIds, allowedAccountRegisterIds)
-- AccountInvite + AccountInviteAccount
-  - Multi-account invites with permission flags and allowlists
-
-## Budgeting and registers
-
-- Budget
-  - Per-account budget; has AccountRegisters and links to BillProfile/Instance, savings goals, notifications, reconciliation periods
-- AccountRegister
-  - Represents a ledger/account within a budget: checking, credit card, loan, asset, crypto wallet, etc.
-  - Many finance‑specific fields (APR tiers, loan details, collateral links, min balances, statement interval)
-  - Encrypted: name, plaid secrets/wallet address where applicable
-  - Relations:
-    - type: AccountType (registerClass, isCredit, accruesBalanceGrowth)
-    - entries: RegisterEntry[]
-    - reoccurrences: Reoccurrence[]
-    - collateralAsset / loansSecuredByAsset (self relations)
-    - paymentCategory / interestCategory defaults (Category)
-    - snapshots, savings goal links, cashOnHand (1:1), cryptoRegisterChains, cryptoTokenBalances
-- RegisterEntry
-  - Transactions in a register (amount, balance, timestamps, flags for projected/pending/reconciled, etc.)
-  - Encrypted: description, plaidId
-  - Optional type via RegisterEntryType (name)
-
-## Categories
-
-- Category
-  - Hierarchical (parent/children via subCategoryId), per-account; functional unique constraint in migrations prevents duplicates by name within (account, parent)
-  - Used by RegisterEntry, Reoccurrence, ReoccurrenceSplit, AccountRegister payment/interest defaults, SavingsGoal
-
-## Reoccurrences and splits
-
-- Reoccurrence
-  - Scheduled repeating item (amount, description encrypted, interval and count, optional transfer target)
-  - Optional amount adjustment rules (mode, direction, value, interval, anchor)
-  - Relations: entries, skips, splits, plaid name aliases, BillProfile/Instances
-- ReoccurrenceSplit
-  - Split of a reoccurrence into transfer lines with amount mode (FIXED/PERCENT), category, and order; targets another AccountRegister
-- ReoccurrenceSkip
-  - Skipped occurrences for a given account/register
-- ReoccurrencePlaidNameAlias
-  - Normalized names used to match Plaid transactions to reoccurrences per register
-
-## Bills and reconciliation
-
-- BillProfile (BILL/INCOME/TRANSFER)
-  - 1:1 with a Reoccurrence; stores payee, autopay, expected amount bounds, priority, reminders
-- BillInstance
-  - Instantiated bills at due dates with status, payment linkage to a RegisterEntry
-- ReconciliationPeriod (+ ReconciliationItem)
-  - Statement window, opening/ending balances, status (OPEN/CLOSED), difference and closing adjustments
-
-## Savings and summaries
-
-- SavingsGoal
-  - Source and target registers, amount target, sorting, priority flags, optional category
-- AccountSnapshot + AccountRegisterSnapshot + RegisterEntrySnapshot
-  - Snapshot hierarchy capturing point‑in‑time balances and entries
-- AccountRegisterSummary
-  - Rolling monthly/yearly summaries per register
-
-## Integrations and logs
-
-- PlaidItem, PlaidSyncCursor, PlaidSyncLog
-  - Link users to Plaid items, track cursor, and detailed sync logs (mode, status, tx counts, durations, errors)
-- IntegrationAlert, IntegrationJobLog
-  - Generic alerting/logging artifacts for integrations and background jobs
-- OpenAiRequestLog
-  - Tracks OpenAI requests for auditing/metrics
-
-## Crypto and assets
-
-- EvmChain
-  - Chain catalog (network id, symbol, explorer)
-- CryptoRegisterChain
-  - Which chains a crypto register targets
-- CryptoTokenBalance
-  - Synced token balances and market values per register/network/token
-- Asset fields on AccountRegister for depreciation and vehicle details
-
-## Intervals and types
-
-- Interval
-  - Named schedule intervals (shared by reoccurrence and account statement intervals)
-- AccountType
-  - Logical register type plus flags (class, isCredit, accruesBalanceGrowth)
-- RegisterEntryType
-  - Named classifications for entries; used by ledger logic
-
-## Encryption support
-
-- Encrypted fields include:
-  - User.email, User.password (hashed), AccountRegister.name, plaid secret fields, walletAddress; RegisterEntry.description, plaidId; Reoccurrence.description
-- Generators:
-  - generator fieldEncryptionMigrations produces reencrypt/ modules for automated migrate/re-encrypt flows
-- Re-encryption paths:
-  - app/prisma/reencrypt/* and microservice/prisma/reencrypt/* provide generated migrators
-  - docs/post-restore-encryption-plan.md documents local restore behavior and placeholders
-
+Notable constraints/indices (selection):
+- Uniques/hashes for encrypted identifiers (emailHash, plaidAccessTokenHash, walletAddressHash, plaidIdHash)
+- Category uniqueness uses a functional index defined in migrations (not expressible directly in Prisma)
+- BillInstance uniqueness on (billProfileId, dueAt)
+- Various covering indices for performance on foreign keys and activity windows

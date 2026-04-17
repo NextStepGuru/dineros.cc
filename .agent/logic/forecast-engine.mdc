@@ -1,33 +1,29 @@
 ---
-description: Forecast engine modules, data flow, and testing guidance
+description: Forecast engine module overview and extension points
 ---
 
-# Forecast Engine
+# Forecast engine
 
-## Modules (app/server/services/forecast)
+Location: app/server/services/forecast/* with comprehensive tests under .../forecast/__tests__.
 
+Core modules:
 - ForecastEngine.ts — orchestrator
-- DataLoaderService.ts — DB→cache hydration
-- AccountRegisterService.ts — register operations in forecast context
-- ReoccurrenceService.ts — scheduling logic and splits
-- RegisterEntryService.ts — entry calculations and projection flags
-- LoanCalculatorService.ts — interest and amortization calculations
-- TransferService.ts — inter-account transfer validation and effects
-- DataPersisterService.ts — cache→DB persistence for projections/snapshots
-- DateTime.ts and DateTimeService.ts — date/time utilities and edge-case handling
-- ModernCacheService.ts — fast in-memory storage
-- getProjectedBalanceAtDate.ts — convenience function for at-date projections
-- lib/rateLimiter.ts, logger.ts, types.ts — support utilities and typings
+- DataLoaderService.ts / DataPersisterService.ts — DB ↔ cache boundary
+- ModernCacheService.ts — in-memory performant cache for forecast state
+- AccountRegisterService.ts — register-specific logic
+- ReoccurrenceService.ts — schedule generation and adjustments
+- RegisterEntryService.ts — entry operations
+- TransferService.ts — inter-register transfers
+- LoanCalculatorService.ts — interest calculations and amortization
+- DateTimeService.ts + DateTime.ts — date math and edge cases
+- HolidayService.ts — holiday-aware behaviors
+- reoccurrenceIntervals.ts, types.ts — constants and typing
 
-## Tests
+Testing:
+- Unit, integration, and regression tests with snapshot baselines
+- A tsx test-runner allows performance and scenario runs (see package.json scripts)
 
-- Unit and integration suites cover edge cases, regression scenarios, and performance baselines under app/server/services/forecast/__tests__
-- Snapshot tests capture multi-month scenarios (e.g., threeMonthLoanAndReoccurrence)
-- Use scripts in app/package.json to run subsets or the full suite
-
-## Change guidance
-
-- Modify services with clear separation of concerns; prefer pure functions when possible for predictability
-- Extend types.ts and shared utilities rather than inlining ad‑hoc structures
-- Update or add tests for new edge cases (month boundaries, DST changes, interval adjustments, transfer cycles)
-
+Guidance:
+- Favor pure functions and deterministic inputs per test
+- Use helpers in __tests__/test-utils.ts for fixtures
+- When adding new features (e.g., new account types), update AccountType flags, loader/persister, and service branches. Extend tests accordingly

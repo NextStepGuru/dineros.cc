@@ -1,51 +1,39 @@
 ---
-description: Testing strategy across unit, integration, forecast, and E2E
+description: How tests are organized and how to write new ones
 ---
 
 # Testing
 
-## Test runners and configs
+## Test types
 
-- Vitest is configured via app/vitest.config.ts and variants (coverage, crypto). TZ=UTC enforced in scripts
-- Playwright E2E: app/playwright.config.ts, with projects chromium-public/authed and optional mobile/webkit configs in scripts
-
-## Test suites (examples)
-
-- Unit/integration under:
-  - app/server/api/__tests__ — endpoint tests grouped by domain (auth, account, register, reoccurrence, budget, reports, notifications, tasks, health)
-  - app/server/services/__tests__ — Plaid, RSA/JWT/Hash services, forecast services
-  - app/lib/__tests__ — rounding, utils, category filters
-  - app/schema/__tests__ — Zod schemas
-  - app/stores/__tests__ — Pinia stores
-  - app/pages/__tests__ — Page-level behavior (e.g., login)
-- Forecast engine
-  - app/server/services/forecast/__tests__ — unit/integration/regression tests with snapshots and helper runner (test-runner.ts)
+- Unit/integration (Vitest)
+  - Config: app/vitest.config.ts, .coverage.ts, .setup.ts, .resolve-aliases.ts
+  - Run all: pnpm test
+  - Coverage: pnpm test:coverage (LCOV produced for Sonar)
+  - Generate Prisma client before tests that import it: pnpm --filter dineros-app exec prisma generate
+- Forecast engine suites
+  - Runner: app/server/services/forecast/__tests__/test-runner.ts (tsx)
+  - Commands: test:forecast, test:forecast:unit, :integration, :all, :performance
+  - Large collection of unit/integration/regression tests under forecast/__tests__
+- API/server tests
+  - app/server/api/__tests__/* cover endpoints and regressions
+  - app/server/lib/**/__tests__ and app/server/services/**/__tests__ for utility/service logic
+- App libs
+  - app/lib/__tests__/* cover shared utilities (rounding, sorting, date helpers, table filtering)
 - E2E (Playwright)
-  - app/tests/e2e/specs — public/authed specs + accessibility and visual snapshot baselines
-  - app/tests/e2e/setup — global setup/teardown, auth helpers
+  - app/tests/e2e/specs/public/* and specs/authed/* with visual snapshots
+  - Run: pnpm test:e2e (chromium public+authed), update snapshots locally or via staging workflow
 
-## Commands
+## Writing tests
 
-- pnpm test — run Vitest
-- pnpm test:coverage — generate V8 coverage (used in Sonar workflow)
-- pnpm test:crypto — crypto-intensive tests
-- Forecast:
-  - pnpm test:forecast, :unit, :integration, :performance, :all
-- E2E:
-  - pnpm test:e2e (chromium public + authed)
-  - pnpm test:e2e:update-snapshots (local)
-  - Staging snapshots via GitHub workflow e2e-update-staging-snapshots.yml
+- Co-locate under the nearest __tests__ directory mirroring feature path
+- Prefer deterministic data; many tests mock external services
+- Use TZ=UTC when dealing with dates/times
+- For endpoints, assert both success and error paths (authz, validation)
+- For forecast, prefer adding minimal reproduction fixtures and include snapshots where applicable (existing patterns under __tests__/__snapshots__)
 
-## CI considerations
+## CI behavior
 
-- CI sets minimal env and runs prisma generate before tests
-- Database is not required for most tests; mocks in place. Some suites use generated Prisma client
-- Snapshot images differ across OS; Linux baselines updated via staging workflow
-
-## Adding tests
-
-- For API changes: add/extend tests under app/server/api/__tests__ with success/failure cases
-- For services: provide unit tests co-located in __tests__ directories
-- For forecast logic: add targeted unit/integration and update regression snapshots carefully
-- For E2E flows: cover primary user journeys (login, profile, budgets, registers, reoccurrences, reports)
-
+- PRs run lint, unit/integration, pre-commit security, and CodeQL
+- Same-repo PRs also build and deploy to staging; health verification runs after rollout
+- E2E visual snapshots against staging are manual (separate workflow)
