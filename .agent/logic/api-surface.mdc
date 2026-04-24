@@ -1,12 +1,13 @@
 ---
-description: Map of Nitro/H3 API endpoints and guidance to extend safely
+description: Map of Nitro/H3 API endpoints and guidance to extend safely (observed from app/server/api)
 ---
 
 # API surface
 
-Handlers live under app/server/api/. File suffix encodes HTTP method (.get.ts, .post.ts, .patch.ts, .delete.ts). Paths mirror directories.
+Handlers live under app/server/api/. The HTTP method is encoded in the filename suffix: .get.ts, .post.ts, .patch.ts, .delete.ts. Paths mirror directories.
 
-Examples (observed in tree; not exhaustive):
+Examples (observed; not exhaustive):
+
 - Auth and user
   - login.post.ts, logout.post.ts, change-password.post.ts
   - two-factor-auth.ts, verify-two-factor-auth.post.ts, disable-two-factor-auth.post.ts
@@ -34,42 +35,34 @@ Examples (observed in tree; not exhaustive):
 - Bills
   - bills.get.ts, bills/profile/[id].patch.ts, bill-instance/[id].patch.ts, bills/reminders/evaluate.post.ts
 - Reconciliation
-  - reconciliation/period.get.ts, .post.ts, periods/open.get.ts
+  - reconciliation/period.get.ts, period.post.ts, periods/open.get.ts
   - reconciliation/period/[id].get.ts, period/[id]/close.post.ts, item/[entryId].patch.ts
 - Notifications
   - notifications.get.ts, notifications/count.get.ts, notifications/[id]/dismiss.patch.ts
 - Integrations
-  - plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts
-  - plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts
-  - webhook/plaid.post.ts
-  - crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
-  - asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
-  - admin/plaid-sync-logs.get.ts
+  - Plaid: plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts, plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts, webhook/plaid.post.ts
+  - Crypto: crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
+  - Estimates: asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
+  - Admin: admin/plaid-sync-logs.get.ts, plus other admin/* (accounts, users, logs, system)
 - Forecast and maintenance
   - recalculate.post.ts
   - tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid.ts, sync-plaid-balance.ts, check-*, sync-google-sheet*.post.ts, test-*
-  - lists.ts, countries.get.ts, forecast-risk-alerts*.ts
-- Admin
-  - admin/*: accounts.get.ts, accounts/[id].get.ts, users.get.ts, users/[id].patch.ts, users/[id]/reset-password.post.ts
-  - admin/* logs: audit-logs.get.ts, integration-alerts.get.ts, integration-job-logs.get.ts, postmark/messages.get.ts, openai-request-logs.get.ts, system-status.get.ts
-  - admin/accounts/[id] helpers: cleanup-balance-entries.post.ts, recalculate.post.ts, sync-plaid.post.ts
-  - admin/microservice-reencrypt-migrate.post.ts
 - Health and routes
   - routes/health/live.get.ts, routes/health/ready.get.ts
   - routes/_nuxt.get.ts (assets), routes/sitemap.xml.ts
 
-## Implementation patterns
+## Implementation guidance
 
-- Use app/server/clients/prismaClient.ts for DB access
-- Wrap via withErrorHandler / handleApiError; normalize Plaid errors with plaidApiError.ts
-- Validate requests with Zod (app/schema/zod.ts) when applicable
-- Use server/middleware/auth.ts globally and requireAdmin.ts for admin routes
-- For long-running work, enqueue a BullMQ job (server/queues/*) and return early
+- Use app/server/clients/prismaClient.ts for DB, redisClient.ts for Redis, queuesClient.ts for BullMQ
+- Wrap with withErrorHandler.ts or call handleApiError.ts; normalize Plaid errors with plaidApiError.ts
+- Validate inputs using Zod schemas where applicable (app/schema/zod.ts)
+- Enforce auth via server/middleware/auth.ts and requireAdmin.ts for admin routes
+- For long-running jobs, enqueue work (server/queues/*) and return a 202-style response pattern if appropriate
 
-## Adding an endpoint safely
+## Adding a new endpoint safely
 
-- Create handler under app/server/api/<feature>/<name>.<method>.ts
-- Parse/validate input and enforce access early
-- Delegate to services; keep handler orchestration-focused
-- Add tests under app/server/api/__tests__ covering success and failure
-- If needed, expose a composable or store action to consume it from the client
+1) Create the handler file in app/server/api/<path>.<method>.ts
+2) Parse and validate request; authorize early
+3) Delegate to a service in app/server/services/*
+4) Add tests under app/server/api/__tests__
+5) If consumed by UI, add a composable or store action, and wire to components/pages

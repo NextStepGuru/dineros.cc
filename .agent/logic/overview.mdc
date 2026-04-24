@@ -1,47 +1,40 @@
 ---
-description: High-level purpose, tech stack, and audience for the dineros.cc monorepo
+description: High-level purpose, tech stack, and audience for dineros.cc
 ---
 
-# Overview
+# Dineros.cc — Predictive budgeting & financial management
 
-Dineros.cc is a predictive budgeting and financial management platform. It combines a Nuxt 4 web app, a Nitro/H3 server with REST endpoints, a forecasting engine, integrations (Plaid, Alchemy), and background processing. The repository is a PNPM workspace with two packages:
+Dineros.cc is a Nuxt 4 + TypeScript application that provides predictive budgeting, real-time spending optimization, and simplified accounting. It ships a full-stack monorepo with a Nuxt app (frontend + Nitro/H3 API) and a companion microservice. Core domains include accounts/registers, recurring entries, reconciliation, budgets/categories, savings goals, reporting, and integrations (Plaid, crypto via Alchemy).
 
-- app/ — primary Nuxt application (UI + API + services + Prisma schema, tests)
-- microservice/ — companion H3 service for specialized ops (notably field-encryption migrations / key rotation)
+- Source-available, custom non-commercial license (see LICENSE)
+- Database: MySQL 8 via Prisma ORM
+- Caching/queues: Redis + BullMQ
+- Integrations: Plaid, Postmark, OpenAI, Alchemy (EVM chains)
+- Infra: Dockerfiles, GitHub Actions CI/CD, Kubernetes manifests for GKE
 
-Key product capabilities (derived from code paths and tests):
-- Account registers and entries with forecasting and snapshots
-- Budgets, categories (hierarchical), savings goals
-- Bills (profiles and instances), reconciliation periods
-- Plaid bank sync (items, link flows, webhooks, sync logs)
-- Crypto wallet tracking via Alchemy (EVM chains, token balances)
-- Notifications and admin audit/logging
-- MFA (email codes, TOTP, passkeys)
+See README.md for quickstart and AGENTS.md for AI-agent specific environment notes (e.g., Cursor Cloud DB override).
 
-## Tech stack
+## Tech stack (from repository evidence)
 
-- Frontend: Nuxt 4, Vue 3, Pinia, Tailwind CSS
-- Server: Nitro/H3 (Nuxt server), TypeScript
-- Data: Prisma ORM, MySQL 8 (Decimal for money), Redis
-- Background: BullMQ (queues), nuxt-cron (cron under app/server/cron)
-- Integrations: Plaid, Postmark, OpenAI (logging), Alchemy (EVM)
-- Tooling: Vitest, Playwright, ESLint, PNPM, Docker
-- Deploy: Docker images to GCR; GKE manifests in .deploy/
+- Frontend: Nuxt 4, Vue 3, Tailwind CSS, Pinia (@pinia/nuxt), @nuxt/ui, @nuxt/icon, @nuxt/fonts
+- Backend API: Nitro/H3 under app/server/api/* (file-based routes)
+- Language/tooling: TypeScript, ESLint, Vitest, Playwright
+- Data: Prisma ORM (app/prisma/schema.prisma), MySQL 8, prisma-field-encryption
+- Runtime infra: Redis, BullMQ for background jobs; nuxt-cron for cron tasks
+- Integrations: Plaid, Postmark, OpenAI, Google Cloud logging/storage (dev deps), NATS client present
+- Security: TOTP, WebAuthn Passkeys, JWT, RSA (rotateable); rate limiting with Redis
+- CI/CD: GitHub Actions (PR checks, CodeQL, Sonar optionally), image build and push to gcr.io, deploy to GKE using templated manifests
 
-## Audience and use
+## Audience
 
-- Maintainers and contributors: extend features, fix bugs, evolve schema/services
-- AI agents (Cursor): follow project rules under .cursor/rules/* and skills under .cursor/skills/*
-- Ops: build, ship, and rotate keys using provided GitHub Actions and k8s templates
+- Primary: Project maintainers and contributors
+- Secondary: AI agents and CI automation (Cursor-style). Follow .cursor/rules/* and AGENTS.md when running in cloud agents.
 
-## Quick start (local)
+## Monorepo layout (top-level)
 
-- Copy env: cp .env.example .env
-- Start DB/Redis: docker compose up -d
-- Generate Prisma: pnpm --filter dineros-app exec prisma generate
-- Run dev: pnpm dev (Nuxt on http://localhost:3000)
-- Tests: pnpm test (Vitest), pnpm test:e2e (Playwright)
-
-Notes:
-- Database is MySQL 8. Prisma schema lives at app/prisma/schema.prisma
-- Some tests require prisma generate; CI does this explicitly
+- app/: Nuxt app (UI + API), Prisma schema/migrations, services, queues, cron, tests
+- microservice/: companion service with its own Prisma client and routes
+- .deploy/: Kubernetes templates (envsubst-based)
+- .github/: Actions workflows and composite actions
+- scripts/: Ops/dev scripts (DB restore, Prisma governance checks, key rotation helpers)
+- docs/: focused docs (e.g., post-restore encryption plan)

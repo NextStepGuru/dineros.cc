@@ -1,39 +1,37 @@
 ---
-description: Background job queues and cron tasks overview
+description: Background processing with BullMQ queues and nuxt-cron scheduled jobs
 ---
 
 # Queues and cron
 
-## Queues (BullMQ)
+## BullMQ queues (app/server/queues)
 
-Location: app/server/queues/* and app/server/clients/queuesClient.ts
+- backupQueue.ts — backups
+- plaidSyncQueue.ts — Plaid transaction sync
+- plaidSyncBalanceQueue.ts — Plaid balance-only sync
+- recalculateQueue.ts — forecasting recalculations
 
-- backupQueue.ts — database or file backup orchestration (paired with /api/tasks/backup)
-- plaidSyncQueue.ts — primary Plaid transaction syncing
-- plaidSyncBalanceQueue.ts — Plaid balance refreshes
-- recalculateQueue.ts — forecast and derived-data recalculation
+Use app/server/clients/queuesClient.ts to obtain connections. For long-running or high-latency operations, prefer enqueuing a job and returning early from API handlers.
 
-Guidelines:
-- Enqueue from API or cron when work is non-trivial or external
-- Log integration operations with IntegrationJobLog (recordIntegrationJobLog.ts)
-- Keep job names stable; include dedupe keys where appropriate
+## Scheduled jobs (nuxt-cron, app/server/cron)
 
-## Cron (nuxt-cron)
+- backup.daily.ts — periodic backup
+- plaid.daily.ts — Plaid sync heartbeat
+- plaid-balance.hourly.ts — Plaid balance refresh
+- recalculate.hourly.ts — trigger forecast recalculations
+- bill-reminders.hourly.ts — evaluate bill reminders
+- crypto-balance.hourly.ts — EVM wallet/token balance sync
 
-Location: app/server/cron/*
+Cron tasks call underlying services (e.g., PlaidSyncService, AlchemyService) and may enqueue additional work.
 
-- backup.daily.ts
-- plaid.daily.ts
-- plaid-balance.hourly.ts
-- recalculate.hourly.ts
-- bill-reminders.hourly.ts
-- crypto-balance.hourly.ts
+## Admin/task endpoints (ad-hoc triggers)
 
-Notes:
-- Cron tasks should be idempotent and quick to schedule; offload heavy work to queues
-- Use server/env.ts flags to disable certain crons in CI as needed (see tests covering cronDisabled)
+- app/server/api/tasks/*:
+  - backup.ts, migrate.ts
+  - recalculate.ts
+  - sync-plaid.ts, sync-plaid-balance.ts
+  - check-* (health checks / consistency)
+  - sync-google-sheet*.post.ts (aux data import)
+  - various test-* endpoints for controlled scenarios
 
-## Microservice background
-
-- microservice/lib/bull.ts present for job infra; the microservice focuses on migration/rotation routes
-- Key-rotation CronJob image (runner-keyrotate) bundles kubectl + script to patch secrets and call /migrate
+Guard these behind admin or internal tokens where appropriate; see server/lib/requireAdmin.ts and env-driven guards in some handlers.

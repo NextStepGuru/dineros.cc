@@ -1,29 +1,36 @@
 ---
-description: Forecast engine module overview and extension points
+description: Forecast engine modules and how they collaborate (from services/forecast/*)
 ---
 
 # Forecast engine
 
-Location: app/server/services/forecast/* with comprehensive tests under .../forecast/__tests__.
+Located under app/server/services/forecast/* with extensive tests in __tests__.
 
-Core modules:
+## Modules (selected)
+
 - ForecastEngine.ts — orchestrator
-- DataLoaderService.ts / DataPersisterService.ts — DB ↔ cache boundary
-- ModernCacheService.ts — in-memory performant cache for forecast state
-- AccountRegisterService.ts — register-specific logic
-- ReoccurrenceService.ts — schedule generation and adjustments
-- RegisterEntryService.ts — entry operations
-- TransferService.ts — inter-register transfers
-- LoanCalculatorService.ts — interest calculations and amortization
-- DateTimeService.ts + DateTime.ts — date math and edge cases
-- HolidayService.ts — holiday-aware behaviors
-- reoccurrenceIntervals.ts, types.ts — constants and typing
+- DataLoaderService.ts — loads DB → in-memory cache
+- ModernCacheService.ts — performance-optimized cache
+- AccountRegisterService.ts — register-level operations
+- ReoccurrenceService.ts — recurring schedule expansion and adjustments
+- RegisterEntryService.ts — entry-level operations
+- TransferService.ts — inter-register transfers and validations
+- LoanCalculatorService.ts — interest and amortization calculations
+- DateTimeService.ts, DateTime.ts — calendar and edge-case handling (weekends, DST, anchors)
+- DataPersisterService.ts — writes cache back to DB
+- reoccurrenceIntervals.ts — interval definitions
+- lib/rateLimiter.ts — forecast loop rate limiting
+- types.ts — shared types
 
-Testing:
-- Unit, integration, and regression tests with snapshot baselines
-- A tsx test-runner allows performance and scenario runs (see package.json scripts)
+## Testing
 
-Guidance:
-- Favor pure functions and deterministic inputs per test
-- Use helpers in __tests__/test-utils.ts for fixtures
-- When adding new features (e.g., new account types), update AccountType flags, loader/persister, and service branches. Extend tests accordingly
+- Integration and regression suites under app/server/services/forecast/__tests__
+- Run scripts:
+  - pnpm test:forecast (custom runner)
+  - pnpm test:forecast:unit and :integration
+
+## Extending safely
+
+- Keep modules single-responsibility and pure when possible; pass dependencies explicitly rather than importing global state
+- Update types.ts for new concepts; add fixtures/tests first
+- Ensure DataLoaderService and DataPersisterService are updated to include any new computed fields persisted

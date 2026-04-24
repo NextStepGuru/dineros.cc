@@ -1,39 +1,44 @@
 ---
-description: How tests are organized and how to write new ones
+description: Testing strategy, locations, and commands from package.json and tree
 ---
 
 # Testing
 
-## Test types
+## Unit and integration (Vitest)
 
-- Unit/integration (Vitest)
-  - Config: app/vitest.config.ts, .coverage.ts, .setup.ts, .resolve-aliases.ts
-  - Run all: pnpm test
-  - Coverage: pnpm test:coverage (LCOV produced for Sonar)
-  - Generate Prisma client before tests that import it: pnpm --filter dineros-app exec prisma generate
-- Forecast engine suites
-  - Runner: app/server/services/forecast/__tests__/test-runner.ts (tsx)
-  - Commands: test:forecast, test:forecast:unit, :integration, :all, :performance
-  - Large collection of unit/integration/regression tests under forecast/__tests__
-- API/server tests
-  - app/server/api/__tests__/* cover endpoints and regressions
-  - app/server/lib/**/__tests__ and app/server/services/**/__tests__ for utility/service logic
-- App libs
-  - app/lib/__tests__/* cover shared utilities (rounding, sorting, date helpers, table filtering)
-- E2E (Playwright)
-  - app/tests/e2e/specs/public/* and specs/authed/* with visual snapshots
-  - Run: pnpm test:e2e (chromium public+authed), update snapshots locally or via staging workflow
+- Command: pnpm test (sets TZ=UTC). Coverage: pnpm test:coverage
+- Locations:
+  - app/lib/__tests__/*.test.ts — pure utility tests
+  - app/server/api/__tests__/*.test.ts — API handler tests (many fixtures)
+  - app/server/services/**/__tests__ — services (Plaid, RSA/JWT, reports, forecast modules)
+  - app/pages/__tests__ — simple page tests
+  - app/tests/server/*.test.ts — server middleware/auth tests
 
-## Writing tests
+If Prisma client types are missing locally, run pnpm --filter dineros-app exec prisma generate before testing (CI does this in pr.yml).
 
-- Co-locate under the nearest __tests__ directory mirroring feature path
-- Prefer deterministic data; many tests mock external services
-- Use TZ=UTC when dealing with dates/times
-- For endpoints, assert both success and error paths (authz, validation)
-- For forecast, prefer adding minimal reproduction fixtures and include snapshots where applicable (existing patterns under __tests__/__snapshots__)
+## Forecast engine tests
 
-## CI behavior
+- Scripts:
+  - pnpm test:forecast — custom TS runner (tsx services/forecast/__tests__/test-runner.ts)
+  - pnpm test:forecast:unit — modernCache.unit
+  - pnpm test:forecast:integration — forecastEngine.integration
+  - pnpm test:forecast:all — unit + integration + runner
+- Suite resides in app/server/services/forecast/__tests__ with many regression cases and snapshots
 
-- PRs run lint, unit/integration, pre-commit security, and CodeQL
-- Same-repo PRs also build and deploy to staging; health verification runs after rollout
-- E2E visual snapshots against staging are manual (separate workflow)
+## E2E (Playwright)
+
+- Commands:
+  - pnpm test:e2e — run chromium-public and chromium-authed
+  - pnpm test:e2e:update-snapshots and :staging variants
+- Tests under app/tests/e2e/specs with fixtures in app/tests/e2e/setup and utils
+- Visual snapshot PNGs live alongside tests; staging snapshot refresh via workflow e2e-update-staging-snapshots.yml (manual)
+
+## Lint and pre-commit
+
+- pnpm lint / pnpm lint-fix
+- Pre-commit hooks: .pre-commit-config.yaml runs secret scanners and hygiene checks; CI runs them in pre-commit-security job
+
+## Sonar and CodeQL
+
+- Optional SonarQube workflow (manual trigger) produces LCOV via pnpm test:coverage
+- CodeQL runs on PRs and weekly on default branch
