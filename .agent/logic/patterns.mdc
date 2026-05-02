@@ -1,56 +1,76 @@
 ---
-description: Conventions, naming, and safe-change guidance for contributors and AI agents
+description: Coding conventions, naming, and safe-change guidance
 ---
 
-# Patterns and conventions
+# Conventions
 
-## File and naming conventions
+- API files: app/server/api/<path>.<method>.ts where method ∈ {get, post, patch, delete}
+- Service-first: API handlers should validate/authorize, then delegate to app/server/services/*
+- Validation: Use Zod schemas from app/schema/zod.ts where available
+- Auth: Use app/server/middleware/auth.ts globally, requireAdmin.ts for admin/* scopes
+- Error handling: Prefer withErrorHandler.ts or handleApiError.ts; Plaid errors via plaidApiError.ts
+- Data access: Use app/server/clients/prismaClient.ts; keep Prisma access inside service/repository layers when practical
+- Logging: app/server/logger.ts (Winston + GCP logging compatible). Forecast engine has its own logger.
+- Rate limit: app/server/lib/rateLimitRedis.ts for per-route limiting where needed
+- Time and decimals:
+  - Amounts are Decimal(19,2) at DB. Use domain helpers (e.g., bankers-rounding.ts, calculateAdjustedBalance.ts) and avoid JS float math
+  - Time-related logic centralizes in forecast/DateTimeService.ts and related utilities; tests run in TZ=UTC
 
-- API routes: app/server/api/**/name.method.ts where method ∈ {get, post, patch, delete}. Directory structure mirrors URL path
-- Services: app/server/services/* encapsulate business logic. Prefer thin API handlers that delegate to services
-- Clients: DB/Redis/queues/email integrations under app/server/clients/*
-- Validation: Use Zod (app/schema/zod.ts) for request/response shapes when applicable
-- Auth: Use server/middleware/auth.ts; for admin APIs add requireAdmin.ts at handler start
-- Errors: Wrap handlers with withErrorHandler.ts or use handleApiError.ts inside try/catch blocks
-- Tests: Co-locate unit/integration tests under __tests__ in each domain (lib, server/api, server/services). E2E tests under app/tests/e2e
-- Forecast modules: services/forecast/* are small, focused classes with clear inputs/outputs; avoid cross-module state coupling; prefer explicit arguments and typed returns
-- DB schema:
-  - Monetary fields use Decimal(19,2) unless noted (e.g., display_balance Decimal(36,18) for tokens)
-  - Fields marked with /// @encrypted are handled by prisma-field-encryption; do not manually decrypt in app code
-  - Keep schema comments and map names in sync with migrations
+# Naming
 
-## Safe code changes
+- Branches/commits: follow CONTRIBUTING.md; DCO sign-off required
+- Models/tables: singular Prisma models (Account, RegisterEntry, Reoccurrence, etc.)
+- Encrypted fields: annotated with comments like /// @encrypted (and @encryption:hash(...)) in schema.prisma
+- Migrations: timestamped directories under prisma/migrations with a clear name; microservice has its own prisma/migrations as needed
 
-- Adding an API endpoint
-  - Create file under app/server/api/<feature>/<name>.<method>.ts
-  - Enforce auth/access early; consider account membership helpers (server/lib/accountAccess.ts, accountMembership.ts)
-  - Validate inputs using Zod schemas
-  - Delegate to a service; add unit tests in app/server/api/__tests__/ covering success/failure
-- Changing DB schema
-  - Edit app/prisma/schema.prisma
-  - Generate and apply migration: pnpm --filter dineros-app exec prisma migrate dev (local) -> commit SQL under app/prisma/migrations
-  - Regenerate client: pnpm --filter dineros-app exec prisma generate
-  - If microservice relies on affected models, mirror changes in microservice/prisma/schema.prisma and run its prisma generate
-  - Update seeds/tests affected by schema changes
-- Field encryption
-  - Mark sensitive fields with /// @encrypted (and optional hash annotations)
-  - After schema changes, run prisma generate to update reencrypt/*
-  - For key rotation or post-restore workflows, prefer generated reencrypt migrators; see docs/post-restore-encryption-plan.md
-- Queues/cron
-  - New background jobs go to server/queues/* with a corresponding service; expose admin toggles only if needed
-  - Use nuxt-cron for scheduled tasks under server/cron/*
-- Rate limiting
-  - Use server/lib/rateLimitRedis.ts for request-scoped rate limiting
+# Adding or changing API endpoints safely
 
-## PR and CI expectations
+1) Place new handler under app/server/api with <path>.<method>.ts
+2) Early authorize (session user, account membership, admin as required)
+3) Validate payload (Zod). Normalize/parse dates with parseOptionalIsoQuery.ts if applicable
+4) Delegate to a service; do not embed complex logic in the route
+5) Return minimal DTOs; avoid leaking internal fields (e.g., hashed/encrypted columns)
+6) Add unit tests under app/server/api/__tests__/ covering success + error cases
+7) If used by UI, create composables/stores and write E2E coverage where appropriate
 
-- Lint and tests must pass (see .github/workflows/pr.yml). Pre-commit runs TruffleHog and secret hygiene checks
-- Do not commit .env files (blocked via pre-commit hook). Use .env.example for placeholders
-- For schema governance: npm script prisma:check-governance (scripts/check-prisma-schema-governance.mjs)
-- E2E snapshots vs staging are managed in a separate workflow; do not update via CI unless running the staging snapshot workflow
+# Schema and data model changes
 
-## Common pitfalls
+- Edit app/prisma/schema.prisma
+- Generate migration (Prisma). Ensure app/microservice schemas stay in sync if the microservice relies on the same models
+- Run pnpm --filter dineros-app exec prisma generate after changes
+- Encryption:
+  - Mark sensitive fields with /// @encrypted (and hashes with @encryption:hash(...))
+  - Generated migrators appear under prisma/reencrypt; ensure post-restore/key-rotation flows integrate them
+- Add/adjust seeds in app/prisma/seed.ts only for generally applicable reference data (e.g., intervals, countries)
 
-- DATABASE_URL is required for prisma generate at build; Dockerfiles set a placeholder. When running locally in cloud agents, override injected production/staging DATABASE_URL per AGENTS.md
-- Some tests mock integrations; ensure TZ=UTC env so date logic is stable
-- If you change encrypted fields, expect migrations and possibly the post-restore script to need updates
+# Forecast engine changes
+
+- Compose via ForecastEngine orchestrator with services in server/services/forecast/*
+- Extend types in forecast/types.ts and keep DateTimeService in sync for boundary logic
+- Add or update tests in server/services/forecast/__tests__ (unit + integration + regression snapshots)
+- Use ModernCacheService for performance-sensitive paths to keep tests fast and memory stable
+
+# Background jobs and cron
+
+- New recurring tasks: add under server/cron/*.ts (nuxt-cron)
+- Long-running or batch operations: consider enqueueing via server/queues/* with BullMQ
+- Provide admin/test stubs (tasks/* routes) carefully gated; see existing tasks endpoints for patterns
+
+# Security & secrets
+
+- Never commit real secrets. Use .env.example placeholders.
+- Respect server/envSchema.ts requirements when adding new env vars (Zod-validated)
+- For Plaid and other integrations, normalize errors and avoid logging sensitive payloads
+- Field-level encryption keys are provided via env; see deployment templates and encryption docs
+
+# Testing expectations
+
+- Unit/integration: Vitest with TZ=UTC; see app/package.json scripts
+- E2E: Playwright specs under app/tests/e2e; visual snapshots split for authed/public
+- For new endpoints/services, add Vitest coverage first; add E2E if UI interactions are changed
+
+# CI/CD touch points
+
+- PR workflow (pr.yml) runs lint/test/security and builds + deploys to staging in this repo (fork PRs skip deploy)
+- Default-branch workflow (main.yml) builds and deploys to production
+- CodeQL weekly, optional Sonar scan (manual)

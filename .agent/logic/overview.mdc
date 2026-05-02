@@ -1,40 +1,43 @@
 ---
-description: High-level purpose, tech stack, and audience for dineros.cc
+description: High-level purpose, tech stack, and audience for the Dineros.cc monorepo
 ---
 
-# Dineros.cc — Predictive budgeting & financial management
+# Overview
 
-Dineros.cc is a Nuxt 4 + TypeScript application that provides predictive budgeting, real-time spending optimization, and simplified accounting. It ships a full-stack monorepo with a Nuxt app (frontend + Nitro/H3 API) and a companion microservice. Core domains include accounts/registers, recurring entries, reconciliation, budgets/categories, savings goals, reporting, and integrations (Plaid, crypto via Alchemy).
+Dineros.cc is a predictive budgeting and financial management platform. It combines a Nuxt 4 web app, a rich backend of H3/Nitro API routes, a robust forecasting engine, and integrations such as Plaid (bank sync) and Alchemy (crypto balances). The repository is a PNPM workspace with two main packages:
 
-- Source-available, custom non-commercial license (see LICENSE)
-- Database: MySQL 8 via Prisma ORM
-- Caching/queues: Redis + BullMQ
-- Integrations: Plaid, Postmark, OpenAI, Alchemy (EVM chains)
-- Infra: Dockerfiles, GitHub Actions CI/CD, Kubernetes manifests for GKE
+- app/ — the primary Nuxt application (frontend + server-side API + Prisma schema + tests)
+- microservice/ — a companion service focused on supporting operations like DB field-encryption key rotation and lightweight maintenance endpoints
 
-See README.md for quickstart and AGENTS.md for AI-agent specific environment notes (e.g., Cursor Cloud DB override).
+Key capabilities evidenced in the repo:
 
-## Tech stack (from repository evidence)
+- Predictive budgeting and a modular forecast engine (server/services/forecast/*)
+- Account registers, recurring entries, reconciliations, bills, reports, snapshots
+- Integrations: Plaid (bank links, sync logs, webhooks), Alchemy (EVM balances)
+- Security: field-level encryption via prisma-field-encryption, RSA/JWT services, rate-limiting, 2FA/MFA
+- Background work: BullMQ queues and cron tasks
+- CI/CD: GitHub Actions builds Docker images for app and microservice and deploys to GKE with Kubernetes manifests
 
-- Frontend: Nuxt 4, Vue 3, Tailwind CSS, Pinia (@pinia/nuxt), @nuxt/ui, @nuxt/icon, @nuxt/fonts
-- Backend API: Nitro/H3 under app/server/api/* (file-based routes)
-- Language/tooling: TypeScript, ESLint, Vitest, Playwright
-- Data: Prisma ORM (app/prisma/schema.prisma), MySQL 8, prisma-field-encryption
-- Runtime infra: Redis, BullMQ for background jobs; nuxt-cron for cron tasks
-- Integrations: Plaid, Postmark, OpenAI, Google Cloud logging/storage (dev deps), NATS client present
-- Security: TOTP, WebAuthn Passkeys, JWT, RSA (rotateable); rate limiting with Redis
-- CI/CD: GitHub Actions (PR checks, CodeQL, Sonar optionally), image build and push to gcr.io, deploy to GKE using templated manifests
+# Audience
 
-## Audience
+- AI agents and maintainers working within Cursor-style rule files
+- Senior/full-stack engineers contributing to Nuxt + H3/Nitro backends
+- DevOps engineers operating Docker/GKE deploys and key rotation cronjobs
 
-- Primary: Project maintainers and contributors
-- Secondary: AI agents and CI automation (Cursor-style). Follow .cursor/rules/* and AGENTS.md when running in cloud agents.
+# Tech stack (observed)
 
-## Monorepo layout (top-level)
+- Language/runtime: Node.js 24+, TypeScript
+- Web framework: Nuxt 4 (Vue 3), Pinia state, Tailwind CSS
+- Server: Nitro/H3 endpoints under app/server/api
+- Data: MySQL 8 (Prisma ORM), Redis
+- Job queue: BullMQ
+- Testing: Vitest (unit/integration), Playwright (E2E), extensive forecast engine test harness
+- CI/CD: GitHub Actions → GCR images → GKE, CodeQL, Sonar (manual), pre-commit security
 
-- app/: Nuxt app (UI + API), Prisma schema/migrations, services, queues, cron, tests
-- microservice/: companion service with its own Prisma client and routes
-- .deploy/: Kubernetes templates (envsubst-based)
-- .github/: Actions workflows and composite actions
-- scripts/: Ops/dev scripts (DB restore, Prisma governance checks, key rotation helpers)
-- docs/: focused docs (e.g., post-restore encryption plan)
+# Quick pointers
+
+- Local dev: see README.md. MySQL and Redis via docker-compose.yaml or devcontainer. Ensure DATABASE_URL and Prisma client are generated prior to running tests.
+- Endpoints live at app/server/api and follow <path>.<method>.ts conventions (get/post/patch/delete).
+- Prisma schema is at app/prisma/schema.prisma; migrations under app/prisma/migrations.
+- Field-level encryption uses prisma-field-encryption; generated reencrypt migrators are under app/prisma/reencrypt/.
+- Forecast engine is under app/server/services/forecast/* with a dedicated test runner and suites.

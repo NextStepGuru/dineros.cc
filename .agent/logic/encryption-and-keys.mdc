@@ -1,40 +1,46 @@
 ---
-description: Field-level encryption, key rotation, RSA/JWT usage, and post-restore handling
+description: Field-level encryption, rotation, and related key management in this repo
 ---
 
-# Encryption and keys
+# Field-level encryption (prisma-field-encryption)
 
-## Field-level encryption (prisma-field-encryption)
+Annotations in app/prisma/schema.prisma mark encrypted and hashed fields, e.g.
+- /// @encrypted on columns like User.email, AccountRegister.name, RegisterEntry.description, Reoccurrence.description
+- @encryption:hash(...) on normalized hash columns (e.g., plaidIdHash, emailHash, walletAddressHash)
 
-- Annotated fields in app/prisma/schema.prisma with /// @encrypted (and optional /// @encryption:hash(...)) are transparently encrypted
-- Generated migration helpers under app/prisma/reencrypt/* (and microservice/prisma/reencrypt/*) support re-encrypting data across key rotations
-- DB key material is provided via env (DB_ENCRYPTION_KEY plus optional DB_DECRYPTION_KEY_* for old keys). In K8S, these live in the SECRET_DB secret (see .deploy/dineros.template.yaml)
+Generated migrators
+- app/prisma/reencrypt/* and microservice/prisma/reencrypt/* contain generated migrators and an index.ts with migrate() exported
+- Used for re-encrypting records when rotating keys or after restoring data from another environment
 
-## Key rotation strategies
+Runtime keys
+- DB_ENCRYPTION_KEY and optional DB_DECRYPTION_KEY_* variables provided via K8S secrets (SECRET_DB in templates)
+- The application’s Prisma client loads prisma-field-encryption extension with the appropriate keys (see server/clients/prismaClient.ts)
 
-- In staging, a CronJob (key-rotation-cronjob.template.yaml) runs nightly using the microservice :keyrotate image to:
-  - Patch DB secret with a new encryption key (append-only, preserving prior decryption keys)
-  - Restart Deployments to pick up keys
-  - Call microservice /migrate to run reencrypt migrators (microservice/routes/migrate.post.ts)
-- Microservice routes for rotation/migration: migrate.get.ts and migrate.post.ts (operational endpoints)
+# Rotation workflows
 
-## Post-restore local workflows
+Staging nightly rotation
+- .deploy/key-rotation-cronjob.template.yaml runs the microservice :keyrotate image
+- Script microservice/scripts/k8s-rotate-db-key.sh:
+  - Patches the secret containing encryption material
+  - Restarts Deployments so new keys take effect
+  - Calls microservice /migrate endpoint to invoke generated re-encrypt migrators
+- RBAC in .deploy/key-rotation-rbac.template.yaml grants the CronJob permissions to update the secret and patch deployments
 
-- See docs/post-restore-encryption-plan.md and scripts/reset-encrypted-users-after-restore.ts
-  - After restoring prod/staging data locally without source key, placeholders overwrite sensitive fields (plaid tokens nulled, friendly names for registers/entries/reoccurrences, dev emails)
-  - If source encryption key is provided (e.g., DINEROS_STAGING_DB_ENCRYPTION_KEY), use generated reencrypt migration to decrypt+re-encrypt into local key, then optionally reset local users to dev accounts
+Post-restore local plan
+- docs/post-restore-encryption-plan.md describes enhancing scripts/reset-encrypted-users-after-restore.ts to:
+  - Use generated reencrypt/migrate when a source env key is present (decrypt with source, encrypt with local)
+  - Otherwise, overwrite sensitive fields with safe placeholders across User, AccountRegister, RegisterEntry, Reoccurrence, and null Plaid columns
 
-## RSA and JWT
+# Other keys and crypto utilities
 
-- RSA keypairs stored in Rsa model (rotateable, with isDefault flag)
-- RsaService and JwtService in app/server/services/* manage cryptographic operations (see tests under services/__tests__/RsaService.test.ts and JwtService.test.ts)
+- RSA keypairs persisted in table Rsa; app/server/services/RsaService.ts manages key usage
+- JWT: app/server/services/JwtService.ts with rotateUserJwtKey helper (server/lib/rotateUserJwtKey.ts)
+- Hashing: app/server/services/HashService.ts and tests; emailHash and plaidIdHash columns derived via encryption annotations
+- Plaid access tokens and IDs are encrypted and hashed at rest
 
-## Rate limiting and auth factors
+# Safety notes
 
-- Redis-backed rate limiting helper: app/server/lib/rateLimitRedis.ts
-- MFA: TOTP (otplib) and WebAuthn passkeys under app/server/api/mfa/* and server/lib/mfa.ts
-
-## Safety notes
-
-- Never commit real keys or secrets; .pre-commit-config.yaml enforces checks (TruffleHog, block .env)
-- For CI tests, minimal fake keys are provided via env in workflows (e.g., PLAID_CLIENT_ID=ci-test)
+- Never log raw encrypted payloads or secrets
+- Keep SECRET_DB limited to field-encryption materials; DATABASE_URL lives in dedicated secrets
+- Update env schema validation when adding/changing key variables
+- When introducing new encrypted fields, annotate Prisma schema and regenerate reencrypt code (pnpm --filter dineros-app exec prisma generate)

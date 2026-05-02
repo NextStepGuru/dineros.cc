@@ -1,53 +1,61 @@
 ---
-description: Local dev, Docker images, CI/CD, and GKE deployment templates (from repository files)
+description: Local development, Docker images, Kubernetes manifests, and CI/CD flows
 ---
 
-# Deployment and environments
+# Local development
 
-## Local development
+- Requirements: Node 24.14+, PNPM 10+, MySQL 8, Redis
+- Environment: copy .env.example → .env (do not commit .env)
+- Start services: docker compose up -d (mysql on 3309, redis on 6380 by default)
+- Generate Prisma client: pnpm --filter dineros-app exec prisma generate
+- Run dev server: pnpm dev (from repo root or filter to dineros-app)
 
-- Requirements: Node 24.14+, PNPM 10+, MySQL 8, Redis (see README.md)
-- Quick start:
-  - cp .env.example .env
-  - docker compose up -d (provisions MySQL at 127.0.0.1:3309 and Redis at 127.0.0.1:6380)
-  - pnpm --filter dineros-app exec prisma migrate deploy
-  - pnpm dev (Nuxt at http://localhost:3000)
+Devcontainer (.devcontainer/docker-compose.yml)
+- Provides MySQL and Redis alongside a Node dev container, pre-wiring DATABASE_URL and Redis host/port for convenience
 
-Notes for cloud dev environments (AGENTS.md): override any injected production DATABASE_URL with your local value before running prisma or dev server.
+# Docker images
 
-## Docker images
+App (app/Dockerfile)
+- Multi-stage pnpm + Prisma generate + nuxt build → slim runner
+- Exposes PORT (default 3000, set to 80 in K8S). Copies .output and prisma directory
 
-- app/Dockerfile: multi-stage; runs prisma generate with placeholder DATABASE_URL, builds Nuxt, copies .output and prisma into a slim runner
-- microservice/Dockerfile: multi-stage; prisma generate; main runner uses pnpm runtime; additional target runner-keyrotate includes kubectl+jq for staging key rotation CronJob
+Microservice (microservice/Dockerfile)
+- Multi-stage with pnpm + Prisma generate
+- Runtime image supports NODE_ENV=test branch (test-start) vs start; includes a separate target runner-keyrotate for staging CronJob that bundles kubectl + curl + jq and a k8s-rotate-db-key.sh script
 
-## CI/CD (GitHub Actions)
+# Kubernetes manifests
 
-- PR checks (.github/workflows/pr.yml)
-  - Jobs: lint, test (Vitest), pre-commit security (TruffleHog + hooks), CodeQL
-  - If PR branch is in repo, build images for main app and microservice and deploy to staging GKE namespace via .deploy/dineros.template.yaml
-  - Optional: post a "bugbot run" comment for Cursor Bugbot (if PAT provided)
-- Main branch deploy (.github/workflows/main.yml)
-  - Build app and microservice images, push to gcr.io (Workload Identity)
-  - Deploy production using the same templated manifest and verify rollout (health/ready)
-- Sonar (manual) (.github/workflows/sonar.yml): runs coverage and Sonar scan
-- CodeQL weekly schedule (.github/workflows/codeql.yml)
+- .deploy/dineros.template.yaml renders two Deployments (app and microservice), Services, and Ingress
+- Environment sources:
+  - DATABASE_URL from per-service secrets (SECRET_DATABASE_MAIN, SECRET_DATABASE_MICRO)
+  - DB field encryption material from SECRET_DB (DB_ENCRYPTION_KEY and decryption keys)
+  - App secrets from SECRET_APP (Plaid, Postmark, INTERNAL_API_TOKEN, etc.)
+  - JWT secret from SECRET_JWT (DINEROS_JWT_SECRET)
+- Readiness/liveness/startup probes hit /health/ready and /health/live
+- App talks to microservice via MICROSERVICE_INTERNAL_URL ClusterIP service
+- Redis hostname is a cluster Redis (redis-master.redis.svc.cluster.local) in templates; local dev uses docker-compose redis
 
-## Kubernetes manifests (templated)
+Staging key rotation
+- .deploy/key-rotation-cronjob.template.yaml runs nightly; uses microservice :keyrotate image and a RBAC Role/RoleBinding in .deploy/key-rotation-rbac.template.yaml
+- Cron executes microservice/scripts/k8s-rotate-db-key.sh which patches the DB key secret, rolls Deployments, and calls microservice migrate endpoint
 
-- .deploy/dineros.template.yaml: renders both main app and microservice Deployments + Services + Ingress with envsubst
-  - Uses secrets references for DB (SECRET_DB), DATABASE_URL (SECRET_DATABASE_MAIN/SECRET_DATABASE_MICRO), app secrets (SECRET_APP), JWT (SECRET_JWT), Google SA secret (SECRET_GA)
-  - MICROSERVICE_INTERNAL_URL used by main app to reach the microservice in-cluster
-  - Health probes: /health/live and /health/ready
-- Staging key rotation
-  - .deploy/key-rotation-cronjob.template.yaml — nightly job using microservice :keyrotate image to patch K8S secret and orchestrate restarts, then call microservice /migrate
-  - .deploy/key-rotation-rbac.template.yaml — Role/RoleBinding permitting secrets and deployments patch. Applying requires GKE IAM permissions (see AGENTS.md and action description)
+# CI/CD (GitHub Actions)
 
-## Environment variables (representative)
+PR checks (.github/workflows/pr.yml)
+- Jobs: lint, test (Vitest with minimal env), pre-commit security (TruffleHog + hooks), CodeQL
+- If PR originates from same repo, builds app and microservice images (tags pr-<N>-<SHA>) and deploys to staging via .github/actions/deploy-dineros-gke/action.yml, then verifies rollout and public /health/ready
+- Optionally posts a Bugbot trigger comment (Cursor integration)
 
-- Database: DATABASE_URL (in per-app secret), field encryption bundle in SECRET_DB (DB_ENCRYPTION_KEY, DB_DECRYPTION_KEY_*)
-- Redis: REDIS_HOST, REDIS_PORT
-- External: PLAID_CLIENT_ID/SECRET, POSTMARK_SERVER_TOKEN/WEBHOOK_SECRET, OPENAI_API_KEY, TWILIO_*
-- Auth/security: JWT_SECRET, RSA keys managed via Rsa model in DB (rotation handled at app level)
-- Runtime: DEPLOY_ENV, NUXT_PUBLIC_SITE_URL, MICROSERVICE_INTERNAL_URL
+Default branch deploy (.github/workflows/main.yml)
+- On push to main/master: build app and microservice, push to GCR, then deploy production with envsubst-rendered .deploy templates
+- Post-deploy verification hits production health endpoints via verify script
 
-See .env.example for a comprehensive list and app/server/envSchema.ts for validation.
+Code scanning and quality
+- CodeQL scheduled weekly (codeql.yml)
+- SonarQube scan available as workflow-dispatch (sonar.yml) with coverage from pnpm test:coverage
+
+# Secrets and env
+
+- Keep DATABASE_URL out of SECRET_DB; SECRET_DB only contains field-encryption material (per comments in templates)
+- server/envSchema.ts validates runtime env. Update it when adding new variables
+- AGENTS.md notes Cursor Cloud env overrides (export DATABASE_URL locally when an injected remote URL may exist)
