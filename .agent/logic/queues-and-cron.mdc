@@ -1,37 +1,26 @@
 ---
-description: Background processing with BullMQ queues and nuxt-cron scheduled jobs
+description: BullMQ queues, Redis, and cron schedules present in the app
 ---
 
 # Queues and cron
 
-## BullMQ queues (app/server/queues)
+## Queues (BullMQ)
 
-- backupQueue.ts — backups
-- plaidSyncQueue.ts — Plaid transaction sync
-- plaidSyncBalanceQueue.ts — Plaid balance-only sync
-- recalculateQueue.ts — forecasting recalculations
+- Defined under app/server/queues/
+  - backupQueue.ts — backups
+  - plaidSyncQueue.ts — Plaid transaction sync
+  - plaidSyncBalanceQueue.ts — Plaid balance-only sync
+  - recalculateQueue.ts — forecast recalculation
+- queuesClient.ts wires BullMQ with Redis
+- queueManager.ts and queueManagerPlugin.ts support orchestration and graceful lifecycle
 
-Use app/server/clients/queuesClient.ts to obtain connections. For long-running or high-latency operations, prefer enqueuing a job and returning early from API handlers.
+## Cron tasks (nuxt-cron)
 
-## Scheduled jobs (nuxt-cron, app/server/cron)
+Located in app/server/cron/:
+- backup.daily.ts
+- bill-reminders.hourly.ts
+- plaid.daily.ts, plaid-balance.hourly.ts
+- recalculate.hourly.ts
+- crypto-balance.hourly.ts
 
-- backup.daily.ts — periodic backup
-- plaid.daily.ts — Plaid sync heartbeat
-- plaid-balance.hourly.ts — Plaid balance refresh
-- recalculate.hourly.ts — trigger forecast recalculations
-- bill-reminders.hourly.ts — evaluate bill reminders
-- crypto-balance.hourly.ts — EVM wallet/token balance sync
-
-Cron tasks call underlying services (e.g., PlaidSyncService, AlchemyService) and may enqueue additional work.
-
-## Admin/task endpoints (ad-hoc triggers)
-
-- app/server/api/tasks/*:
-  - backup.ts, migrate.ts
-  - recalculate.ts
-  - sync-plaid.ts, sync-plaid-balance.ts
-  - check-* (health checks / consistency)
-  - sync-google-sheet*.post.ts (aux data import)
-  - various test-* endpoints for controlled scenarios
-
-Guard these behind admin or internal tokens where appropriate; see server/lib/requireAdmin.ts and env-driven guards in some handlers.
+Cron tasks typically delegate to services (e.g., PlaidSyncService, notification services) or enqueue work onto queues. Ensure idempotency and guardrails (rateLimiter, env flags in tests) for scheduled runs.

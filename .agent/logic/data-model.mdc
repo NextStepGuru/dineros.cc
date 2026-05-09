@@ -1,72 +1,70 @@
 ---
-description: Summary of Prisma models, relationships, and notable fields from app/prisma/schema.prisma
+description: High-level Prisma data model map (MySQL) — key entities, relationships, and encrypted fields
 ---
 
-# Database overview (MySQL via Prisma)
+# Data model (app/prisma/schema.prisma)
 
-Amounts use Decimal columns (usually Decimal(19,2)). Time fields are DateTime. Sensitive fields are annotated for prisma-field-encryption with comments like /// @encrypted and @encryption:hash(...).
+Provider: MySQL. Prisma client generated at build and in CI. Field-level encryption via prisma-field-encryption annotations in comments.
 
-Core entities
-- Account — tenant/root container for budgets, registers, categories, etc.
-- User — login identity with role (USER/ADMIN), country/timezone preferences; email/password encrypted; jwtKey for token rotation
-- Budget — groups registers and reporting within an account (default/archived flags)
-- AccountRegister — an individual register (checking/savings/credit/loan/asset/cash/crypto). Contains balance/limits/APRs/loan params and integration fields (Plaid, crypto wallet, depreciation, categories), plus collateral/parent relations and sort orders
-- RegisterEntry — ledger entries attached to a register; supports reconciliation, Plaid linkage, categorization, manual/projected flags, typeId
-- RegisterEntryType — catalog for entry typing
-- Interval — generic interval catalog (used for statement cycles and reoccurrence schedules/adjustments)
+Below is a relationship-oriented summary (not exhaustive fields).
 
-Recurring and scheduling
-- Reoccurrence — recurring transaction definition with schedule (interval+count), optional transfer target, amount adjustments (mode/direction/value/interval), category, and generated entries
-- ReoccurrenceSplit — break a recurrence into multiple target registers with fixed or percent amounts
-- ReoccurrenceSkip — explicit skip markers by account/register/date
-- ReoccurrencePlaidNameAlias — normalized name aliases for matching Plaid transactions to recurrences
+- User
+  - Fields: id, email (encrypted), emailHash (hash of email), password (encrypted), role, countryId, jwtKey, settings/config
+  - Relations: budgets, accounts (UserAccount), plaidItems, notifications/dismissals, reconciliationPeriodsClosed
+- Account
+  - Fields: id (uuid), name, isDefault, isArchived
+  - Relations: users (UserAccount), invites, reoccurrences, registers (AccountRegister), budgets, categories, snapshots, savingsGoals, bills, reconciliationPeriods
+- UserAccount — membership and permissions per account, with allowedBudgetIds and allowedAccountRegisterIds JSON
+- AccountInvite + AccountInviteAccount — invite and per-account permissions for invitee
+- Budget — per Account; relations to registers, savingsGoals, notifications, bill profiles/instances, reconciliationPeriods
+- AccountRegister — core ledger/register entity for an account and budget
+  - Fields include: typeId (AccountType), name (encrypted), balances, creditLimit, PLAID linkage (plaidId, plaidAccessToken — encrypted + hash), asset/loan properties, minAccountBalance, vehicle details, walletAddress (encrypted + hash) for crypto, statement interval, various sort orders
+  - Relations: entries (RegisterEntry), reoccurrences, splits target, bill profiles/instances, snapshots, savings goals (source/target), reconciliationPeriods, crypto chains and token balances, optional collateral
+- RegisterEntry — transaction rows
+  - Fields: description (encrypted), amount, balance, flags (projected, pending, cleared, matched, balance/manual), typeId, plaid linkage (encrypted + hash), categoryId, timestamps
+  - Relations: register, reoccurrence, category, reconciliationItems, paid bill instances, reconciliation closing entry
+- Category — hierarchical (parent/children via subCategoryId), scoped optionally to account
+  - Used by entries, reoccurrences, splits, and as default payment/interest categories on registers
+  - Note: a functional unique index for (account_id, IFNULL(sub_category_id,''), name) exists via migration
+- Reoccurrence — scheduled transaction definition for a register
+  - Fields: intervalId (+ count), amount, description (encrypted), categoryId, weekend adjustments, optional transferAccountRegisterId, amount adjustment strategy (mode/direction/value/interval)
+  - Relations: entries (emitted from this), skips, splits, plaid name aliases, billProfile/instances
+- ReoccurrenceSplit — splits a reoccurrence across transfer registers, with fixed/percent modes
+- ReoccurrenceSkip — per-occurrence skip markers
+- ReoccurrencePlaidNameAlias — normalized Plaid names mapped to a reoccurrence for matching
+- SavingsGoal — sources and targets funds between two registers within a budget
+- Bills
+  - BillProfile (kind: BILL/INCOME/TRANSFER) — encapsulates a reoccurrence with metadata like payee, expected ranges, reminders, priority
+  - BillInstance — concrete scheduled/paid instances with status, dueAt, paidAt, paidAmount, linkage to entry
+- Reconciliation
+  - ReconciliationPeriod — OPEN/CLOSED, with statement balances, dates, closing adjustment linkage, closedByUser
+  - ReconciliationItem — links register entries to a period and clearance status
+- Snapshots
+  - AccountSnapshot — per Account at a time
+  - AccountRegisterSnapshot — per register in a snapshot (name, balances, type)
+  - RegisterEntrySnapshot — point-in-time entry data for the snapshot
+  - AccountRegisterSummary — summary rows by month/year
+- Notifications
+  - NotificationEvent — active events (FORECAST_RISK, REOCCURRENCE_HEALTH), deduped by (userId,budgetId,kind,fingerprint|occurrenceKey)
+  - NotificationDismissal — suppressions by occurrenceKey
+- Integrations & logs
+  - PlaidItem, PlaidSyncCursor, PlaidSyncLog (captures tx counts, errors, durations)
+  - IntegrationAlert, IntegrationJobLog — generic alerting/job logs
+  - OpenAiRequestLog — request/response metrics
+- Types & config
+  - AccountType — type, name, class, isCredit, accruesBalanceGrowth
+  - Interval — interval catalog (shared across registers & reoccurrences)
+  - Rsa — RSA key material (id, isDefault, keypair)
+- Cash and Crypto
+  - CashOnHand — per register denomination counts
+  - EvmChain — chain catalog (networkId, symbol)
+  - CryptoRegisterChain — allowed chains for a crypto register
+  - CryptoTokenBalance — token holdings and USD valuation per register
 
-Billing and reminders
-- BillProfile — wraps a recurrence to add bill semantics (payee, grace days, reminders, expected ranges)
-- BillInstance — concrete dated bill with amount, status lifecycle, and optional linkage to a paid register entry
+Encrypted fields (selected):
+- User.email, User.password
+- AccountRegister.name, plaidId, plaidAccessToken, walletAddress (+ hash columns for deterministic lookups)
+- RegisterEntry.description, plaidId (+ hash)
+- Reoccurrence.description
 
-Reconciliation and snapshots
-- ReconciliationPeriod — statement window with opening/ending balances, status, ledger cleared balance, difference; links to a closing adjustment entry
-- ReconciliationItem — per-entry clearance tracking during a period
-- AccountSnapshot — saved point-in-time snapshot at account level
-- AccountRegisterSnapshot + RegisterEntrySnapshot — snapshot rows for registers and entries
-- AccountRegisterSummary — monthly summary by register (balance, month/year)
-
-Categories and reporting
-- Category — hierarchical (parent via subCategoryId), scoped optionally to account; linked to entries/recurrences and may provide default payment/interest categories for registers
-- NotificationEvent / NotificationDismissal — tracking and suppression for in-app notifications (FORECAST_RISK, REOCCURRENCE_HEALTH)
-- Reports: Implemented at service layer (e.g., reports/CategoryReportService) rather than as schema tables
-
-Integrations and logs
-- PlaidItem — linkage from user to Plaid item (no access token here)
-- PlaidSyncCursor — per-item cursor for incremental Plaid sync
-- PlaidSyncLog — structured log of sync runs (mode, status, timing, counts, errors)
-- IntegrationAlert — structured alerts for integration failures/errors
-- IntegrationJobLog — job-centric log entries
-
-Security and keys
-- Rsa — persisted RSA keypairs with isDefault/isArchived
-- OpenAiRequestLog — OpenAI API usage logging including tokens/ids/status
-
-Cash and crypto (recent additions)
-- CashOnHand — banknote denomination counts for a register (ones/fives/tens/etc.)
-- EvmChain — chain metadata (name, networkId, symbol, explorer, isDefault)
-- CryptoRegisterChain — linkage between a register and enabled EVM chains
-- CryptoTokenBalance — token snapshot per register/network/token; includes displayBalance, priceUsd, valueUsd, logoUrl, syncedAt
-
-Access and invites
-- UserAccount — membership on accounts with fine-grained permissions and allowedBudgetIds/allowedAccountRegisterIds
-- AccountInvite — invite sent by a user to an email with expiry and tokenHash; AccountInviteAccount maps invited permissions to specific accounts
-
-Indexes and constraints (selected)
-- Many @index and @unique directives across foreign keys and natural keys
-- Functional uniqueness noted (categories per account and parent) is enforced via SQL migration not expressible in Prisma schema
-
-Encryption flags (examples)
-- User.email, User.password — /// @encrypted (with emailHash as @encryption:hash(email))
-- AccountRegister.name, plaidId/plaidAccessToken, walletAddress — encrypted/hashed variants
-- RegisterEntry.description, plaidId — encrypted/hashed variants
-- Reoccurrence.description — encrypted
-
-Microservice schema
-- microservice/prisma/schema.prisma mirrors a necessary subset of models (accounts, users, registers, entries, categories, recurrences, intervals, RSA, OpenAI log, etc.) to support maintenance operations and encryption rotation.
+Microservice model (microservice/prisma/schema.prisma): subset aligned to maintenance needs (accounts, users, registers, entries, reoccurrences, snapshots, types, RSA, Plaid cursor/items, etc.). It intentionally omits some app-only models (e.g., notifications, bills in older snapshot). Always consult both schemas before cross-package changes.

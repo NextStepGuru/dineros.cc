@@ -1,43 +1,44 @@
 ---
-description: How tests are organized and how to extend them safely
+description: How tests are organized and run — Vitest, forecast suites, and Playwright E2E
 ---
 
-# Test stack
+# Testing
 
-- Unit/integration: Vitest (Node, TZ=UTC). Config in app/vitest.* and scripts in app/package.json
-- E2E: Playwright (public and authed projects), with accessibility checks and visual snapshots
-- Forecast: Dedicated TS test runner (tsx) that executes forecast scenarios and performance checks
+## Unit and integration (Vitest)
 
-# Where tests live
+- Runner: Vitest with TZ=UTC
+- Configs: app/vitest.config.ts, app/vitest.config.coverage.ts, app/vitest.resolve-aliases.ts, app/vitest.setup.ts
+- Typical command: pnpm test (from repo root delegates to app)
+- CI sets minimal env (DATABASE_URL dummy, PLAID_CLIENT_ID/SECRET placeholders) and runs prisma generate before tests
+- Coverage tasks available (test:coverage, coverage:view/report/open/serve helpers)
 
-- API routes: app/server/api/__tests__/*.test.ts — comprehensive coverage of endpoints (auth, accounts, registers, entries, budgets, categories, reports, reconciliations, tasks, Plaid, MFA, etc.)
-- Services: app/server/services/**/__tests__ — forecast, matching, RSA/JWT, Plaid sync/enrichment, budget/category cloning, reports, etc.
-- Libs/schemas: app/lib/__tests__ and app/schema/__tests__
-- Stores/pages: app/stores/__tests__ and app/pages/__tests__ (smoke/simple)
-- E2E: app/tests/e2e/** (fixtures, setup, specs, snapshots). Public and authed projects each have separate suites and baselines
+Key suites:
+- server/api/__tests__ — broad endpoint coverage incl. auth, accounts, budgets, register entries, reoccurrences, reports, reconciliation, tasks, admin
+- server/services/**/__tests__ — PlaidSyncService, TransactionMatchingService, HashService, JwtService, reconciliation, reports
+- server/services/forecast/**/__tests__ — core forecast integration/regression/unit tests
+- lib/__tests__ and schema/__tests__ — utilities, Zod behaviors
 
-# Running tests
+## Forecast engine testing
 
-- All: pnpm test (Vitest, TZ=UTC)
-- Coverage: pnpm test:coverage; artifacts are LCOV for Sonar when invoked in sonar.yml
-- Forecast engine: pnpm test:forecast, test:forecast:unit, test:forecast:integration, test:forecast:performance
-- E2E: pnpm test:e2e (local), or the manual staging snapshot updater workflow for Linux baselines
+- Custom test runner: app/server/services/forecast/__tests__/test-runner.ts
+- Commands:
+  - pnpm test:forecast — quick functionality
+  - pnpm test:forecast:unit — ModernCache unit tests
+  - pnpm test:forecast:integration — integration tests
+  - pnpm test:forecast:all — runs unit + integration + runner
 
-# Environment for tests
+## End-to-end (Playwright)
 
-- Minimal env used in CI (pr.yml): DATABASE_URL for local MySQL in CI, DEPLOY_ENV=local, DB_ENCRYPTION_KEY dummy, PLAID_* dummy
-- Prisma client must be generated before tests that import Prisma types: pnpm --filter dineros-app exec prisma generate
-- Tests generally mock integrations; real MySQL/Redis are not required for Vitest by default suites
+- Playwright config: app/playwright.config.ts
+- Specs under app/tests/e2e/specs/{public,authed}
+- Visual snapshots committed under ...visual.spec.ts-snapshots/
+- Commands:
+  - pnpm test:e2e — chromium-public and chromium-authed
+  - pnpm test:e2e:update-snapshots — local baselines
+  - pnpm test:e2e:update-snapshots:staging — baselines vs https://staging.dineros.cc
+- CI includes a manual workflow (e2e-update-staging-snapshots.yml) to regenerate Linux PNG baselines vs staging
 
-# Adding tests
+## Mocks and environment
 
-- For new endpoints: add Vitest route tests in app/server/api/__tests__ covering auth, input validation, domain branching, and error mapping
-- For new services: unit tests for core logic, plus integration where DB state is material
-- For forecast changes: extend scenarios and regression snapshots under server/services/forecast/__tests__
-- For UI flows: add Playwright specs and update visual snapshots (local vs staging Linux baselines differ; use the staging workflow to update CI baselines)
-
-# Debugging tests
-
-- Run a single file: vitest run path/to/test.ts
-- Forecast debug: set DEBUG=forecast:* for verbose logs where supported by the services
-- E2E: playwright test --ui or --debug to inspect failures; review generated screenshots under -snapshots directories
+- Tests run in Node with mocks; MySQL/Redis generally not required (CI uses a dummy DATABASE_URL and generates Prisma client)
+- Crypto-specific tests can be run with pnpm test:crypto

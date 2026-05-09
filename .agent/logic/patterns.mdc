@@ -1,76 +1,85 @@
 ---
-description: Coding conventions, naming, and safe-change guidance
+description: Conventions, naming, and safe-change guidance for endpoints, services, Prisma schema, and tests
 ---
 
-# Conventions
+# Patterns and conventions
 
-- API files: app/server/api/<path>.<method>.ts where method ∈ {get, post, patch, delete}
-- Service-first: API handlers should validate/authorize, then delegate to app/server/services/*
-- Validation: Use Zod schemas from app/schema/zod.ts where available
-- Auth: Use app/server/middleware/auth.ts globally, requireAdmin.ts for admin/* scopes
-- Error handling: Prefer withErrorHandler.ts or handleApiError.ts; Plaid errors via plaidApiError.ts
-- Data access: Use app/server/clients/prismaClient.ts; keep Prisma access inside service/repository layers when practical
-- Logging: app/server/logger.ts (Winston + GCP logging compatible). Forecast engine has its own logger.
-- Rate limit: app/server/lib/rateLimitRedis.ts for per-route limiting where needed
-- Time and decimals:
-  - Amounts are Decimal(19,2) at DB. Use domain helpers (e.g., bankers-rounding.ts, calculateAdjustedBalance.ts) and avoid JS float math
-  - Time-related logic centralizes in forecast/DateTimeService.ts and related utilities; tests run in TZ=UTC
+## File and naming conventions
 
-# Naming
+- API routes: app/server/api/<path>.<method>.ts (method is .get.ts, .post.ts, .patch.ts, .delete.ts)
+- Services: app/server/services/<Domain>Service.ts; forecast/* for forecasting domain
+- Queues: app/server/queues/*Queue.ts (BullMQ)
+- Cron: app/server/cron/*.ts (nuxt-cron)
+- Clients: app/server/clients/*Client.ts (Prisma, Redis, NATS, Postmark)
+- Zod schemas: app/schema/*.ts
+- Prisma: app/prisma/schema.prisma + app/prisma/migrations/* (MySQL provider)
+- Tests: colocate under app/server/**/__tests__ or feature-specific folders
 
-- Branches/commits: follow CONTRIBUTING.md; DCO sign-off required
-- Models/tables: singular Prisma models (Account, RegisterEntry, Reoccurrence, etc.)
-- Encrypted fields: annotated with comments like /// @encrypted (and @encryption:hash(...)) in schema.prisma
-- Migrations: timestamped directories under prisma/migrations with a clear name; microservice has its own prisma/migrations as needed
+## API route implementation checklist
 
-# Adding or changing API endpoints safely
+- Validate input with Zod (schema/zod.ts or dedicated schemas) where applicable
+- Authenticate early (server/middleware/auth.ts); require admin with server/lib/requireAdmin.ts when needed
+- Authorize per-account using accountAccess.ts and accountMembership.ts helpers
+- Delegate business logic to server/services/*; keep route handlers thin
+- Use withErrorHandler.ts or handleApiError.ts consistently; normalize external errors (e.g., Plaid) via helpers (plaidApiError.ts)
+- For long or asynchronous tasks, enqueue via server/queues/* (BullMQ) or expose tasks/* endpoints guarded appropriately
+- Add unit tests in app/server/api/__tests__ matching the route path/name
 
-1) Place new handler under app/server/api with <path>.<method>.ts
-2) Early authorize (session user, account membership, admin as required)
-3) Validate payload (Zod). Normalize/parse dates with parseOptionalIsoQuery.ts if applicable
-4) Delegate to a service; do not embed complex logic in the route
-5) Return minimal DTOs; avoid leaking internal fields (e.g., hashed/encrypted columns)
-6) Add unit tests under app/server/api/__tests__/ covering success + error cases
-7) If used by UI, create composables/stores and write E2E coverage where appropriate
+## Services
 
-# Schema and data model changes
+- Keep pure logic in services; inject dependencies via clients (prismaClient.ts, redisClient.ts)
+- Forecast services are heavily tested — run forecast suites before shipping changes (see testing.mdc)
+- For Plaid and crypto integrations, prefer dedicated services (PlaidSyncService, PlaidTransactionEnrichmentService, AlchemyService, AssetValueEstimateService)
 
-- Edit app/prisma/schema.prisma
-- Generate migration (Prisma). Ensure app/microservice schemas stay in sync if the microservice relies on the same models
-- Run pnpm --filter dineros-app exec prisma generate after changes
-- Encryption:
-  - Mark sensitive fields with /// @encrypted (and hashes with @encryption:hash(...))
-  - Generated migrators appear under prisma/reencrypt; ensure post-restore/key-rotation flows integrate them
-- Add/adjust seeds in app/prisma/seed.ts only for generally applicable reference data (e.g., intervals, countries)
+## Prisma and migrations
 
-# Forecast engine changes
+- Edit app/prisma/schema.prisma, then create migrations; ensure MySQL decimal precision is appropriate (several migrations convert precision)
+- prisma-field-encryption: encrypted fields are annotated in schema.prisma (e.g., User.email, RegisterEntry.description, AccountRegister.plaid*); some fields also have hash annotations for lookup
+- Keep microservice/prisma/schema.prisma in sync for models the microservice touches (it’s a subset; do not assume full parity). A governance script exists: scripts/check-prisma-schema-governance.mjs
+- Generate client for tests/CI: pnpm --filter dineros-app exec prisma generate
 
-- Compose via ForecastEngine orchestrator with services in server/services/forecast/*
-- Extend types in forecast/types.ts and keep DateTimeService in sync for boundary logic
-- Add or update tests in server/services/forecast/__tests__ (unit + integration + regression snapshots)
-- Use ModernCacheService for performance-sensitive paths to keep tests fast and memory stable
+## Security and secrets
 
-# Background jobs and cron
+- Never commit .env; pre-commit hook blocks it (scripts/check-no-env-committed.sh)
+- Do not log secrets; use server/lib/plaidAccessTokenCrypto.ts and hashed columns for lookups
+- JWT, RSA, and DB encryption keys are managed via env and K8S secrets; rotate per deployment docs
+- Post-restore workflows overwrite or re-encrypt sensitive data for local dev; see docs/post-restore-encryption-plan.md
 
-- New recurring tasks: add under server/cron/*.ts (nuxt-cron)
-- Long-running or batch operations: consider enqueueing via server/queues/* with BullMQ
-- Provide admin/test stubs (tasks/* routes) carefully gated; see existing tasks endpoints for patterns
+## Error handling and UX
 
-# Security & secrets
+- Convert internal errors with handleApiError.ts; return user-friendly messages using app/lib/userFriendlyApiError.ts when appropriate
+- Server middleware/security headers: app/server/plugins/security-headers.ts
 
-- Never commit real secrets. Use .env.example placeholders.
-- Respect server/envSchema.ts requirements when adding new env vars (Zod-validated)
-- For Plaid and other integrations, normalize errors and avoid logging sensitive payloads
-- Field-level encryption keys are provided via env; see deployment templates and encryption docs
+## Testing
 
-# Testing expectations
+- Vitest: unit/integration with TZ=UTC; coverage tasks available
+- Playwright: E2E public/authed flows + visual snapshots; Linux baselines can be regenerated in CI (workflow: e2e-update-staging-snapshots.yml)
+- Forecast engine has a dedicated test runner and granular suites; run test:forecast:all before changes that affect balances, interest, or schedules
 
-- Unit/integration: Vitest with TZ=UTC; see app/package.json scripts
-- E2E: Playwright specs under app/tests/e2e; visual snapshots split for authed/public
-- For new endpoints/services, add Vitest coverage first; add E2E if UI interactions are changed
+## UI/UX conventions
 
-# CI/CD touch points
+- Components in components/ and feature-heavy pages under pages/
+- State via Pinia (stores/*)
+- Tailwind CSS used (assets/css/main.css)
 
-- PR workflow (pr.yml) runs lint/test/security and builds + deploys to staging in this repo (fork PRs skip deploy)
-- Default-branch workflow (main.yml) builds and deploys to production
-- CodeQL weekly, optional Sonar scan (manual)
+## Safe change recipes
+
+- Add a new API endpoint:
+  1) Create app/server/api/<path>.<method>.ts
+  2) Validate input with Zod; authz with account* helpers
+  3) Delegate to a service; add tests under server/api/__tests__
+  4) If background work, add a queue and/or cron thoughtfully
+- Modify Prisma schema:
+  1) Update app/prisma/schema.prisma
+  2) Add a migration (and parallel update in microservice if needed)
+  3) Regenerate Prisma client, run tests
+  4) Review encryption annotations and seed updates if necessary
+- Update forecast logic:
+  1) Edit forecast services in server/services/forecast/*
+  2) Run unit/integration/regression suites; ensure no balance continuity regressions
+
+## Branching, commits, CI gates
+
+- Branch names: short descriptive (see CONTRIBUTING.md)
+- Run pnpm lint and pnpm test before pushing
+- CI: PRs run lint/test/CodeQL and (for in-repo branches) build + staging deploy; main deploys to production

@@ -1,28 +1,26 @@
 ---
-description: Microservice scope, structure, and deployment notes
+description: Purpose and structure of the companion microservice; how it interacts with main app and deploy
 ---
 
 # Microservice
 
-The microservice is a small H3/Nitro server intended for operational tasks (e.g., DB encryption key rotation migration) and background helpers.
+Purpose: maintenance and operational endpoints, notably DB field-encryption key rotation/migration, using a schema subset aligned with those tasks.
 
-## Structure
+Structure:
+- server.ts — starts the service (H3/nitro style)
+- routes/
+  - migrate.get.ts, migrate.post.ts — migration/reencrypt triggers
+  - test.get.ts — simple health/test route
+- clients/ — prismaClient.ts and redisClient.ts
+- prisma/ — schema.prisma (subset), migrations, reencrypt/
+- lib/bull.ts — BullMQ helpers
+- scripts/k8s-rotate-db-key.sh — used by the special key-rotation image to rotate secrets + call /migrate
 
-- Entry: microservice/server.ts; logs at microservice/server/logger.ts
-- Routes: microservice/routes/migrate.get.ts, migrate.post.ts, test.get.ts
-- Clients: microservice/clients/prismaClient.ts, redisClient.ts
-- Prisma: microservice/prisma/schema.prisma and migrations; generated reencrypt/*
-- Utilities: microservice/lib/bull.ts for BullMQ setup
-- Docker: microservice/Dockerfile supports a special runner-keyrotate target used by staging CronJob
+Deployment:
+- K8S Deployment runs the microservice on containerPort 3050 with a ClusterIP Service
+- Receives INTERNAL_API_TOKEN via env; main app references MICROSERVICE_INTERNAL_URL for internal calls
+- A second image target (runner-keyrotate) bundles kubectl and is used by a CronJob in staging for nightly key rotation
 
-## Usage in deployment
-
-- Exposed as a ClusterIP Service on port 3050; main app talks to it via MICROSERVICE_INTERNAL_URL
-- The staging CronJob uses the runner-keyrotate image to:
-  - Patch secret ${SECRET_DB}
-  - Roll deployments
-  - Hit /migrate endpoint to run reencrypt migration over the DB with updated key set
-
-## Notes
-
-- The microservice schema is a subset of the main app’s and may lag on some entities not needed for rotation tasks. When adding encrypted models in the app that affect rotation flows, mirror them here and regenerate prisma client and reencrypt code
+Notes:
+- Keep models in microservice/prisma/schema.prisma consistent with app models it manages; it is not a full mirror
+- Build uses microservice/copy-files.sh before docker build (seen in CI pre_build_command)

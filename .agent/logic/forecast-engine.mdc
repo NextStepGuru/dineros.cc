@@ -1,36 +1,29 @@
 ---
-description: Forecast engine modules and how they collaborate (from services/forecast/*)
+description: Orientation to the forecasting subsystem — services, data flow, and tests
 ---
 
 # Forecast engine
 
-Located under app/server/services/forecast/* with extensive tests in __tests__.
+Location: app/server/services/forecast/
 
-## Modules (selected)
-
-- ForecastEngine.ts — orchestrator
-- DataLoaderService.ts — loads DB → in-memory cache
-- ModernCacheService.ts — performance-optimized cache
+Core modules (observed):
+- ForecastEngine.ts — orchestrates forecasting
+- DataLoaderService.ts — DB → in-memory cache
+- ModernCacheService.ts — optimized in-memory cache
 - AccountRegisterService.ts — register-level operations
-- ReoccurrenceService.ts — recurring schedule expansion and adjustments
-- RegisterEntryService.ts — entry-level operations
-- TransferService.ts — inter-register transfers and validations
-- LoanCalculatorService.ts — interest and amortization calculations
-- DateTimeService.ts, DateTime.ts — calendar and edge-case handling (weekends, DST, anchors)
-- DataPersisterService.ts — writes cache back to DB
-- reoccurrenceIntervals.ts — interval definitions
-- lib/rateLimiter.ts — forecast loop rate limiting
-- types.ts — shared types
+- ReoccurrenceService.ts — recurring schedule generation and adjustments
+- RegisterEntryService.ts — entry management during forecast
+- LoanCalculatorService.ts — interest and amortization
+- TransferService.ts — inter-register transfers
+- DateTime.ts / DateTimeService.ts — date math, business rules, weekend handling (see adjust_before_if_on_weekend)
+- DataPersisterService.ts — cache → DB snapshotting/persistence
+- logger.ts, reoccurrenceIntervals.ts, types.ts, lib/rateLimiter.ts — supporting utilities
 
-## Testing
+Tests:
+- Extensive unit, integration, and regression coverage under forecast/__tests__
+- Run via pnpm test:forecast and pnpm test:forecast:all (see testing.mdc)
 
-- Integration and regression suites under app/server/services/forecast/__tests__
-- Run scripts:
-  - pnpm test:forecast (custom runner)
-  - pnpm test:forecast:unit and :integration
-
-## Extending safely
-
-- Keep modules single-responsibility and pure when possible; pass dependencies explicitly rather than importing global state
-- Update types.ts for new concepts; add fixtures/tests first
-- Ensure DataLoaderService and DataPersisterService are updated to include any new computed fields persisted
+Guidance:
+- Any change to calculations should run the full forecast test suite
+- Pay attention to decimal precision and bankers rounding (see app/lib/bankers-rounding.ts and tests)
+- Ensure continuity across statement periods, interest accrual, and transfers (numerous regression tests exist)
