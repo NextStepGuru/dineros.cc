@@ -1,29 +1,28 @@
 ---
-description: Orientation to the forecasting subsystem — services, data flow, and tests
+description: Structure of the forecast engine and extension points
 ---
 
 # Forecast engine
 
-Location: app/server/services/forecast/
+Location: app/server/services/forecast/*
 
-Core modules (observed):
-- ForecastEngine.ts — orchestrates forecasting
-- DataLoaderService.ts — DB → in-memory cache
-- ModernCacheService.ts — optimized in-memory cache
-- AccountRegisterService.ts — register-level operations
-- ReoccurrenceService.ts — recurring schedule generation and adjustments
-- RegisterEntryService.ts — entry management during forecast
-- LoanCalculatorService.ts — interest and amortization
-- TransferService.ts — inter-register transfers
-- DateTime.ts / DateTimeService.ts — date math, business rules, weekend handling (see adjust_before_if_on_weekend)
-- DataPersisterService.ts — cache → DB snapshotting/persistence
-- logger.ts, reoccurrenceIntervals.ts, types.ts, lib/rateLimiter.ts — supporting utilities
+Core modules (selected)
+- ForecastEngine — orchestrator for a single run
+- DataLoaderService — loads DB state into in-memory/cache structures
+- AccountRegisterService — account-level operations and projections
+- ReoccurrenceService — schedule generation and amount adjustments
+- RegisterEntryService — materializes ledger entries
+- LoanCalculatorService — interest and amortization
+- TransferService — inter-register transfers with validation and ordering
+- DateTime/DateTimeService — date math, weekend adjustments, intervals
+- ModernCacheService — optimized in-memory caching
+- DataPersisterService — persists snapshots/results back to DB
+- getProjectedBalanceAtDate.ts — helper for point-in-time projection
 
-Tests:
-- Extensive unit, integration, and regression coverage under forecast/__tests__
-- Run via pnpm test:forecast and pnpm test:forecast:all (see testing.mdc)
+Testing
+- Extensive unit/integration/regression tests under app/server/services/forecast/__tests__
+- When changing behavior, add regression fixtures/snapshots alongside targeted unit tests
 
-Guidance:
-- Any change to calculations should run the full forecast test suite
-- Pay attention to decimal precision and bankers rounding (see app/lib/bankers-rounding.ts and tests)
-- Ensure continuity across statement periods, interest accrual, and transfers (numerous regression tests exist)
+Guidance
+- Keep deterministic results under known seeds; avoid relying on wall clock outside DateTimeService
+- Rate limits and performance tunings in forecast/lib/rateLimiter.ts — consider when expanding scope

@@ -1,85 +1,62 @@
 ---
-description: Conventions, naming, and safe-change guidance for endpoints, services, Prisma schema, and tests
+description: Coding conventions, naming, and how to change code safely
 ---
 
 # Patterns and conventions
 
-## File and naming conventions
+## General TypeScript/Nuxt
 
-- API routes: app/server/api/<path>.<method>.ts (method is .get.ts, .post.ts, .patch.ts, .delete.ts)
-- Services: app/server/services/<Domain>Service.ts; forecast/* for forecasting domain
-- Queues: app/server/queues/*Queue.ts (BullMQ)
-- Cron: app/server/cron/*.ts (nuxt-cron)
-- Clients: app/server/clients/*Client.ts (Prisma, Redis, NATS, Postmark)
-- Zod schemas: app/schema/*.ts
-- Prisma: app/prisma/schema.prisma + app/prisma/migrations/* (MySQL provider)
-- Tests: colocate under app/server/**/__tests__ or feature-specific folders
+- Node >= 24.14, TypeScript (~5.9), Nuxt 4
+- app/tsconfig.json and app/server/tsconfig.json extend Nuxt-generated configs; keep type imports/circular deps minimal
+- Prefer small, focused modules; colocate tests under __tests__ near the code or in app/tests/
 
-## API route implementation checklist
+## API routes (Nitro/H3)
 
-- Validate input with Zod (schema/zod.ts or dedicated schemas) where applicable
-- Authenticate early (server/middleware/auth.ts); require admin with server/lib/requireAdmin.ts when needed
-- Authorize per-account using accountAccess.ts and accountMembership.ts helpers
-- Delegate business logic to server/services/*; keep route handlers thin
-- Use withErrorHandler.ts or handleApiError.ts consistently; normalize external errors (e.g., Plaid) via helpers (plaidApiError.ts)
-- For long or asynchronous tasks, enqueue via server/queues/* (BullMQ) or expose tasks/* endpoints guarded appropriately
-- Add unit tests in app/server/api/__tests__ matching the route path/name
+- File paths mirror URL paths (e.g., server/api/foo/bar.get.ts → GET /api/foo/bar)
+- Method suffix: .get.ts, .post.ts, .patch.ts, .delete.ts
+- Guarding:
+  - Use app/server/middleware/auth.ts to require sessions (and server/lib/requireAdmin.ts for admin)
+  - Use withErrorHandler.ts or handleApiError.ts to normalize errors
+- Validation: use Zod schemas (app/schema/zod.ts or feature-specific files)
+- Business logic: keep endpoints thin; delegate to app/server/services/* where possible
+- Tests: add/update under app/server/api/__tests__ with Vitest
 
 ## Services
 
-- Keep pure logic in services; inject dependencies via clients (prismaClient.ts, redisClient.ts)
-- Forecast services are heavily tested — run forecast suites before shipping changes (see testing.mdc)
-- For Plaid and crypto integrations, prefer dedicated services (PlaidSyncService, PlaidTransactionEnrichmentService, AlchemyService, AssetValueEstimateService)
+- Stateless functions where possible; pass explicit inputs
+- Use server/clients/prismaClient.ts and redisClient.ts (do not instantiate Prisma directly)
+- Shared helpers in server/lib/* (e.g., getPlaidClient, registerFuturePagination, handleApiError)
 
 ## Prisma and migrations
 
-- Edit app/prisma/schema.prisma, then create migrations; ensure MySQL decimal precision is appropriate (several migrations convert precision)
-- prisma-field-encryption: encrypted fields are annotated in schema.prisma (e.g., User.email, RegisterEntry.description, AccountRegister.plaid*); some fields also have hash annotations for lookup
-- Keep microservice/prisma/schema.prisma in sync for models the microservice touches (it’s a subset; do not assume full parity). A governance script exists: scripts/check-prisma-schema-governance.mjs
-- Generate client for tests/CI: pnpm --filter dineros-app exec prisma generate
+- Edit app/prisma/schema.prisma → run prisma migrate dev (local) → commit the migration directory
+- Generate Prisma client before tests/build: pnpm --filter dineros-app exec prisma generate
+- Governance: scripts/check-prisma-schema-governance.mjs validates schema constraints in CI
+- Encrypted fields: annotated with /// @encrypted, /// @encryption:hash(...). Do not remove without a migration plan
 
-## Security and secrets
+## Queue/cron jobs
 
-- Never commit .env; pre-commit hook blocks it (scripts/check-no-env-committed.sh)
-- Do not log secrets; use server/lib/plaidAccessTokenCrypto.ts and hashed columns for lookups
-- JWT, RSA, and DB encryption keys are managed via env and K8S secrets; rotate per deployment docs
-- Post-restore workflows overwrite or re-encrypt sensitive data for local dev; see docs/post-restore-encryption-plan.md
+- Define queues in server/queues/*.ts, wired through server/clients/queuesClient.ts
+- Schedule with app/server/cron/*.ts (nuxt-cron)
+- Keep the job body idempotent and small; long-running tasks should chunk/paginate
 
-## Error handling and UX
+## Frontend
 
-- Convert internal errors with handleApiError.ts; return user-friendly messages using app/lib/userFriendlyApiError.ts when appropriate
-- Server middleware/security headers: app/server/plugins/security-headers.ts
+- Use Pinia stores in app/stores; avoid global singletons outside Pinia
+- Composables (app/composables) should be SSR-safe when used on server/route middleware
+- Components follow PascalCase; props and emits typed; prefer small units
+- Tailwind CSS with utility-first approach (see assets/css/main.css)
 
-## Testing
+## Naming
 
-- Vitest: unit/integration with TZ=UTC; coverage tasks available
-- Playwright: E2E public/authed flows + visual snapshots; Linux baselines can be regenerated in CI (workflow: e2e-update-staging-snapshots.yml)
-- Forecast engine has a dedicated test runner and granular suites; run test:forecast:all before changes that affect balances, interest, or schedules
+- Branches: feat/*, fix/*, docs/* (see CONTRIBUTING.md)
+- Files: kebab-case for modules, PascalCase for Vue SFCs
+- Envs: DATABASE_URL lives in DB-specific secret; DB_ENCRYPTION_KEY/DB_DECRYPTION_KEY_* in a separate secret (see .deploy templates)
 
-## UI/UX conventions
+## Safe change guidelines
 
-- Components in components/ and feature-heavy pages under pages/
-- State via Pinia (stores/*)
-- Tailwind CSS used (assets/css/main.css)
-
-## Safe change recipes
-
-- Add a new API endpoint:
-  1) Create app/server/api/<path>.<method>.ts
-  2) Validate input with Zod; authz with account* helpers
-  3) Delegate to a service; add tests under server/api/__tests__
-  4) If background work, add a queue and/or cron thoughtfully
-- Modify Prisma schema:
-  1) Update app/prisma/schema.prisma
-  2) Add a migration (and parallel update in microservice if needed)
-  3) Regenerate Prisma client, run tests
-  4) Review encryption annotations and seed updates if necessary
-- Update forecast logic:
-  1) Edit forecast services in server/services/forecast/*
-  2) Run unit/integration/regression suites; ensure no balance continuity regressions
-
-## Branching, commits, CI gates
-
-- Branch names: short descriptive (see CONTRIBUTING.md)
-- Run pnpm lint and pnpm test before pushing
-- CI: PRs run lint/test/CodeQL and (for in-repo branches) build + staging deploy; main deploys to production
+- Add API: create server/api path with method suffix, validate inputs, call service; add tests in server/api/__tests__
+- Change schema: create migration, generate client, update services and tests; never edit migration_lock.toml
+- Update forecast logic: prefer adding unit tests in server/services/forecast/__tests__ first; keep rateLimiter and ModernCacheService semantics intact
+- Background job changes: ensure cron/queue naming remains consistent; update deployment docs if new env vars are required
+- Security-sensitive code: never log secrets; use plaidApiError.ts and handleApiError.ts for sanitization; update .trufflehog-detectors.yaml if new secret patterns emerge

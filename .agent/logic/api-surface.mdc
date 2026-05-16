@@ -1,10 +1,10 @@
 ---
-description: Observed Nitro/H3 API endpoints and guidance for adding new ones safely
+description: Observed Nitro/H3 API endpoints and how to extend safely
 ---
 
 # API surface (observed under app/server/api)
 
-Conventions: file suffix denotes method (.get.ts, .post.ts, .patch.ts, .delete.ts). Paths mirror directories.
+Conventions: method via filename suffix (.get.ts, .post.ts, .patch.ts, .delete.ts). Paths mirror directories.
 
 Auth and user
 - login.post.ts, logout.post.ts, change-password.post.ts
@@ -50,20 +50,21 @@ Integrations
 - Plaid: plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts, plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts, webhook/plaid.post.ts
 - Crypto: crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
 - Estimates: asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
-- Admin: admin/* (accounts, users, logs, system, plaid-sync-logs)
+- Admin: admin/* (accounts, users, audit/integration logs, openai-request-logs, system-status, plaid-sync-logs)
 
 Forecast and maintenance
 - recalculate.post.ts
-- tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid.ts, sync-plaid-balance.ts, check-*, sync-google-sheet*.post.ts, test-*
+- tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid*.ts, check-*, debug/test utilities, sync-google-sheet*.post.ts
 
 Health and routes
 - routes/health/live.get.ts, routes/health/ready.get.ts
+- legacy _ah: _ah/liveness.ts, _ah/readiness.ts
 - routes/_nuxt.get.ts, routes/sitemap.xml.ts
 
 ## Implementation guidance
 
-- Use server/clients/prismaClient.ts and redisClient.ts for DB/cache
-- Wrap with withErrorHandler.ts or handleApiError.ts; map Plaid errors with plaidApiError.ts
-- Validate with Zod (app/schema/zod.ts) or feature-specific schemas
-- Enforce auth (server/middleware/auth.ts) and use requireAdmin.ts for admin routes
-- Delegate to services; add tests under server/api/__tests__
+- Use server/clients/prismaClient.ts and redisClient.ts
+- Wrap handlers with withErrorHandler.ts or handleApiError.ts; Plaid errors via plaidApiError.ts
+- Validate with Zod (app/schema/zod.ts or feature-specific schemas)
+- Enforce auth (server/middleware/auth.ts) and requireAdmin.ts when needed
+- Delegate to services in server/services/*; add Vitest coverage under server/api/__tests__

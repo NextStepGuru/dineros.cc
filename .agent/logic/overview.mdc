@@ -1,34 +1,35 @@
 ---
-description: High-level overview for AI agents and contributors — purpose, tech, packages, and where to look first
+description: High-level purpose, tech stack, and audience for dineros.cc
 ---
 
 # Dineros.cc — Overview
 
-Dineros.cc is a predictive budgeting and financial management platform. It combines a Nuxt 4 frontend with server-side API routes (Nitro/H3), a MySQL 8 database accessed via Prisma, Redis-backed queues, and a companion microservice. The codebase is TypeScript-first and organized as a PNPM workspace with two packages: the main app and a microservice.
+Dineros.cc is a Nuxt 4 + TypeScript application for predictive budgeting, real-time spending optimization, and simplified accounting. It combines a feature-rich web app, a modular server (Nitro/H3) with a large API surface, a robust financial forecast engine, queues/cron for background work, and a companion microservice used for operational tasks (e.g., DB key rotation/migrate).
 
-- Purpose: predictive budgeting, registers and entries, reoccurrences, reconciliation, reports, Plaid sync, crypto balances, savings goals, and more
-- Tech stack (observed):
-  - Nuxt 4 + Vue 3 (SSR/Nitro) and Pinia state
-  - TypeScript, Vitest for unit/integration, Playwright for E2E
-  - Prisma ORM (MySQL 8), prisma-field-encryption
-  - Redis + BullMQ for queues
-  - Plaid, Postmark, OpenAI clients
-  - Dockerfiles + GKE manifests for deploy, GCR for images
-- Audience: AI agents, maintainers, and contributors extending UI, API endpoints, business services, data model, and deployment scripts
+## Purpose
 
-## Packages (pnpm-workspace)
+- Predictive budgeting and forecasting across multiple account types
+- Register management with transfers, reconciliations, and PLAID syncing
+- Bills, notifications, categories, savings goals, and reporting
+- Security-first approach with field-level encryption and 2FA
 
-- app/ — Nuxt application, API (Nitro/H3), Prisma schema & migrations, services, queues, cron, tests
-- microservice/ — companion service with its own Prisma schema subset and routes used for maintenance (e.g., encryption key migration)
+## Tech stack
 
-## How to run locally (from repo root)
+- Frontend: Nuxt 4 (Vue 3), Tailwind CSS, Pinia
+- Backend: Nitro/H3 API routes (in Nuxt server), BullMQ (queues), Redis (cache/queues), Prisma ORM (MySQL 8)
+- Data and integrations: Plaid, Postmark, OpenAI
+- Tooling: TypeScript, Vitest, Playwright, ESLint, PNPM workspaces
+- Infra: Dockerfiles, GKE manifests/templates, GitHub Actions CI/CD
 
-- Prereqs: Node >= 24.14.0, PNPM 10+, MySQL 8, Redis (see .nvmrc, README.md)
-- Quick start:
-  - cp .env.example .env
-  - docker compose up -d (MySQL/Redis)
-  - pnpm install
-  - pnpm --filter dineros-app exec prisma migrate deploy
-  - pnpm dev (serves on http://localhost:3000)
+## Audience
 
-See README.md and AGENTS.md for environment caveats (e.g., overriding DATABASE_URL when a cloud agent injects production-like secrets).
+- Contributors working on full-stack TypeScript/Nuxt
+- Backend/service engineers working on API endpoints, background jobs, and the forecast engine
+- DevOps engineers managing CI/CD and GKE deployments
+
+## Where to start
+
+- README.md for setup, commands, and architecture sketch
+- AGENTS.md for AI-agent and cloud runner caveats
+- app/ for the main Nuxt app (frontend + server + prisma)
+- microservice/ for the companion service used in ops flows

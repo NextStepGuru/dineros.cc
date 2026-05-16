@@ -1,26 +1,22 @@
 ---
-description: BullMQ queues, Redis, and cron schedules present in the app
+description: Background queues, scheduled jobs, and where to add new ones
 ---
 
 # Queues and cron
 
-## Queues (BullMQ)
+Queues (BullMQ)
+- Defined under app/server/queues/*: backupQueue, plaidSyncQueue, plaidSyncBalanceQueue, recalculateQueue
+- queuesClient.ts wires connections and admin toggles
 
-- Defined under app/server/queues/
-  - backupQueue.ts — backups
-  - plaidSyncQueue.ts — Plaid transaction sync
-  - plaidSyncBalanceQueue.ts — Plaid balance-only sync
-  - recalculateQueue.ts — forecast recalculation
-- queuesClient.ts wires BullMQ with Redis
-- queueManager.ts and queueManagerPlugin.ts support orchestration and graceful lifecycle
+Cron jobs (nuxt-cron)
+- app/server/cron/*:
+  - backup.daily.ts — periodic backups
+  - bill-reminders.hourly.ts — bill reminder evaluation
+  - plaid.daily.ts, plaid-balance.hourly.ts — Plaid data syncs
+  - recalculate.hourly.ts — schedule forecast recalculations
+  - crypto-balance.hourly.ts — crypto balances via AlchemyService
 
-## Cron tasks (nuxt-cron)
-
-Located in app/server/cron/:
-- backup.daily.ts
-- bill-reminders.hourly.ts
-- plaid.daily.ts, plaid-balance.hourly.ts
-- recalculate.hourly.ts
-- crypto-balance.hourly.ts
-
-Cron tasks typically delegate to services (e.g., PlaidSyncService, notification services) or enqueue work onto queues. Ensure idempotency and guardrails (rateLimiter, env flags in tests) for scheduled runs.
+Patterns
+- Keep handlers small and idempotent
+- Enqueue granular jobs with clear IDs; use IntegrationJobLog for job audit where appropriate
+- Add tests for job logic in server/services/__tests__ or server/lib/__tests__ as applicable

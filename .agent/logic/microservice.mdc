@@ -1,26 +1,23 @@
 ---
-description: Purpose and structure of the companion microservice; how it interacts with main app and deploy
+description: Companion microservice responsibilities, routes, and deployment
 ---
 
 # Microservice
 
-Purpose: maintenance and operational endpoints, notably DB field-encryption key rotation/migration, using a schema subset aligned with those tasks.
+Purpose
+- Provide operational endpoints used during DB key rotations and maintenance (e.g., /migrate)
+- Maintain a minimal Prisma schema subset and reencryption logic decoupled from the main app
 
-Structure:
-- server.ts — starts the service (H3/nitro style)
-- routes/
-  - migrate.get.ts, migrate.post.ts — migration/reencrypt triggers
+Key files
+- microservice/server.ts — Nitro/H3 bootstrap
+- microservice/routes/
+  - migrate.get.ts, migrate.post.ts — entrypoints for re-encryption/migrations
   - test.get.ts — simple health/test route
-- clients/ — prismaClient.ts and redisClient.ts
-- prisma/ — schema.prisma (subset), migrations, reencrypt/
-- lib/bull.ts — BullMQ helpers
-- scripts/k8s-rotate-db-key.sh — used by the special key-rotation image to rotate secrets + call /migrate
+- microservice/clients/ — prismaClient, redisClient
+- microservice/prisma/ — schema and generated reencryption code
+- microservice/scripts/k8s-rotate-db-key.sh — invoked by CronJob to rotate K8S secret + roll Deployments + call /migrate
 
-Deployment:
-- K8S Deployment runs the microservice on containerPort 3050 with a ClusterIP Service
-- Receives INTERNAL_API_TOKEN via env; main app references MICROSERVICE_INTERNAL_URL for internal calls
-- A second image target (runner-keyrotate) bundles kubectl and is used by a CronJob in staging for nightly key rotation
-
-Notes:
-- Keep models in microservice/prisma/schema.prisma consistent with app models it manages; it is not a full mirror
-- Build uses microservice/copy-files.sh before docker build (seen in CI pre_build_command)
+Deployment
+- Built and pushed by CI to gcr.io as dineros-microservice:<sha>
+- Runner variant dineros-microservice:<sha>-keyrotate includes kubectl/jq for CronJob
+- Exposed internally via ClusterIP Service; app uses MICROSERVICE_INTERNAL_URL when needed

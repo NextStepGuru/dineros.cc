@@ -1,50 +1,38 @@
 ---
-description: Field-level encryption, hashed lookups, RSA keys, rotation flows, and restore-time handling
+description: Field-level encryption, re-encrypt flows, and key rotation
 ---
 
-# Encryption and keys
+# Encryption and key management
 
-## Field-level encryption (prisma-field-encryption)
+## Field-level encryption (Prisma)
 
-- Encrypted fields are annotated in app/prisma/schema.prisma comments, e.g.:
-  - User.email, User.password
-  - AccountRegister.name, plaidId, plaidAccessToken, walletAddress
-  - RegisterEntry.description, plaidId
-  - Reoccurrence.description
-- Some fields have deterministic hash columns for lookup (e.g., plaidAccessTokenHash, plaidIdHash, emailHash) with explicit algorithms in comments
-- Generated helpers under app/prisma/reencrypt/ support migration/re-encryption across keys
+- Implemented via prisma-field-encryption with annotations in app/prisma/schema.prisma
+- Common patterns:
+  - /// @encrypted on PII/financial data (User.email, RegisterEntry.description, AccountRegister.plaidAccessToken, walletAddress, etc.)
+  - /// @encryption:hash(field) for deterministic lookup hashes (e.g., plaidIdHash, emailHash)
+- Generated migrators:
+  - app/prisma/reencrypt/* and microservice/prisma/reencrypt/* expose migrate() to re-encrypt all annotated fields
 
-## RSA and JWT
+## Re-encrypt after DB restore
 
-- Rsa model stores keypairs (id, isDefault); server/services/RsaService.ts manages RSA operations
-- JwtService.ts and HashService.ts provide token and hashing utilities (with tests)
+- docs/post-restore-encryption-plan.md describes using generated reencrypt migrate() to convert ciphertext from source env key to local key
+- scripts/reset-encrypted-users-after-restore.ts currently provides fallback (placeholder overwrites) and should be extended to use generated migrate when source key is available
 
-## Plaid token handling
+## Key rotation (staging automation)
 
-- server/lib/plaidAccessTokenCrypto.ts — crypto logic for Plaid tokens
-- AccountRegister stores Plaid access tokens encrypted with separate hash columns for lookups
-- Plaid sync activity is logged in PlaidSyncLog (counts, durations, errors)
+- Staging CronJob (runner-keyrotate image) executes microservice/scripts/k8s-rotate-db-key.sh
+  - Rotates DB_ENCRYPTION_KEY/DB_DECRYPTION_KEY_* in ${SECRET_DB}
+  - Patches deployments (main + microservice) to roll pods
+  - Calls microservice /migrate to re-encrypt with the new key
+- RBAC in .deploy/key-rotation-rbac.template.yaml must be applied or granted via IAM (container.roles.*)
 
-## Key rotation (staging CronJob)
+## JWT/RSA and related services
 
-- .deploy/key-rotation-cronjob.template.yaml uses a special microservice image target (runner-keyrotate) to:
-  - Patch K8S secret ${SECRET_DB} containing only DB encryption key materials (DB_ENCRYPTION_KEY and any DB_DECRYPTION_KEY_n)
-  - Roll deployments (main and microservice)
-  - Call microservice routes/migrate.post.ts to apply re-encryption/database migrations as needed
-- RBAC for rotating secrets and patching deployments is in .deploy/key-rotation-rbac.template.yaml
+- app/server/services/JwtService.ts and RsaService.ts manage JWT secrets/keys and RSA material
+- rotateUserJwtKey helper: app/server/lib/rotateUserJwtKey.ts
 
-## Post-restore plan (local dev)
+## Safety notes
 
-- docs/post-restore-encryption-plan.md describes the approach:
-  - Preferred: run generated prisma/reencrypt migrate() with both source and local keys to re-encrypt
-  - Fallback (when source key is unavailable): overwrite sensitive columns with placeholders, null Plaid columns, and use friendly sample names for users/registers/entries/reoccurrences
-  - Wire-up via scripts/dump-and-restore.sh and scripts/reset-encrypted-users-after-restore.ts
-
-## Secrets layout (K8S)
-
-- SECRET_DB — only DB field-encryption secrets (not DATABASE_URL)
-- SECRET_DATABASE_MAIN / SECRET_DATABASE_MICRO — contain DATABASE_URL for each service
-- SECRET_APP — app secrets (POSTMARK, PLAID, INTERNAL_API_TOKEN, etc.)
-- SECRET_JWT — DINEROS_JWT_SECRET
-
-Follow deployment.mdc for how these are injected. Do not log or commit any key material.
+- Never log or commit keys; .trufflehog-detectors.yaml enforces scans
+- DATABASE_URL and DB_* encryption secrets are intentionally split across different K8S Secrets in templates
+- When adding encrypted fields, re-run prisma generate to refresh reencryption migrators
