@@ -1,10 +1,13 @@
 ---
-description: Observed Nitro/H3 API endpoints and how to extend safely
+description: Observed Nitro/H3 endpoints and guidance for extending the API
 ---
 
-# API surface (observed under app/server/api)
+# API surface (app/server/api)
 
-Conventions: method via filename suffix (.get.ts, .post.ts, .patch.ts, .delete.ts). Paths mirror directories.
+Conventions
+- Route path mirrors directory names; file suffix denotes method: .get.ts, .post.ts, .patch.ts, .delete.ts
+- Admin routes under admin/
+- Health endpoints live under app/server/routes/
 
 Auth and user
 - login.post.ts, logout.post.ts, change-password.post.ts
@@ -13,28 +16,25 @@ Auth and user
 - mfa/passkey: auth-options.post.ts, register-options.post.ts, register-verify.post.ts, verify.post.ts, delete.post.ts
 - user.get.ts, user.post.ts, user/notification-settings.patch.ts, validate-token.ts
 
-Accounts and membership
+Accounts and invites
 - account/[accountId]/members.get.ts, members/[userId].patch.ts, members/[userId].delete.ts
 - account-invite.get.ts, account-invite.post.ts, account-invite/[id].delete.ts, account-invite/accept.post.ts, account-invite/validate.get.ts
+
+Registers and entries
 - account-register.post.ts, account-register.delete.ts, account-register-sort.post.ts
+- register.ts
+- register-entry.post.ts, register-entry.patch.ts, register-entry.delete.ts
+- register-entry-transfer.post.ts, register-entry-transfer-create.post.ts
+- register-entry-applied.post.ts, register-entry-skip.post.ts, register-entry-match-reoccurrence.post.ts
+- snapshot.post.ts, snapshots.get.ts, snapshot/[id].get.ts, snapshot/[id].delete.ts, snapshot-register/[id].get.ts
 - account-registers/forecast-balances.get.ts
 
 Budgets and categories
 - budget.post.ts, budget/[id].patch.ts, budget/[id].delete.ts, budget/[id]/reset.post.ts
 - categories.get.ts, category.post.ts, category.patch.ts, category.delete.ts
 
-Registers and entries
-- register.ts
-- register-entry.post.ts, register-entry.patch.ts, register-entry.delete.ts
-- register-entry-transfer.post.ts, register-entry-transfer-create.post.ts
-- register-entry-applied.post.ts, register-entry-skip.post.ts, register-entry-match-reoccurrence.post.ts
-- snapshot.post.ts, snapshots.get.ts, snapshot/[id].get.ts, snapshot/[id].delete.ts, snapshot-register/[id].get.ts
-
 Reoccurrences and health
 - reoccurrence.post.ts, reoccurrence.delete.ts, reoccurrence-health.get.ts
-
-Reports
-- reports/categories.get.ts
 
 Bills
 - bills.get.ts, bills/profile/[id].patch.ts, bill-instance/[id].patch.ts, bills/reminders/evaluate.post.ts
@@ -43,28 +43,40 @@ Reconciliation
 - reconciliation/period.get.ts, reconciliation/period.post.ts, reconciliation/periods/open.get.ts
 - reconciliation/period/[id].get.ts, reconciliation/period/[id]/close.post.ts, reconciliation/item/[entryId].patch.ts
 
-Notifications
+Reports and notifications
+- reports/categories.get.ts
 - notifications.get.ts, notifications/count.get.ts, notifications/[id]/dismiss.patch.ts
 
 Integrations
 - Plaid: plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts, plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts, webhook/plaid.post.ts
 - Crypto: crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
 - Estimates: asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
-- Admin: admin/* (accounts, users, audit/integration logs, openai-request-logs, system-status, plaid-sync-logs)
+
+Cash on hand
+- cash-on-hand/[registerId].get.ts, cash-on-hand/[registerId].patch.ts
 
 Forecast and maintenance
 - recalculate.post.ts
-- tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid*.ts, check-*, debug/test utilities, sync-google-sheet*.post.ts
+- tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid.ts, sync-plaid-balance.ts, check-*, debug/test utilities, sync-google-sheet*.post.ts
 
-Health and routes
-- routes/health/live.get.ts, routes/health/ready.get.ts
+Admin
+- admin/accounts.get.ts, admin/accounts/[id].get.ts, admin/accounts/[id]/cleanup-balance-entries.post.ts, admin/accounts/[id]/recalculate.post.ts, admin/accounts/[id]/sync-plaid.post.ts
+- admin/users.get.ts, admin/users/[id].patch.ts, admin/users/[id]/plaid.get.ts, admin/users/[id]/reset-password.post.ts
+- admin/audit-logs.get.ts, admin/notification-events.get.ts, admin/integration-alerts.get.ts, admin/integration-job-logs.get.ts
+- admin/system-status.get.ts, admin/postmark/messages.get.ts, admin/openai-request-logs.get.ts
+- admin/microservice-reencrypt-migrate.post.ts
+- admin/plaid-sync-logs.get.ts
+
+Health and routes (app/server/routes)
+- health/live.get.ts, health/ready.get.ts
 - legacy _ah: _ah/liveness.ts, _ah/readiness.ts
-- routes/_nuxt.get.ts, routes/sitemap.xml.ts
+- _nuxt.get.ts, sitemap.xml.ts
 
-## Implementation guidance
-
-- Use server/clients/prismaClient.ts and redisClient.ts
-- Wrap handlers with withErrorHandler.ts or handleApiError.ts; Plaid errors via plaidApiError.ts
-- Validate with Zod (app/schema/zod.ts or feature-specific schemas)
-- Enforce auth (server/middleware/auth.ts) and requireAdmin.ts when needed
-- Delegate to services in server/services/*; add Vitest coverage under server/api/__tests__
+# Extending the API safely
+- Put new routes under app/server/api following filename method conventions
+- Validate inputs with Zod (extend app/schema/zod.ts or add a targeted schema file)
+- Enforce auth with server/middleware/auth.ts; use requireAdmin.ts if needed
+- Delegate complex work to server/services/*; keep route handlers short
+- Use server/clients/prismaClient.ts and redisClient.ts; do not instantiate new Prisma clients ad hoc
+- Wrap errors with withErrorHandler.ts or handleApiError.ts and return user-friendly messages where appropriate
+- Add tests in app/server/api/__tests__/; see existing test suites for patterns and fixtures

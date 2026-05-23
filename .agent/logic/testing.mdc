@@ -1,30 +1,36 @@
 ---
-description: Test strategy and commands (Vitest, Playwright, forecast harness)
+description: How tests are organized and how to run them quickly
 ---
 
 # Testing
 
-Unit/integration (Vitest)
-- Run: pnpm test (TZ=UTC)
-- Configs: app/vitest.config.ts, app/vitest.config.coverage.ts, app/vitest.setup.ts
-- Server/API tests under app/server/api/__tests__
-- Server/lib and services have colocated __tests__
-- Some suites mock Prisma/Redis; DATABASE_URL dummy envs provided in CI
+Unit and integration (Vitest)
+- Configs in app/vitest.config.ts, app/vitest.config.coverage.ts, app/vitest.config.all.ts
+- Run all: pnpm test (TZ=UTC)
+- Coverage: pnpm test:coverage
+- Crypto-only: pnpm test:crypto
+- Many suites under:
+  - app/server/api/__tests__ (route handlers)
+  - app/server/services/**/__tests__ (services, forecast engine)
+  - app/lib/__tests__ and app/schema/__tests__
+  - app/pages/__tests__
 
-Forecast engine harness
-- app/server/services/forecast/__tests__/test-runner.ts
-- Commands:
-  - pnpm test:forecast (quick)
-  - pnpm test:forecast:unit / :integration / :all
-  - pnpm test:forecast:performance
+Forecast engine tests
+- Runner: pnpm test:forecast (tsx server/services/forecast/__tests__/test-runner.ts)
+- Unit: pnpm test:forecast:unit
+- Integration: pnpm test:forecast:integration
+- Performance: pnpm test:forecast:performance
 
 E2E (Playwright)
-- Tests under app/tests/e2e
-- Run locally: pnpm test:e2e (projects chromium-public and chromium-authed)
-- Update snapshots (local): pnpm test:e2e:update-snapshots
-- Update snapshots vs staging (Linux via CI): .github/workflows/e2e-update-staging-snapshots.yml
+- app/tests/e2e/specs/* with public and authed projects; visual snapshots under *.spec.ts-snapshots/
+- Run: pnpm test:e2e
+- Update snapshots locally: pnpm test:e2e:update-snapshots
+- Update vs staging (Linux snapshots): .github/workflows/e2e-update-staging-snapshots.yml
 
-Conventions
-- Use TZ=UTC in tests for deterministic dates
-- Generate Prisma client before running tests that import it: pnpm --filter dineros-app exec prisma generate
-- For crypto/argon2 heavy tests: pnpm test:crypto
+Test helpers
+- app/tests/helpers/prismaMock.ts — mocking Prisma where needed
+- app/server/api/__tests__/fixtures/dbUserForSession.ts — fixtures
+
+CI nuances
+- PR workflow generates Prisma client before tests
+- Minimal envs set in workflows; tests avoid real DB/Redis by design unless explicitly required

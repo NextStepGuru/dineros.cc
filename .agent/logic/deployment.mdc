@@ -1,51 +1,44 @@
 ---
-description: CI/CD, Docker images, and GKE deployment templates
+description: CI/CD, containers, Kubernetes manifests, and runtime configuration
 ---
 
-# Deployment
+# Deployment and operations
 
-## Docker images
+Containers
+- app/Dockerfile: multi-stage, prisma generate with placeholder DATABASE_URL during build, final runner uses .output
+- microservice/Dockerfile: multi-stage, prisma generate; special target runner-keyrotate for staging CronJob
 
-- app/Dockerfile builds Nuxt output (.output) and runs node .output/server/index.mjs
-- microservice/Dockerfile builds Nitro-based service; also exposes a runner-keyrotate target with kubectl/jq for in-cluster key rotation CronJob
+Local services
+- docker-compose.yaml: MySQL 8 and Redis with local ports; volumes and healthchecks configured
+- .devcontainer/docker-compose.yml: devcontainer with MySQL/Redis services for Codespaces/devcontainers
 
-## CI/CD (GitHub Actions)
+CI/CD (GitHub Actions)
+- .github/workflows/pr.yml (PRs)
+  - Lint, tests (with generated Prisma client), pre-commit security (TruffleHog, hooks), CodeQL
+  - If PR branch is from this repo, build/push images to gcr.io and deploy to staging via .deploy manifests, then verify rollout and /health/ready
+  - Posts a Bugbot run comment (optional)
+- .github/workflows/main.yml (default branch)
+  - Build/push app and microservice images to gcr.io
+  - Deploy to production GKE using .deploy action and verify public health
+- .github/workflows/codeql.yml and sonar.yml: security and static analysis
 
-- .github/workflows/pr.yml (PR checks)
-  - Lint (pnpm lint), Tests (Vitest), pre-commit security (trufflehog + pre-commit), CodeQL
-  - Build & push images to gcr.io (app and microservice) for the PR
-  - Deploy to GKE staging (manifests rendered via .github/actions/deploy-dineros-gke)
-  - Verify rollout and GET https://staging.dineros.cc/health/ready
-- .github/workflows/main.yml (push to main/master)
-  - Build & push images to gcr.io with sha + latest tags
-  - Deploy to production GKE, then verify rollout and health
-- .github/workflows/e2e-update-staging-snapshots.yml (manual) — regenerate Playwright visual baselines against staging
-- .github/workflows/codeql.yml — scheduled CodeQL scan
-- .github/workflows/sonar.yml — optional SonarQube scan (manual)
+Kubernetes
+- .deploy/dineros.template.yaml: envsubst-rendered manifest including
+  - Namespace, Deployments (main app and microservice), Services, Ingress
+  - Secrets are referenced via envFrom and secretKeyRef (DATABASE_URL, JWT, Plaid, Postmark, INTERNAL_API_TOKEN, Redis host/port, etc.)
+  - SecurityContext set to runAsNonRoot UID 1001; readiness/liveness/startup probes hit HTTP 80 paths /health/ready and /health/live
+  - MICROSERVICE_INTERNAL_URL provided to main app
+- .deploy/key-rotation-cronjob.template.yaml and key-rotation-rbac.template.yaml
+  - Staging-only nightly DB field-encryption key rotation and microservice migrate trigger; requires RBAC Role/RoleBinding and appropriate GKE IAM for apply
 
-Authentication to GCP uses Workload Identity (google-github-actions/auth). Images are pushed with docker/build-push-action. Deploys rendered with envsubst then kubectl apply (see .github/scripts/deploy-dineros-gke.sh).
+Runtime configuration
+- Environment validated in app/server/envSchema.ts (Zod)
+- Health endpoints mounted at /health/ready and /health/live
+- Logging: server/logger.ts and service-specific logging; GCP logging wiring via GCLOUD_KEY_NAME and GOOGLE_APPLICATION_CREDENTIALS
 
-## Kubernetes manifests
+Agent/cloud notes
+- AGENTS.md documents Cursor Cloud specifics: start system MySQL and Redis, override DATABASE_URL injected secret, test behavior
 
-- .deploy/dineros.template.yaml — Namespace, Deployments (app and microservice), Services, Ingress
-  - DB secrets split: DATABASE_URL from SECRET_DATABASE_MAIN/SECRET_DATABASE_MICRO; encryption keys from SECRET_DB
-  - Env: REDIS_HOST/PORT, INTERNAL_API_TOKEN, PLAID, POSTMARK, OPENAI, JWT_SECRET
-  - Health probes hit /health/ready and /health/live routes
-- .deploy/key-rotation-cronjob.template.yaml — staging-only nightly DB key rotation; uses the microservice runner-keyrotate image
-- .deploy/key-rotation-rbac.template.yaml — Role/RoleBinding to allow the CronJob to patch secrets and roll deployments
-
-## Local development
-
-- docker-compose.yaml provides MySQL 8.0.43 and Redis 8.x locally (bound to 127.0.0.1)
-- .devcontainer/docker-compose.yml offers a devcontainer with MySQL/Redis sidecars
-- Typical flow:
-  - cp .env.example .env
-  - docker compose up -d
-  - pnpm install
-  - pnpm --filter dineros-app exec prisma migrate deploy
-  - pnpm dev
-
-## Environment variables
-
-- Required for server startup validated in app/server/env.ts + envSchema.ts
-- CI examples for tests: see pr.yml and sonar.yml (DATABASE_URL dummy, DB_ENCRYPTION_KEY minimal, PLAID_* placeholders)
+Release safety
+- Ensure prisma migrations are applied (CI deploy uses migrate deploy in image build/runtime where needed)
+- Verify probes and /health readiness before routing traffic (deployment job does an extra verification script)

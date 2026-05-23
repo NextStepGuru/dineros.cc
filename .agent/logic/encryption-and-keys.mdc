@@ -1,38 +1,27 @@
 ---
-description: Field-level encryption, re-encrypt flows, and key rotation
+description: Field-level encryption, re-encryption flow, and key rotation practices
 ---
 
-# Encryption and key management
+# Encryption and keys
 
-## Field-level encryption (Prisma)
+Field-level encryption
+- Implemented via prisma-field-encryption annotations in app/prisma/schema.prisma (/// @encrypted and hash annotations)
+- Generated helpers in app/prisma/reencrypt/* (index.ts per-model migrators)
+- Sensitive fields include User.email/password, AccountRegister.name/plaid fields/walletAddress, RegisterEntry.description/plaidId, Reoccurrence.description, etc.
 
-- Implemented via prisma-field-encryption with annotations in app/prisma/schema.prisma
-- Common patterns:
-  - /// @encrypted on PII/financial data (User.email, RegisterEntry.description, AccountRegister.plaidAccessToken, walletAddress, etc.)
-  - /// @encryption:hash(field) for deterministic lookup hashes (e.g., plaidIdHash, emailHash)
-- Generated migrators:
-  - app/prisma/reencrypt/* and microservice/prisma/reencrypt/* expose migrate() to re-encrypt all annotated fields
+Re-encryption after restore
+- docs/post-restore-encryption-plan.md describes the local-restore strategy
+- scripts/dump-and-restore.sh invokes scripts/reset-encrypted-users-after-restore.ts to sanitize or re-encrypt data
+- Strategy supports:
+  - Using source env key + local key to re-encrypt via generated migrate() where available
+  - Fallback placeholder overwrites for sensitive fields when source key is absent
 
-## Re-encrypt after DB restore
+Key rotation (staging)
+- .deploy/key-rotation-cronjob.template.yaml schedules nightly append-only DB key rotation
+- Cron container uses microservice Docker image target runner-keyrotate and runs scripts/k8s-rotate-db-key.sh to update secrets and restart Deployments, then triggers microservice migration endpoint
+- RBAC in .deploy/key-rotation-rbac.template.yaml must be applied with appropriate permissions
 
-- docs/post-restore-encryption-plan.md describes using generated reencrypt migrate() to convert ciphertext from source env key to local key
-- scripts/reset-encrypted-users-after-restore.ts currently provides fallback (placeholder overwrites) and should be extended to use generated migrate when source key is available
-
-## Key rotation (staging automation)
-
-- Staging CronJob (runner-keyrotate image) executes microservice/scripts/k8s-rotate-db-key.sh
-  - Rotates DB_ENCRYPTION_KEY/DB_DECRYPTION_KEY_* in ${SECRET_DB}
-  - Patches deployments (main + microservice) to roll pods
-  - Calls microservice /migrate to re-encrypt with the new key
-- RBAC in .deploy/key-rotation-rbac.template.yaml must be applied or granted via IAM (container.roles.*)
-
-## JWT/RSA and related services
-
-- app/server/services/JwtService.ts and RsaService.ts manage JWT secrets/keys and RSA material
-- rotateUserJwtKey helper: app/server/lib/rotateUserJwtKey.ts
-
-## Safety notes
-
-- Never log or commit keys; .trufflehog-detectors.yaml enforces scans
-- DATABASE_URL and DB_* encryption secrets are intentionally split across different K8S Secrets in templates
-- When adding encrypted fields, re-run prisma generate to refresh reencryption migrators
+Do/do not
+- Do not log decrypted values or keys
+- Keep DATABASE_URL and DB_ENCRYPTION_KEY out of code; inject via Kubernetes secrets or .env locally
+- When adding new encrypted fields, ensure annotations exist in schema; run prisma generate to refresh reencrypt code

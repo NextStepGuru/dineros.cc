@@ -1,22 +1,30 @@
 ---
-description: Background queues, scheduled jobs, and where to add new ones
+description: Background processing via BullMQ and scheduled jobs via nuxt-cron
 ---
 
 # Queues and cron
 
 Queues (BullMQ)
-- Defined under app/server/queues/*: backupQueue, plaidSyncQueue, plaidSyncBalanceQueue, recalculateQueue
-- queuesClient.ts wires connections and admin toggles
+- Definitions under app/server/queues/
+  - backupQueue.ts
+  - plaidSyncQueue.ts and plaidSyncBalanceQueue.ts
+  - recalculateQueue.ts
+- Use server/lib/queueManager.ts and server/clients/queuesClient.ts for consistent setup
+- Admin UI via @bull-board/h3 is present as a dependency; SHOW_BULL_MQ_ADMIN controls visibility in prod manifests
 
 Cron jobs (nuxt-cron)
-- app/server/cron/*:
-  - backup.daily.ts — periodic backups
-  - bill-reminders.hourly.ts — bill reminder evaluation
-  - plaid.daily.ts, plaid-balance.hourly.ts — Plaid data syncs
-  - recalculate.hourly.ts — schedule forecast recalculations
-  - crypto-balance.hourly.ts — crypto balances via AlchemyService
+- app/server/cron/* — scheduled tasks, e.g.:
+  - backup.daily.ts
+  - bill-reminders.hourly.ts
+  - plaid.daily.ts, plaid-balance.hourly.ts
+  - recalculate.hourly.ts
+- Cron triggers should enqueue work onto queues; keep cron handlers lightweight and idempotent
 
-Patterns
-- Keep handlers small and idempotent
-- Enqueue granular jobs with clear IDs; use IntegrationJobLog for job audit where appropriate
-- Add tests for job logic in server/services/__tests__ or server/lib/__tests__ as applicable
+Tasks endpoints
+- app/server/api/tasks/* — http-invoked maintenance/debug triggers (seed, migrate, sync, test helpers)
+- Gate dangerous tasks behind internal tokens or admin checks
+
+Guidelines
+- Prefer small jobs with retries and observability (IntegrationJobLog for external-facing work)
+- Avoid long DB transactions in workers; batch work and checkpoint
+- Ensure Redis availability is validated via clients/redisClient.ts
