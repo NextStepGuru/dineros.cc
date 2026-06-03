@@ -4,7 +4,7 @@ FROM node:24-alpine AS base
 WORKDIR /repo
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # ---- Dependencies (cacheable layer) ----
 FROM base AS deps
@@ -26,6 +26,8 @@ RUN pnpm prisma generate
 FROM node:24-alpine AS runner
 WORKDIR /repo/microservice
 ENV NODE_ENV=production
+# pnpm must not prompt when workspace prep touches node_modules (no TTY in K8s)
+ENV CI=true
 
 RUN addgroup --system --gid 1001 appgroup \
   && adduser --system --uid 1001 --ingroup appgroup appuser
@@ -33,7 +35,7 @@ RUN addgroup --system --gid 1001 appgroup \
 # Set up pnpm environment for runtime
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Copy workspace install and microservice sources from build stage
 COPY --from=build /repo/node_modules /repo/node_modules

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import prismaPkg from "@prisma/client";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { prismaMariaDbPoolConfig } from "../lib/prismaMariaDbAdapterConfig";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "~/lib/normalizePrismaDmmf";
 import env from "../env";
@@ -30,7 +31,7 @@ export function createAppPrisma(): {
     throw new Error("DATABASE_URL is required for Prisma initialization.");
   }
 
-  const adapter = new PrismaMariaDb(databaseUrl);
+  const adapter = new PrismaMariaDb(prismaMariaDbPoolConfig(databaseUrl));
 
   const baseClient = new PrismaClient({
     log: ["warn"],

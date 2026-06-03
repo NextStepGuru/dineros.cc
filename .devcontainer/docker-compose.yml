@@ -23,7 +23,7 @@ services:
       MYSQL_ROOT_PASSWORD: dineros
       MYSQL_DATABASE: dineros
     ports:
-      - "3309:3306"
+      - "3316:3306"
     networks:
       - dineros
     healthcheck:
