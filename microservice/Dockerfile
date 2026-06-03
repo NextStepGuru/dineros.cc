@@ -51,8 +51,8 @@ EXPOSE $PORT
 
 USER appuser
 
-# Use test-start script for testing (skips migration)
-CMD ["sh", "-c", "if [ \"$NODE_ENV\" = \"test\" ]; then pnpm test-start; else pnpm start; fi"]
+# Do not invoke pnpm at runtime (workspace install can OOM under the 1Gi K8s limit).
+CMD ["sh", "-c", "if [ \"$NODE_ENV\" = \"test\" ]; then exec /repo/node_modules/.bin/tsx server.ts; else node migrate-with-retry.js && exec /repo/node_modules/.bin/tsx server.ts; fi"]
 
 # ---- Staging CronJob: kubectl + curl + jq for in-cluster DB key rotation (not the default image) ----
 FROM runner AS runner-keyrotate
