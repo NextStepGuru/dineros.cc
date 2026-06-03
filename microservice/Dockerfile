@@ -4,7 +4,7 @@ FROM node:24-alpine AS base
 WORKDIR /repo
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # ---- Dependencies (cacheable layer) ----
 FROM base AS deps
@@ -35,7 +35,7 @@ RUN addgroup --system --gid 1001 appgroup \
 # Set up pnpm environment for runtime
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Copy workspace install and microservice sources from build stage
 COPY --from=build /repo/node_modules /repo/node_modules
