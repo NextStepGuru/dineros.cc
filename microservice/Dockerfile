@@ -26,6 +26,8 @@ RUN pnpm prisma generate
 FROM node:24-alpine AS runner
 WORKDIR /repo/microservice
 ENV NODE_ENV=production
+# pnpm must not prompt when workspace prep touches node_modules (no TTY in K8s)
+ENV CI=true
 
 RUN addgroup --system --gid 1001 appgroup \
   && adduser --system --uid 1001 --ingroup appgroup appuser

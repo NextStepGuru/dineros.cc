@@ -14,6 +14,7 @@
 import * as dotenv from "dotenv";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { prismaMariaDbPoolConfig } from "../app/server/lib/prismaMariaDbAdapterConfig";
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 import { fieldEncryptionExtension } from "prisma-field-encryption";
 import { normalizePrismaDmmfForFieldEncryption } from "../app/lib/normalizePrismaDmmf";
@@ -48,7 +49,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const adapter = new PrismaMariaDb(databaseUrl);
+const adapter = new PrismaMariaDb(prismaMariaDbPoolConfig(databaseUrl));
 
 const prisma = new PrismaClient({ adapter }).$extends(
   fieldEncryptionExtension({

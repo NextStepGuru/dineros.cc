@@ -150,7 +150,7 @@ ${OPTIONAL_E2E_SEED_ENTRY}
               path: /health/ready
               port: 80
             periodSeconds: 5
-            timeoutSeconds: 2
+            timeoutSeconds: 5
             failureThreshold: 2
           livenessProbe:
             httpGet:
@@ -164,6 +164,7 @@ ${OPTIONAL_E2E_SEED_ENTRY}
               path: /health/live
               port: 80
             periodSeconds: 5
+            timeoutSeconds: 3
             failureThreshold: 30
       volumes:
         - name: service-account-volume

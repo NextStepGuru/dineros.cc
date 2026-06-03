@@ -1,5 +1,6 @@
 import prismaPkg from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { prismaMariaDbPoolConfig } from "../server/lib/prismaMariaDbAdapterConfig";
 import { accounts } from "./backup/accounts";
 import { accountRegisters } from "./backup/accountRegisters";
 import { users } from "./backup/users";
@@ -287,7 +288,7 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required for Prisma initialization.");
 }
 
-const adapter = new PrismaMariaDb(databaseUrl);
+const adapter = new PrismaMariaDb(prismaMariaDbPoolConfig(databaseUrl));
 
 export const prisma = new PrismaClient({ adapter }).$extends(
   fieldEncryptionExtension({
