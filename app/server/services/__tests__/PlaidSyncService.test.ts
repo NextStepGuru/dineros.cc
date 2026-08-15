@@ -36,9 +36,9 @@ describe("PlaidSyncService", () => {
       createNewTransaction: vi.fn(),
     };
 
-    (TransactionMatchingService as any).mockImplementation(
-      () => mockTransactionMatcher
-    );
+    (TransactionMatchingService as any).mockImplementation(function () {
+      return mockTransactionMatcher;
+    });
 
     plaidSyncService = new PlaidSyncService();
   });

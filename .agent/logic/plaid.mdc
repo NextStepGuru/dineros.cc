@@ -1,0 +1,46 @@
+---
+description: Plaid Link, transaction sync, balance updates, and common pitfalls
+---
+
+# Plaid
+
+## Link and token storage
+
+- Link token: `app/server/api/plaid-link.ts` — products `[Transactions]` only (no Balance product).
+- Public token exchange: `plaid-link.post.ts` — stores encrypted `access_token` in `user.settings.plaid`, upserts `PlaidItem`, enqueues initial item sync.
+- Register linking: `plaid-link-accounts.post.ts` — sets `AccountRegister.plaidId`, `plaidAccessToken`, `plaidJson`.
+- Settings token crypto: `plaidAccessTokenCrypto.ts` (AES-GCM for settings blob; register columns use prisma-field-encryption).
+
+## Sync paths (`PlaidSyncService`)
+
+1. **Item cursor** (`syncItemWithTransactionsSync`): when `itemId` is set (webhook, admin account sync, post-link).
+   - Resolve access token from user’s Plaid settings via `PlaidItem`.
+   - Loop `/transactions/sync` until `has_more` is false; apply added/modified/removed; upsert `PlaidSyncCursor`.
+2. **Legacy token batch** (`getAndSyncPlaidAccounts` without `itemId`): daily cron.
+   - Group non-archived registers by `plaidAccessToken`; `/transactions/get` by date window; update `plaidLastSyncAt`.
+
+After either path: **inline** `getAllAccountsByAccessTokenAndUpdateBalance` (best-effort), then enqueue `recalculate` for affected accounts. Do not depend solely on a delayed balance queue job.
+
+## Balance updates
+
+- API: `/accounts/get` (`accountsGet`) — works with Transactions product; do not use `accountsBalanceGet` unless Balance is linked.
+- Resolve registers: equality on `plaidAccessToken` + in-memory filter on decrypted `plaidId` (never `plaidId: { in }` — encrypted field).
+- Write **both** `balance` and `latestBalance`; set `plaidBalanceLastSyncAt`.
+- Amounts: debit prefer `current` then `available`; credit negate `current`. Skip null/non-numeric.
+- Hourly: `plaid-balance.hourly.ts` → `plaid-sync-balance` queue; skips if `plaidBalanceLastSyncAt` within **6 hours**.
+- Manual force: `tasks/sync-plaid-balance.ts` with `force: true` (unique jobId, delay 0).
+
+## Webhooks (`webhook/plaid.post.ts`)
+
+- TRANSACTIONS + SYNC_UPDATES_AVAILABLE / DEFAULT_UPDATE / INITIAL_UPDATE / HISTORICAL_UPDATE → enqueue item sync (`delay: 0`).
+- ITEM ERROR / LOGIN_REQUIRED → `markPlaidItemReauthRequired`.
+
+## Triggers
+
+- Cron: `plaid.daily.ts` (txn sync), `plaid-balance.hourly.ts` (balance).
+- Admin: `admin/accounts/[id]/sync-plaid.post.ts`, `tasks/sync-plaid.ts`.
+- Logs: `PlaidSyncLog` / admin `plaid-sync-logs`; credential errors via `integrationOpsAlert`.
+
+## Pitfall (balances “stuck”, txns OK)
+
+Encrypted `plaidId` lookups with `in` / ciphertext `updateMany` match zero rows. Transactions still work via token-scoped register maps. Fix: load by token (or id), filter/update by register `id`. See `.cursor/rules/encrypted-prisma-queries.mdc` and `plaid-sync.mdc`.

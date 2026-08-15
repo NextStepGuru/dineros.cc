@@ -4,6 +4,9 @@ description: How tests are organized and how to run them quickly
 
 # Testing
 
+Agent policy
+- Do **not** add, modify, or run tests unless the user directly asks — `.cursor/rules/05-workflow-execution.mdc` and `testing-vitest-nuxt.mdc`.
+
 Unit and integration (Vitest)
 - Configs in app/vitest.config.ts, app/vitest.config.coverage.ts, app/vitest.config.all.ts
 - Run all: pnpm test (TZ=UTC)
@@ -29,6 +32,7 @@ E2E (Playwright)
 
 Test helpers
 - app/tests/helpers/prismaMock.ts — mocking Prisma where needed
+- app/tests/helpers/mockConstructable.ts — Vitest 4 constructable class mocks (`new`); never use arrow `mockImplementation` for classes
 - app/server/api/__tests__/fixtures/dbUserForSession.ts — fixtures
 
 CI nuances

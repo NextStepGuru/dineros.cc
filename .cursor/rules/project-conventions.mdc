@@ -11,4 +11,25 @@ Quick checklist; full wording is in the files under `.cursor/rules/`.
 - **Build / dev server / typecheck**: Never run unless the user asks — `00-global-safety.mdc`.
 - **Tests**: Do not add, modify, or run tests unless the user asks — `05-workflow-execution.mdc`. Vitest + Nuxt project layout and config files — `testing-vitest-nuxt.mdc`.
 - **Prisma / migrations**: Shared client and migration policy — `backend-best-practices.mdc` (sections **Data Access** and **Prisma schema and migrations**). **Account membership** (`UserAccount` capabilities, list filtering) — **Data Access** in `backend-best-practices.mdc`; microservice env — `backend-security-and-ops.mdc`.
+- **Encrypted field queries**: Never `in`/`contains` on `@encrypted` columns — `encrypted-prisma-queries.mdc`; details — `.agent/logic/encryption-and-keys.mdc`.
+- **Plaid**: Sync + balance write path — `plaid-sync.mdc`; encyclopedia — `.agent/logic/plaid.mdc`.
+- **Register balances** (`balance` vs `latestBalance`): `register-balances.mdc`; model notes — `.agent/logic/data-model.mdc`.
+- **Forecast money rounding**: `forecast-money-rounding.mdc`; engine notes — `.agent/logic/forecast-engine.mdc`.
 - **Code style / TS / Zod**: `10-code-style-and-ts.mdc`.
+
+## Domain docs (`.agent/logic/`)
+
+Read the matching file when working in that area (not always-applied):
+
+- `overview.mdc` — purpose / stack
+- `architecture.mdc` — directory map
+- `data-model.mdc` — Prisma entities, balance fields
+- `api-surface.mdc` — API routes
+- `queues-and-cron.mdc` — BullMQ + cron
+- `encryption-and-keys.mdc` — field encryption
+- `plaid.mdc` — Plaid link / sync / balances
+- `forecast-engine.mdc` — forecast modules
+- `microservice.mdc` — companion service
+- `deployment.mdc` — CI / GKE
+- `patterns.mdc` — conventions (respect agent policy above)
+- `testing.mdc` — how tests are organized

@@ -10,12 +10,18 @@ Core entities
 - Budget: scoped under Account; links to registers, goals, notifications, bills, reconciliation
 - AccountRegister: an account/register ledger row with many financial attributes
   - Types via AccountType (credit/loan flags, accrual behavior, registerClass)
-  - Balance, limits, APRs, loan parameters, sort orders, min balances
-  - Optional Plaid linkage (ids and access token encrypted + hashed)
+  - **`balance`**: accounts-list / table display column
+  - **`latestBalance`**: live bank/user snapshot (Plaid, Alchemy, cash, user edit); future ledger and register dropdown start here
+  - Keep both in sync when writing a live snapshot (Plaid sets both). Clearing/applying an entry increments both.
+  - Forecast must not overwrite `latestBalance` (see forecast-engine.mdc)
+  - Limits, APRs, loan parameters, sort orders, min balances
+  - Optional Plaid linkage (ids and access token encrypted + hashed); `plaidLastSyncAt`, `plaidBalanceLastSyncAt`
   - Optional vehicle/asset depreciation fields; crypto wallet address (encrypted)
   - Relationships: entries, reoccurrences, splits, bill profiles/instances, snapshots, savingsGoals, collateral relations, child registers, categories for default payment/interest
 - RegisterEntry: a ledger entry for a register
   - amount, balance, createdAt, typeId (RegisterEntryType), flags (projected, reconciled, pending, cleared, matched, balance-entry, manual)
+  - **Future tab**: uncleared, non-reconciled rows (`isCleared: false`, `isReconciled: false`) until the user clears them
+  - **Past tab**: cleared / balance-entry / reconciled
   - Plaid linkage (encrypted ids + JSON)
   - categoryId optional, memo optional; referenceId/checkNo optional; seq ordering
 

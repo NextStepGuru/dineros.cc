@@ -3,6 +3,27 @@
 This file is for AI agent and CI/cloud execution guidance.
 If you are contributing code as a person, start with `README.md` and `CONTRIBUTING.md`.
 
+## Domain docs (read when relevant)
+
+Policy and do/don’t live in `.cursor/rules/`. How the system works lives in `.agent/logic/` — **Read** the matching file before changing that area; nothing auto-loads these.
+
+| Topic | File |
+| --- | --- |
+| Stack / purpose | `.agent/logic/overview.mdc` |
+| Directory map / data flow | `.agent/logic/architecture.mdc` |
+| Prisma models / balance fields | `.agent/logic/data-model.mdc` |
+| API routes | `.agent/logic/api-surface.mdc` |
+| BullMQ + nuxt-cron | `.agent/logic/queues-and-cron.mdc` |
+| Field encryption / queries | `.agent/logic/encryption-and-keys.mdc` |
+| Plaid link / sync / balances | `.agent/logic/plaid.mdc` |
+| Forecast engine | `.agent/logic/forecast-engine.mdc` |
+| Microservice | `.agent/logic/microservice.mdc` |
+| Deploy / CI | `.agent/logic/deployment.mdc` |
+| Conventions / checklists | `.agent/logic/patterns.mdc` |
+| Test layout (commands when user asks) | `.agent/logic/testing.mdc` |
+
+When behavior changes, update the matching `.agent/logic` file and any globbed rule under `.cursor/rules/` (see `00-global-safety.mdc` → Rule Updates).
+
 ## Cursor Cloud specific instructions
 
 ### Infrastructure

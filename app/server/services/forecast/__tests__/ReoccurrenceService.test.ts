@@ -892,16 +892,16 @@ describe("ReoccurrenceService", () => {
 
       it("should calculate monthly occurrence without weekend consideration", () => {
         const reoccurrence = createMockReoccurrence({
-          lastAt: new Date("2024-11-30T00:00:00.000Z"), // Saturday
+          lastAt: new Date("2024-11-30T00:00:00.000Z"), // Saturday (EOM)
           intervalId: 3, // Monthly
           intervalCount: 1,
           adjustBeforeIfOnWeekend: true,
         });
 
-        // Should return raw next month occurrence
+        // EOM-sticky → Dec 31; weekend adjust is not applied in calculateNextOccurrence
         const result = service.calculateNextOccurrence(reoccurrence);
 
-        expect(result).toEqual(new Date("2024-12-30T00:00:00.000Z")); // Monday
+        expect(result).toEqual(new Date("2024-12-31T00:00:00.000Z"));
       });
 
       it("should calculate yearly occurrence without weekend consideration", () => {

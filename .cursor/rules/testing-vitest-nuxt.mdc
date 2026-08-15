@@ -19,7 +19,7 @@ Official reference: [Nuxt 4 — Testing](https://nuxt.com/docs/4.x/getting-start
 Do **not** set global `test.environment: 'nuxt'` for the entire suite (slow; hybrid-env pitfalls per Nuxt docs).
 
 - **`node`** project: `environment: 'node'`. Include/exclude globs: **`app/vitest.test-globs.ts`** (`vitestNodeTestIncludes`, `vitestNodeProjectExcludes`). The node project **excludes** `tests/nuxt/**` and `**/*.nuxt.{test,spec}.ts` so those files run only under the Nuxt project.
-- **`nuxt`** project: built with **`defineVitestProject`** from `@nuxt/test-utils/config`. Includes **`app/tests/nuxt/**/_.test.ts`** and **`\*\*/_.nuxt.{test,spec}.ts`** — use for composables/pages/plugins that need **`useNuxtApp`\*\*, auto-imports, or full Nuxt pipeline.
+- **`nuxt`** project: built with **`defineVitestProject`** from `@nuxt/test-utils/config`. Includes **`app/tests/nuxt/**/*.test.ts`** and **`**/*.nuxt.{test,spec}.ts`** — use for composables/pages/plugins that need **`useNuxtApp`**, auto-imports, or full Nuxt pipeline.
 
 ## `~/` resolution in Vitest
 
@@ -32,7 +32,11 @@ Aliases are centralized in **`app/vitest.resolve-aliases.ts`** (`vitestResolveAl
 
 ## Package versions
 
-- **`@nuxt/test-utils` v3.x** matches **Vitest 3** currently in use. **`@nuxt/test-utils` v4+** declares a peer on **`vitest ^4.0.2`** — upgrade Vitest and test-utils together when moving to that stack.
+- **`@nuxt/test-utils` v4.x** peers **`vitest ^4`** and aligns with **Nuxt 4.5 / Vite 8**. Pool options are top-level (`maxWorkers`, `isolate`); do not use removed `test.poolOptions`.
+
+## Class / constructor mocks (Vitest 4)
+
+Mocks called with `new` must use `function`/`class` `mockImplementation` (or [`app/tests/helpers/mockConstructable.ts`](app/tests/helpers/mockConstructable.ts)), never arrow functions — arrows throw `is not a constructor`.
 
 ## Agent policy
 

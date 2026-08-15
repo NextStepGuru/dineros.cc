@@ -75,9 +75,9 @@ const { twoFaHashVerify } = vi.hoisted(() => ({
   twoFaHashVerify: vi.fn().mockResolvedValue(true),
 }));
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    verify: twoFaHashVerify,
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { verify: twoFaHashVerify };
+  }),
 }));
 
 describe("Two-Factor Authentication API Endpoints", () => {

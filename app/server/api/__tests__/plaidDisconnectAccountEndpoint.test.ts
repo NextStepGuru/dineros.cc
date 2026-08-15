@@ -58,7 +58,9 @@ describe("POST /api/plaid-disconnect-account", () => {
     const { PlaidApi } = await import("plaid");
     (
       PlaidApi as unknown as { mockImplementation: (_fn: unknown) => void }
-    ).mockImplementation(() => mockPlaidClient);
+    ).mockImplementation(function () {
+      return mockPlaidClient;
+    });
     const mod = await import("../plaid-disconnect-account.post");
     handler = mod.default as typeof handler;
     const { getUser } = await import("~/server/lib/getUser");

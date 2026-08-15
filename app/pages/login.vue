@@ -351,5 +351,5 @@ async function startPasskeySignIn() {
       template(#fallback)
         AuthFormCard(icon="i-lucide-log-in" title="Welcome back" :subtitle="null")
           div(class="flex justify-center py-8")
-            UIcon(name="i-lucide-loader-2" class="animate-spin size-8 text-primary")
+            UIcon(name="i-lucide-loader-circle" class="animate-spin size-8 text-primary")
 </template>

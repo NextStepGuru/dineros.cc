@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mockConstructable } from "~/tests/helpers/mockConstructable";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 vi.hoisted(() => {
@@ -39,7 +40,7 @@ const mockHashService = {
   hash: vi.fn(),
 };
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => mockHashService),
+  default: mockConstructable(mockHashService),
 }));
 
 // Mock logger

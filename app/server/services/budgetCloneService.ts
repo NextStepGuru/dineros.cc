@@ -200,6 +200,7 @@ async function cloneReoccurrenceRows(
         transferAccountRegisterId: newTransferId,
         intervalCount: ro.intervalCount,
         lastAt: ro.lastAt,
+        scheduleAnchorAt: ro.scheduleAnchorAt ?? ro.lastAt,
         endAt: ro.endAt,
         totalIntervals: ro.totalIntervals,
         elapsedIntervals: ro.elapsedIntervals,

@@ -1887,7 +1887,7 @@ async function recalcAccount() {
       v-if="showRegisterFilterHydrationBanner"
       class="flex justify-center items-center gap-2 py-2.5 px-2 mb-2 rounded-md border border-primary/40 bg-default/90"
     )
-      USpinner(size="sm" color="primary")
+      UIcon(name="i-lucide-loader-circle" class="animate-spin size-4 text-primary")
       span(class="text-sm frog-text-muted") Searching the full register… Matching rows appear as each batch loads.
 
     div(

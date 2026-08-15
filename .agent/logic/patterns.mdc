@@ -4,10 +4,13 @@ description: Conventions, naming, validation, error handling, and safe-change ch
 
 # Coding patterns and conventions
 
+Agent policy (always wins)
+- Do not build, start the dev server, typecheck, migrate, deploy, commit, or run/add tests unless the user explicitly asks — see `.cursor/rules/00-global-safety.mdc` and `05-workflow-execution.mdc`.
+- Checklists below are for humans / when the user requests those steps.
+
 TypeScript and style
 - TypeScript everywhere; keep strictness aligned with repo configs
 - Follow existing patterns in the file you edit; prefer small, focused changes
-- Lint before commit (pnpm lint) and keep unit tests green (pnpm test)
 
 API endpoints (app/server/api)
 - File naming encodes HTTP method: foo.get.ts, bar.post.ts, item/[id].patch.ts, etc.
@@ -18,7 +21,6 @@ API endpoints (app/server/api)
   - handleApiError.ts and plaidApiError.ts for integration error normalization
 - Access persistence via server/clients/prismaClient.ts; avoid creating ad-hoc clients in routes
 - Delegate nontrivial logic to server/services/*; keep routes thin
-- Add tests under app/server/api/__tests__ matching the feature area
 
 Services
 - Place domain logic in server/services/*; keep a clear public method surface
@@ -31,6 +33,7 @@ Data validation and schemas
 
 Encryption and secrets
 - Many Prisma fields are annotated with /// @encrypted (see app/prisma/schema.prisma)
+- Never `in`/`contains` on encrypted fields — `.cursor/rules/encrypted-prisma-queries.mdc` and encryption-and-keys.mdc
 - Use server/services/RsaService.ts, server/lib/plaidAccessTokenCrypto.ts helpers when handling secrets
 - Never log plaintext secrets or sensitive PII
 
@@ -43,25 +46,24 @@ Naming
 - Services: <Domain>Service.ts (e.g., PlaidSyncService, NotificationCenterService)
 - Tests: mirror source structure (e.g., server/services/foo/__tests__/Foo.test.ts)
 
-# Safe change checklists
+# Safe change checklists (when the user asks)
 
 Schema changes (Prisma)
-- Edit app/prisma/schema.prisma only; run prisma migrate dev (local) and check generated SQL
+- Edit app/prisma/schema.prisma (and microservice schema if shared tables change)
+- Prefer asking the user to create a **manual migration**; agents must not run `prisma migrate dev` / `db push` unless explicitly requested (backend-best-practices.mdc)
 - Ensure decimal precision is appropriate for money fields (Decimal(19,2) common)
 - Respect field encryption annotations; do not remove /// @encrypted unless intended
-- Regenerate client: pnpm --filter dineros-app exec prisma generate
-- Update seeds if new reference data is needed (app/prisma/seed.ts)
-- If microservice depends on the same tables, check microservice/prisma/schema.prisma; it is a subset and may require updates
+- When the user asks: regenerate client (`prisma generate`), update seeds if needed
 
 API changes
 - Update or add Zod schemas
 - Keep handler thin; delegate to service
-- Add/extend unit tests under app/server/api/__tests__
+- Add/extend unit tests only when the user asks
 - Check auth coverage and admin guards
 
 Forecast engine
 - Prefer extending existing modules (AccountRegisterService, ReoccurrenceService, TransferService, LoanCalculatorService, etc.)
-- Run targeted tests:
+- When the user asks for tests:
   - pnpm test:forecast:unit
   - pnpm test:forecast:integration
   - pnpm test:forecast (scenario runner)
@@ -82,11 +84,11 @@ Errors and responses
 - Log integration failures through recordIntegrationJobLog.ts or recordPlaidSyncLog.ts
 
 Testing
-- Add unit tests near the code; use app/tests/helpers/prismaMock.ts when needed
-- API tests live under app/server/api/__tests__ with fixtures
-- E2E: add Playwright specs in app/tests/e2e (visual snapshots are per-OS)
+- Agents: do not add or run tests unless the user asks
+- When adding tests (user-requested): unit near the code; API under app/server/api/__tests__; e2e under app/tests/e2e
 
 CI and deployment
 - PRs run lint/test, build images, and deploy to staging if from the main repo
 - Default branch builds + deploys to production
 - Use .deploy/dineros.template.yaml for k8s resource references when reasoning about env vars
+- Agents: do not deploy unless the user asks

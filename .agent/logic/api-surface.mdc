@@ -49,6 +49,7 @@ Reports and notifications
 
 Integrations
 - Plaid: plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts, plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts, webhook/plaid.post.ts
+- Plaid behavior (sync/balances): see `.agent/logic/plaid.mdc`
 - Crypto: crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
 - Estimates: asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
 

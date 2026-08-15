@@ -1,0 +1,27 @@
+---
+description: AccountRegister balance vs latestBalance and who may write them
+globs: app/server/services/forecast/**,app/pages/account-registers.vue,app/pages/register/**,app/server/api/register.ts
+alwaysApply: false
+---
+
+# Register balances
+
+## Fields
+
+- **`latestBalance`**: live bank/user snapshot (Plaid, Alchemy, cash count, user edit). Source of truth for future ledger start and register dropdown.
+- **`balance`**: accounts-table / list display column. Keep in sync when writing a live snapshot (Plaid sets both).
+
+## Who writes what
+
+- **Plaid / Alchemy / cash / register upsert**: **set** both to the snapshot amount.
+- **Clear / apply entry** (`register-entry-applied`): **increment** both by the entry amount.
+- **Forecast**: must **not** persist `latest_balance` (see `ForecastEngine` — Plaid/user are source of truth). DataLoader copies `latestBalance` into in-memory `balance` for projections only.
+
+## UI
+
+- Accounts page (`account-registers.vue`): uses `reg.balance` (and forecast overlay when enabled).
+- Register page dropdown / future ledger: start from `latestBalance` (pockets adjusted via `calculateAdjustedBalance`).
+
+If balances look stale after new Plaid txns, check balance sync write path (`plaid-sync.mdc`), not forecast.
+
+Details: `.agent/logic/data-model.mdc`, `.agent/logic/forecast-engine.mdc`.

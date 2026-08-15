@@ -137,6 +137,8 @@ export async function createTestDatabase(): Promise<PrismaClient> {
         const row = {
           ...data.data,
           id: data.data.id ?? reoccurrences.length + 1,
+          scheduleAnchorAt:
+            data.data.scheduleAnchorAt ?? data.data.lastAt ?? null,
           interval: { name: mockIntervalName(data.data.intervalId) },
         };
         reoccurrences.push(row);

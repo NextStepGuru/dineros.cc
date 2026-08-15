@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { dbUserForSession } from "./fixtures/dbUserForSession";
+import { mockConstructable } from "~/tests/helpers/mockConstructable";
 
 /** Test-only credential strings (not real secrets). */
 const FIXTURE_PLAINTEXT_PASSWORD = "password123"; // NOSONAR S2068 — fixture
@@ -105,11 +106,11 @@ const mockJwtService = {
 };
 
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => mockHashService),
+  default: mockConstructable(mockHashService),
 }));
 
 vi.mock("~/server/services/JwtService", () => ({
-  default: vi.fn().mockImplementation(() => mockJwtService),
+  default: mockConstructable(mockJwtService),
 }));
 
 vi.mock("~/server/lib/handleApiError", () => ({

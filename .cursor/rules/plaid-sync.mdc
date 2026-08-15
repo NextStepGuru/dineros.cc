@@ -1,0 +1,33 @@
+---
+description: Plaid transaction sync, balance writes, and throttle rules
+globs: "**/*plaid*,app/server/services/Plaid*.ts,app/server/queues/plaid*.ts,app/server/cron/plaid*.ts"
+alwaysApply: false
+---
+
+# Plaid sync
+
+## Paths
+
+- **Item cursor**: `/transactions/sync` when `itemId` is set (webhooks / admin).
+- **Legacy**: date-range `/transactions/get` grouped by access token (daily cron).
+
+After either path, call **`getAllAccountsByAccessTokenAndUpdateBalance` inline** (best-effort). Do not rely only on a delayed balance job that may no-op under the 6h throttle.
+
+## Balance write
+
+- Use **`accountsGet`**, not `accountsBalanceGet` (Link products are Transactions only).
+- Persist **both** `balance` and `latestBalance`; set `plaidBalanceLastSyncAt`.
+- Skip when Plaid returns no numeric amount.
+- Debit: prefer `balances.current`, else `available`. Credit: negate `current`.
+- Load registers by token equality + in-memory `plaidId` filter — never `plaidId: { in }` (see `encrypted-prisma-queries.mdc`).
+
+## Throttle / force
+
+- Hourly cron + queue: skip registers with `plaidBalanceLastSyncAt` within last **6 hours**.
+- Manual `/api/tasks/sync-plaid-balance` must pass **`force: true`** (unique `jobId`, no delay).
+
+## After sync
+
+Enqueue recalculate for affected `accountId`s. Record sync logs via `recordPlaidSyncLog`.
+
+Encyclopedia: `.agent/logic/plaid.mdc`.

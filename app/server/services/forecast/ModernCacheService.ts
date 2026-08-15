@@ -13,6 +13,8 @@ export type CacheReoccurrence = {
   transferAccountRegisterId: number | null;
   intervalCount: number;
   lastAt: Date | null;
+  /** Preferred day-of-month for monthly/yearly schedules (persisted). */
+  scheduleAnchorAt?: Date | null;
   /** Last occurrence date on or before "now" (for display/persist; respects interval) */
   lastRunAt?: Date | null;
   endAt: Date | null;

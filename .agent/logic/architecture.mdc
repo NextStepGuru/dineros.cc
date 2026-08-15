@@ -26,7 +26,8 @@ App (Nuxt) structure
   - app/server/services/: domain services (Plaid, transaction matching, notifications, reconciliation, forecast/* modules)
   - app/server/clients/: prisma, redis, nats, postmark, openai
   - app/server/queues/: BullMQ queue definitions (backupQueue, plaidSync*, recalculateQueue)
-  - app/server/cron/: nuxt-cron periodic jobs (plaid.daily, recalculate.hourly, etc.)
+  - app/server/cron/: nuxt-cron periodic jobs (plaid.daily, plaid-balance.hourly, recalculate.hourly, etc.)
+  - Plaid domain notes: `.agent/logic/plaid.mdc`
   - app/server/middleware/: H3 middlewares (auth, sitemap-redirect)
   - app/server/plugins/: server lifecycle helpers (graceful, security-headers, initTestDate)
   - app/server/routes/: health/live.get.ts, health/ready.get.ts, sitemap, and _nuxt passthrough

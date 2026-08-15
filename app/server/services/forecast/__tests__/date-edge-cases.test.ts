@@ -44,8 +44,12 @@ describe("Date edge cases for recurrences", () => {
   });
 
   function recurrence(
-    overrides: Partial<ServiceReoccurrence> = {},
+    overrides: Partial<ServiceReoccurrence> & {
+      scheduleAnchorAt?: Date | null;
+    } = {},
   ): ServiceReoccurrence {
+    const lastAt =
+      overrides.lastAt ?? new Date("2024-01-01T00:00:00.000Z");
     return {
       id: 1,
       accountId: "test-account",
@@ -54,7 +58,12 @@ describe("Date edge cases for recurrences", () => {
       amount: 100 as unknown as ServiceReoccurrence["amount"],
       intervalId: 3,
       intervalCount: 1,
-      lastAt: new Date("2024-01-01T00:00:00.000Z"),
+      lastAt,
+      // Preserve day-of-month across short months unless the test overrides.
+      scheduleAnchorAt:
+        overrides.scheduleAnchorAt !== undefined
+          ? overrides.scheduleAnchorAt
+          : lastAt,
       endAt: null,
       totalIntervals: null,
       elapsedIntervals: null,
@@ -87,15 +96,46 @@ describe("Date edge cases for recurrences", () => {
       expect(ymd(result)).toBe("2024-02-29");
     });
 
-    it("monthly Jan 31 2023 -> Feb 28 -> Mar 28", () => {
+    it("monthly Jan 31 2023 -> Feb 28 -> Mar 31 (anchor preserved)", () => {
+      const anchor = new Date("2023-01-31T00:00:00.000Z");
       const first = service.calculateNextOccurrence(
-        recurrence({ lastAt: new Date("2023-01-31T00:00:00.000Z") }),
+        recurrence({ lastAt: anchor, scheduleAnchorAt: anchor }),
       );
       const second = service.calculateNextOccurrence(
-        recurrence({ lastAt: first as Date }),
+        recurrence({ lastAt: first as Date, scheduleAnchorAt: anchor }),
       );
       expect(ymd(first)).toBe("2023-02-28");
-      expect(ymd(second)).toBe("2023-03-28");
+      expect(ymd(second)).toBe("2023-03-31");
+    });
+
+    it("monthly Jan 30 2023 -> Feb 28 -> Mar 30 (anchor preserved)", () => {
+      const anchor = new Date("2023-01-30T00:00:00.000Z");
+      const first = service.calculateNextOccurrence(
+        recurrence({ lastAt: anchor, scheduleAnchorAt: anchor }),
+      );
+      const second = service.calculateNextOccurrence(
+        recurrence({ lastAt: first as Date, scheduleAnchorAt: anchor }),
+      );
+      expect(ymd(first)).toBe("2023-02-28");
+      expect(ymd(second)).toBe("2023-03-30");
+    });
+
+    it("EOM-sticky without scheduleAnchorAt recovers to month-end after Feb", () => {
+      // lastAt is EOM so sticky day=31 applies each step even without scheduleAnchorAt
+      const first = service.calculateNextOccurrence(
+        recurrence({
+          lastAt: new Date("2023-01-31T00:00:00.000Z"),
+          scheduleAnchorAt: null,
+        }),
+      );
+      const second = service.calculateNextOccurrence(
+        recurrence({
+          lastAt: first as Date,
+          scheduleAnchorAt: null,
+        }),
+      );
+      expect(ymd(first)).toBe("2023-02-28");
+      expect(ymd(second)).toBe("2023-03-31");
     });
 
     it("monthly Jan 30 2023 -> Feb 28", () => {

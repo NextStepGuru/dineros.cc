@@ -7,10 +7,10 @@ export default defineEventHandler(async (event) => {
     event,
     z.object({
       accountRegisterId: z.coerce.number().min(1),
-    }).parse
+    }).parse,
   );
 
-  addPlaidBalanceSyncJob({ accountRegisterId });
+  addPlaidBalanceSyncJob({ accountRegisterId, force: true });
 
   log({ message: "Plaid accounts synchronized successfully", level: "debug" });
 

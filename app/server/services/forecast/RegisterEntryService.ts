@@ -5,6 +5,7 @@ import type {
   CacheAccountRegister, ModernCacheService
 } from "./ModernCacheService";
 import { recalculateRunningBalanceAndSort } from "../../../lib/sort";
+import { roundToCents } from "~/lib/bankers-rounding";
 import { log } from "../../logger";
 import { createId } from "@paralleldrive/cuid2";
 import { dateTimeService } from "./DateTimeService";
@@ -58,8 +59,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       throw new Error(`Account not found ${accountRegisterId}`);
     }
 
-    // Convert amount to number to handle Decimal objects and strings
-    const numericAmount = +amount;
+    // Convert amount to number and normalize to whole cents (bankers rounding)
+    const numericAmount = roundToCents(+amount);
     const balance = +lookupAccountRegister.balance + numericAmount;
     const targetBalance = balance; // Always use the running balance
 
@@ -198,20 +199,35 @@ export class RegisterEntryService implements IRegisterEntryService {
     return sortedEntries;
   }
 
+  /** YYYY-MM-DD key matching DataLoader's reoccurrenceSkip.skippedAt format. */
+  occurrenceSkipDateKey(date: Date | string): string {
+    return dateTimeService.format("YYYY-MM-DD", date);
+  }
+
+  /**
+   * True if any of the candidate dates matches a ReoccurrenceSkip for this
+   * reoccurrence (adjusted and/or nominal dates).
+   */
+  isOccurrenceSkipped(
+    reoccurrenceId: number,
+    ...candidateDates: Array<Date | string>
+  ): boolean {
+    const skips = this.cache.reoccurrenceSkip.find({ reoccurrenceId });
+    if (skips.length === 0) return false;
+    const skipKeys = new Set(
+      skips.map((skip) => skip.skippedAt).filter((key) => key.length > 0),
+    );
+    return candidateDates.some((date) =>
+      skipKeys.has(this.occurrenceSkipDateKey(date)),
+    );
+  }
+
   filterSkippedEntries(entries: CacheRegisterEntry[]): CacheRegisterEntry[] {
-    // Filter out entries that have been skipped
     return entries.filter((entry) => {
       if (!entry.reoccurrenceId) {
-        return true; // Keep non-reoccurring entries
+        return true;
       }
-
-      // Check if this entry's date is in the skip list
-      const skipDate = dateTimeService.format("YYYY-MM-DD", entry.createdAt);
-      const skips = this.cache.reoccurrenceSkip.find({
-        reoccurrenceId: entry.reoccurrenceId,
-      });
-
-      return !skips.some((skip) => skip.skippedAt === skipDate);
+      return !this.isOccurrenceSkipped(entry.reoccurrenceId, entry.createdAt);
     });
   }
 

@@ -58,14 +58,24 @@ Use one of these options:
 
 - Follow existing patterns in the file you are editing.
 - Keep changes minimal and scoped.
-- Update docs when behavior changes.
+- Update docs when behavior changes (see below).
 - Do not include secrets, keys, or credentials in code, tests, logs, or screenshots.
 - Never commit `.env` files anywhere in this repository tree.
 - Commit only template files such as `.env.example` with placeholder values.
 
+## Docs when behavior changes
+
+If you change how a subsystem works (Plaid, encryption queries, forecast balances, queues, API surface, etc.):
+
+1. Update the matching file under `.agent/logic/` (how it works).
+2. Update any matching globbed rule under `.cursor/rules/` (agent do/don’t for that area).
+3. Keep human docs (`README.md`, `docs/`) in sync only when setup or contributor-facing behavior changed.
+
+See `docs/README.md` for an index and `AGENTS.md` for the agent domain-doc map.
+
 ## Cursor-specific files
 
-The `.cursor/` directory and `AGENTS.md` are tooling guidance for AI-assisted workflows.
+The `.cursor/` directory, `.agent/logic/`, and `AGENTS.md` are tooling guidance for AI-assisted workflows.
 Contributors do not need Cursor to contribute.
 
 ## Reporting security issues
