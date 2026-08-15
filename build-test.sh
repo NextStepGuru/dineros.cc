@@ -56,7 +56,7 @@ build_main_project() {
     log "Testing main project container startup..."
     docker run --rm -d \
         --name dineros-main-test \
-        -p 3000:3000 \
+        -p 3102:3102 \
         -e DB_ENCRYPTION_KEY=k1.aesgcm256.yQcdOV0BPCyRNiFasjXX5kqelCifs2jpp70GbLrao4c= \
         -e PLAID_CLIENT_ID=dummy \
         -e PLAID_SECRET=dummy \

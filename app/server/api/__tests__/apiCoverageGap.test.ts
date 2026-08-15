@@ -125,7 +125,7 @@ const mfaGapFns = vi.hoisted(() => ({
   getWebAuthnConfig: vi.fn().mockReturnValue({
     rpID: "localhost",
     rpName: "Test",
-    origin: "http://localhost:3000",
+    origin: "http://localhost:3102",
   }),
   withUpdatedPasskeys: vi.fn((settings: any, passkeys: unknown[]) => ({
     ...settings,
@@ -201,7 +201,7 @@ describe("API coverage gap (forecast-balances, admin, MFA passkey/totp, savings-
     mfaGapFns.getWebAuthnConfig.mockReturnValue({
       rpID: "localhost",
       rpName: "Test",
-      origin: "http://localhost:3000",
+      origin: "http://localhost:3102",
     });
     prisma.$transaction.mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {

@@ -39,7 +39,7 @@ COPY --from=build /repo/app/.output /app/.output
 COPY --from=build /repo/app/prisma /app/prisma
 RUN chown -R appuser:appgroup /app
 
-ARG PORT=3000
+ARG PORT=3102
 ENV PORT=$PORT
 EXPOSE $PORT
 

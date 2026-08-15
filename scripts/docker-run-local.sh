@@ -29,7 +29,7 @@ RUN_ARGS=(
 exec docker run --rm \
   --network "$NETWORK" \
   --env-file .env \
-  -p 3000:3000 \
+  -p 3102:3102 \
   "${RUN_ARGS[@]}" \
   "$@" \
   dineros:local

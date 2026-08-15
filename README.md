@@ -70,7 +70,7 @@ pnpm --filter dineros-app exec prisma migrate deploy
 pnpm dev
 ```
 
-App URL: `http://localhost:3000`
+App URL: `http://localhost:3102`
 
 ## Common commands
 
@@ -176,7 +176,7 @@ Backend Services
 ### **Microservice Architecture**
 
 ```
-Main Application (Port 3000)
+Main Application (Port 3102)
 ├── Web Interface
 ├── API Endpoints
 └── Core Business Logic
@@ -275,7 +275,7 @@ pnpm dev
 
 5. **Access the application**
 
-- Main app: http://localhost:3000
+- Main app: http://localhost:3102
 - Microservice: http://localhost:3001
 
 ### **Docker Setup**
@@ -366,7 +366,7 @@ docker build -t dineros-main .
 cd microservice && docker build -t dineros-microservice .
 
 # Run containers
-docker run -p 3000:3000 dineros-main
+docker run -p 3102:3102 dineros-main
 docker run -p 3001:3000 dineros-microservice
 ```
 
