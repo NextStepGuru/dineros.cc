@@ -75,6 +75,6 @@ export default defineEventHandler(async (event) => {
 
     handleApiError(error);
 
-    throw new Error("Failed to create Plaid Link token");
+    throw new Error("Failed to create Plaid Link token", { cause: error });
   }
 });

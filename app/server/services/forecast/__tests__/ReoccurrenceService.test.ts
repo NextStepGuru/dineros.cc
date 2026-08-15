@@ -67,6 +67,7 @@ describe("ReoccurrenceService", () => {
 
     mockEntryService = {
       createEntry: vi.fn(),
+      isOccurrenceSkipped: vi.fn().mockReturnValue(false),
     };
 
     mockTransferService = {

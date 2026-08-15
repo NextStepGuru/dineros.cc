@@ -74,7 +74,7 @@ class PlaidTransactionEnrichmentService {
       return { description: fallbackName, categoryId: null };
     }
 
-    let categories: Category[] = [];
+    let categories: Category[];
     try {
       const rows = await this.db.category.findMany({
         where: { accountId, isArchived: false },

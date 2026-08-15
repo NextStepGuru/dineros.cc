@@ -197,7 +197,7 @@ function buildTokenRows(
     if (row.error || row.tokenMetadata?.spam === true) continue;
 
     const decimals = row.tokenMetadata?.decimals ?? 18;
-    let displayBalance = 0;
+    let displayBalance: number;
     try {
       displayBalance = Number(
         formatUnits(BigInt((row.tokenBalance ?? "0").trim()), decimals),

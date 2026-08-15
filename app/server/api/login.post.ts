@@ -180,7 +180,7 @@ async function runMfaFlow(
   const backupCodes = user.settings.mfa.totp.backupCodes || [];
   const isBackupCode = backupCodes.includes(tokenChallenge);
 
-  let verificationResult = false;
+  let verificationResult: boolean;
 
   if (isBackupCode) {
     const updatedBackupCodes = backupCodes.filter(
@@ -328,7 +328,7 @@ async function loginHandler(event: any) {
     return { errors: "Invalid email or password." };
   }
 
-  let isPasswordValid = false;
+  let isPasswordValid: boolean;
   try {
     isPasswordValid = await new HashService().verify(user.password, password);
   } catch (error) {

@@ -99,6 +99,6 @@ export default defineEventHandler(async (event: H3Event) => {
   } catch (error) {
     handleApiError(error);
 
-    throw new Error("An error occurred while resetting password.");
+    throw new Error("An error occurred while resetting password.", { cause: error });
   }
 });

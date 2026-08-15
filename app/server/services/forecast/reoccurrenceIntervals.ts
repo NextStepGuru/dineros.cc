@@ -126,7 +126,7 @@ function addCalendarUnitsWithAnchor(
   const targetYear = Math.floor(absoluteMonths / 12);
   const targetMonth = ((absoluteMonths % 12) + 12) % 12;
   const probe = dateTimeService.createUTC(
-    new Date(Date.UTC(targetYear, targetMonth, 1)),
+    `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-01T00:00:00.000Z`,
   );
   const targetDay = Math.min(anchorDayOfMonth, dateTimeService.daysInMonth(probe));
   return dateTimeService.toDate(
