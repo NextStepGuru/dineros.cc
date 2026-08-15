@@ -1,7 +1,7 @@
 import env from "~/server/env";
 import { log } from "~/server/logger";
 
-const LOCAL_DEFAULT_APP_URL = "http://localhost:3000";
+const LOCAL_DEFAULT_APP_URL = "http://localhost:3102";
 
 let warnedMissingSiteUrl = false;
 let warnedInvalidSiteUrl = false;

@@ -6,7 +6,10 @@ import { dateTimeService } from "~/server/services/forecast";
 import { paginateFutureRegisterWindow } from "~/server/lib/registerFuturePagination";
 import {
   buildFutureLedgerSorted,
+  buildLowestByHorizon,
   futureRegisterEntryOr,
+  pickEntryWithHighestBalance,
+  pickEntryWithLowestBalance,
   resolveLoanTransferPeerIds,
   stripRegisterEntryPlaidJson,
 } from "~/server/lib/registerLedgerFuture";
@@ -198,6 +201,7 @@ export default defineEventHandler(async (event) => {
           entries: [],
           lowest: undefined,
           highest: undefined,
+          lowestByHorizon: buildLowestByHorizon([]),
           skip,
           focusedAt,
           take: effectiveTake,
@@ -208,28 +212,11 @@ export default defineEventHandler(async (event) => {
         };
       }
 
-      const firstEntry = balanceUpdated[0];
-      if (firstEntry === undefined) {
-        throw new Error("register quick mode: missing first entry");
-      }
-      const entryWithLowestBalance = balanceUpdated.reduce(
-        (minEntry, entry) => {
-          return entry.balance < minEntry.balance ? entry : minEntry;
-        },
-        firstEntry,
-      );
-
-      const entryWithHighestBalance = balanceUpdated.reduce(
-        (minEntry, entry) => {
-          return entry.balance > minEntry.balance ? entry : minEntry;
-        },
-        firstEntry,
-      );
-
       return {
         entries: paginatedEntries,
-        lowest: entryWithLowestBalance,
-        highest: entryWithHighestBalance,
+        lowest: pickEntryWithLowestBalance(balanceUpdated),
+        highest: pickEntryWithHighestBalance(balanceUpdated),
+        lowestByHorizon: buildLowestByHorizon(balanceUpdated),
         skip,
         focusedAt,
         take: effectiveTake,
@@ -261,6 +248,7 @@ export default defineEventHandler(async (event) => {
         entries: [],
         lowest: undefined,
         highest: undefined,
+        lowestByHorizon: buildLowestByHorizon([]),
         skip,
         focusedAt,
         take,
@@ -271,22 +259,11 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    const firstEntry = balanceUpdated[0];
-    if (firstEntry === undefined) {
-      throw new Error("register full mode: missing first entry");
-    }
-    const entryWithLowestBalance = balanceUpdated.reduce((minEntry, entry) => {
-      return entry.balance < minEntry.balance ? entry : minEntry;
-    }, firstEntry);
-
-    const entryWithHighestBalance = balanceUpdated.reduce((minEntry, entry) => {
-      return entry.balance > minEntry.balance ? entry : minEntry;
-    }, firstEntry);
-
     return {
       entries: paginatedEntries,
-      lowest: entryWithLowestBalance,
-      highest: entryWithHighestBalance,
+      lowest: pickEntryWithLowestBalance(balanceUpdated),
+      highest: pickEntryWithHighestBalance(balanceUpdated),
+      lowestByHorizon: buildLowestByHorizon(balanceUpdated),
       skip,
       focusedAt,
       take,

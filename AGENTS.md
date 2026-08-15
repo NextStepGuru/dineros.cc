@@ -57,7 +57,7 @@ Copy the `DATABASE_URL` value from `.env` (or `.env.example`) and export it befo
 
 See `README.md` for standard commands. Key notes:
 
-- `pnpm dev` — starts Nuxt dev server on port 3000 (requires MySQL + Redis running and `DATABASE_URL` overridden)
+- `pnpm dev` — starts Nuxt dev server on port 3102 (requires MySQL + Redis running and `DATABASE_URL` overridden)
 - `pnpm lint` — ESLint (exits 0 with only minor warnings)
 - `pnpm test` — Vitest unit/integration tests (no DB needed; mocks in place). Run with `TZ=UTC`.
 - `npx prisma generate` — regenerate Prisma client after schema changes

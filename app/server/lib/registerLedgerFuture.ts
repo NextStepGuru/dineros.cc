@@ -126,6 +126,127 @@ export function buildFutureLedgerSorted<T extends LedgerSortableEntry>(params: {
   return balanceUpdated;
 }
 
+type BalanceExtremeEntry = {
+  balance: number;
+  createdAt: Date | string;
+};
+
+export type LowestBalanceHorizonDays = 30 | 60 | 90 | 365 | 730 | 1095;
+
+export const LOWEST_BALANCE_HORIZON_DAYS: LowestBalanceHorizonDays[] = [
+  30, 60, 90, 365, 730, 1095,
+];
+
+export type LowestByHorizon<T extends BalanceExtremeEntry> = Record<
+  LowestBalanceHorizonDays,
+  T | undefined
+>;
+
+/**
+ * Global min balance; on ties prefer the earliest createdAt
+ * (independent of ledger display order).
+ */
+export function pickEntryWithLowestBalance<T extends BalanceExtremeEntry>(
+  entries: T[],
+): T | undefined {
+  if (entries.length === 0) return undefined;
+  let best = entries[0]!;
+  for (let i = 1; i < entries.length; i += 1) {
+    const entry = entries[i]!;
+    if (entry.balance < best.balance) {
+      best = entry;
+      continue;
+    }
+    if (
+      entry.balance === best.balance &&
+      dateTimeService.isBefore(entry.createdAt, best.createdAt)
+    ) {
+      best = entry;
+    }
+  }
+  return best;
+}
+
+/**
+ * Within [startOfDay(now), endOfDay(now + horizonDays)]: prefer the earliest
+ * entry with balance < 0; otherwise the absolute lowest in the window
+ * (earliest createdAt on ties).
+ */
+export function pickLowestBalanceInHorizon<T extends BalanceExtremeEntry>(
+  entries: T[],
+  horizonDays: LowestBalanceHorizonDays,
+  now: Date = dateTimeService.nowDate(),
+): T | undefined {
+  const windowStart = dateTimeService.toDate(dateTimeService.startOfDay(now));
+  const windowEnd = dateTimeService.toDate(
+    dateTimeService.endOfDay(
+      dateTimeService.add(horizonDays, "days", dateTimeService.startOfDay(now)),
+    ),
+  );
+
+  const inWindow = entries.filter((entry) => {
+    const at = dateTimeService.toDate(entry.createdAt);
+    return (
+      dateTimeService.isSameOrAfter(at, windowStart) &&
+      dateTimeService.isSameOrBefore(at, windowEnd)
+    );
+  });
+
+  if (inWindow.length === 0) return undefined;
+
+  let firstBelowZero: T | undefined;
+  for (const entry of inWindow) {
+    if (entry.balance >= 0) continue;
+    if (
+      !firstBelowZero ||
+      dateTimeService.isBefore(entry.createdAt, firstBelowZero.createdAt)
+    ) {
+      firstBelowZero = entry;
+    }
+  }
+  if (firstBelowZero) return firstBelowZero;
+
+  return pickEntryWithLowestBalance(inWindow);
+}
+
+export function buildLowestByHorizon<T extends BalanceExtremeEntry>(
+  entries: T[],
+  now: Date = dateTimeService.nowDate(),
+): LowestByHorizon<T> {
+  return {
+    30: pickLowestBalanceInHorizon(entries, 30, now),
+    60: pickLowestBalanceInHorizon(entries, 60, now),
+    90: pickLowestBalanceInHorizon(entries, 90, now),
+    365: pickLowestBalanceInHorizon(entries, 365, now),
+    730: pickLowestBalanceInHorizon(entries, 730, now),
+    1095: pickLowestBalanceInHorizon(entries, 1095, now),
+  };
+}
+
+/**
+ * Global max balance; on ties prefer the earliest createdAt.
+ */
+export function pickEntryWithHighestBalance<T extends BalanceExtremeEntry>(
+  entries: T[],
+): T | undefined {
+  if (entries.length === 0) return undefined;
+  let best = entries[0]!;
+  for (let i = 1; i < entries.length; i += 1) {
+    const entry = entries[i]!;
+    if (entry.balance > best.balance) {
+      best = entry;
+      continue;
+    }
+    if (
+      entry.balance === best.balance &&
+      dateTimeService.isBefore(entry.createdAt, best.createdAt)
+    ) {
+      best = entry;
+    }
+  }
+  return best;
+}
+
 /**
  * Balance after all ledger rows (in register display/processing order) with
  * transaction date on or before `asOf` (inclusive). Used for "projected balance

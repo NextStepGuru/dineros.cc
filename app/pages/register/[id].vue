@@ -82,9 +82,42 @@ const registersForRegisterPage = computed((): AccountRegister[] =>
 
 const REGISTER_ONBOARDING_DISMISS_KEY = "dineros_register_onboarding_dismissed";
 const REGISTER_RECALC_ONCE_KEY = "dineros_register_recalc_once";
+const REGISTER_LOWEST_HORIZON_KEY = "dineros_register_lowest_balance_horizon";
+
+type LowestBalanceHorizonDays = 30 | 60 | 90 | 365 | 730 | 1095;
+type LowestByHorizon = Partial<
+  Record<LowestBalanceHorizonDays, RegisterEntry | undefined>
+>;
+
+const LOWEST_BALANCE_HORIZON_OPTIONS: {
+  id: LowestBalanceHorizonDays;
+  label: string;
+  shortLabel: string;
+}[] = [
+  { id: 30, label: "30 days", shortLabel: "30 days" },
+  { id: 60, label: "60 days", shortLabel: "60 days" },
+  { id: 90, label: "90 days", shortLabel: "90 days" },
+  { id: 365, label: "1 year", shortLabel: "1 year" },
+  { id: 730, label: "2 years", shortLabel: "2 years" },
+  { id: 1095, label: "3 years", shortLabel: "3 years" },
+];
+
+function isLowestBalanceHorizonDays(
+  value: unknown,
+): value is LowestBalanceHorizonDays {
+  return (
+    value === 30 ||
+    value === 60 ||
+    value === 90 ||
+    value === 365 ||
+    value === 730 ||
+    value === 1095
+  );
+}
 
 const onboardingDismissed = ref(false);
 const recalcCompletedOnce = ref(false);
+const selectedLowestHorizon = ref<LowestBalanceHorizonDays>(30);
 
 function readOnboardingLocal() {
   if (!import.meta.client) return;
@@ -93,10 +126,29 @@ function readOnboardingLocal() {
       localStorage.getItem(REGISTER_ONBOARDING_DISMISS_KEY) === "1";
     recalcCompletedOnce.value =
       localStorage.getItem(REGISTER_RECALC_ONCE_KEY) === "1";
+    const storedHorizon = Number(
+      localStorage.getItem(REGISTER_LOWEST_HORIZON_KEY),
+    );
+    if (isLowestBalanceHorizonDays(storedHorizon)) {
+      selectedLowestHorizon.value = storedHorizon;
+    }
   } catch {
     /* ignore */
   }
 }
+
+function persistLowestHorizon(horizon: LowestBalanceHorizonDays) {
+  if (!import.meta.client) return;
+  try {
+    localStorage.setItem(REGISTER_LOWEST_HORIZON_KEY, String(horizon));
+  } catch {
+    /* ignore */
+  }
+}
+
+watch(selectedLowestHorizon, (horizon) => {
+  persistLowestHorizon(horizon);
+});
 
 function dismissRegisterOnboarding() {
   onboardingDismissed.value = true;
@@ -255,6 +307,7 @@ const accountEntries = shallowRef<{
   entries: RegisterEntry[];
   lowest: RegisterEntry;
   highest: RegisterEntry;
+  lowestByHorizon?: LowestByHorizon;
   isPartialLoad?: boolean;
 }>({ entries: [], lowest: {} as RegisterEntry, highest: {} as RegisterEntry });
 
@@ -267,6 +320,7 @@ type RegisterPagePayload = {
   entries: RegisterEntry[];
   lowest: RegisterEntry;
   highest: RegisterEntry;
+  lowestByHorizon?: LowestByHorizon;
   isPartialLoad?: boolean;
   hasMore: boolean;
   currentSkip: number;
@@ -352,6 +406,7 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
+      lowestByHorizon?: LowestByHorizon;
       isPartialLoad: boolean;
       hasMore: boolean;
     }>("/api/register", {
@@ -372,6 +427,7 @@ async function fetchRegisterPagePayload(): Promise<RegisterPagePayload | null> {
       entries,
       lowest: data.lowest,
       highest: data.highest,
+      lowestByHorizon: data.lowestByHorizon,
       isPartialLoad: data.isPartialLoad,
       hasMore: data.hasMore || false,
       currentSkip: entries.length,
@@ -434,28 +490,51 @@ async function loadMoreChainAllowsAppend(
   return false;
 }
 
+function isEarlierRegisterEntryCreatedAt(
+  a: RegisterEntry,
+  b: RegisterEntry,
+): boolean {
+  const aTime = new Date(a.createdAt as string | Date).getTime();
+  const bTime = new Date(b.createdAt as string | Date).getTime();
+  return Number.isFinite(aTime) && Number.isFinite(bTime) && aTime < bTime;
+}
+
 function applyRegisterLoadMoreAppend(data: {
   entries: RegisterEntry[];
   hasMore: boolean;
   lowest: RegisterEntry;
   highest: RegisterEntry;
+  lowestByHorizon?: LowestByHorizon;
 }) {
   tableEntries.value = [...tableEntries.value, ...data.entries];
   hasMoreData.value = data.hasMore || false;
   currentSkip.value += data.entries.length;
+  const currentLowest = accountEntries.value.lowest;
   if (
     data.lowest &&
-    (!accountEntries.value.lowest ||
-      data.lowest.balance < accountEntries.value.lowest.balance)
+    Number.isFinite(Number(data.lowest.balance)) &&
+    (!currentLowest ||
+      !Number.isFinite(Number(currentLowest.balance)) ||
+      data.lowest.balance < currentLowest.balance ||
+      (data.lowest.balance === currentLowest.balance &&
+        isEarlierRegisterEntryCreatedAt(data.lowest, currentLowest)))
   ) {
     accountEntries.value.lowest = data.lowest;
   }
+  const currentHighest = accountEntries.value.highest;
   if (
     data.highest &&
-    (!accountEntries.value.highest ||
-      data.highest.balance > accountEntries.value.highest.balance)
+    Number.isFinite(Number(data.highest.balance)) &&
+    (!currentHighest ||
+      !Number.isFinite(Number(currentHighest.balance)) ||
+      data.highest.balance > currentHighest.balance ||
+      (data.highest.balance === currentHighest.balance &&
+        isEarlierRegisterEntryCreatedAt(data.highest, currentHighest)))
   ) {
     accountEntries.value.highest = data.highest;
+  }
+  if (data.lowestByHorizon) {
+    accountEntries.value.lowestByHorizon = data.lowestByHorizon;
   }
 }
 
@@ -465,6 +544,7 @@ function applyRegisterPageData(payload: RegisterPagePayload | null) {
     entries: [...payload.entries],
     lowest: payload.lowest,
     highest: payload.highest,
+    lowestByHorizon: payload.lowestByHorizon,
     isPartialLoad: payload.isPartialLoad,
   };
   tableEntries.value = [...payload.entries];
@@ -512,6 +592,7 @@ const loadMoreEntries = async () => {
       entries: RegisterEntry[];
       lowest: RegisterEntry;
       highest: RegisterEntry;
+      lowestByHorizon?: LowestByHorizon;
       isPartialLoad: boolean;
       hasMore: boolean;
     }>("/api/register", {
@@ -699,8 +780,30 @@ const accountEntriesStatus = computed(() => {
   return "idle";
 });
 
-const lowestEntry = computed(() => accountEntries?.value?.lowest);
 const highestEntry = computed(() => accountEntries?.value?.highest);
+
+const selectedLowestHorizonOption = computed(
+  () =>
+    LOWEST_BALANCE_HORIZON_OPTIONS.find(
+      (option) => option.id === selectedLowestHorizon.value,
+    ) ?? LOWEST_BALANCE_HORIZON_OPTIONS[0]!,
+);
+
+const displayLowestEntry = computed(() => {
+  const byHorizon = accountEntries.value.lowestByHorizon;
+  const fromHorizon = byHorizon?.[selectedLowestHorizon.value];
+  if (fromHorizon && Number.isFinite(Number(fromHorizon.balance))) {
+    return fromHorizon;
+  }
+  return undefined;
+});
+
+const showLowestBalanceHint = computed(
+  () =>
+    !!displayLowestEntry.value &&
+    !currentType.value?.isCredit &&
+    displayLowestEntry.value.accountRegisterId === accountRegisterId.value,
+);
 
 const currentAccountRegister = computed(() =>
   registersForRegisterPage.value.find(
@@ -1102,18 +1205,56 @@ function formatCurrency(amount: number) {
 
 function scrollToLowestBalance() {
   if (
-    !lowestEntry.value ||
-    !Number.isFinite(Number(lowestEntry.value.balance)) ||
+    !displayLowestEntry.value ||
+    !Number.isFinite(Number(displayLowestEntry.value.balance)) ||
     !tableEntries.value.length
   )
     return;
 
-  // Find the index of the first entry with the lowest balance
-  const targetIndex = tableEntries.value.findIndex(
-    (entry) =>
-      entry.balance === lowestEntry.value!.balance &&
-      entry.createdAt === lowestEntry.value!.createdAt,
-  );
+  const target = displayLowestEntry.value;
+  const targetId = target.id;
+  if (targetId != null) {
+    const byId = tableEntries.value.findIndex((entry) => entry.id === targetId);
+    if (byId !== -1 && tableRef.value) {
+      const rows = tableRef.value.querySelectorAll("tbody tr");
+      if (rows[byId]) {
+        rows[byId].scrollIntoView({ behavior: "smooth", block: "end" });
+        rows[byId].classList.add("!bg-yellow-200", "dark:!bg-yellow-800");
+        setTimeout(() => {
+          rows[byId].classList.remove(
+            "!bg-yellow-200",
+            "dark:!bg-yellow-800",
+          );
+        }, 2000);
+      }
+      return;
+    }
+  }
+
+  const targetBalance = Number(target.balance);
+  const targetCreatedAt = new Date(
+    target.createdAt as string | Date,
+  ).getTime();
+  // Prefer earliest row that hits the lowest balance (ties by createdAt)
+  let targetIndex = -1;
+  let bestTime = Number.POSITIVE_INFINITY;
+  tableEntries.value.forEach((entry, index) => {
+    if (Number(entry.balance) !== targetBalance) return;
+    const t = new Date(entry.createdAt as string | Date).getTime();
+    if (!Number.isFinite(t)) return;
+    if (
+      Number.isFinite(targetCreatedAt) &&
+      t === targetCreatedAt
+    ) {
+      targetIndex = index;
+      bestTime = t;
+      return;
+    }
+    if (t < bestTime) {
+      bestTime = t;
+      targetIndex = index;
+    }
+  });
 
   if (targetIndex !== -1 && tableRef.value) {
     // Scroll to the specific row
@@ -1523,13 +1664,27 @@ async function recalcAccount() {
                   span(class="truncate min-w-0") {{ selectedAccountOption.label }}
                   span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                 span(v-else) …
-        div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
-          span The lowest balance of&nbsp;
+        div(
+          class="text-muted text-right flex flex-wrap items-center justify-end gap-1.5"
+          v-if="showLowestBalanceHint"
+        )
+          span Lowest in next
+          ClientOnly
+            USelect(
+              v-model="selectedLowestHorizon"
+              size="xs"
+              class="w-28"
+              :items="LOWEST_BALANCE_HORIZON_OPTIONS"
+              value-key="id"
+              label-key="label")
+            template(#fallback)
+              span(class="text-xs") {{ selectedLowestHorizonOption.label }}
+          span of&nbsp;
           b(@click="scrollToLowestBalance" class="cursor-pointer frog-link")
-            DollarFormat(:amount="lowestEntry.balance")
+            DollarFormat(:amount="displayLowestEntry.balance")
             | &nbsp;
           span &nbsp;on
-          b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
+          b.text-nowrap &nbsp;{{ formatDate(displayLowestEntry.createdAt) }}&nbsp;
         div(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
           span The loan will be paid off on
           b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
@@ -1775,7 +1930,7 @@ async function recalcAccount() {
                                 :aria-busy="isRecalcAccountLoading"
                               )
                       div(
-                        v-if="showAccountSelector || (lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId) || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
+                        v-if="showAccountSelector || showLowestBalanceHint || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
                         class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
                       )
                         div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
@@ -1803,13 +1958,27 @@ async function recalcAccount() {
                                   span(class="truncate min-w-0") {{ selectedAccountOption.label }}
                                   span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                                 span(v-else) …
-                        div(class="text-muted text-right" v-if="lowestEntry && !currentType?.isCredit && lowestEntry.accountRegisterId === accountRegisterId")
-                          span The lowest balance of&nbsp;
+                        div(
+                          class="text-muted text-right flex flex-wrap items-center justify-end gap-1.5"
+                          v-if="showLowestBalanceHint"
+                        )
+                          span Lowest in next
+                          ClientOnly
+                            USelect(
+                              v-model="selectedLowestHorizon"
+                              size="xs"
+                              class="w-28"
+                              :items="LOWEST_BALANCE_HORIZON_OPTIONS"
+                              value-key="id"
+                              label-key="label")
+                            template(#fallback)
+                              span(class="text-xs") {{ selectedLowestHorizonOption.label }}
+                          span of&nbsp;
                           b(@click="scrollToLowestBalance" class="cursor-pointer frog-link")
-                            DollarFormat(:amount="lowestEntry.balance")
+                            DollarFormat(:amount="displayLowestEntry.balance")
                             | &nbsp;
                           span &nbsp;on
-                          b.text-nowrap &nbsp;{{ formatDate(lowestEntry.createdAt) }}&nbsp;
+                          b.text-nowrap &nbsp;{{ formatDate(displayLowestEntry.createdAt) }}&nbsp;
                         div(class="text-muted text-right" v-else-if="highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId")
                           span The loan will be paid off on
                           b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;

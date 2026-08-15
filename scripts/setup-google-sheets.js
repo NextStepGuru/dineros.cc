@@ -35,7 +35,7 @@ console.log('Create a .env file in the scripts/ directory with:');
 console.log('');
 console.log('GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id_here');
 console.log('ACCOUNT_REGISTER_ID=your_account_register_id_here');
-console.log('API_BASE_URL=http://localhost:3000');
+console.log('API_BASE_URL=http://localhost:3102');
 console.log('API_TOKEN=your_api_token_here (if required)');
 console.log('SHEET_NAME=Register Data (optional, defaults to "Register Data")');
 console.log('');
