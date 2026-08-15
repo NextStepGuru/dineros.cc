@@ -202,12 +202,17 @@ export class AccountRegisterService implements IAccountRegisterService {
     // Balance already updated in RegisterEntryService.createEntry — do not call updateBalance here
     // (double-counting inflated loan balance and could skew payment caps).
 
-    // If there's a target account, create a transfer payment
+    // If there's a target account, create a transfer payment capped against post-interest debt.
     if (accountRegister.targetAccountRegisterId) {
+      const balanceAfterInterest = getProjectedBalanceAtDate(
+        this.cache,
+        accountRegister.id,
+        accrualDate,
+      );
       const paymentAmount = this.loanCalculator.calculatePaymentAmount(
         accountRegister,
         interest,
-        projectedBalance,
+        balanceAfterInterest,
         accrualDate,
       );
 
@@ -244,49 +249,8 @@ export class AccountRegisterService implements IAccountRegisterService {
           },
         });
       }
-    } else {
-      // If there's no target account, create a direct payment entry
-      const paymentAmount = this.loanCalculator.calculatePaymentAmount(
-        accountRegister,
-        interest,
-        projectedBalance,
-        accrualDate,
-      );
-
-      if (paymentAmount > 0) {
-        this.entryService.createEntry({
-          accountRegisterId: accountRegister.id,
-          description: `Payment for ${accountRegister.name}`,
-          amount: Number(paymentAmount),
-          forecastDate: accrualDate,
-          typeId: 4, // Loan Payment
-          categoryId: accountRegister.paymentCategoryId ?? null,
-          reoccurrence: {
-            accountId: "",
-            accountRegisterId: accountRegister.id,
-            description: `Payment for ${accountRegister.name}`,
-            lastAt: dateTimeService.nowDate(),
-            amount: new Prisma.Decimal(Number(paymentAmount)),
-            transferAccountRegisterId: null,
-            intervalId: intervalId,
-            intervalCount: 1,
-            id: 0,
-            endAt: null,
-            totalIntervals: null,
-            elapsedIntervals: null,
-            updatedAt: dateTimeService.nowDate(),
-            adjustBeforeIfOnWeekend: false,
-            categoryId: null,
-            amountAdjustmentMode: "NONE",
-            amountAdjustmentDirection: null,
-            amountAdjustmentValue: null,
-            amountAdjustmentIntervalId: null,
-            amountAdjustmentIntervalCount: 1,
-            amountAdjustmentAnchorAt: null,
-          },
-        });
-      }
     }
+    // No funding account: post interest only — never invent a single-sided payment.
 
     // Update statement date to next cycle
     await this.updateStatementDate(accountRegister, forecastDate);

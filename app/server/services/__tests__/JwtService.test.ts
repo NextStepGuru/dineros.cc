@@ -14,10 +14,12 @@ vi.mock("~/server/clients/prismaClient", async () => {
 // Mock RsaService to return properly formatted keys
 vi.mock("../RsaService", () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      getLatestKey: vi.fn(),
-      getKey: vi.fn(),
-    })),
+    default: vi.fn().mockImplementation(function () {
+      return {
+        getLatestKey: vi.fn(),
+        getKey: vi.fn(),
+      };
+    }),
   };
 });
 
@@ -67,7 +69,9 @@ describe("JwtService", () => {
     };
 
     // Make RsaService constructor return our mocked instance
-    (RsaService as any).mockImplementation(() => mockRsaService);
+    (RsaService as any).mockImplementation(function () {
+      return mockRsaService;
+    });
 
     jwtService = new JwtService();
   });

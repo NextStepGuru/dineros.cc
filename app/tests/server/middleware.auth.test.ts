@@ -16,9 +16,9 @@ vi.mock("h3", () => ({
 
 const mockVerify = vi.fn();
 vi.mock("~/server/services/JwtService", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    verify: mockVerify,
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { verify: mockVerify };
+  }),
 }));
 
 vi.mock("~/server/clients/prismaClient", async () => {

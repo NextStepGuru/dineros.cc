@@ -172,7 +172,11 @@ describe("AccountRegisterService", () => {
 
   describe("processInterestCharges", () => {
     it("should process interest for eligible accounts", async () => {
-      const account1 = createMockAccount({ id: 1, name: "Account 1" });
+      const account1 = createMockAccount({
+        id: 1,
+        name: "Account 1",
+        targetAccountRegisterId: 2,
+      });
       const account2 = createMockAccount({ id: 2, name: "Account 2" });
       const accounts = [account1, account2];
 
@@ -201,6 +205,9 @@ describe("AccountRegisterService", () => {
         expect.any(Date),
       );
       expect(mockEntryService.createEntry).toHaveBeenCalled();
+      expect(
+        mockTransferService.transferBetweenAccountsWithDate,
+      ).toHaveBeenCalled();
     });
 
     it("should handle accounts with no interest charges", async () => {
@@ -324,7 +331,7 @@ describe("AccountRegisterService", () => {
       );
     });
 
-    it("should create direct payment when no target account", async () => {
+    it("posts interest only when no funding account (no phantom payment)", async () => {
       const account = createMockAccount({
         id: 1,
         name: "Loan Account",
@@ -338,18 +345,22 @@ describe("AccountRegisterService", () => {
 
       await (service as any).processAccountInterestCharge(account);
 
-      // Should create direct payment entry
       expect(mockEntryService.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           accountRegisterId: 1,
-          description: "Payment for Loan Account",
-          amount: 100,
+          description: "Interest Charge",
+          amount: -30,
         }),
       );
-
+      expect(mockEntryService.createEntry).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Payment for Loan Account",
+        }),
+      );
       expect(
         mockTransferService.transferBetweenAccountsWithDate,
       ).not.toHaveBeenCalled();
+      expect(mockLoanCalculator.calculatePaymentAmount).not.toHaveBeenCalled();
     });
 
     it("should handle positive interest (rare case)", async () => {
@@ -473,7 +484,7 @@ describe("AccountRegisterService", () => {
       );
     });
 
-    it("passes paymentCategoryId on direct payment entry when no target account", async () => {
+    it("does not invent a payment category entry when no funding account", async () => {
       const account = createMockAccount({
         id: 1,
         name: "Loan Account",
@@ -495,11 +506,8 @@ describe("AccountRegisterService", () => {
             "Payment for ",
           ),
         );
-      expect(paymentCalls).toHaveLength(1);
-      expect(paymentCalls[0]![0]).toMatchObject({
-        categoryId: PAYMENT_CAT,
-        typeId: 4,
-      });
+      expect(paymentCalls).toHaveLength(0);
+      expect(mockLoanCalculator.calculatePaymentAmount).not.toHaveBeenCalled();
     });
 
     it("uses null categoryId on interest and payment when register has none", async () => {

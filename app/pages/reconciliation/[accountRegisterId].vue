@@ -342,7 +342,7 @@ section(class="px-3 sm:px-4 py-4 max-w-6xl mx-auto space-y-4")
           thead
             tr(class="border-b sticky top-0 bg-elevated z-10")
               th(class="text-center p-2 w-12")
-                UIcon(name="i-lucide-check-circle" class="frog-text-muted" size="16")
+                UIcon(name="i-lucide-circle-check" class="frog-text-muted" size="16")
               th(class="text-left p-2") Date
               th(class="text-left p-2") Description
               th(class="text-right p-2") Amount

@@ -6,6 +6,7 @@ import type { RecalculateJob } from "../queues/recalculateQueue";
 import recalculate from "../queues/recalculateQueue";
 import { sharedRedisConnection } from "../clients/redisClient";
 import { log } from "../logger";
+import { dateTimeService } from "../services/forecast/DateTimeService";
 import type { PlaidSyncJob } from "../queues/plaidSyncQueue";
 import plaidSync from "../queues/plaidSyncQueue";
 import type { PlaidSyncBalanceJob } from "../queues/plaidSyncBalanceQueue";
@@ -65,9 +66,11 @@ export const addPlaidSyncJob = (data: PlaidSyncJob, opts?: JobsOptions) =>
 export const addPlaidBalanceSyncJob = (data: PlaidSyncBalanceJob) =>
   queueManager.addJob(plaidBalanceSync.queueName, data, {
     attempts: 0,
-    delay: 10 * 1000, // 10 seconds
+    delay: data.force ? 0 : 10 * 1000,
     removeOnComplete: true,
     removeOnFail: false,
-    jobId: `plaid-balance-sync-${data.accountRegisterId}`,
+    jobId: data.force
+      ? `plaid-balance-sync-${data.accountRegisterId}-${dateTimeService.nowDate().getTime()}`
+      : `plaid-balance-sync-${data.accountRegisterId}`,
     keepLogs: 4,
   });

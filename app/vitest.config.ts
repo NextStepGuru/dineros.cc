@@ -1,6 +1,6 @@
 // Vitest + Nuxt 4: https://nuxt.com/docs/4.x/getting-started/testing
 // Explicit projects: node (fast) vs nuxt runtime — avoids duplicate runs from defineVitestConfig auto-split.
-// @nuxt/test-utils v3.x aligns with Vitest 3; v4+ peers vitest ^4 — upgrade both when moving to Vitest 4.
+// @nuxt/test-utils v4 peers vitest ^4 (Vite 8).
 import { mergeConfig } from "vite";
 import { defineConfig } from "vitest/config";
 import { defineVitestProject } from "@nuxt/test-utils/config";
@@ -28,14 +28,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: false,
-        maxForks: 4,
-        minForks: 2,
-        isolate: true,
-      },
-    },
+    isolate: true,
+    maxWorkers: 4,
     testTimeout: 30000,
     hookTimeout: 5000,
     env: {

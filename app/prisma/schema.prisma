@@ -581,6 +581,7 @@ model Reoccurrence {
   transferAccountRegisterId     Int?                       @map("transfer_account_register_id") @db.UnsignedInt
   intervalCount                 Int                        @default(1) @map("interval_count") @db.UnsignedInt
   lastAt                        DateTime?                  @map("last_at")
+  scheduleAnchorAt              DateTime?                  @map("schedule_anchor_at")
   endAt                         DateTime?                  @map("end_at")
   totalIntervals                Int?                       @map("total_intervals") @db.UnsignedInt
   elapsedIntervals              Int?                       @map("elapsed_intervals") @db.UnsignedInt

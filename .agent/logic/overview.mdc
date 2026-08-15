@@ -28,7 +28,7 @@ Packages and layout
 
 Key capabilities
 - Forecast engine (app/server/services/forecast/*) with extensive tests
-- Registers and entries with encryption and Plaid sync
+- Registers and entries with encryption and Plaid sync (see `.agent/logic/plaid.mdc`)
 - Recurrences with splits and transfer logic
 - Reports and notifications
 - Reconciliation flows
@@ -36,4 +36,5 @@ Key capabilities
 
 Getting started
 - Read README.md for local setup and commands
-- For agents in constrained environments, read AGENTS.md (DB/Redis startup, env overrides)
+- For agents in constrained environments, read AGENTS.md (DB/Redis startup, env overrides, domain-doc map)
+- Domain encyclopedia: `.agent/logic/*.mdc`; policy: `.cursor/rules/`

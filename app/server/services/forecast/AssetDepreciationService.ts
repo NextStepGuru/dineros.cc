@@ -231,7 +231,8 @@ export class AssetDepreciationService {
           return this.calculateCompound(
             currentValue,
             annualRate,
-            isDepreciating
+            isDepreciating,
+            residualValue,
           );
         }
       }
@@ -247,7 +248,12 @@ export class AssetDepreciationService {
 
       case "compound":
       default: {
-        return this.calculateCompound(currentValue, annualRate, isDepreciating);
+        return this.calculateCompound(
+          currentValue,
+          annualRate,
+          isDepreciating,
+          residualValue,
+        );
       }
     }
   }
@@ -265,22 +271,29 @@ export class AssetDepreciationService {
       return roundToCents(newValue - currentValue);
     } else {
       // Appreciation doesn't use declining-balance, use compound
-      return this.calculateCompound(currentValue, annualRate, isDepreciating);
+      return this.calculateCompound(
+        currentValue,
+        annualRate,
+        isDepreciating,
+        residualValue,
+      );
     }
   }
 
   private calculateCompound(
     currentValue: number,
     annualRate: number,
-    isDepreciating: boolean
+    isDepreciating: boolean,
+    residualValue = 0,
   ): number {
     // Monthly compound: current_value * annual_rate / 12
     const monthlyChange = (currentValue * annualRate) / 12;
     if (isDepreciating) {
-      return roundToCents(-monthlyChange);
-    } else {
-      return roundToCents(monthlyChange);
+      if (currentValue <= residualValue) return 0;
+      const newValue = Math.max(residualValue, currentValue - monthlyChange);
+      return roundToCents(newValue - currentValue);
     }
+    return roundToCents(monthlyChange);
   }
 
   private async advanceStatementDate(

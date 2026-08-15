@@ -1,3 +1,4 @@
+import { roundToCents } from "~/lib/bankers-rounding";
 import { dateTimeService } from "./DateTimeService";
 
 type IntervalUnit = "days" | "weeks" | "months" | "years";
@@ -7,6 +8,13 @@ export type ReoccurrenceIntervalInput = {
   intervalCount?: number | null;
   intervalName?: string | null;
   lastAt: Date;
+  /**
+   * Preferred day-of-month (1–31) for monthly/yearly schedules.
+   * When omitted, derived from `scheduleAnchorAt` or EOM-sticky from `lastAt`.
+   */
+  anchorDayOfMonth?: number | null;
+  /** Persisted schedule anchor; day-of-month is used for monthly/yearly advancement. */
+  scheduleAnchorAt?: Date | null;
 };
 
 function normalizeIntervalName(intervalName?: string | null): string {
@@ -76,6 +84,67 @@ function advanceTwiceMonthlyStep(lastAt: Date): Date {
   return dateTimeService.toDate(dateTimeService.setDate(15, nextMonthStart));
 }
 
+/**
+ * Resolve the preferred day-of-month for monthly/yearly schedules.
+ * Prefer explicit anchorDayOfMonth, then scheduleAnchorAt, then EOM-sticky
+ * (if lastAt is the last day of its month, keep targeting month-end via day 31).
+ */
+export function resolveAnchorDayOfMonth(input: {
+  lastAt: Date;
+  anchorDayOfMonth?: number | null;
+  scheduleAnchorAt?: Date | null;
+}): number {
+  if (
+    input.anchorDayOfMonth != null &&
+    Number.isFinite(input.anchorDayOfMonth) &&
+    input.anchorDayOfMonth >= 1
+  ) {
+    return Math.min(31, Math.floor(input.anchorDayOfMonth));
+  }
+  if (input.scheduleAnchorAt) {
+    return dateTimeService.date(dateTimeService.createUTC(input.scheduleAnchorAt));
+  }
+  const last = dateTimeService.createUTC(input.lastAt);
+  const day = dateTimeService.date(last);
+  const eom = dateTimeService.daysInMonth(last);
+  if (day === eom) return 31;
+  return day;
+}
+
+/** Advance calendar months/years while preserving an anchor day-of-month. */
+function addCalendarUnitsWithAnchor(
+  lastAt: Date,
+  amount: number,
+  unit: "months" | "years",
+  anchorDayOfMonth: number,
+): Date {
+  const last = dateTimeService.createUTC(lastAt);
+  const currentYear = last.year() as number;
+  const currentMonth = last.month() as number;
+  const monthsToAdd = unit === "years" ? amount * 12 : amount;
+  const absoluteMonths = currentYear * 12 + currentMonth + monthsToAdd;
+  const targetYear = Math.floor(absoluteMonths / 12);
+  const targetMonth = ((absoluteMonths % 12) + 12) % 12;
+  const probe = dateTimeService.createUTC(
+    `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-01T00:00:00.000Z`,
+  );
+  const targetDay = Math.min(anchorDayOfMonth, dateTimeService.daysInMonth(probe));
+  return dateTimeService.toDate(
+    dateTimeService.set(
+      {
+        year: targetYear,
+        month: targetMonth,
+        date: targetDay,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+      },
+      probe,
+    ),
+  );
+}
+
 export function calculateNextOccurrenceDate(
   input: ReoccurrenceIntervalInput,
 ): Date | null {
@@ -94,8 +163,22 @@ export function calculateNextOccurrenceDate(
     return next;
   }
 
+  const anchorDay = resolveAnchorDayOfMonth({
+    lastAt,
+    anchorDayOfMonth: input.anchorDayOfMonth,
+    scheduleAnchorAt: input.scheduleAnchorAt,
+  });
+
   const unitFromName = getIntervalUnitByName(intervalName);
   if (intervalName && unitFromName) {
+    if (unitFromName === "months" || unitFromName === "years") {
+      return addCalendarUnitsWithAnchor(
+        lastAt,
+        intervalCount,
+        unitFromName,
+        anchorDay,
+      );
+    }
     return dateTimeService.toDate(
       dateTimeService.add(intervalCount, unitFromName, lastAt),
     );
@@ -111,6 +194,14 @@ export function calculateNextOccurrenceDate(
 
   const unitFromId = getIntervalUnitById(intervalId);
   if (!unitFromId) return null;
+  if (unitFromId === "months" || unitFromId === "years") {
+    return addCalendarUnitsWithAnchor(
+      lastAt,
+      intervalCount,
+      unitFromId,
+      anchorDay,
+    );
+  }
   return dateTimeService.toDate(
     dateTimeService.add(intervalCount, unitFromId, lastAt),
   );
@@ -122,6 +213,7 @@ export function computeFirstNextOccurrenceDate(params: {
   intervalId: number;
   intervalCount: number;
   intervalName?: string | null;
+  scheduleAnchorAt?: Date | null;
 }): Date | null {
   if (!params.lastAt) return null;
   return calculateNextOccurrenceDate({
@@ -129,6 +221,7 @@ export function computeFirstNextOccurrenceDate(params: {
     intervalId: params.intervalId,
     intervalCount: params.intervalCount,
     intervalName: params.intervalName ?? undefined,
+    scheduleAnchorAt: params.scheduleAnchorAt ?? null,
   });
 }
 
@@ -170,7 +263,7 @@ export function countCompletedAdjustmentSteps(params: {
 }
 
 function roundCents(n: number): number {
-  return Math.round(n * 100) / 100;
+  return roundToCents(n);
 }
 
 /**

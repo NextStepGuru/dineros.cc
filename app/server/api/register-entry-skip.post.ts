@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { dateTimeService } from "~/server/services/forecast";
+import { calculateNextOccurrenceDate } from "~/server/services/forecast/reoccurrenceIntervals";
 import { createError } from "h3";
 
 // Define the schema for the request body
@@ -59,6 +60,8 @@ export default defineEventHandler(async (event) => {
           id: true,
           lastAt: true,
           intervalCount: true,
+          intervalId: true,
+          scheduleAnchorAt: true,
           interval: true,
           accountId: true,
         },
@@ -74,45 +77,45 @@ export default defineEventHandler(async (event) => {
       });
 
     await PrismaDb.$transaction(async (prisma) => {
-      // Perform the deletion operation
       await prisma.registerEntry.delete({
         where: {
           id: registerEntryId,
         },
       });
 
-      const addObj: Record<string, number> = {};
-      addObj[reoccurrence.interval.name] = reoccurrence.intervalCount;
+      // Always persist a skip row — source of truth for forecast generation
+      await prisma.reoccurrenceSkip.create({
+        data: {
+          reoccurrenceId: reoccurrence.id,
+          accountId: reoccurrence.accountId,
+          accountRegisterId: lookup.accountRegisterId,
+          skippedAt: lookup.createdAt,
+        },
+      });
 
-      const lastAt = reoccurrence.lastAt
-        ? dateTimeService.add(
-            reoccurrence.intervalCount,
-            reoccurrence.interval.name as any,
-            reoccurrence.lastAt
-          )
-        : dateTimeService.add(
-            reoccurrence.intervalCount,
-            reoccurrence.interval.name as any
-          );
+      // Optional lastAt bump when skipping the immediate next occurrence
+      if (reoccurrence.lastAt) {
+        const nextOccurrence = calculateNextOccurrenceDate({
+          lastAt: dateTimeService.toDate(reoccurrence.lastAt),
+          intervalId: reoccurrence.intervalId,
+          intervalCount: reoccurrence.intervalCount,
+          intervalName: reoccurrence.interval.name,
+          scheduleAnchorAt: reoccurrence.scheduleAnchorAt,
+        });
 
-      if (dateTimeService.isSameOrBefore(lookup.createdAt, lastAt)) {
-        await prisma.reoccurrence.update({
-          where: {
-            id: reoccurrence.id,
-          },
-          data: {
-            lastAt: lastAt.toISOString(),
-          },
-        });
-      } else {
-        await prisma.reoccurrenceSkip.create({
-          data: {
-            reoccurrenceId: reoccurrence.id,
-            accountId: reoccurrence.accountId,
-            accountRegisterId: lookup.accountRegisterId,
-            skippedAt: lookup.createdAt,
-          },
-        });
+        if (
+          nextOccurrence &&
+          dateTimeService.isSameOrBefore(lookup.createdAt, nextOccurrence)
+        ) {
+          await prisma.reoccurrence.update({
+            where: {
+              id: reoccurrence.id,
+            },
+            data: {
+              lastAt: nextOccurrence.toISOString(),
+            },
+          });
+        }
       }
     }).catch(() => {
       throw createError({
@@ -123,7 +126,6 @@ export default defineEventHandler(async (event) => {
 
     addRecalculateJob({ accountId: reoccurrence.accountId });
 
-    // Return a success response
     return {
       message: "Skipped register entry successfully.",
     };

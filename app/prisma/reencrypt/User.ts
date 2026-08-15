@@ -2,7 +2,10 @@
 
 import type { PrismaClient, User } from '@prisma/client'
 import type { ProgressReportCallback } from 'prisma-field-encryption/dist/generator/runtime'
-import { defaultProgressReport, visitRecords } from 'prisma-field-encryption/dist/generator/runtime'
+import {
+  defaultProgressReport,
+  visitRecords
+} from 'prisma-field-encryption/dist/generator/runtime'
 
 type Cursor = User['id']
 

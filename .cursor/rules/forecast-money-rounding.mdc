@@ -1,0 +1,17 @@
+---
+description: Forecast/ledger monetary amounts must use bankers rounding to cents
+globs:
+  - app/server/services/forecast/**/*
+  - app/lib/bankers-rounding.ts
+  - app/lib/sort.ts
+alwaysApply: false
+---
+
+# Forecast money rounding
+
+- Normalize **entry amounts** with `roundToCents` from `~/lib/bankers-rounding` (bankers / half-to-even, 2 dp) at `RegisterEntryService.createEntry`.
+- Reoccurrence adjustments (`reoccurrenceIntervals`) and percent splits must use the same helpers — never a local `Math.round(n * 100) / 100` for money.
+- Do not change the running-balance float accumulator in `lib/sort.ts` unless explicitly asked; amounts entering it should already be whole cents.
+- Loan interest/payments and asset depreciation already use `roundToCents`; keep that consistent.
+
+Encyclopedia: `.agent/logic/forecast-engine.mdc`.

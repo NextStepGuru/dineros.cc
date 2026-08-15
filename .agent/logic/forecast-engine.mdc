@@ -19,9 +19,56 @@ Core modules (selected)
 - DataPersisterService — persists snapshots/results back to DB
 - getProjectedBalanceAtDate.ts — helper for point-in-time projection
 
+## Skipped occurrences
+
+- `ReoccurrenceSkip` rows are the source of truth for skipping a specific instance date.
+- DataLoader loads skips into cache (`skippedAt` as `YYYY-MM-DD`).
+- `ReoccurrenceService` must omit skipped dates when creating entries/transfers (check adjusted and nominal dates); still advance the schedule so later occurrences generate.
+- `ForecastEngine` also filters skipped entries before running balances / persist (safety net).
+- Do **not** rely on bumping `lastAt` alone to persist a skip — future skips survive only via skip rows (and `persistReoccurrenceLastAt` does not walk `lastAt` into the future).
+- Skip API (`register-entry-skip`) always inserts a skip row; may also bump `lastAt` when skipping the immediate next occurrence using `calculateNextOccurrenceDate` (same math as forecast).
+
+## Balances (do not overwrite live snapshot)
+
+- DataLoader maps DB `latestBalance` into cache `balance` **and** `latestBalance` for projections.
+- ForecastEngine must **not** call `updateAccountRegisterBalances` / write `latest_balance` after a run — Plaid/user edits are the source of truth for the live snapshot.
+- Persister may still update entry running `balance` columns and pocket auto-apply increments.
+- Agent rule: `.cursor/rules/register-balances.mdc`.
+
+## Money rounding
+
+- Entry amounts are normalized to whole cents via bankers rounding (`roundToCents` from `~/lib/bankers-rounding`) inside `RegisterEntryService.createEntry`.
+- Reoccurrence amount adjustments and percent splits also use bankers rounding (not `Math.round` half-up).
+- Running-balance accumulation in `lib/sort.ts` is left as float sum of already-rounded amounts.
+- Agent rule: `.cursor/rules/forecast-money-rounding.mdc`.
+
+## Month-end schedule anchors
+
+- Monthly/yearly reoccurrences preserve day-of-month via `Reoccurrence.scheduleAnchorAt` (preferred day clamped to each month’s length: Jan 31 → Feb 28/29 → Mar 31).
+- When `scheduleAnchorAt` is null, EOM-sticky applies: if `lastAt` is the last day of its month, target day 31 (end of next months).
+- Upsert/create sets `scheduleAnchorAt` from `lastAt`; clone copies it. Migration should backfill `schedule_anchor_at = last_at`.
+
+## Loan interest and payments
+
+- Interest posts first; payment amount is capped against the **post-interest** projected balance.
+- If `targetAccountRegisterId` is null, post interest only — never invent a single-sided payment (no phantom net-worth gain).
+
+## Transfers
+
+- Skip self-transfers (`source === target`) and transfers involving archived registers.
+
+## Unused schema fields
+
+- `Reoccurrence.totalIntervals` / `elapsedIntervals` are cloned and stored but **not read** by the forecast engine. Do not treat them as an occurrence cap until a product write path exists.
+
+## Depreciation
+
+- Declining-balance and compound depreciation both floor at `assetResidualValue` for depreciating assets.
+
 Testing
 - Extensive unit/integration/regression tests under app/server/services/forecast/__tests__
-- When changing behavior, add regression fixtures/snapshots alongside targeted unit tests
+- Calculation regressions: `calculation-bugs.regression.test.ts`, `multiYearLedger.golden.test.ts`
+- Agents: do not add/run tests unless the user asks (see `.cursor/rules/05-workflow-execution.mdc`)
 
 Guidance
 - Keep deterministic results under known seeds; avoid relying on wall clock outside DateTimeService

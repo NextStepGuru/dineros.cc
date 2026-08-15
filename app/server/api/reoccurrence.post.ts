@@ -230,13 +230,15 @@ async function upsertReoccurrenceWithSplits(
   const mode = body.amountAdjustmentMode ?? "NONE";
   const adjustmentFields = buildAdjustmentFields(mode, body, parsedAdjustmentAnchorAt);
 
+  let existing: { scheduleAnchorAt: Date | null } | null = null;
   if (body.id > 0) {
-    const existing = await prisma.reoccurrence.findFirst({
+    existing = await prisma.reoccurrence.findFirst({
       where: {
         id: body.id,
         accountRegisterId: body.accountRegisterId,
         accountId: body.accountId,
       },
+      select: { scheduleAnchorAt: true },
     });
     if (!existing) {
       throw createError({
@@ -257,6 +259,7 @@ async function upsertReoccurrenceWithSplits(
       description: body.description,
       amount: body.amount,
       lastAt: parsedLastAt,
+      scheduleAnchorAt: parsedLastAt,
       endAt: parsedEndAt,
       categoryId: body.categoryId ?? null,
       ...adjustmentFields,
@@ -271,6 +274,8 @@ async function upsertReoccurrenceWithSplits(
       description: body.description,
       amount: body.amount,
       lastAt: parsedLastAt,
+      // Preserve existing schedule anchor; seed from lastAt when missing (legacy rows).
+      scheduleAnchorAt: existing?.scheduleAnchorAt ?? parsedLastAt,
       endAt: parsedEndAt,
       categoryId: body.categoryId ?? null,
       ...adjustmentFields,

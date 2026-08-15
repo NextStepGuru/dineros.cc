@@ -103,11 +103,15 @@ const mockJwtService = {
 };
 
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => mockHashService),
+  default: vi.fn().mockImplementation(function () {
+    return mockHashService;
+  }),
 }));
 
 vi.mock("~/server/services/JwtService", () => ({
-  default: vi.fn().mockImplementation(() => mockJwtService),
+  default: vi.fn().mockImplementation(function () {
+    return mockJwtService;
+  }),
 }));
 
 describe("Additional API Endpoints Coverage", () => {

@@ -54,7 +54,9 @@ describe("Plaid Link API Endpoint", () => {
       linkTokenCreate: vi.fn(),
     };
     const { PlaidApi } = await import("plaid");
-    (PlaidApi as any).mockImplementation(() => mockPlaidClient);
+    (PlaidApi as any).mockImplementation(function () {
+      return mockPlaidClient;
+    });
 
     // Import the handler after mocking dependencies
     const module = await import("../plaid-link");

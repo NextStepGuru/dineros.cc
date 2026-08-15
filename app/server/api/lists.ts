@@ -41,6 +41,6 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     handleApiError(error);
 
-    throw new Error("An error occurred while fetching lists.");
+    throw new Error("An error occurred while fetching lists.", { cause: error });
   }
 });

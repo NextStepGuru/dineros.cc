@@ -29,9 +29,25 @@ export class TransferService implements ITransferService {
       categoryId: transferCategoryId,
     } = params;
 
+    if (sourceAccountRegisterId === targetAccountRegisterId) {
+      forecastLogger.warn(
+        `Skipping self-transfer for register ${sourceAccountRegisterId}`,
+      );
+      return;
+    }
+
+    const sourceReg = this.cache.accountRegister.findById(sourceAccountRegisterId);
+    const targetReg = this.cache.accountRegister.findById(targetAccountRegisterId);
+    if (sourceReg?.isArchived || targetReg?.isArchived) {
+      forecastLogger.warn(
+        `Skipping transfer involving archived register (source=${sourceAccountRegisterId}, target=${targetAccountRegisterId})`,
+      );
+      return;
+    }
+
     // Cap transfer to debt account so payment never exceeds balance
     let effectiveAmount = Math.abs(+amount);
-    const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
+    const targetForCap = targetReg;
     if (targetForCap && +targetForCap.balance < 0) {
       const amountOwed = Math.abs(+targetForCap.balance);
       if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
@@ -75,9 +91,25 @@ export class TransferService implements ITransferService {
       categoryId: transferCategoryIdWithDate,
     } = params;
 
+    if (sourceAccountRegisterId === targetAccountRegisterId) {
+      forecastLogger.warn(
+        `Skipping self-transfer for register ${sourceAccountRegisterId}`,
+      );
+      return;
+    }
+
+    const sourceReg = this.cache.accountRegister.findById(sourceAccountRegisterId);
+    const targetReg = this.cache.accountRegister.findById(targetAccountRegisterId);
+    if (sourceReg?.isArchived || targetReg?.isArchived) {
+      forecastLogger.warn(
+        `Skipping transfer involving archived register (source=${sourceAccountRegisterId}, target=${targetAccountRegisterId})`,
+      );
+      return;
+    }
+
     // Cap transfer to debt account so payment never exceeds balance
     let effectiveAmount = Math.abs(+amount);
-    const targetForCap = this.cache.accountRegister.findById(targetAccountRegisterId);
+    const targetForCap = targetReg;
     if (targetForCap && +targetForCap.balance < 0) {
       const amountOwed = Math.abs(+targetForCap.balance);
       if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;

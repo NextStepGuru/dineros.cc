@@ -23,7 +23,10 @@ describe("Reoccurrence transfer regressions", () => {
         findOne: vi.fn(),
       },
     };
-    mockEntryService = { createEntry: vi.fn() };
+    mockEntryService = {
+      createEntry: vi.fn(),
+      isOccurrenceSkipped: vi.fn().mockReturnValue(false),
+    };
     mockTransferService = { transferBetweenAccounts: vi.fn() };
 
     service = new ReoccurrenceService(

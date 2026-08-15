@@ -1,0 +1,42 @@
+---
+description: Safe Prisma queries on prisma-field-encryption @encrypted columns
+globs: app/server/**/*.ts,app/prisma/**/*.prisma
+alwaysApply: false
+---
+
+# Encrypted Prisma queries
+
+Fields marked `/// @encrypted` (and companion `*Hash` columns) cannot use string filters that compare ciphertext.
+
+## Never on encrypted fields
+
+- `in` / `notIn` / `contains` / `startsWith` / `endsWith` / `mode: 'insensitive'`
+- `updateMany({ where: { plaidId: accountId } })` — ciphertext will not match plaintext
+
+Examples: `AccountRegister.plaidId`, `plaidAccessToken`, `RegisterEntry.plaidId`, `User.email`, names/descriptions that are encrypted.
+
+## Allowed
+
+- Equality (`where: { plaidAccessToken: token }`) — extension rewrites to the hash column when configured.
+- Null checks (`plaidId: { not: null }`).
+- Filter by **non-encrypted** keys (`id`, `accountId`, etc.).
+
+## Pattern: load then filter in memory
+
+```typescript
+// ❌ BAD
+await db.accountRegister.findMany({
+  where: { plaidId: { in: plaidAccountIds } },
+});
+
+// ✅ GOOD — equality on token, then filter decrypted plaidId
+const rows = await db.accountRegister.findMany({
+  where: { plaidAccessToken: accessToken, plaidId: { not: null } },
+});
+const wanted = new Set(plaidAccountIds);
+return rows.filter((r) => r.plaidId != null && wanted.has(r.plaidId));
+```
+
+Updates: `where: { id: registerId }`, not encrypted field equality for bulk writes when unsure.
+
+Details: `.agent/logic/encryption-and-keys.mdc`. Reference: `PlaidSyncService.findPlaidRegistersByAccessToken`.

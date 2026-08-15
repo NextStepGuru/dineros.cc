@@ -454,7 +454,9 @@ export class ForecastEngine implements IForecastEngine {
       const accountEntriesAll = this.cache.registerEntry.find({
         accountRegisterId: accountRegister.id,
       });
-      const accountEntries = accountEntriesAll;
+      // Drop skipped reoccurrence instances before balances / persist
+      const accountEntries =
+        this.entryService.filterSkippedEntries(accountEntriesAll);
 
       // Calculate running balances and sort
       const accountType = IS_CREDIT_TYPE_IDS.includes(accountRegister.typeId)

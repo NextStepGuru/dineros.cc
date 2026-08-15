@@ -32,36 +32,6 @@
     "sonar:quick": "bash scripts/sonar-local.sh --no-coverage",
     "restore": "./scripts/dump-and-restore.sh production --identical --persist"
   },
-  "pnpm": {
-    "overrides": {
-      "@hono/node-server": "^1.19.10",
-      "@tootallnate/once": "^3.0.1",
-      "effect": "^3.20.0",
-      "fast-xml-parser": "^5.5.7",
-      "flatted": "^3.4.2",
-      "h3": "^1.15.9",
-      "happy-dom": "^20.0.0",
-      "hono": "^4.12.7",
-      "@nuxt/test-utils>h3-next": "npm:h3@2.0.1-rc.18",
-      "lodash@<4.17.23": "4.17.23",
-      "serialize-javascript": "^7.0.3",
-      "yaml": "^2.8.3",
-      "h3@>=2.0.0-beta.0 <2.0.1-rc.18": "2.0.1-rc.18",
-      "picomatch@<2.3.2": "2.3.2",
-      "picomatch@>=4.0.0 <4.0.4": "4.0.4"
-    },
-    "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "prisma",
-      "@parcel/watcher",
-      "esbuild",
-      "msgpackr-extract",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver",
-      "vue-demi"
-    ]
-  },
   "engines": {
     "node": ">=24.14.0"
   },

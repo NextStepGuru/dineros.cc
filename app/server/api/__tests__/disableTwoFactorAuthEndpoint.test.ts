@@ -31,9 +31,9 @@ const { hashVerify } = vi.hoisted(() => ({
   hashVerify: vi.fn().mockResolvedValue(true),
 }));
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    verify: hashVerify,
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { verify: hashVerify };
+  }),
 }));
 
 // Mock dependencies

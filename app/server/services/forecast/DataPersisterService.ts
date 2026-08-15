@@ -62,28 +62,43 @@ export class DataPersisterService implements IDataPersisterService {
     const nowMoment = dateTimeService.createUTC(nowDate);
     const existingRows = await db.reoccurrence.findMany({
       where: { id: { in: reoccurrences.map((r) => r.id) } },
-      select: { id: true, lastAt: true },
+      select: { id: true, lastAt: true, scheduleAnchorAt: true },
     });
-    const existingById = new Map<number, Date | null>(
-      existingRows.map((r) => [r.id, r.lastAt ?? null])
+    const existingById = new Map<
+      number,
+      { lastAt: Date | null; scheduleAnchorAt: Date | null }
+    >(
+      existingRows.map((r) => [
+        r.id,
+        {
+          lastAt: r.lastAt ?? null,
+          scheduleAnchorAt: r.scheduleAnchorAt ?? null,
+        },
+      ]),
     );
 
-    const rows = reoccurrences.map((item) => ({
-      id: item.id,
-      description: item.description,
-      intervalId: item.intervalId,
-      intervalCount: item.intervalCount || 1,
-      intervalName: item.intervalName,
-      proposedLastRunAt: item.lastRunAt ?? null,
-      existingLastAt: existingById.get(item.id) ?? null,
-      updatedAt: item.updatedAt ?? nowDate,
-    })).map((row) => {
+    const rows = reoccurrences.map((item) => {
+      const existing = existingById.get(item.id);
+      return {
+        id: item.id,
+        description: item.description,
+        intervalId: item.intervalId,
+        intervalCount: item.intervalCount || 1,
+        intervalName: item.intervalName,
+        proposedLastRunAt: item.lastRunAt ?? null,
+        existingLastAt: existing?.lastAt ?? null,
+        scheduleAnchorAt:
+          item.scheduleAnchorAt ?? existing?.scheduleAnchorAt ?? null,
+        updatedAt: item.updatedAt ?? nowDate,
+      };
+    }).map((row) => {
       const candidateFromExisting = this.computeLatestPastRunFromExisting(
         row.existingLastAt,
         row.intervalId,
         row.intervalCount,
         row.intervalName,
-        nowMoment
+        nowMoment,
+        row.scheduleAnchorAt,
       );
       const proposedPastRunAt =
         row.proposedLastRunAt &&
@@ -141,7 +156,8 @@ export class DataPersisterService implements IDataPersisterService {
     intervalId: number,
     intervalCount: number,
     intervalName: string | null | undefined,
-    nowMoment: ReturnType<typeof dateTimeService.createUTC>
+    nowMoment: ReturnType<typeof dateTimeService.createUTC>,
+    scheduleAnchorAt?: Date | null,
   ): Date | null {
     if (existingLastAt === null) {
       return null;
@@ -152,6 +168,7 @@ export class DataPersisterService implements IDataPersisterService {
       intervalId,
       intervalCount,
       intervalName,
+      scheduleAnchorAt: scheduleAnchorAt ?? null,
     });
     let guard = 0;
     while (
@@ -164,6 +181,7 @@ export class DataPersisterService implements IDataPersisterService {
         intervalId,
         intervalCount,
         intervalName,
+        scheduleAnchorAt: scheduleAnchorAt ?? null,
       });
       guard += 1;
       if (guard > 2000) break;

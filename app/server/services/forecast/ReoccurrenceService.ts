@@ -6,6 +6,7 @@ import type {
 } from "./ModernCacheService";
 import type { RegisterEntryService } from "./RegisterEntryService";
 import type { TransferService } from "./TransferService";
+import { roundToCents } from "~/lib/bankers-rounding";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { holidayService } from "./HolidayService";
@@ -129,17 +130,26 @@ export class ReoccurrenceService implements IReoccurrenceService {
       return { stop: next == null, nextAt: next };
     }
 
-    const reoccurrenceForEntry = {
-      ...reoccurrence,
-      lastAt: dateTimeService.toDate(adjustedLastAt),
-    };
-    this.createOccurrenceEntries(
-      reoccurrence,
-      reoccurrenceForEntry,
+    // Honor ReoccurrenceSkip rows (adjusted entry date and/or nominal schedule date)
+    const isSkipped = this.entryService.isOccurrenceSkipped(
+      reoccurrence.id,
+      dateTimeService.toDate(adjustedLastAt),
       processedNominalDate,
-      amountContext.effectiveAmount,
-      amountContext.splitRatio,
     );
+    if (!isSkipped) {
+      const reoccurrenceForEntry = {
+        ...reoccurrence,
+        lastAt: dateTimeService.toDate(adjustedLastAt),
+      };
+      this.createOccurrenceEntries(
+        reoccurrence,
+        reoccurrenceForEntry,
+        processedNominalDate,
+        amountContext.effectiveAmount,
+        amountContext.splitRatio,
+      );
+    }
+
     const next = this.advanceNextOccurrence(reoccurrence, processedNominalDate);
     this.updateCachedReoccurrenceAfterProcessing(
       reoccurrence.id,
@@ -270,10 +280,11 @@ export class ReoccurrenceService implements IReoccurrenceService {
         ? `${occurrenceDescription} - ${splitEntry.description.trim()}`
         : `${occurrenceDescription} - Split`;
       const splitMode = splitEntry.amountMode ?? "FIXED";
-      const splitAmount =
+      const splitAmount = roundToCents(
         splitMode === "PERCENT"
           ? effectiveAmount * this.normalizeSplitPercent(splitEntry.amount)
-          : Number(splitEntry.amount) * splitRatio;
+          : Number(splitEntry.amount) * splitRatio,
+      );
 
       this.transferService.transferBetweenAccounts({
         targetAccountRegisterId: splitEntry.transferAccountRegisterId,
@@ -412,6 +423,7 @@ export class ReoccurrenceService implements IReoccurrenceService {
       intervalId: reoccurrence.intervalId,
       intervalCount: reoccurrence.intervalCount,
       intervalName: cached.intervalName,
+      scheduleAnchorAt: reoccurrence.scheduleAnchorAt ?? null,
     });
     if (computed) {
       return computed;

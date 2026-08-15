@@ -1613,7 +1613,7 @@ watch(workflowMode, (w) => {
           )
         div(class="flex items-center gap-2 shrink-0 text-sm")
           span(class="frog-text-muted") {{ forecastSliderLabel }}
-          UIcon(v-if="forecastBalancesLoading" name="i-lucide-loader-2" class="animate-spin frog-text-muted")
+          UIcon(v-if="forecastBalancesLoading" name="i-lucide-loader-circle" class="animate-spin frog-text-muted")
       p(class="text-xs frog-text-muted") Projected from forecast; run recalculate if numbers look stale.
 
     UCard(v-if="showShortcuts" class="my-4")

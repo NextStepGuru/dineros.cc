@@ -111,9 +111,9 @@ const { gapHashVerify } = vi.hoisted(() => ({
   gapHashVerify: vi.fn().mockResolvedValue(true),
 }));
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    verify: gapHashVerify,
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { verify: gapHashVerify };
+  }),
 }));
 
 vi.mock("~/server/lib/getUser", () => ({

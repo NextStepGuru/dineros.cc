@@ -388,6 +388,7 @@ describe("Reoccurrence + Forecast integration", () => {
         intervalId: 3,
         intervalCount: 1,
         lastAt: new Date("2024-01-31T00:00:00.000Z"),
+        scheduleAnchorAt: new Date("2024-01-31T00:00:00.000Z"),
         endAt: null,
         adjustBeforeIfOnWeekend: false,
       },
@@ -407,11 +408,11 @@ describe("Reoccurrence + Forecast integration", () => {
 
     expect(dates).toEqual([
       "2024-02-29",
-      "2024-03-29",
-      "2024-04-29",
-      "2024-05-29",
-      "2024-06-29",
-      "2024-07-29",
+      "2024-03-31",
+      "2024-04-30",
+      "2024-05-31",
+      "2024-06-30",
+      "2024-07-31",
     ]);
   });
 

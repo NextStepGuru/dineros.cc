@@ -6,6 +6,7 @@ import { dateTimeService } from "../services/forecast/DateTimeService";
 
 export type PlaidSyncBalanceJob = {
   accountRegisterId: number;
+  force?: boolean;
 };
 
 export default {
@@ -47,19 +48,24 @@ export default {
 
     const accountRegisters = await prisma.accountRegister.findMany({
       where: {
+        isArchived: false,
         plaidAccessToken: lookupPlaidAccessToken.plaidAccessToken,
-        OR: [
-          { plaidBalanceLastSyncAt: null },
-          {
-            plaidBalanceLastSyncAt: {
-              lt: olderThanDate,
-            },
-          },
-        ],
+        plaidId: { not: null },
+        ...(job.data.force
+          ? {}
+          : {
+              OR: [
+                { plaidBalanceLastSyncAt: null },
+                {
+                  plaidBalanceLastSyncAt: {
+                    lt: olderThanDate,
+                  },
+                },
+              ],
+            }),
       },
       select: {
         plaidId: true,
-        plaidAccessToken: true,
       },
     });
 
@@ -71,7 +77,7 @@ export default {
       log({
         level: "info",
         message: `No accounts found for PlaidSyncBalanceJob ${job.id}`,
-        data: { plaidAccessToken: job.data.accountRegisterId },
+        data: { accountRegisterId: job.data.accountRegisterId },
       });
       return;
     }
@@ -84,7 +90,15 @@ export default {
           plaidAccountIds,
         });
     } catch (err) {
-      console.error("[PLAID_BALANCE_SYNC_ERROR]", String(err));
+      log({
+        message: "PLAID_BALANCE_SYNC_ERROR",
+        level: "error",
+        data: {
+          error: err instanceof Error ? err.message : String(err),
+          jobId: job.id,
+          accountRegisterId: job.data.accountRegisterId,
+        },
+      });
       throw err;
     }
 

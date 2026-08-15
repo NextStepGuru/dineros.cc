@@ -23,4 +23,5 @@ alwaysApply: true
 
 ## Rule Updates
 
-- Update Cursor rules (`.cursor/rules/*.mdc`) when project conventions or tooling change and the rules no longer match.
+- When project conventions, tooling, or runtime behavior change, update the matching **globbed** rule under `.cursor/rules/*.mdc` **and** the matching domain doc under `.agent/logic/*.mdc` so both stay accurate.
+- Do not leave encyclopedia-only facts in always-apply rules; put how-it-works detail in `.agent/logic/` and keep Cursor rules short and actionable.

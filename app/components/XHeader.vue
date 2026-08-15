@@ -190,7 +190,7 @@ function navIconForLabel(label: string): string {
     Bills: "i-lucide-receipt",
     Goals: "i-lucide-target",
     Reports: "i-lucide-pie-chart",
-    Help: "i-lucide-circle-help",
+    Help: "i-lucide-circle-question-mark",
     Admin: "i-lucide-shield-check",
     Reconciliation: "i-lucide-clipboard-check",
   };
@@ -506,7 +506,7 @@ UHeader(
                 @click.stop)
                 UButton(
                   size="xs"
-                  icon="i-lucide-more-horizontal"
+                  icon="i-lucide-ellipsis"
                   square
                   variant="ghost"
                   color="neutral"
@@ -543,7 +543,7 @@ UHeader(
             color="neutral"
             size="sm"
             class="justify-start"
-            icon="i-lucide-circle-help"
+            icon="i-lucide-circle-question-mark"
             @click="close") Help
           UButton(
             to="/edit-profile/profile"
@@ -706,7 +706,7 @@ UHeader(
                 @click.stop)
                 UButton(
                   size="sm"
-                  icon="i-lucide-more-horizontal"
+                  icon="i-lucide-ellipsis"
                   square
                   variant="ghost"
                   color="neutral"

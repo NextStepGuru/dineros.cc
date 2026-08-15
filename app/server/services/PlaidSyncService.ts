@@ -9,10 +9,7 @@ import { PlaidApi } from "plaid";
 import { configuration } from "../lib/getPlaidClient";
 import { createId as cuid } from "@paralleldrive/cuid2";
 import { log } from "~/server/logger";
-import {
-  addPlaidBalanceSyncJob,
-  addRecalculateJob,
-} from "~/server/clients/queuesClient";
+import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { dateTimeService } from "./forecast/DateTimeService";
 import TransactionMatchingService from "./TransactionMatchingService";
 import PlaidTransactionEnrichmentService from "./PlaidTransactionEnrichmentService";
@@ -30,6 +27,29 @@ import { resolvePlaidAccessTokenFromStored } from "~/server/lib/plaidAccessToken
 import { recordPlaidSyncLog } from "~/server/lib/recordPlaidSyncLog";
 
 const DAYS_REQUESTED = 3;
+
+type PlaidBalanceRegister = {
+  id: number;
+  plaidId: string | null;
+  type: { isCredit: boolean };
+};
+
+/**
+ * Ledger snapshot from Plaid. Prefer `current` (posted) over `available` (holds)
+ * so the stored register balance moves with posted transactions.
+ */
+function signedPlaidRegisterBalance(
+  account: AccountBase,
+  isCredit: boolean,
+): number | null {
+  const raw = isCredit
+    ? account.balances.current
+    : (account.balances.current ?? account.balances.available);
+  if (raw == null) return null;
+  const n = Number.parseFloat(raw.toString());
+  if (!Number.isFinite(n)) return null;
+  return isCredit ? n * -1 : n;
+}
 
 /** Posted Plaid txn may include the `transaction_id` of the pending txn it replaced. */
 function pendingTransactionIdIfPosted(tx: Transaction): string | null {
@@ -302,7 +322,12 @@ class PlaidSyncService {
 
     for (const transaction of transactions) {
       try {
-        if (this.shouldSkipSupersededPendingPlaidTxn(transaction, pendingIdsSuperseded)) {
+        if (
+          this.shouldSkipSupersededPendingPlaidTxn(
+            transaction,
+            pendingIdsSuperseded,
+          )
+        ) {
           log({
             message:
               "Skipping superseded pending Plaid transaction (posted in same batch)",
@@ -315,7 +340,12 @@ class PlaidSyncService {
           continue;
         }
 
-        if (await this.tryPlaidPostedPendingUpdateInPlace(transaction, accountRegister)) {
+        if (
+          await this.tryPlaidPostedPendingUpdateInPlace(
+            transaction,
+            accountRegister,
+          )
+        ) {
           matchedCount++;
           continue;
         }
@@ -343,7 +373,85 @@ class PlaidSyncService {
   }
 
   /**
-   * Gets account balances and updates them
+   * Load Plaid-linked registers for a token. Equality on the encrypted token uses
+   * the hash column; never use `plaidId: { in }` (unsupported on encrypted fields).
+   */
+  private async findPlaidRegistersByAccessToken(
+    accessToken: string,
+    plaidAccountIds?: string[],
+  ): Promise<PlaidBalanceRegister[]> {
+    const accountRegisters = await this.db.accountRegister.findMany({
+      where: {
+        plaidAccessToken: accessToken,
+        plaidId: { not: null },
+        isArchived: false,
+      },
+      select: {
+        id: true,
+        plaidId: true,
+        type: { select: { isCredit: true } },
+      },
+    });
+    if (!plaidAccountIds?.length) return accountRegisters;
+    const requested = new Set(plaidAccountIds);
+    return accountRegisters.filter(
+      (r) => r.plaidId != null && requested.has(r.plaidId),
+    );
+  }
+
+  private async applyPlaidBalancesToRegisters(
+    accounts: AccountBase[],
+    accountRegisters: PlaidBalanceRegister[],
+  ): Promise<void> {
+    const registerByPlaidId = new Map(
+      accountRegisters
+        .filter((r) => r.plaidId != null)
+        .map((r) => [r.plaidId as string, r]),
+    );
+    const now = dateTimeService.nowDate();
+    let updated = 0;
+
+    for (const account of accounts) {
+      const accountRegister = registerByPlaidId.get(account.account_id);
+      if (!accountRegister) continue;
+
+      const latestBalance = signedPlaidRegisterBalance(
+        account,
+        accountRegister.type.isCredit,
+      );
+      if (latestBalance == null) {
+        log({
+          message: "Skipping Plaid balance update: no numeric balance",
+          data: { accountRegisterId: accountRegister.id },
+          level: "warn",
+        });
+        continue;
+      }
+
+      await this.db.accountRegister.update({
+        where: { id: accountRegister.id },
+        data: {
+          balance: latestBalance,
+          latestBalance,
+          plaidBalanceLastSyncAt: now,
+        },
+      });
+      updated += 1;
+    }
+
+    log({
+      message: "Applied Plaid account balances",
+      data: {
+        plaidAccounts: accounts.length,
+        linkedRegisters: accountRegisters.length,
+        updated,
+      },
+      level: "info",
+    });
+  }
+
+  /**
+   * Fetches Plaid account balances and writes them onto linked registers.
    */
   async getAllAccountsByAccessTokenAndUpdateBalance({
     accessToken,
@@ -352,58 +460,58 @@ class PlaidSyncService {
     accessToken: string;
     plaidAccountIds: string[];
   }): Promise<AccountBase[]> {
+    const accountRegisters = await this.findPlaidRegistersByAccessToken(
+      accessToken,
+      plaidAccountIds,
+    );
+    const linkedPlaidIds = accountRegisters
+      .map((r) => r.plaidId)
+      .filter((id): id is string => id != null);
+
+    if (linkedPlaidIds.length === 0) {
+      log({
+        message: "No Plaid-linked registers for balance update",
+        level: "info",
+      });
+      return [];
+    }
+
     let accountsResponse;
     try {
       accountsResponse = await this.client.accountsGet({
         access_token: accessToken,
-        options: { account_ids: [...plaidAccountIds] },
+        options: { account_ids: linkedPlaidIds },
       });
     } catch (err) {
       await this.maybeAlertPlaidCredentialError(err, { path: "accountsGet" });
       throw err;
     }
 
-    const accountRegisters = await this.db.accountRegister.findMany({
-      where: {
-        plaidId: { in: plaidAccountIds },
-        plaidAccessToken: accessToken,
-      },
-      select: {
-        id: true,
-        plaidId: true,
-        type: { select: { isCredit: true } },
-      },
-    });
-
     const accountList = accountsResponse.data.accounts;
-    const registerByPlaidId = new Map(
-      accountRegisters.map((r) => [r.plaidId, r]),
-    );
-    const now = dateTimeService.nowDate();
-
-    await Promise.all(
-      accountList.map((account) => {
-        const accountRegister = registerByPlaidId.get(account.account_id);
-        if (!accountRegister) return Promise.resolve();
-
-        const rawBalance = accountRegister.type.isCredit
-          ? account.balances.current
-          : (account.balances.available ?? account.balances.current);
-        const latestBalance = accountRegister.type.isCredit
-          ? Number.parseFloat(rawBalance?.toString() || "0") * -1
-          : Number.parseFloat(rawBalance?.toString() || "0");
-
-        return this.db.accountRegister.updateMany({
-          where: { plaidId: account.account_id },
-          data: {
-            latestBalance,
-            plaidBalanceLastSyncAt: now,
-          },
-        });
-      }),
-    );
-
+    await this.applyPlaidBalancesToRegisters(accountList, accountRegisters);
     return accountList;
+  }
+
+  /** Best-effort: transaction sync should still succeed if balance pull fails. */
+  private async syncBalancesForAccessToken(
+    accessToken: string,
+    plaidAccountIds: string[],
+  ): Promise<void> {
+    try {
+      await this.getAllAccountsByAccessTokenAndUpdateBalance({
+        accessToken,
+        plaidAccountIds,
+      });
+    } catch (err) {
+      log({
+        message: "Plaid balance update after transaction sync failed",
+        data: {
+          error: err instanceof Error ? err.message : String(err),
+          plaidAccountCount: plaidAccountIds.length,
+        },
+        level: "error",
+      });
+    }
   }
 
   /**
@@ -927,8 +1035,11 @@ class PlaidSyncService {
         accountRegisters,
       );
 
+      await this.syncBalancesForAccessToken(accessToken, [
+        ...registerByPlaidAccountId.keys(),
+      ]);
+
       for (const ar of accountRegisters) {
-        addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
         addRecalculateJob({ accountId: ar.accountId });
       }
 
@@ -1058,19 +1169,22 @@ class PlaidSyncService {
     }[],
   ): Promise<void> {
     const legacyStart = dateTimeService.nowDate().getTime();
-    const startDate = this.minPlaidSyncStartDateFromTokenAccounts(accountsForToken);
+    const startDate =
+      this.minPlaidSyncStartDateFromTokenAccounts(accountsForToken);
     const startStr = startDate.toISOString().slice(0, 10);
     const endStr = dateTimeService
       .now()
       .add(DAYS_REQUESTED, "days")
       .toISOString()
       .slice(0, 10);
+    const plaidAccountIds = accountsForToken.map((a) => a.plaidId);
     const syncResult = await this.syncAllTransactions({
       accessToken,
-      plaidAccountIds: accountsForToken.map((a) => a.plaidId),
+      plaidAccountIds,
       startDate: startStr,
       endDate: endStr,
     });
+    await this.syncBalancesForAccessToken(accessToken, plaidAccountIds);
 
     const syncAtMidnightUTC = dateTimeService
       .createUTC(dateTimeService.nowDate())
@@ -1130,17 +1244,15 @@ class PlaidSyncService {
   /**
    * Main sync method that orchestrates the entire sync process
    */
-  async getAndSyncPlaidAccounts(
-    {
-      accountRegisterId,
-      resetSyncDates = false,
-      itemId,
-    }: {
-      accountRegisterId?: number;
-      resetSyncDates?: boolean;
-      itemId?: string;
-    } = {},
-  ): Promise<void> {
+  async getAndSyncPlaidAccounts({
+    accountRegisterId,
+    resetSyncDates = false,
+    itemId,
+  }: {
+    accountRegisterId?: number;
+    resetSyncDates?: boolean;
+    itemId?: string;
+  } = {}): Promise<void> {
     if (itemId) {
       await this.syncItemWithTransactionsSync(itemId);
       return;
@@ -1166,18 +1278,6 @@ class PlaidSyncService {
       resetSyncDates,
     );
 
-    // Add balance sync jobs (only for registers we're syncing)
-    const accountRegisterIdsInScope = new Set(
-      Object.values(plaidAccounts).flatMap((arr) =>
-        arr.map((a) => a.accountRegisterId),
-      ),
-    );
-    for (const ar of accountRegisters) {
-      if (accountRegisterIdsInScope.has(ar.id)) {
-        addPlaidBalanceSyncJob({ accountRegisterId: ar.id });
-      }
-    }
-
     for (const accessToken in plaidAccounts) {
       const accountsForToken = plaidAccounts[accessToken];
       if (!accountsForToken?.length) continue;
@@ -1193,7 +1293,9 @@ class PlaidSyncService {
           data: {
             error,
             accountCount: accountsForToken.length,
-            accountRegisterIds: accountsForToken.map((a) => a.accountRegisterId),
+            accountRegisterIds: accountsForToken.map(
+              (a) => a.accountRegisterId,
+            ),
           },
           level: "error",
         });
@@ -1205,9 +1307,13 @@ class PlaidSyncService {
           durationMs: dateTimeService.nowDate().getTime() - legacySyncStart,
           errorCount: 1,
           errorSummary:
-            error instanceof Error ? error.message.slice(0, 8000) : String(error),
+            error instanceof Error
+              ? error.message.slice(0, 8000)
+              : String(error),
           metadata: {
-            accountRegisterIds: accountsForToken.map((a) => a.accountRegisterId),
+            accountRegisterIds: accountsForToken.map(
+              (a) => a.accountRegisterId,
+            ),
           },
         });
       }

@@ -66,6 +66,6 @@ export default defineEventHandler(async (event: H3Event) => {
   } catch (error) {
     handleApiError(error);
 
-    throw new Error("An error occurred while changing password.");
+    throw new Error("An error occurred while changing password.", { cause: error });
   }
 });

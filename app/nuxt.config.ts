@@ -169,6 +169,21 @@ export default defineNuxtConfig({
     ...(process.env.NODE_ENV === "test" ? [] : ["nuxt-cron"]),
   ],
   css: ["~/assets/css/main.css"],
+  icon: {
+    clientBundle: {
+      scan: {
+        globInclude: ["**/*.{vue,ts,js}"],
+      },
+      icons: [
+        "lucide:line-chart",
+        "lucide:clipboard-check",
+        "lucide:circle-question-mark",
+        "lucide:shield-check",
+        "lucide:user",
+        "simple-icons:x",
+      ],
+    },
+  },
   typescript: {
     strict: false,
     typeCheck: false,

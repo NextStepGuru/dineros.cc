@@ -14,7 +14,7 @@ export interface ProgressReport {
 }
 
 export type ProgressReportCallback = (
-  progress: ProgressReport
+  _progress: ProgressReport
 ) => void | Promise<void>
 
 export const defaultProgressReport: ProgressReportCallback = ({

@@ -59,9 +59,9 @@ const { emailHashVerify } = vi.hoisted(() => ({
   emailHashVerify: vi.fn().mockResolvedValue(true),
 }));
 vi.mock("~/server/services/HashService", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    verify: emailHashVerify,
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return { verify: emailHashVerify };
+  }),
 }));
 
 vi.mock("~/server/clients/prismaClient", async () => {

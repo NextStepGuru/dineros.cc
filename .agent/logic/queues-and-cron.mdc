@@ -12,6 +12,14 @@ Queues (BullMQ)
 - Use server/lib/queueManager.ts and server/clients/queuesClient.ts for consistent setup
 - Admin UI via @bull-board/h3 is present as a dependency; SHOW_BULL_MQ_ADMIN controls visibility in prod manifests
 
+## Plaid jobs (balance vs transactions)
+
+- Transaction sync (`plaid-sync`) should call **inline** `/accounts/get` balance update after txn apply (`PlaidSyncService.syncBalancesForAccessToken`). Do not rely only on enqueuing balance jobs.
+- Balance queue (`plaid-sync-balance`): by default skips registers with `plaidBalanceLastSyncAt` within the last **6 hours**.
+- `addPlaidBalanceSyncJob({ force: true })`: delay 0 and a unique `jobId` (timestamp suffix) so manual/task syncs are not deduped or delayed.
+- Hourly cron `plaid-balance.hourly.ts` enqueues one job per distinct access token for stale/null `plaidBalanceLastSyncAt`.
+- See `.agent/logic/plaid.mdc` and `.cursor/rules/plaid-sync.mdc`.
+
 Cron jobs (nuxt-cron)
 - app/server/cron/* — scheduled tasks, e.g.:
   - backup.daily.ts
@@ -23,6 +31,7 @@ Cron jobs (nuxt-cron)
 Tasks endpoints
 - app/server/api/tasks/* — http-invoked maintenance/debug triggers (seed, migrate, sync, test helpers)
 - Gate dangerous tasks behind internal tokens or admin checks
+- `sync-plaid-balance` uses `force: true`
 
 Guidelines
 - Prefer small jobs with retries and observability (IntegrationJobLog for external-facing work)
