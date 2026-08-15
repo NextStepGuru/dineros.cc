@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Mock } from "vitest";
+import { buildLowestByHorizon } from "~/server/lib/registerLedgerFuture";
 
 type RegisterTestGlobal = typeof globalThis & {
   defineEventHandler: Mock;
@@ -228,6 +229,7 @@ describe("Register and File Upload API Endpoints", () => {
         entries: mockBalanceUpdated,
         lowest: mockBalanceUpdated[1],
         highest: mockBalanceUpdated[0],
+        lowestByHorizon: buildLowestByHorizon(mockBalanceUpdated),
         skip: 0,
         focusedAt: new Date("2024-01-01T00:00:00.000Z"),
         take: 100,
@@ -518,6 +520,7 @@ describe("Register and File Upload API Endpoints", () => {
         entries: expectedEntries,
         lowest: expectedEntries[0],
         highest: expectedEntries[0],
+        lowestByHorizon: buildLowestByHorizon(expectedEntries),
         skip: 0,
         focusedAt: expect.any(Date),
         take: 50,
