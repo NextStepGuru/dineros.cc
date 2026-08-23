@@ -1,0 +1,14 @@
+---
+description: Statement opening/ending can be edited on an OPEN reconciliation period
+globs: app/pages/reconciliation/**,app/server/api/reconciliation/period/**,app/server/services/reconciliationService.ts,app/schema/reconciliation.ts
+alwaysApply: false
+---
+
+# Reconciliation statement balances
+
+- Opening and ending are stored on `ReconciliationPeriod` (`statementOpeningBalance`, `statementEndingBalance`).
+- Set them at `POST /api/reconciliation/period`, or change an **OPEN** period with `PATCH /api/reconciliation/period/:id`.
+- Do not add an adjustment entry to force close. Difference is `ending − (opening + cleared net)`.
+- Closed periods cannot be edited.
+
+Details: `.agent/logic/reconciliation.mdc`.

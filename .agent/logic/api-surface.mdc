@@ -42,7 +42,7 @@ Bills
 
 Reconciliation
 - reconciliation/period.get.ts (open period + last closed ending), reconciliation/period.post.ts, reconciliation/periods/open.get.ts
-- reconciliation/period/[id].get.ts, reconciliation/period/[id]/close.post.ts (dollars must be ~0; leftover `statement_only` blocks; cleared items need `categoryId`), reconciliation/period/[id]/match.post.ts
+- reconciliation/period/[id].get.ts, reconciliation/period/[id].patch.ts (opening/ending on OPEN periods), reconciliation/period/[id]/close.post.ts (dollars must be ~0; leftover `statement_only` blocks; cleared items need `categoryId`), reconciliation/period/[id]/match.post.ts
 - reconciliation/item/[entryId].patch.ts (`isCleared`, `note`, `categoryId`), reconciliation/statement/extract.post.ts, reconciliation/statement-line/[id].patch.ts (`createLedgerEntry` to import a leftover line)
 - reconciliation/period/[id]/import-statement-lines.post.ts (bulk leftover import to ledger)
 - Behavior: `.agent/logic/reconciliation.mdc`

@@ -23,6 +23,11 @@ export const closeReconciliationPeriodSchema = z.object({
   closeNote: z.string().max(500).nullable().optional(),
 });
 
+export const patchReconciliationPeriodSchema = z.object({
+  statementOpeningBalance: z.coerce.number(),
+  statementEndingBalance: z.coerce.number(),
+});
+
 export const patchStatementLineSchema = z.object({
   ignore: z.boolean().optional(),
   registerEntryId: z.string().min(1).nullable().optional(),

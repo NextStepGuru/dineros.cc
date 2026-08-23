@@ -973,6 +973,37 @@ export async function importStatementLinesToLedger(params: {
   };
 }
 
+export async function updateReconciliationPeriodBalances(params: {
+  userId: number;
+  periodId: number;
+  statementOpeningBalance: number;
+  statementEndingBalance: number;
+}) {
+  const workspace = await getReconciliationPeriodWorkspace({
+    userId: params.userId,
+    periodId: params.periodId,
+  });
+  if (workspace.period.status !== "OPEN") {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Closed periods cannot be edited.",
+    });
+  }
+
+  await prismaRecon.reconciliationPeriod.update({
+    where: { id: params.periodId },
+    data: {
+      statementOpeningBalance: roundToCents(params.statementOpeningBalance),
+      statementEndingBalance: roundToCents(params.statementEndingBalance),
+    },
+  });
+
+  return getReconciliationPeriodWorkspace({
+    userId: params.userId,
+    periodId: params.periodId,
+  });
+}
+
 export async function closeReconciliationPeriod(params: {
   userId: number;
   periodId: number;

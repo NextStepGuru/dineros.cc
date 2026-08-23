@@ -137,6 +137,11 @@ const openForm = reactive({
   statementEndingBalance: 0,
 });
 
+const balanceForm = reactive({
+  statementOpeningBalance: 0,
+  statementEndingBalance: 0,
+});
+
 const accountRegisterId = computed(() =>
   Number.parseInt(String(route.params.accountRegisterId || 0), 10),
 );
@@ -226,6 +231,21 @@ const canClosePeriod = computed(
     closeGap.value.uncategorizedCleared === 0,
 );
 
+const periodIsOpen = computed(
+  () => workspace.value?.period.status === "OPEN",
+);
+
+const balancesDirty = computed(() => {
+  const period = workspace.value?.period;
+  if (!period) return false;
+  return (
+    Math.round(balanceForm.statementOpeningBalance * 100) !==
+      Math.round(period.statementOpeningBalance * 100) ||
+    Math.round(balanceForm.statementEndingBalance * 100) !==
+      Math.round(period.statementEndingBalance * 100)
+  );
+});
+
 function entryCountLabel(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -283,6 +303,10 @@ async function loadWorkspace() {
     workspace.value = await ($api as typeof $fetch)<ReconciliationWorkspace>(
       `/api/reconciliation/period/${periodId.value}`,
     );
+    balanceForm.statementOpeningBalance =
+      workspace.value.period.statementOpeningBalance;
+    balanceForm.statementEndingBalance =
+      workspace.value.period.statementEndingBalance;
   } catch {
     toast.add({
       color: "error",
@@ -585,6 +609,45 @@ async function matchLine(lineId: number, registerEntryId: string | null) {
   }
 }
 
+async function saveBalances() {
+  if (!periodId.value || !periodIsOpen.value || !balancesDirty.value) return;
+  actionLoading.value.add("balances");
+  try {
+    workspace.value = await ($api as typeof $fetch)<ReconciliationWorkspace>(
+      `/api/reconciliation/period/${periodId.value}`,
+      {
+        method: "PATCH",
+        body: {
+          statementOpeningBalance: balanceForm.statementOpeningBalance,
+          statementEndingBalance: balanceForm.statementEndingBalance,
+        },
+      },
+    );
+    balanceForm.statementOpeningBalance =
+      workspace.value.period.statementOpeningBalance;
+    balanceForm.statementEndingBalance =
+      workspace.value.period.statementEndingBalance;
+    toast.add({
+      color: "success",
+      description: "Opening and ending balances updated.",
+    });
+  } catch (error: unknown) {
+    const err = error as {
+      data?: { message?: string };
+      statusMessage?: string;
+    };
+    toast.add({
+      color: "error",
+      description:
+        err?.data?.message ??
+        err?.statusMessage ??
+        "Failed to update opening and ending balances.",
+    });
+  } finally {
+    actionLoading.value.delete("balances");
+  }
+}
+
 async function rematch() {
   if (!periodId.value) return;
   actionLoading.value.add("rematch");
@@ -790,13 +853,26 @@ section(class="px-3 sm:px-4 py-4 max-w-6xl mx-auto space-y-4")
         div(class="space-y-1")
           h2(class="font-semibold text-lg")
             | {{ new Date(workspace.period.startDate).toLocaleDateString() }} – {{ new Date(workspace.period.endDate).toLocaleDateString() }}
+          div(class="flex flex-wrap items-end gap-3 mt-3")
+            UFormField(label="Opening balance")
+              UInputNumber(
+                v-model="balanceForm.statementOpeningBalance"
+                :step="0.01"
+                :disabled="!periodIsOpen || actionLoading.has('balances')")
+            UFormField(label="Ending balance")
+              UInputNumber(
+                v-model="balanceForm.statementEndingBalance"
+                :step="0.01"
+                :disabled="!periodIsOpen || actionLoading.has('balances')")
+            UButton(
+              v-if="periodIsOpen"
+              size="sm"
+              color="primary"
+              icon="i-lucide-save"
+              :loading="actionLoading.has('balances')"
+              :disabled="!balancesDirty || actionLoading.has('balances')"
+              @click="saveBalances") Save balances
           div(class="flex flex-wrap gap-x-6 gap-y-1 text-sm")
-            span
-              span(class="frog-text-muted") Opening:&nbsp;
-              span(class="font-medium") {{ formatMoney(workspace.period.statementOpeningBalance) }}
-            span
-              span(class="frog-text-muted") Ending:&nbsp;
-              span(class="font-medium") {{ formatMoney(workspace.period.statementEndingBalance) }}
             span
               span(class="frog-text-muted") Cleared net:&nbsp;
               span(class="font-medium") {{ formatMoney(workspace.period.clearedAmountSum) }}

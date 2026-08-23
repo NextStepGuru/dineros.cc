@@ -11,6 +11,7 @@ Purpose
 Open a period
 - `POST /api/reconciliation/period` with dates, opening/ending, optional income/expense subtotals and `statementLines`.
 - `GET /api/reconciliation/period` returns `{ open, lastClosed }` so the UI can prefill opening from the last closed ending.
+- `PATCH /api/reconciliation/period/:id` updates `statementOpeningBalance` / `statementEndingBalance` on an **OPEN** period. Closed periods cannot be edited. Difference is recomputed from the new balances.
 - `POST /api/reconciliation/statement/extract` (multipart `file` + `accountRegisterId`) parses in memory and drops the blob. Does not persist the file.
 - Extract pipeline: PDF text (`unpdf`) / CSV / OFX → Novo-style parser → LLM JSON extract (`purpose: statement_extract`) only when the parse is incomplete. Do not log statement line text on `OpenAiRequestLog`.
 - Control check: `opening + sum(lines) ≈ ending`. Warn when it fails; user still confirms Open.
