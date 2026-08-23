@@ -9,7 +9,7 @@ alwaysApply: false
 Show a small icon **before** the description (`RegisterEntryOriginIcon` / `registerEntryOrigin`).
 
 - **Repeat** (`i-lucide-repeat`): live projected recurrence (date not past, no Plaid link).
-- **Plaid** (`i-simple-icons-plaid`): recurrence whose date has passed **or** that matched a Plaid txn (`plaidId` / `isMatched`). Do not keep the repeat icon.
+- **Settled** (`i-lucide-badge-check`): recurrence whose date has passed **or** that matched a Plaid txn (`plaidId` / `isMatched`). Do not keep the repeat icon.
 - **Pencil**: `isManualEntry` / manual type.
 - Other `typeId`s: transfer, interest, loan/CC payment, balance, unmatched bank import.
 

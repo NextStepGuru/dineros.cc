@@ -188,7 +188,7 @@ export default defineNuxtConfig({
         "lucide:shield-check",
         "lucide:user",
         "simple-icons:x",
-        "simple-icons:plaid",
+        "lucide:badge-check",
         "lucide:repeat",
         "lucide:pencil",
         "lucide:building-2",

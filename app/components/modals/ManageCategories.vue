@@ -221,7 +221,8 @@ UModal(
               @click="archiveCategory(cat.id)"
             ) Archive
 
-      p.text-sm.frog-text-muted(class="dark:text-muted")(
+      p.text-sm.frog-text-muted(
+        class="dark:text-muted"
         v-if="categoriesForAccount.length === 0 && !newName"
       )
         | No categories yet. Add one above.

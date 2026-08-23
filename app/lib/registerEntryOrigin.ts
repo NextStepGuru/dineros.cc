@@ -55,7 +55,7 @@ export function registerEntryOrigin(
   if (isRecurringRow(entry)) {
     if (isRecurrenceSettled(entry, todayISO)) {
       return {
-        icon: "i-simple-icons-plaid",
+        icon: "i-lucide-badge-check",
         label: hasPlaidLink(entry)
           ? "Matched to a Plaid transaction"
           : "Occurrence date has passed",

@@ -28,7 +28,7 @@ Core modules (selected)
 - Do **not** rely on bumping `lastAt` alone to persist a skip — future skips survive only via skip rows (and `persistReoccurrenceLastAt` does not walk `lastAt` into the future).
 - Skip API (`register-entry-skip`) always inserts a skip row; may also bump `lastAt` when skipping the immediate next occurrence using `calculateNextOccurrenceDate` (same math as forecast).
 - Edit modal: a today/future **projected** recurrence shows **Skip this occurrence** only (not Apply). Apply/Clear/Delete are for posted or past pending rows — Apply posts the instance; Skip means it will not happen.
-- Register description origin icon: projected recurrences use **repeat**; once the occurrence date has passed or the row has a Plaid match (`plaidId` / `isMatched`), swap to the **Plaid** icon. Manual / transfer / interest / bank-import rows use other icons (`registerEntryOrigin.ts`).
+- Register description origin icon: projected recurrences use **repeat**; once the occurrence date has passed or the row has a Plaid match (`plaidId` / `isMatched`), swap to **badge-check**. Manual / transfer / interest / bank-import rows use other icons (`registerEntryOrigin.ts`).
 
 ## Balances (do not overwrite live snapshot)
 

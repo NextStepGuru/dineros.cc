@@ -25,7 +25,7 @@ Core entities
   - Plaid linkage (encrypted ids + JSON)
   - categoryId optional; `categoryLocked` / `categorySource` (`ai` | `rule` | `pfc` | `user` | `recurrence`)
   - memo optional; referenceId/checkNo optional; seq ordering
-  - Register table origin icon (before description): live recurrence = repeat; date-passed or Plaid-matched recurrence = Plaid logo (not repeat); pencil = manual; other `typeId`s have their own icons (`app/lib/registerEntryOrigin.ts`)
+  - Register table origin icon (before description): live recurrence = repeat; date-passed or Plaid-matched recurrence = badge-check (not repeat); pencil = manual; other `typeId`s have their own icons (`app/lib/registerEntryOrigin.ts`)
   - Register row overlay: running balance under $1,000 = yellow tint, under $0 = red tint (`register-row-balance-*`); paints on cells so zebra/hover still apply
 
 MerchantCategoryRule
