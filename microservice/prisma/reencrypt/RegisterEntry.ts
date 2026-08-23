@@ -2,7 +2,7 @@
 
 import type { PrismaClient, RegisterEntry } from '@prisma/client'
 import {
-  type ProgressReportCallback,
+  ProgressReportCallback,
   defaultProgressReport,
   visitRecords
 } from 'prisma-field-encryption/dist/generator/runtime'
@@ -96,6 +96,18 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     "category": {
  *       "modelName": "Category",
  *       "isList": false
+ *     },
+ *     "reconciliationItems": {
+ *       "modelName": "ReconciliationItem",
+ *       "isList": true
+ *     },
+ *     "reconciliationClosingPeriods": {
+ *       "modelName": "ReconciliationPeriod",
+ *       "isList": true
+ *     },
+ *     "statementLines": {
+ *       "modelName": "StatementLine",
+ *       "isList": true
  *     }
  *   }
  * }

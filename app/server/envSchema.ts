@@ -50,8 +50,12 @@ const envSchema = z.object({
   ALCHEMY_API_KEY: z.string().optional(),
   /** OpenAI API key; if unset, Plaid transaction enrichment is skipped. */
   OPENAI_API_KEY: z.string().optional(),
-  /** Model for Plaid register-entry enrichment (default gpt-5-nano). */
-  OPENAI_PLAID_TX_MODEL: z.string().default("gpt-5-nano"),
+  /** Model for Plaid register-entry enrichment (default gpt-5-mini). */
+  OPENAI_PLAID_TX_MODEL: z.string().default("gpt-5-mini"),
+  /** Model for batched Plaid transaction matching (defaults to OPENAI_PLAID_TX_MODEL). */
+  OPENAI_PLAID_MATCH_MODEL: z.string().optional(),
+  /** Minimum AI match confidence (0–1) before merging into an existing line. */
+  OPENAI_PLAID_MATCH_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.7),
   /** Model for vehicle value estimate (default gpt-5-nano). Legacy; prefer OPENAI_ASSET_VALUE_MODEL. */
   OPENAI_VEHICLE_VALUE_MODEL: z.string().default("gpt-5-nano"),
   /** Model for AI asset value estimates (vehicle, house, boat, RV, motorcycle). */

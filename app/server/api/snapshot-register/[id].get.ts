@@ -57,6 +57,8 @@ export default defineEventHandler(async (event) => {
       isProjected: e.isProjected,
       isBalanceEntry: e.isBalanceEntry,
       isPending: e.isPending,
+      isManualEntry: e.isManualEntry,
+      isMatched: false,
       plaidId: null as string | null,
     }));
 

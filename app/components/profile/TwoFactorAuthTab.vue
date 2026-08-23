@@ -248,7 +248,7 @@ function toggleBackupCodes() {
 <template lang="pug">
 div(class="max-w-2xl mx-auto space-y-5")
 
-  div(v-if="hasAnyMfaEnabled" class="rounded-lg border border-amber-200/80 dark:border-amber-900/50 p-4 bg-amber-50/50 dark:bg-amber-950/20")
+  div(v-if="hasAnyMfaEnabled" class="section-callout section-callout--warning")
     UFormField(label="Current password (required to remove a key, disable email OTP, or disable all MFA)" for="stepUpPassword")
       UInput(
         id="stepUpPassword"
@@ -258,35 +258,35 @@ div(class="max-w-2xl mx-auto space-y-5")
         class="w-full"
       )
 
-  div(class="rounded-lg border border-gray-200 dark:border-gray-800 p-4")
+  div(class="panel-bordered")
     .flex.items-center.justify-between.mb-3
       h3(class="font-semibold") Authenticator app (TOTP)
       span(
         class="text-xs px-2 py-1 rounded-full"
-        :class="hasTotpEnabled ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
+        :class="hasTotpEnabled ? 'badge-status-on' : 'badge-status-off'"
       ) {{ hasTotpEnabled ? 'Enabled' : 'Not enabled' }}
 
     UForm(:state="twoFaFormState" :disabled="isTwoFaSaving" :loading="isTwoFaSaving")
       template(v-if="showQRCode")
         .text-center.mb-4
-          div(class="flex items-center justify-center gap-3 mb-4 p-3 rounded-lg bg-gray-100 dark:bg-gray-800/60")
+          div(class="flex items-center justify-center gap-3 mb-4 p-3 rounded-lg bg-muted")
             NuxtImg(
               src="https://res.cloudinary.com/guidedsteps/image/upload/c_fill,g_face:auto,w_128/v1737776329/pepe_solo_t0twqk.png"
               width="40"
               height="40"
               sizes="40px"
               alt="Dineros"
-              class="size-10 rounded-full ring-2 ring-gray-300 dark:ring-gray-600")
+              class="size-10 rounded-full ring-2 frog-logo-ring")
             div(class="text-left")
-              span(class="font-semibold text-gray-900 dark:text-gray-100") Dineros.cc
-              p(class="text-xs text-gray-600 dark:text-gray-400") This account will appear with this name and your email in your app
+              span(class="font-semibold text-highlighted") Dineros.cc
+              p(class="text-xs frog-text-muted") This account will appear with this name and your email in your app
           img(:src="twoFaImage" alt="QR code — scan with your authenticator app" class="mx-auto mb-4 max-w-64")
 
         div(
-          class="mb-4 p-4 rounded-lg border border-amber-200/90 dark:border-amber-800/70 bg-amber-50/90 dark:bg-amber-950/30"
+          class="mb-4 p-4 rounded-lg section-callout section-callout--warning"
         )
-          h3(class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2") Emergency backup codes
-          p(class="text-xs text-amber-800 dark:text-amber-300/90 mb-3") Save these backup codes in a secure location.
+          h3(class="text-sm font-semibold frog-status-warning mb-2") Emergency backup codes
+          p(class="text-xs frog-text-muted mb-3") Save these backup codes in a secure location.
 
           .flex.items-center.justify-between.mb-2
             UButton(
@@ -302,7 +302,7 @@ div(class="max-w-2xl mx-auto space-y-5")
               div(
                 v-for="code in backupCodes"
                 :key="code"
-                class="text-center p-2 rounded font-mono text-sm border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900/80 text-gray-900 dark:text-gray-100"
+                class="text-center p-2 rounded font-mono text-sm border border-default bg-default text-highlighted"
               ) {{ code }}
 
         UFormField(label="Authentication code" for="twoFactorCode")
@@ -343,10 +343,10 @@ div(class="max-w-2xl mx-auto space-y-5")
         :loading="isTwoFaSaving"
       ) {{ hasTotpEnabled ? 'Already enabled' : 'Enable authenticator app' }}
 
-  div(class="rounded-lg border border-gray-200 dark:border-gray-800 p-4")
+  div(class="panel-bordered")
     .flex.items-center.justify-between.mb-3
       h3(class="font-semibold") Security keys / passkeys
-      span(class="text-xs text-gray-600 dark:text-gray-400") {{ passkeys.length }} registered
+      span(class="text-xs frog-text-muted") {{ passkeys.length }} registered
 
     UFormField(label="Label (optional)" for="passkeyName")
       UInput(
@@ -369,11 +369,11 @@ div(class="max-w-2xl mx-auto space-y-5")
       div(
         v-for="passkey in passkeys"
         :key="passkey.id"
-        class="flex items-center justify-between rounded border border-gray-200 dark:border-gray-700 px-3 py-2"
+        class="flex items-center justify-between rounded border border-default px-3 py-2"
       )
         div
           p(class="text-sm font-medium") {{ passkey.name || 'Security key' }}
-          p(class="text-xs text-gray-500 dark:text-gray-400") {{ passkey.id }}
+          p(class="text-xs frog-text-muted") {{ passkey.id }}
         UButton(
           color="error"
           variant="ghost"
@@ -382,11 +382,11 @@ div(class="max-w-2xl mx-auto space-y-5")
           :disabled="isTwoFaSaving"
         ) Remove
 
-  div(class="rounded-lg border border-gray-200 dark:border-gray-800 p-4")
+  div(class="panel-bordered")
     .flex.items-center.justify-between
       div
         h3(class="font-semibold") Email verification code
-        p(class="text-xs text-gray-500 dark:text-gray-400") Send a one-time login code to your account email
+        p(class="text-xs frog-text-muted") Send a one-time login code to your account email
       UButton(
         :color="emailOtpEnabled ? 'neutral' : 'primary'"
         size="sm"

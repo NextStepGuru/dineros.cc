@@ -6,6 +6,7 @@ import {
   formatDate,
   getAccountRegisterLabel,
   getIntervalLabel,
+  moneyColorClass,
 } from "~/lib/utils";
 import {
   sortCategoriesForManageList,
@@ -193,7 +194,7 @@ const columns: TableColumn<Reoccurrence>[] = [
     header: () => h("div", {}, "Category"),
     cell: ({ row }) => {
       const id = row.getValue("categoryId") as string | null | undefined;
-      if (!id) return h("div", { class: "text-gray-500" }, "—");
+      if (!id) return h("div", { class: "frog-text-muted" }, "—");
       const cat = listStore.getCategories.find((c) => c.id === id);
       return h("div", {}, cat?.name ?? id);
     },
@@ -223,11 +224,8 @@ const columns: TableColumn<Reoccurrence>[] = [
     accessorKey: "amount",
     header: () => h("div", { class: "text-right" }, "Amount"),
     cell: ({ row }) => {
-      const className = `text-right ${
-        Number.parseInt(String(row.getValue("amount")), 10) < 0
-          ? "dark:text-red-300 text-red-700"
-          : ""
-      }`;
+      const amount = Number.parseFloat(String(row.getValue("amount")));
+      const className = moneyColorClass(amount, { alignRight: true });
 
       return h(
         "div",
@@ -235,7 +233,7 @@ const columns: TableColumn<Reoccurrence>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("amount")),
+        }).format(amount),
       );
     },
   },
@@ -514,7 +512,7 @@ watch(
         div(
           v-for="i in 12"
           :key="`reocc-skeleton-${i}`"
-          class="reoccurrences-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+          class="reoccurrences-inner-head-grid w-full border-b border-default"
         )
           div(class="p-2 sm:p-4 text-xs sm:text-sm text-muted min-w-0 overflow-hidden")
             USkeleton(class="h-4 w-20 max-w-full")
@@ -528,7 +526,7 @@ watch(
             USkeleton(class="h-4 w-16 ml-auto")
           div(class="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap")
             USkeleton(class="h-4 w-20 ml-auto")
-      table.reoccurrences-main-table(
+      table.reoccurrences-main-table.data-table(
         v-if="reoccurrencesForTable.length > 0"
         class="w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm"
         aria-label="Recurring entries"
@@ -562,7 +560,7 @@ watch(
           tr(
             v-for="(row, index) in reoccurrencesForTable"
             :key="row.id ?? `reocc-${index}`"
-            class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700")
+            class="border-b border-default")
             td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default") {{ getAccountRegisterLabel(row.accountRegisterId, listStore.getAccountRegisters) }}
             td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default") {{ getIntervalLabel(row.intervalId, listStore.getIntervals) }}
             td.reoccurrences-cell-clip(class="p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")

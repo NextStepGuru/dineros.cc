@@ -11,12 +11,15 @@ import type { PlaidSyncJob } from "../queues/plaidSyncQueue";
 import plaidSync from "../queues/plaidSyncQueue";
 import type { PlaidSyncBalanceJob } from "../queues/plaidSyncBalanceQueue";
 import plaidBalanceSync from "../queues/plaidSyncBalanceQueue";
+import type { RecategorizeJob } from "../queues/recategorizeQueue";
+import recategorize from "../queues/recategorizeQueue";
 
 export const queueConfigs = [
   { name: backup.queueName, processor: backup.processor },
   { name: recalculate.queueName, processor: recalculate.processor },
   { name: plaidSync.queueName, processor: plaidSync.processor },
   { name: plaidBalanceSync.queueName, processor: plaidBalanceSync.processor },
+  { name: recategorize.queueName, processor: recategorize.processor },
 ] as QueueRegistryConfig[];
 
 log({ message: `BullMQ Queues: ${queueConfigs.length}`, level: "info" });
@@ -72,5 +75,15 @@ export const addPlaidBalanceSyncJob = (data: PlaidSyncBalanceJob) =>
     jobId: data.force
       ? `plaid-balance-sync-${data.accountRegisterId}-${dateTimeService.nowDate().getTime()}`
       : `plaid-balance-sync-${data.accountRegisterId}`,
+    keepLogs: 4,
+  });
+
+export const addRecategorizeJob = (data: RecategorizeJob) =>
+  queueManager.addJob(recategorize.queueName, data, {
+    attempts: 0,
+    delay: 0,
+    jobId: `recategorize-${data.accountId}-${data.accountRegisterId ?? "all"}`,
+    removeOnComplete: true,
+    removeOnFail: false,
     keepLogs: 4,
   });

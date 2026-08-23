@@ -5,6 +5,7 @@ import { migrate as migrateUser } from './User'
 import { migrate as migrateAccountRegister } from './AccountRegister'
 import { migrate as migrateRegisterEntry } from './RegisterEntry'
 import { migrate as migrateReoccurrence } from './Reoccurrence'
+import { migrate as migrateStatementLine } from './StatementLine'
 
 export interface ProgressReport {
   model: string
@@ -40,7 +41,8 @@ export type MigrationReport = {
   User: number,
   AccountRegister: number,
   RegisterEntry: number,
-  Reoccurrence: number
+  Reoccurrence: number,
+  StatementLine: number
 }
 
 /**
@@ -51,6 +53,7 @@ export type MigrationReport = {
  * - AccountRegister
  * - RegisterEntry
  * - Reoccurrence
+ * - StatementLine
  *
  * @returns a dictionary of the number of processed records per model.
  */
@@ -62,17 +65,20 @@ export async function migrate(
     processedUser,
     processedAccountRegister,
     processedRegisterEntry,
-    processedReoccurrence
+    processedReoccurrence,
+    processedStatementLine
   ] = await Promise.all([
     migrateUser(client, reportProgress),
     migrateAccountRegister(client, reportProgress),
     migrateRegisterEntry(client, reportProgress),
-    migrateReoccurrence(client, reportProgress)
+    migrateReoccurrence(client, reportProgress),
+    migrateStatementLine(client, reportProgress)
   ])
   return {
     User: processedUser,
     AccountRegister: processedAccountRegister,
     RegisterEntry: processedRegisterEntry,
-    Reoccurrence: processedReoccurrence
+    Reoccurrence: processedReoccurrence,
+    StatementLine: processedStatementLine
   }
 }

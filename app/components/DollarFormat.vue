@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { moneyColorClass } from "~/lib/utils";
+
 const props = withDefaults(
   defineProps<{
     amount: number | null | undefined;
@@ -13,12 +15,7 @@ const numericAmount = computed(() =>
   props.amount == null ? null : Number(props.amount),
 );
 
-const displayClass = computed(() => {
-  if (numericAmount.value == null) return "frog-text-muted";
-  if (numericAmount.value > 0) return "dark:text-green-300 text-green-700";
-  if (numericAmount.value < 0) return "dark:text-red-300 text-red-700";
-  return "frog-text-muted";
-});
+const displayClass = computed(() => moneyColorClass(numericAmount.value));
 
 const sign = computed(() => {
   if (numericAmount.value == null) return "";

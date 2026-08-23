@@ -21,7 +21,7 @@ const mode = computed<"staging" | "local" | null>(() => {
     :class="
       mode === 'staging'
         ? 'border-amber-700 bg-amber-400 text-neutral-950'
-        : 'border-blue-800 bg-blue-600 text-white'
+        : 'border-default bg-elevated text-highlighted'
     "
   >
     <span v-if="mode === 'staging'">Staging — not production data</span>

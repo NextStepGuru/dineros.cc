@@ -28,7 +28,7 @@ Services
 - Use server/lib helpers for cross-cutting needs (queueManager, pagination, notifications, audit logs, etc.)
 
 Data validation and schemas
-- Central schemas live in app/schema/zod.ts with targeted files like app/schema/plaid.ts
+- Central schemas live in app/schema/zod.ts with targeted files like app/schema/plaid.ts and app/schema/reconciliation.ts
 - When introducing new DTOs, colocate schema with feature or extend zod.ts thoughtfully
 
 Encryption and secrets

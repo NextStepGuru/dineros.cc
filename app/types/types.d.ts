@@ -147,6 +147,8 @@ export type RegisterEntry = {
   isProjected: boolean;
   isBalanceEntry: boolean;
   isPending: boolean;
+  isManualEntry?: boolean;
+  isMatched?: boolean;
   /** Set when the row is tied to a Plaid transaction (import or match). */
   plaidId?: string | null;
 };

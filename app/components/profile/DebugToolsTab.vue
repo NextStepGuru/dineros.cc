@@ -142,7 +142,7 @@ div(class="max-w-4xl mx-auto")
           UIcon(:name="task.icon" class="w-5 h-5")
           h3(class="text-lg font-semibold") {{ task.label }}
 
-        p(class="text-sm text-gray-600 mb-4") {{ task.description }}
+        p(class="text-sm frog-text-muted mb-4") {{ task.description }}
 
         UButton(
           @click="runDebugTask(task.value)"

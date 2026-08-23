@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { userFriendlyApiError } from "~/lib/userFriendlyApiError";
 import { formatAccountRegisters } from "~/lib/utils";
 import type { AccountRegister } from "~/types/types";
 
@@ -9,6 +10,7 @@ useHead({ title: "Reports | Dineros" });
 
 const listStore = useListStore();
 const authStore = useAuthStore();
+const toast = useToast();
 const { workflowMode } = useWorkflowMode();
 const {
   dateFrom,
@@ -19,7 +21,10 @@ const {
   loading,
   data,
   errorMessage,
+  fetchReport,
 } = useCategoryReports();
+
+const recategorizing = ref(false);
 
 const registersSorted = computed((): AccountRegister[] =>
   formatAccountRegisters(listStore.getAccountRegisters),
@@ -38,6 +43,41 @@ const registerSelectItems = computed(() => {
 onMounted(async () => {
   await listStore.fetchLists();
 });
+
+async function recategorizeWithAi() {
+  if (!authStore.getBudgetId || recategorizing.value) return;
+  recategorizing.value = true;
+  try {
+    const $api = useNuxtApp().$api as typeof $fetch;
+    const result = await $api<{ updated: number; skippedLocked: number }>(
+      "/api/register-entries/recategorize",
+      {
+        method: "POST",
+        body: {
+          budgetId: authStore.getBudgetId,
+          ...(accountRegisterScope.value !== "all"
+            ? { accountRegisterId: accountRegisterScope.value }
+            : {}),
+        },
+      },
+    );
+    toast.add({
+      color: "success",
+      description: `${result.updated} updated, ${result.skippedLocked} skipped locked.`,
+    });
+    await fetchReport();
+  } catch (e: unknown) {
+    toast.add({
+      color: "error",
+      description: userFriendlyApiError(
+        e,
+        "We couldn’t recategorize entries. Please try again.",
+      ),
+    });
+  } finally {
+    recategorizing.value = false;
+  }
+}
 </script>
 
 <template lang="pug">
@@ -80,6 +120,11 @@ section(class="m-4 max-w-6xl mx-auto space-y-6")
           UFormField(label="Show subcategories")
             .flex.items-center(class="h-8")
               USwitch(v-model="showSubcategories")
+          UFormField(label=" ")
+            UButton(
+              :loading="recategorizing"
+              :disabled="!authStore.getBudgetId || recategorizing"
+              @click="recategorizeWithAi") Recategorize with AI
 
     .space-y-6(class="pt-2")
       template(v-if="!dateFrom || !dateTo")

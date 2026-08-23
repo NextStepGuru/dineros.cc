@@ -188,7 +188,7 @@ UModal(
         li.p-2.flex.items-center.gap-2(
           v-for="cat in categoriesForAccountSorted"
           :key="cat.id"
-          :class="cat.subCategoryId ? 'pl-4 sm:pl-6 ml-2 border-l border-gray-200 dark:border-gray-600' : ''"
+          :class="cat.subCategoryId ? 'pl-4 sm:pl-6 ml-2 border-l border-default' : ''"
         )
           template(v-if="editingId === cat.id")
             UInput(
@@ -221,7 +221,7 @@ UModal(
               @click="archiveCategory(cat.id)"
             ) Archive
 
-      p.text-sm.text-gray-500(class="dark:text-gray-400")(
+      p.text-sm.frog-text-muted(class="dark:text-muted")(
         v-if="categoriesForAccount.length === 0 && !newName"
       )
         | No categories yet. Add one above.

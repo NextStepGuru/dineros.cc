@@ -161,6 +161,7 @@ export default defineNuxtConfig({
   },
   modules: [
     "@nuxt/ui",
+    "@nuxt/fonts",
     "@pinia/nuxt",
     "@nuxt/image",
     "@nuxt/eslint",
@@ -169,6 +170,12 @@ export default defineNuxtConfig({
     ...(process.env.NODE_ENV === "test" ? [] : ["nuxt-cron"]),
   ],
   css: ["~/assets/css/main.css"],
+  fonts: {
+    families: [
+      { name: "Inter", provider: "google" },
+      { name: "Libre Baskerville", provider: "google" },
+    ],
+  },
   icon: {
     clientBundle: {
       scan: {
@@ -181,6 +188,16 @@ export default defineNuxtConfig({
         "lucide:shield-check",
         "lucide:user",
         "simple-icons:x",
+        "simple-icons:plaid",
+        "lucide:repeat",
+        "lucide:pencil",
+        "lucide:building-2",
+        "lucide:arrow-left-right",
+        "lucide:percent",
+        "lucide:trending-up",
+        "lucide:banknote",
+        "lucide:credit-card",
+        "lucide:scale",
       ],
     },
   },

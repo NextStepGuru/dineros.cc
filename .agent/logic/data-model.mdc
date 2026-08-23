@@ -23,7 +23,14 @@ Core entities
   - **Future tab**: uncleared, non-reconciled rows (`isCleared: false`, `isReconciled: false`) until the user clears them
   - **Past tab**: cleared / balance-entry / reconciled
   - Plaid linkage (encrypted ids + JSON)
-  - categoryId optional, memo optional; referenceId/checkNo optional; seq ordering
+  - categoryId optional; `categoryLocked` / `categorySource` (`ai` | `rule` | `pfc` | `user` | `recurrence`)
+  - memo optional; referenceId/checkNo optional; seq ordering
+  - Register table origin icon (before description): live recurrence = repeat; date-passed or Plaid-matched recurrence = Plaid logo (not repeat); pencil = manual; other `typeId`s have their own icons (`app/lib/registerEntryOrigin.ts`)
+  - Register row overlay: running balance under $1,000 = yellow tint, under $0 = red tint (`register-row-balance-*`); paints on cells so zebra/hover still apply
+
+MerchantCategoryRule
+- Account-scoped merchant → category mapping (`merchantKey`, optional `merchantEntityId`, `applyMode` ALWAYS | HINT)
+- Upserted from user category edits; ALWAYS applied on classify, HINT used as few-shot
 
 Recurrences and splits
 - Reoccurrence: describes a recurring transaction
@@ -40,8 +47,11 @@ Bills
 - BillInstance: concrete due item with amount, status (UPCOMING → PAID flow), paid linkage to a RegisterEntry
 
 Reconciliation
-- ReconciliationPeriod: status (OPEN/CLOSED), statement window and balances, closing metadata (closing adjustment entry), closedByUser
+- ReconciliationPeriod: status (OPEN/CLOSED), statement window, opening/ending balances, optional statement income/expense subtotals, closing metadata (closing adjustment entry), closedByUser
 - ReconciliationItem: per-entry clearance tracking within a period
+- StatementLine: extracted bank-statement rows for a period (encrypted `description`); matchStatus `unmatched` | `matched` | `statement_only` | `conflict` | `ignored`; optional `registerEntryId`
+- Difference math: `ending − (opening + sum of cleared item amounts)`. Last closed period ending should equal the next opening (continuity warning, not a hard block).
+- Details: `.agent/logic/reconciliation.mdc`
 
 Snapshots and summaries
 - AccountSnapshot: periodic snapshot per account

@@ -201,7 +201,7 @@ UModal(
             v-model="duplicateFinancialAccount"
             label="Create new financial account (copy categories and migrate references)"
           )
-          p.text-sm.text-gray-500.mt-1
+          p.text-sm.frog-text-muted.mt-1
             | Uses a new account workspace; your default budget is unchanged.
       template(v-else-if="mode === 'rename' && budget")
         UFormField(label="Name")

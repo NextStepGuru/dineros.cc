@@ -30,4 +30,8 @@ After either path, call **`getAllAccountsByAccessTokenAndUpdateBalance` inline**
 
 Enqueue recalculate for affected `accountId`s. Record sync logs via `recordPlaidSyncLog`.
 
+## Transaction matching
+
+Order: skip existing `plaidId` → pending→posted → deterministic alias/exact/fuzzy → **batched AI match** (`PlaidTransactionMatchAiService`) → create with AI or enrichment. Classify (or recategorize) on create and pending→posted/modified when not `categoryLocked`. Alias path uses all Plaid name fields and **±14 days** (amount may differ). AI may merge unequal amounts onto projected recurrence lines when confidence ≥ `OPENAI_PLAID_MATCH_MIN_CONFIDENCE`. Merchant rules and user locks live in `MerchantCategoryRule` / `categoryLocked` — see `.agent/logic/plaid.mdc`.
+
 Encyclopedia: `.agent/logic/plaid.mdc`.

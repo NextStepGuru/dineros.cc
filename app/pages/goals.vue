@@ -251,7 +251,7 @@ onMounted(() => {
       </div>
       <table
         v-if="savingsGoalsForTable.length > 0"
-        class="w-full min-w-full text-xs sm:text-sm border-collapse"
+        class="data-table w-full min-w-full text-xs sm:text-sm border-collapse"
       >
         <caption class="sr-only">Savings goals</caption>
         <thead class="[&>tr]:relative [&>tr]:after:absolute [&>tr]:after:inset-x-0 [&>tr]:after:bottom-0 [&>tr]:after:h-px [&>tr]:after:bg-border">
@@ -269,7 +269,7 @@ onMounted(() => {
           <tr
             v-for="(goal, index) in savingsGoalsForTable"
             :key="goal.id ?? `goal-${index}`"
-            class="odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+            class="border-b border-default"
           >
             <td class="p-2 sm:p-4 text-xs sm:text-sm border-b border-default">
               <button

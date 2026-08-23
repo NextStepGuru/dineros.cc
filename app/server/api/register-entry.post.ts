@@ -7,6 +7,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { dateTimeService } from "~/server/services/forecast";
+import { upsertMerchantCategoryRuleFromUserEdit } from "~/server/services/merchantCategoryRuleService";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -96,7 +97,14 @@ export default defineEventHandler(async (event: H3Event) => {
           createdAt,
           hasBalanceReCalc: true,
           categoryId: categoryId ?? null,
+          categoryLocked: true,
+          categorySource: "user",
         },
+      });
+      await upsertMerchantCategoryRuleFromUserEdit({
+        accountId: lookup.accountId,
+        categoryId: categoryId ?? null,
+        plaidJson: plaidJson ?? existing.plaidJson,
       });
     } else {
       registerEntry = await PrismaDb.registerEntry.create({
@@ -118,7 +126,14 @@ export default defineEventHandler(async (event: H3Event) => {
           createdAt,
           hasBalanceReCalc: true,
           categoryId: categoryId ?? null,
+          categoryLocked: true,
+          categorySource: "user",
         },
+      });
+      await upsertMerchantCategoryRuleFromUserEdit({
+        accountId: lookup.accountId,
+        categoryId: categoryId ?? null,
+        plaidJson,
       });
     }
 

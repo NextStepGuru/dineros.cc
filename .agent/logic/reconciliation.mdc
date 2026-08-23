@@ -1,0 +1,43 @@
+---
+description: Statement reconciliation periods, extract, two-sided match, and close rules
+---
+
+# Statement reconciliation
+
+Purpose
+- Compare a register ledger to an independent bank statement (PDF/CSV/OFX), not to live Plaid balance.
+- Manual checklist still works when no statement file is uploaded.
+
+Open a period
+- `POST /api/reconciliation/period` with dates, opening/ending, optional income/expense subtotals and `statementLines`.
+- `GET /api/reconciliation/period` returns `{ open, lastClosed }` so the UI can prefill opening from the last closed ending.
+- `POST /api/reconciliation/statement/extract` (multipart `file` + `accountRegisterId`) parses in memory and drops the blob. Does not persist the file.
+- Extract pipeline: PDF text (`unpdf`) / CSV / OFX → Novo-style parser → LLM JSON extract (`purpose: statement_extract`) only when the parse is incomplete. Do not log statement line text on `OpenAiRequestLog`.
+- Control check: `opening + sum(lines) ≈ ending`. Warn when it fails; user still confirms Open.
+
+Difference
+- `difference = statementEnding − (statementOpening + sum(cleared item amounts))`
+- Stored `ledgerClearedBalance` is opening + cleared net.
+- Opening continuity: warn when this opening ≠ last closed ending for the same register.
+
+Match (`statementMatchService`, also `POST /api/reconciliation/period/:id/match`)
+1. Exact: same signed cents + same UTC calendar day (1:1 for duplicate same-day amounts).
+2. Fuzzy: same cents, ±3 days, prefer overlapping merchant tokens from `plaidJson.merchant_name` / description (in-memory; never `contains` on encrypted fields).
+3. Conflict: same merchant near the date, amount differs — do not auto-clear.
+4. LLM leftovers in batches of ~25 (`purpose: statement_line_match`). Auto-clear only when confidence ≥ `OPENAI_PLAID_MATCH_MIN_CONFIDENCE` (default 0.7).
+- High-confidence matches set `ReconciliationItem.isCleared` and `RegisterEntry.isCleared`.
+- Unmatched statement rows become `statement_only`.
+- Import leftovers to the ledger: `PATCH /api/reconciliation/statement-line/:id` with `createLedgerEntry: true`, or `POST /api/reconciliation/period/:id/import-statement-lines` (optional `statementLineIds`, otherwise all `statement_only` / unmatched). Creates a cleared manual `RegisterEntry` + `ReconciliationItem` and matches the line. Does not set `isReconciled` until close. Enqueues register recalc.
+
+Workspace buckets
+- Matched (collapsed), statement-only, ledger-only (hints: next statement / pending / projected / transfer / missing), conflicts.
+- Ledger-only hints use Plaid `pending` / posted date after period end, transfer recurrences, `sourceAccountRegisterId`.
+
+Close
+- Difference must be ~0. There is no adjustment-entry bypass.
+- Remaining `statement_only` rows block close. Add them to the ledger, match them, or ignore them per line (`PATCH`). There is no bulk-ignore-on-close.
+- Every **cleared** `RegisterEntry` must have `categoryId`. Assign from the workspace (`PATCH /api/reconciliation/item/:entryId` with `categoryId`) or the register. Uncleared and ignored rows are not in this set.
+- Cleared items are marked `isReconciled`.
+
+Schema
+- `StatementLine` (encrypted `description`) on `ReconciliationPeriod`. Apply the manual Prisma migration; do not `migrate dev` from the agent unless asked.

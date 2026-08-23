@@ -3,7 +3,9 @@ import { h, resolveComponent, watch } from "vue";
 import {
   formatAccountRegisters,
   formatDate,
+  formatDateShort,
   isCryptoAccountType,
+  moneyColorClass,
 } from "~/lib/utils";
 import {
   buildSortedCategorySelectItems,
@@ -42,6 +44,7 @@ const ModalsMatchRegisterEntryReoccurrence = defineAsyncComponent(
 const UButton = resolveComponent("UButton");
 const UTooltip = resolveComponent("UTooltip");
 const BaseIconBtn = resolveComponent("BaseIconButton");
+const RegisterEntryOriginIcon = resolveComponent("RegisterEntryOriginIcon");
 
 const overlay = useOverlay();
 const route = useRoute();
@@ -197,11 +200,6 @@ const accountRegisterOptionsWithBalance = computed(() => {
   });
 });
 
-function balanceColorClass(balance: number) {
-  if (balance < 0) return "text-red-600 dark:text-red-400";
-  if (balance > 0) return "text-green-600 dark:text-green-400";
-  return "text-muted";
-}
 
 const selectedAccountOption = computed(() =>
   accountRegisterOptionsWithBalance.value.find(
@@ -919,7 +917,7 @@ const tableUi = ref({
   root: "!overflow-visible relative min-h-0",
   base: "!overflow-visible min-w-full",
   thead: "!z-30",
-  tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
+  tr: "transition-colors",
 });
 
 /** Plaid-linked rows until cleared, reconciled, or matched to a recurrence (recurring-only rows have no plaidId). */
@@ -975,7 +973,7 @@ const columns: TableColumn<RegisterEntry>[] = [
                     [
                       h("span", {
                         class:
-                          "inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0",
+                          "status-dot-warning",
                         role: "img",
                         "aria-label": dotLabel,
                       }),
@@ -991,8 +989,8 @@ const columns: TableColumn<RegisterEntry>[] = [
     accessorKey: "createdAt",
     meta: {
       class: {
-        th: "w-24 max-w-24 whitespace-nowrap !pl-0 !pr-2",
-        td: "w-24 max-w-24 whitespace-nowrap align-top !pl-0 !pr-2",
+        th: "w-28 max-w-28 whitespace-nowrap !pl-0 !pr-2",
+        td: "w-28 max-w-28 whitespace-nowrap align-top overflow-hidden !pl-0 !pr-2",
       },
     },
     header: () => h("div", { class: "text-right tabular-nums" }, "Date"),
@@ -1009,7 +1007,7 @@ const columns: TableColumn<RegisterEntry>[] = [
     meta: {
       class: {
         th: "w-full max-w-[42rem]",
-        td: "w-full max-w-[42rem]",
+        td: "w-full max-w-[42rem] overflow-hidden",
       },
     },
     header: () => h("div", { class: "w-full max-w-[42rem]" }, "Description"),
@@ -1017,6 +1015,10 @@ const columns: TableColumn<RegisterEntry>[] = [
       const entry = row.original;
       const showRecurBtn = isPlaidImportAwaitingReview(entry);
       return h("div", { class: "flex items-center gap-1 min-w-0" }, [
+        h(RegisterEntryOriginIcon, {
+          entry,
+          todayISO: todayISOString.value,
+        }),
         h(
           "div",
           {
@@ -1100,11 +1102,8 @@ const columns: TableColumn<RegisterEntry>[] = [
     accessorKey: "amount",
     header: () => h("div", { class: "text-right" }, "Amount"),
     cell: ({ row }) => {
-      const className = `text-right ${
-        Number(row.getValue("amount")) < 0
-          ? "dark:text-red-300 text-red-700"
-          : ""
-      }`;
+      const amount = Number(row.getValue("amount"));
+      const className = moneyColorClass(amount, { alignRight: true });
 
       return h(
         "div",
@@ -1112,7 +1111,7 @@ const columns: TableColumn<RegisterEntry>[] = [
         new Intl.NumberFormat("en-US", {
           style: "currency",
           currency: "USD",
-        }).format(row.getValue("amount")),
+        }).format(amount),
       );
     },
   },
@@ -1120,11 +1119,8 @@ const columns: TableColumn<RegisterEntry>[] = [
     accessorKey: "balance",
     header: () => h("div", { class: "text-right" }, "Balance"),
     cell: ({ row }) => {
-      const className = `text-right ${
-        Number(row.getValue("balance")) < 0
-          ? "dark:text-red-300 text-red-700"
-          : ""
-      }`;
+      const balance = Number(row.getValue("balance"));
+      const className = moneyColorClass(balance, { alignRight: true });
 
       return h(
         "div",
@@ -1219,12 +1215,9 @@ function scrollToLowestBalance() {
       const rows = tableRef.value.querySelectorAll("tbody tr");
       if (rows[byId]) {
         rows[byId].scrollIntoView({ behavior: "smooth", block: "end" });
-        rows[byId].classList.add("!bg-yellow-200", "dark:!bg-yellow-800");
+        rows[byId].classList.add("data-table-row-flash");
         setTimeout(() => {
-          rows[byId].classList.remove(
-            "!bg-yellow-200",
-            "dark:!bg-yellow-800",
-          );
+          rows[byId].classList.remove("data-table-row-flash");
         }, 2000);
       }
       return;
@@ -1268,12 +1261,9 @@ function scrollToLowestBalance() {
       });
 
       // Add highlight effect
-      rows[targetIndex].classList.add("!bg-yellow-200", "dark:!bg-yellow-800");
+      rows[targetIndex].classList.add("data-table-row-flash");
       setTimeout(() => {
-        rows[targetIndex].classList.remove(
-          "!bg-yellow-200",
-          "dark:!bg-yellow-800",
-        );
+        rows[targetIndex].classList.remove("data-table-row-flash");
       }, 2000);
     }
   }
@@ -1379,6 +1369,16 @@ const registerRowsForDisplay = computed(() =>
     displayBalance: Number(entry.balance),
   })),
 );
+
+const REGISTER_BALANCE_CAUTION_USD = 1000;
+
+function registerRowBalanceOverlayClass(balance: number): string {
+  if (balance < 0) return "register-row-balance-negative";
+  if (balance < REGISTER_BALANCE_CAUTION_USD) {
+    return "register-row-balance-caution";
+  }
+  return "";
+}
 
 const needsFullRegisterHydration = computed(() => {
   if (snapshotMode.isSnapshotMode.value) return false;
@@ -1654,15 +1654,15 @@ async function recalcAccount() {
                 span(class="inline-flex items-center gap-2 min-w-0 max-w-full text-default")
                   template(v-if="selectedAccountOption")
                     span(class="truncate min-w-0") {{ selectedAccountOption.label }}
-                    span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                    span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                   span(v-else) …
               template(#item-trailing="{ item }")
-                span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
+                span(:class="['tabular-nums text-right shrink-0', moneyColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
             template(#fallback)
               span(class="inline-flex items-center gap-2 min-w-0 w-full md:w-64 my-0 text-sm text-default")
                 template(v-if="selectedAccountOption")
                   span(class="truncate min-w-0") {{ selectedAccountOption.label }}
-                  span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                  span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                 span(v-else) …
         div(
           class="text-muted text-right flex flex-wrap items-center justify-end gap-1.5"
@@ -1719,7 +1719,7 @@ async function recalcAccount() {
               div(class="shrink-0 mt-0.5")
                 UIcon(
                   :name="mainAccountCount > 0 ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-                  :class="mainAccountCount > 0 ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                  :class="mainAccountCount > 0 ? 'frog-status-positive size-6' : 'frog-text-muted size-6'"
                 )
               div(class="min-w-0 flex-1")
                 p(class="font-medium") 1. Create or update your accounts
@@ -1729,7 +1729,7 @@ async function recalcAccount() {
               div(class="shrink-0 mt-0.5")
                 UIcon(
                   :name="hasReoccurrences ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-                  :class="hasReoccurrences ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                  :class="hasReoccurrences ? 'frog-status-positive size-6' : 'frog-text-muted size-6'"
                 )
               div(class="min-w-0 flex-1")
                 p(class="font-medium") 2. Add recurring items
@@ -1739,7 +1739,7 @@ async function recalcAccount() {
               div(class="shrink-0 mt-0.5")
                 UIcon(
                   :name="recalcCompletedOnce ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-                  :class="recalcCompletedOnce ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                  :class="recalcCompletedOnce ? 'frog-status-positive size-6' : 'frog-text-muted size-6'"
                 )
               div(class="min-w-0 flex-1")
                 p(class="font-medium") 3. Recalc — then save a copy
@@ -1751,7 +1751,7 @@ async function recalcAccount() {
               div(class="shrink-0 mt-0.5")
                 UIcon(
                   :name="plaidLinked ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-                  :class="plaidLinked ? 'text-green-500 size-6' : 'frog-text-muted size-6'"
+                  :class="plaidLinked ? 'frog-status-positive size-6' : 'frog-text-muted size-6'"
                 )
               div(class="min-w-0 flex-1")
                 p(class="font-medium") 4. Link your real accounts
@@ -1783,7 +1783,7 @@ async function recalcAccount() {
           div(
             class="register-inner-head-grid w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default"
           )
-            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0")
+            div(class="px-2 sm:px-4 py-2 sm:py-3.5 border-b border-default min-w-0 hidden md:block")
               USkeleton(class="h-4 w-2 mx-auto")
             div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right border-b border-default")
               USkeleton(class="h-4 w-14 ml-auto")
@@ -1798,9 +1798,9 @@ async function recalcAccount() {
           div(
             v-for="i in 25"
             :key="`reg-skel-${i}`"
-            class="register-inner-head-grid w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+            class="register-inner-head-grid w-full border-b border-default"
           )
-            div(class="p-2 sm:p-4 min-w-0 flex justify-center")
+            div(class="p-2 sm:p-4 min-w-0 hidden md:flex md:justify-center")
               USkeleton(class="h-4 w-2")
             div(class="p-2 sm:p-4 min-w-0 flex justify-end")
               USkeleton(class="h-4 w-20")
@@ -1851,7 +1851,7 @@ async function recalcAccount() {
               tr(
                 v-for="t in cryptoPortfolio.tokens"
                 :key="t.id"
-                class="border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+                class="border-b border-default"
               )
                 td(class="py-2 pr-2 min-w-0")
                   div(class="flex items-center gap-2 min-w-0")
@@ -1874,11 +1874,11 @@ async function recalcAccount() {
         ref="tableRef"
         :key="tableKey"
         aria-label="Register entries"
-        class="register-main-table w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm")
+        class="register-main-table data-table w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm")
         colgroup
-          col(style="width:3%")
-          col(style="width:11%")
-          col(style="width:36%")
+          col.register-col-review(style="width:3%")
+          col.register-col-date(style="width:11%")
+          col.register-col-description(style="width:36%")
           col.register-col-category(style="width:17%")
           col(style="width:14%")
           col(style="width:19%")
@@ -1948,15 +1948,15 @@ async function recalcAccount() {
                                 span(class="inline-flex items-center gap-2 min-w-0 max-w-full text-default")
                                   template(v-if="selectedAccountOption")
                                     span(class="truncate min-w-0") {{ selectedAccountOption.label }}
-                                    span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                                    span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                                   span(v-else) …
                               template(#item-trailing="{ item }")
-                                span(:class="['tabular-nums text-right shrink-0', balanceColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
+                                span(:class="['tabular-nums text-right shrink-0', moneyColorClass(item.balanceRaw)]") {{ item.balanceFormatted }}
                             template(#fallback)
                               span(class="inline-flex items-center gap-2 min-w-0 w-full md:w-64 my-0 text-sm text-default")
                                 template(v-if="selectedAccountOption")
                                   span(class="truncate min-w-0") {{ selectedAccountOption.label }}
-                                  span(:class="[balanceColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
+                                  span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                                 span(v-else) …
                         div(
                           class="text-muted text-right flex flex-wrap items-center justify-end gap-1.5"
@@ -1984,7 +1984,7 @@ async function recalcAccount() {
                           b.text-nowrap &nbsp;{{ formatDate(highestEntry.createdAt) }}&nbsp;
                     div.register-inner-head-grid(
                       class="w-full border-t border-default bg-default text-xs sm:text-sm font-semibold text-default")
-                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left border-b border-default min-w-0")
+                      div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left border-b border-default min-w-0 hidden md:block")
                         span(class="sr-only") Import review
                       div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-right whitespace-nowrap border-b border-default") Date
                       div(class="px-2 sm:px-4 py-2 sm:py-3.5 text-left border-b border-default min-w-0") Description
@@ -2004,8 +2004,8 @@ async function recalcAccount() {
             tr(
               v-for="({ entry, displayBalance }, index) in registerRowsForDisplay"
               :key="entry.id ?? `reg-entry-${index}-${entry.createdAt}`"
-              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700`")
-              td(class="p-2 sm:p-4 border-b border-default w-7")
+              :class="['border-b border-default', registerRowBalanceOverlayClass(displayBalance)]")
+              td(class="register-cell-review p-2 sm:p-4 border-b border-default w-7")
                 .flex.justify-center.w-7
                   UTooltip(
                     v-if="isPlaidImportAwaitingReview(entry)"
@@ -2013,13 +2013,16 @@ async function recalcAccount() {
                     :delay-duration="200")
                     span(class="inline-flex cursor-default items-center justify-center p-1.5 -m-1 rounded-sm")
                       span(
-                        class="inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-amber-500/25 dark:ring-amber-400/30 shrink-0"
+                        class="status-dot-warning"
                         role="img"
                         aria-label="Bank import not reviewed yet.")
                   span(v-else class="inline-block size-2 shrink-0")
-              td(class="p-2 sm:p-4 border-b border-default text-right tabular-nums whitespace-nowrap") {{ formatDate(entry.createdAt) }}
-              td(class="p-2 sm:p-4 border-b border-default")
+              td(class="register-cell-date p-2 sm:p-4 border-b border-default text-right tabular-nums whitespace-nowrap overflow-hidden")
+                span(class="md:hidden") {{ formatDateShort(entry.createdAt) }}
+                span(class="hidden md:inline") {{ formatDate(entry.createdAt) }}
+              td(class="register-cell-description p-2 sm:p-4 border-b border-default overflow-hidden")
                 .flex.items-center.gap-1.min-w-0
+                  RegisterEntryOriginIcon(:entry="entry" :todayISO="todayISOString")
                   div(
                     class="cursor-pointer font-bold dark:text-white truncate flex-1 min-w-0"
                     role="button"
@@ -2108,6 +2111,7 @@ async function recalcAccount() {
 }
 
 /* Column floor widths — keep text from overlapping; table may exceed 100% and scroll on narrow screens. */
+.register-main-table col.register-col-review,
 .register-main-table col:nth-child(1) {
   min-width: 2.25rem;
 }
@@ -2116,7 +2120,15 @@ async function recalcAccount() {
   min-width: 5.5rem;
 }
 
+.register-main-table col.register-col-date {
+  min-width: 5.5rem;
+}
+
 .register-main-table col:nth-child(3) {
+  min-width: 9rem;
+}
+
+.register-main-table col.register-col-description {
   min-width: 9rem;
 }
 
@@ -2132,16 +2144,25 @@ async function recalcAccount() {
   min-width: 5.5rem;
 }
 
+.register-main-table tbody td {
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.register-main-table .register-cell-description {
+  max-width: 0;
+}
+
 /* Match outer <colgroup> ratios so column labels line up with body cells. */
 .register-inner-head-grid {
   display: grid;
-  grid-template-columns: minmax(1.75rem, 3%) minmax(4.5rem, 11%) minmax(
+  grid-template-columns: minmax(1.75rem, 3%) minmax(5.5rem, 13%) minmax(
       0,
       1fr
     ) minmax(5rem, 17%) minmax(3.5rem, 14%) minmax(4rem, 19%);
 }
 
-/* Below `md` (768px): hide category column.
+/* Below `md` (768px): hide import-review and category columns.
    Do not use `display:none` on `td` — it drops the cell from the table grid and breaks col/colgroup alignment
    (Amount/Balance shift under wrong headers). Use `visibility:collapse` on col + td and widen description col. */
 @media (max-width: 767px) {
@@ -2157,9 +2178,32 @@ async function recalcAccount() {
     min-width: max(100%, 36rem);
   }
 
+  .register-main-table col.register-col-review,
+  .register-main-table col:nth-child(1) {
+    visibility: collapse;
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .register-main-table td.register-cell-review {
+    visibility: collapse;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+  }
+
+  .register-main-table col.register-col-date,
+  .register-main-table col:nth-child(2) {
+    width: 14% !important;
+    min-width: 5rem;
+  }
+
+  .register-main-table col.register-col-description,
   .register-main-table col:nth-child(3) {
-    min-width: 12rem;
-    width: 53% !important; /* 36% + 17% when category is collapsed */
+    min-width: 10rem;
+    width: 53% !important; /* gains review + collapsed category width */
   }
 
   .register-main-table col.register-col-category {
@@ -2179,8 +2223,7 @@ async function recalcAccount() {
 
   .register-inner-head-grid {
     grid-template-columns:
-      minmax(2.25rem, 3%) minmax(5.5rem, 11%) minmax(12rem, 1fr) minmax(5rem, 14%)
-      minmax(5.5rem, 19%);
+      minmax(5rem, 14%) minmax(10rem, 1fr) minmax(5rem, 16%) minmax(5.5rem, 22%);
   }
 }
 </style>

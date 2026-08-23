@@ -50,6 +50,14 @@ export const formatDate = (
   return undefined;
 };
 
+/** `yy-mm-dd` — for narrow register rows on small screens. */
+export const formatDateShort = (
+  dt: string | Date | number | null | undefined
+): string | undefined => {
+  const full = formatDate(dt);
+  return full ? full.slice(2) : undefined;
+};
+
 export const handleError = (
   event: FormErrorEvent | Error,
   toastInstance: {
@@ -237,3 +245,21 @@ export const formatCurrencyOptions: Intl.NumberFormatOptions = {
   currency: "USD",
   currencySign: "accounting",
 };
+
+/** Shared money text color classes (see `.money-*` in `assets/css/main.css`). */
+export function moneyColorClass(
+  amount: number | null | undefined,
+  options?: { alignRight?: boolean },
+): string {
+  const classes: string[] = [];
+  if (options?.alignRight) classes.push("text-right");
+  if (amount == null || !Number.isFinite(Number(amount))) {
+    classes.push("money-zero");
+    return classes.join(" ");
+  }
+  const n = Number(amount);
+  if (n > 0) classes.push("money-positive");
+  else if (n < 0) classes.push("money-negative");
+  else classes.push("money-zero");
+  return classes.join(" ");
+}

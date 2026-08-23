@@ -150,7 +150,7 @@ div(class="max-w-5xl mx-auto px-2")
       select#oai-success(
         v-model="filters.success"
         autocomplete="off"
-        class="block min-w-[140px] rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+        class="form-select-native min-w-[140px]"
       )
         option(value="all") All
         option(value="true") Yes
@@ -162,14 +162,14 @@ div(class="max-w-5xl mx-auto px-2")
     UButton(color="primary" :loading="loading" @click="applyFilters") Apply
     UButton(variant="outline" @click="exportCsv") Export CSV
 
-  p(class="text-sm text-gray-500 mb-4")
+  p(class="text-sm frog-text-muted mb-4")
     | Usage rows from Plaid enrichment and other logged completions. Showing {{ items.length }} of {{ total }}.
 
   div(v-if="loading && items.length === 0" class="text-center py-8") Loading…
 
-  div(v-else class="overflow-x-auto border rounded-lg")
-    table(class="w-full text-sm text-left")
-      thead(class="bg-gray-100 dark:bg-gray-800")
+  div(v-else class="overflow-x-auto border border-default rounded-lg")
+    table.admin-log-table
+      thead
         tr
           th(class="p-2") Time
           th(class="p-2") Purpose
@@ -184,7 +184,7 @@ div(class="max-w-5xl mx-auto px-2")
           th(class="p-2") Meta
       tbody
         template(v-for="row in items" :key="row.id")
-          tr(class="border-t border-gray-200 dark:border-gray-700 align-top")
+          tr
             td(class="p-2 whitespace-nowrap") {{ new Date(row.createdAt).toLocaleString() }}
             td(class="p-2") {{ row.purpose }}
             td(class="p-2 max-w-[120px] truncate") {{ row.model }}
@@ -194,7 +194,7 @@ div(class="max-w-5xl mx-auto px-2")
             td(class="p-2") {{ row.cachedPromptTokens ?? "—" }}
             td(class="p-2") {{ row.durationMs }}
             td(class="p-2") {{ row.success ? "yes" : "no" }}
-            td(class="p-2 max-w-[200px] wrap-break-word text-red-600 dark:text-red-400") {{ row.errorMessage || "—" }}
+            td(class="p-2 max-w-[200px] wrap-break-word money-negative") {{ row.errorMessage || "—" }}
             td(class="p-2")
               UButton(
                 v-if="row.metadata != null"
@@ -204,7 +204,7 @@ div(class="max-w-5xl mx-auto px-2")
               ) {{ expandedId === row.id ? "Hide" : "Show" }}
               span(v-else) —
           tr(v-if="expandedId === row.id && row.metadata != null")
-            td(colspan="11" class="p-2 bg-gray-50 dark:bg-gray-900")
+            td(colspan="11" class="row-detail")
               pre(class="text-xs overflow-x-auto whitespace-pre-wrap") {{ formatJson(row.metadata) }}
 
   div(class="flex justify-center gap-4 mt-6")

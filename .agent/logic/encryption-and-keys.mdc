@@ -42,3 +42,4 @@ Do/do not
 - Do not log decrypted values or keys
 - Keep DATABASE_URL and DB_ENCRYPTION_KEY out of code; inject via Kubernetes secrets or .env locally
 - When adding new encrypted fields, ensure annotations exist in schema; run prisma generate to refresh reencrypt code
+- `StatementLine.description` is encrypted (same pattern as `RegisterEntry.description`). Match on loaded rows in memory, never `contains` on ciphertext.

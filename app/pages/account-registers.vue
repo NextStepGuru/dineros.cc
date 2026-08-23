@@ -6,6 +6,7 @@ import {
   formatDate,
   getAccountTypeLabel,
   isCryptoAccountType,
+  moneyColorClass,
 } from "~/lib/utils";
 import { CATEGORY_FILTER_ALL } from "~/lib/categoryFilter";
 import { matchesTableGlobalFilter } from "~/lib/tableGlobalFilterMatch";
@@ -872,8 +873,7 @@ const columns: TableColumn<AccountRegister>[] = [
         h(
           "span",
           {
-            class:
-              "text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200",
+            class: "badge-crypto",
           },
           "Crypto",
         ),
@@ -905,11 +905,8 @@ const columns: TableColumn<AccountRegister>[] = [
     accessorKey: "balance",
     header: () => h("div", { class: "text-right" }, "Balance"),
     cell: ({ row }) => {
-      const className = `text-right ${
-        Number(row.getValue("balance")) < 0
-          ? "dark:text-red-300 text-red-700"
-          : ""
-      }`;
+      const balance = Number(row.getValue("balance"));
+      const className = moneyColorClass(balance, { alignRight: true });
 
       return h(
         "div",
@@ -1003,7 +1000,62 @@ function handleManageCategories() {
 }
 
 function formatCurrencyClass(balance: number): string {
-  return `text-right ${+balance < 0 ? "dark:text-red-300 text-red-700" : ""}`;
+  return moneyColorClass(balance, { alignRight: true });
+}
+
+function mainAccountDragClass(index: number): string {
+  const classes = ["transition-all", "duration-200", "ease-in-out"];
+  if (isDragging.value && draggedIndex.value === index) {
+    classes.push("dnd-dragging");
+  }
+  if (
+    isDragging.value &&
+    draggedPocketGroup.value &&
+    draggedPocketGroup.value.parentId === draggableAccountRegisters.value[index]?.id
+  ) {
+    classes.push("dnd-pocket-group", "border-t-2", "border-l-2", "border-r-2");
+  }
+  if (isDragging.value && dragOverIndex.value === index) {
+    classes.push("dnd-drop-target", "animate-pulse");
+  }
+  if (isDragging.value && dragOverIndex.value === index + 1) {
+    classes.push("dnd-drop-target-bottom", "animate-pulse");
+  }
+  return classes.join(" ");
+}
+
+function pocketDragClass(
+  subRow: AccountRegister,
+  parentRow: AccountRegister,
+  subIndex: number,
+): string {
+  const classes = [
+    "transition-all",
+    "duration-200",
+    "ease-in-out",
+    "dnd-pocket-row",
+  ];
+  const subKey = `sub-${subRow.id}`;
+  if (isDragging.value && draggedIndex.value === subKey) {
+    classes.push("dnd-pocket-dragging");
+  }
+  if (
+    isDragging.value &&
+    draggedPocketGroup.value &&
+    draggedPocketGroup.value.parentId === parentRow.id
+  ) {
+    classes.push("dnd-pocket-group", "border-l-2", "border-r-2");
+    if (subIndex === pocketSubs(parentRow.id).length - 1) {
+      classes.push("border-b-2");
+    }
+  }
+  if (isDragging.value && dragOverIndex.value === subKey) {
+    classes.push("dnd-drop-target", "animate-pulse");
+  }
+  if (isDragging.value && dragOverIndex.value === `${subKey}-next`) {
+    classes.push("dnd-drop-target-bottom", "animate-pulse");
+  }
+  return classes.join(" ");
 }
 
 function formatCurrency(balance: number): string {
@@ -1666,7 +1718,7 @@ watch(workflowMode, (w) => {
         v-for="i in 12"
         :key="`acct-skeleton-${i}`"
         :class="showDebitCreditColumns ? 'accounts-inner-head-grid accounts-inner-head-grid--6' : 'accounts-inner-head-grid accounts-inner-head-grid--4'"
-        class="w-full border-b border-default odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700"
+        class="w-full border-b border-default data-table"
       )
         div(class="p-2 sm:p-4 min-w-0")
           USkeleton(class="h-4 w-5")
@@ -1690,7 +1742,7 @@ watch(workflowMode, (w) => {
         b(class="frog-text") {{ accountLiquiditySnapshot.lowest.name }}
         | &nbsp;at&nbsp;
         b(:class="formatCurrencyClass(accountLiquiditySnapshot.lowestComputedBalance)") {{ formatCurrency(accountLiquiditySnapshot.lowestComputedBalance) }}
-      p(v-if="accountLiquiditySnapshot.negativeCount > 0" class="text-sm mt-2 text-amber-700 dark:text-amber-300")
+      p(v-if="accountLiquiditySnapshot.negativeCount > 0" class="text-sm mt-2 frog-status-warning")
         | {{ accountLiquiditySnapshot.negativeCount }} of {{ accountLiquiditySnapshot.mainCount }} main accounts have negative computed balance — review registers and recurring items.
       p(v-else class="text-sm mt-2 frog-text-muted") All main accounts are at or above zero right now.
       div(class="mt-3")
@@ -1703,7 +1755,7 @@ watch(workflowMode, (w) => {
     div(
       v-if="draggableAccountRegisters.length > 0"
       class="accounts-table-outer mt-2 min-w-0 w-full rounded-md border border-primary/40")
-      table.accounts-main-table(
+      table.accounts-main-table.data-table(
         class="w-full min-w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm"
         aria-label="Account registers with balances"
       )
@@ -1759,7 +1811,7 @@ watch(workflowMode, (w) => {
           template(v-for="(row, index) in draggableAccountRegisters" :key="`main-${row.id}`")
             // Main account row (draggable)
             tr(
-              :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700 transition-all duration-200 ease-in-out ${isDragging && draggedIndex === index ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-yellow-50 dark:bg-yellow-900/20' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-t-2 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === index && isDragging ? 'border-t-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${dragOverIndex === index + 1 && isDragging ? 'border-b-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== index ? 'hover:bg-blue-100 dark:hover:bg-blue-800/30' : ''}`"
+              :class="mainAccountDragClass(index)"
               :draggable="!isSnapshotMode"
               @dragstart="handleDragStart($event, index)"
               @dragover="handleDragOver($event, index)"
@@ -1783,7 +1835,7 @@ watch(workflowMode, (w) => {
                   span {{ getAccountTypeLabel(row.typeId, listStore.getAccountTypes) }}
                   span(
                     v-if="isCryptoAccountType(row.typeId, listStore.getAccountTypes)"
-                    class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200") Crypto
+                    class="badge-crypto") Crypto
               td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
                 div(class="flex items-center min-w-0")
                   button(
@@ -1807,7 +1859,7 @@ watch(workflowMode, (w) => {
                     UIcon(name="i-lucide-banknote" class="text-base")
                   div(
                     v-if="riskAlertForRegister(row.id)"
-                    class="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+                    class="ml-2 risk-eta-label"
                   )
                     UIcon(name="i-lucide-triangle-alert" class="text-xs")
                     span {{ formatRiskEta(riskAlertForRegister(row.id)?.daysUntilRisk ?? 0) }}
@@ -1824,7 +1876,7 @@ watch(workflowMode, (w) => {
               tr(
                 v-for="(subRow, subIndex) in pocketSubs(row.id)"
                 :key="`sub-${subRow.id}`"
-                :class="`odd:bg-gray-100 even:bg-white dark:odd:bg-gray-700 dark:even:bg-gray-700/85 transition-all duration-200 ease-in-out border-l-2 border-l-green-200 dark:border-l-green-700/50 ${isDragging && draggedIndex === `sub-${subRow.id}` ? 'opacity-30 scale-95 transform rotate-1 shadow-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400 dark:border-green-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-r-2 border-yellow-400 dark:border-yellow-600' : ''} ${isDragging && draggedPocketGroup && draggedPocketGroup.parentId === row.id && subIndex === pocketSubs(row.id).length - 1 ? 'border-b-2 border-yellow-400 dark:border-yellow-600' : ''} ${dragOverIndex === `sub-${subRow.id}` && isDragging ? 'border-t-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${dragOverIndex === `sub-${subRow.id}-next` && isDragging ? 'border-b-4 border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse' : ''} ${isDragging && draggedIndex !== `sub-${subRow.id}` ? 'hover:bg-green-100 dark:hover:bg-green-800/30' : ''}`"
+                :class="pocketDragClass(subRow, row, subIndex)"
                 :draggable="!isSnapshotMode"
                 @dragstart="handlePocketDragStart($event, subRow, row.id)"
                 @dragover="handlePocketDragOver($event, subRow, row.id)"
@@ -1849,7 +1901,7 @@ watch(workflowMode, (w) => {
                     span {{ getAccountTypeLabel(subRow.typeId, listStore.getAccountTypes) }}
                     span(
                       v-if="isCryptoAccountType(subRow.typeId, listStore.getAccountTypes)"
-                      class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200") Crypto
+                      class="badge-crypto") Crypto
                 td(class="min-w-0 p-2 sm:p-4 text-xs sm:text-sm text-muted border-b border-default")
                   div(class="flex items-center min-w-0 flex-1")
                     div(@click.prevent="handleTableClick(subRow)" role="button" tabindex="0" @keydown.enter.prevent="handleTableClick(subRow)" class="cursor-pointer font-semibold flex items-center min-w-0 frog-text flex-1")

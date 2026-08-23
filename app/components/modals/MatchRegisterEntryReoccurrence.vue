@@ -27,11 +27,18 @@ const recurrencesForRegister = computed(() =>
   ),
 );
 
+const entryAmount = computed(() => Number(props.registerEntry.amount));
+
+function recurrenceSortScore(r: Reoccurrence): number {
+  const amountDiff = Math.abs(Number(r.amount) - entryAmount.value);
+  return amountDiff;
+}
+
 const filteredRecurrences = computed(() => {
-  const list = recurrencesForRegister.value;
-  return list.filter((r) =>
+  const list = recurrencesForRegister.value.filter((r) =>
     matchesTableGlobalFilter(filterText.value, [r.description]),
   );
+  return [...list].sort((a, b) => recurrenceSortScore(a) - recurrenceSortScore(b));
 });
 
 function rowClasses(r: Reoccurrence) {
@@ -67,7 +74,7 @@ async function confirmMatch() {
     toast.add({
       color: "success",
       description:
-        "Matched. Future imports with this bank name will link when a forecast line lines up.",
+        "Matched. Future imports with similar bank names can auto-link to this recurrence, including when the amount varies.",
     });
     await listStore.fetchLists();
     props.callback();
@@ -100,7 +107,7 @@ UModal(title="Match to existing recurrence" class="modal-mobile-fullscreen max-w
         span.font-medium.text-highlighted.ml-1 {{ registerEntry.description }}
         span.ml-2 ({{ currencyFmt.format(Number(registerEntry.amount)) }})
       p.text-xs.frog-text-muted
-        | Saves a name alias for this register so the next Plaid sync can merge into the matching forecast line (same amount, within the usual date window).
+        | Saves bank name aliases for this register. Future Plaid syncs can merge into the matching forecast line by name and date (amount may differ for variable bills). AI matching also helps when aliases are not enough.
 
       UInput(
         v-model="filterText"

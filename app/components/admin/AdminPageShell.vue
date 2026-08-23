@@ -87,8 +87,8 @@ div(class="container mx-auto px-4 py-6 lg:py-8")
               v-for="item in navItems"
               :key="item.to"
               :to="item.to"
-              class="block rounded-md px-2.5 py-2 text-sm transition-colors"
-              :class="item.active ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-elevated text-muted hover:text-highlighted'")
+              class="secondary-nav-link"
+              :class="{ 'secondary-nav-link--active': item.active }")
               | {{ item.label }}
 
       main(class="min-w-0")

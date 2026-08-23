@@ -18,11 +18,21 @@ export type CategoryMetaMap = Map<
 >;
 
 function hueForKey(key: string): string {
+  const palette = [
+    "#2a4480",
+    "#4571bd",
+    "#d68f1a",
+    "#b96c14",
+    "#33559f",
+    "#6992d3",
+    "#964d14",
+    "#4bb4aa",
+  ];
   let h = 0;
   for (const ch of key) {
     h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
   }
-  return `hsl(${h % 360} 58% 48%)`;
+  return palette[h % palette.length]!;
 }
 
 export function rootCategoryId(meta: CategoryMetaMap, id: string): string {

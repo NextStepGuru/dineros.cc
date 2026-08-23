@@ -1988,8 +1988,8 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   :max="100"
                   class="w-full")
 
-            div(v-if="isSelectedAccountTypeMortgage" class="space-y-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800")
-              h3(class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2") Mortgage details
+            div(v-if="isSelectedAccountTypeMortgage" class="space-y-4 section-callout section-callout--info")
+              h3(class="section-heading-info") Mortgage details
 
               UFormField(label="APR 1 start date" name="apr1StartAt" hint="Optional date when APR 1 schedule starts")
                 UInput(
@@ -2088,8 +2088,8 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                 :step="0.01"
                 class="w-full")
 
-            div(v-if="isSelectedAccountTypeSavings" class="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
-              h3(class="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2") Savings Goal Settings
+            div(v-if="isSelectedAccountTypeSavings" class="space-y-4 section-callout section-callout--info")
+              h3(class="section-heading-info") Savings Goal Settings
 
               UFormField(label="Savings Goal Amount" name="accountSavingsGoal" hint="target amount to save")
                 UInputNumber(
@@ -2100,8 +2100,8 @@ UModal(:title="props.title" :description="props.description || props.title" clas
 
         template(#asset)
           div(class="space-y-4 pt-2")
-            div(v-if="isSelectedAccountTypeDepreciatingOrAppreciatingAsset" class="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800")
-              h3(class="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2") {{ assetSectionLabel }} Settings
+            div(v-if="isSelectedAccountTypeDepreciatingOrAppreciatingAsset" class="space-y-4 section-callout section-callout--warning")
+              h3(class="section-heading-warning") {{ assetSectionLabel }} Settings
 
               UFormField(:label="assetSectionLabel + ' Rate (%)'" name="depreciationRate" :hint="assetSectionLabel === 'Depreciation' ? 'Annual depreciation rate (0–100%)' : 'Annual appreciation rate (0–100%)'")
                 UInputNumber(
@@ -2142,10 +2142,10 @@ UModal(:title="props.title" :description="props.description || props.title" clas
                   type="date"
                   class="w-full")
 
-            div(v-if="isSelectedAccountTypeEstimatable" class="space-y-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800")
-              h3(class="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-2") {{ estimateSectionTitle }}
+            div(v-if="isSelectedAccountTypeEstimatable" class="space-y-4 section-callout section-callout--warning")
+              h3(class="section-heading-warning") {{ estimateSectionTitle }}
 
-              p(class="text-xs text-emerald-900/80 dark:text-emerald-200/90 mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
+              p(class="text-xs frog-text-muted mb-2") Illustrative only — not an appraisal or licensed guidebook value. Estimates are logged for admins under OpenAI request logs.
 
               template(v-if="currentAssetCategory === 'vehicle'")
                 div(class="grid grid-cols-1 sm:grid-cols-2 gap-3")
@@ -2325,9 +2325,9 @@ UModal(:title="props.title" :description="props.description || props.title" clas
               ) Get estimate
 
               div(v-if="lastAssetEstimate" class="space-y-2 text-sm")
-                p(class="font-medium text-emerald-900 dark:text-emerald-100") {{ estimateRangeLabel }}
-                p(class="text-emerald-800/90 dark:text-emerald-200/90") {{ lastAssetEstimate.rationale }}
-                p(class="text-xs text-emerald-800/70 dark:text-emerald-300/80") {{ lastAssetEstimate.disclaimer }}
+                p(class="font-medium frog-text") {{ estimateRangeLabel }}
+                p(class="frog-text-muted") {{ lastAssetEstimate.rationale }}
+                p(class="text-xs frog-text-muted") {{ lastAssetEstimate.disclaimer }}
 
               .flex.flex-wrap.gap-2(v-if="lastAssetEstimate")
                 UButton(size="sm" color="neutral" variant="subtle" @click.prevent="applyEstimateToBalance" :disabled="isSaving || isDeleting") Apply mid to balance

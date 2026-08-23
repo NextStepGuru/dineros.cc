@@ -2,7 +2,7 @@
 
 import type { PrismaClient, AccountRegister } from '@prisma/client'
 import {
-  type ProgressReportCallback,
+  ProgressReportCallback,
   defaultProgressReport,
   visitRecords
 } from 'prisma-field-encryption/dist/generator/runtime'
@@ -152,6 +152,10 @@ async function migrateRecord(client: PrismaClient, cursor: Cursor | undefined) {
  *     },
  *     "snapshotRows": {
  *       "modelName": "AccountRegisterSnapshot",
+ *       "isList": true
+ *     },
+ *     "reconciliationPeriods": {
+ *       "modelName": "ReconciliationPeriod",
  *       "isList": true
  *     }
  *   }

@@ -811,6 +811,8 @@ export const registerEntrySchema = z.object({
   isCleared: z.boolean().default(false),
   isBalanceEntry: z.boolean().default(false),
   isPending: z.boolean().default(false),
+  isManualEntry: z.boolean().optional(),
+  isMatched: z.boolean().optional(),
   plaidId: z.string().nullable().optional(),
   plaidJson: z.any().nullable().optional(),
   createdAt: z.coerce.date().default(new Date()),

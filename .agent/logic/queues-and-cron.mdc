@@ -8,6 +8,7 @@ Queues (BullMQ)
 - Definitions under app/server/queues/
   - backupQueue.ts
   - plaidSyncQueue.ts and plaidSyncBalanceQueue.ts
+  - recategorizeQueue.ts
   - recalculateQueue.ts
 - Use server/lib/queueManager.ts and server/clients/queuesClient.ts for consistent setup
 - Admin UI via @bull-board/h3 is present as a dependency; SHOW_BULL_MQ_ADMIN controls visibility in prod manifests

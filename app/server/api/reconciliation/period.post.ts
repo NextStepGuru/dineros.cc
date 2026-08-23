@@ -1,21 +1,12 @@
-import { z } from "zod";
 import { getUser } from "~/server/lib/getUser";
 import { handleApiError } from "~/server/lib/handleApiError";
 import { openReconciliationPeriod } from "~/server/services/reconciliationService";
-
-const bodySchema = z.object({
-  budgetId: z.coerce.number().int().positive(),
-  accountRegisterId: z.coerce.number().int().positive(),
-  startDate: z.string().min(10),
-  endDate: z.string().min(10),
-  statementOpeningBalance: z.coerce.number().default(0),
-  statementEndingBalance: z.coerce.number(),
-});
+import { openReconciliationPeriodSchema } from "~/schema/reconciliation";
 
 export default defineEventHandler(async (event) => {
   try {
     const { userId } = getUser(event);
-    const body = bodySchema.parse(await readBody(event));
+    const body = openReconciliationPeriodSchema.parse(await readBody(event));
     return await openReconciliationPeriod({
       userId,
       budgetId: body.budgetId,
@@ -24,6 +15,14 @@ export default defineEventHandler(async (event) => {
       endDate: body.endDate,
       statementOpeningBalance: body.statementOpeningBalance,
       statementEndingBalance: body.statementEndingBalance,
+      statementIncomeTotal: body.statementIncomeTotal,
+      statementExpenseTotal: body.statementExpenseTotal,
+      statementLines: body.statementLines?.map((line) => ({
+        date: line.date,
+        description: line.description,
+        amount: line.amount,
+        lineType: line.lineType ?? null,
+      })),
     });
   } catch (error) {
     handleApiError(error);

@@ -223,10 +223,10 @@ div(class="max-w-2xl mx-auto")
         :disabled="isProfileSaving"
         label="Currently observing Daylight Saving Time"
       )
-      p.text-sm.text-gray-500.mt-1
+      p.text-sm.frog-text-muted.mt-1
         | Check this box if your location is currently observing Daylight Saving Time (DST)
 
-      p.text-sm.text-gray-500.mt-1(v-if="selectedTimezoneInfo")
+      p.text-sm.frog-text-muted.mt-1(v-if="selectedTimezoneInfo")
         | Selected: {{ selectedTimezoneInfo.name }} ({{ selectedTimezoneInfo.offset > 0 ? '+' : '' }}{{ selectedTimezoneInfo.offset / 60 }} hours from UTC)
         span(v-if="formState.isDaylightSaving") + DST
     UButton(

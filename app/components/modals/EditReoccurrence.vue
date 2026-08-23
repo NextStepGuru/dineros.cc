@@ -366,7 +366,7 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
           :filter-fields="['label', 'name']"
           placeholder="None")
 
-      .space-y-3.border.border-gray-700.rounded-lg.p-3
+      .space-y-3.border.border-default.rounded-lg.p-3
         UFormField(label="Amount adjustment" hint="independent of payment frequency" name="amountAdjustmentMode")
           USelect(
             v-model="formState.amountAdjustmentMode"
@@ -424,9 +424,9 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
         .flex.items-center.justify-between
           UFormField(label="Split transfers")
           UButton(color="neutral" variant="subtle" size="xs" @click="addSplit") Add split
-        p.text-xs.text-gray-400 {{ splitCountLabel }}
+        p.text-xs.frog-text-muted {{ splitCountLabel }}
         .space-y-3(v-if="splitsRef.length > 0")
-          .grid.grid-cols-1.gap-3.border.border-gray-700.rounded-lg.p-3(v-for="(split, index) in splitsRef" :key="split.id || 'new-split-' + index")
+          .grid.grid-cols-1.gap-3.border.border-default.rounded-lg.p-3(v-for="(split, index) in splitsRef" :key="split.id || 'new-split-' + index")
             .flex.gap-3.items-start.flex-wrap(class="max-sm:flex-col")
               UFormField(label="Amount type" class="flex-none min-w-36")
                 USelect(v-model="split.amountMode" class="w-full" :items="[{ id: 'FIXED', name: 'Fixed ($)' }, { id: 'PERCENT', name: 'Percent (%)' }]" valueKey="id" labelKey="name")
@@ -455,7 +455,7 @@ UModal(title="Edit Reoccurrence" class="modal-mobile-fullscreen")
                 UInput(v-model="split.description" class="w-full" placeholder="Optional")
               UTooltip(text="Remove split" :delay-duration="150")
                 BaseIconButton(icon="i-lucide-trash-2" size="xs" class="mt-6 shrink-0" aria-label="Remove split" @click="removeSplit(index)")
-        p.text-xs.text-gray-500(v-else) No split transfers configured.
+        p.text-xs.frog-text-muted(v-else) No split transfers configured.
 
   template(#footer)
     .w-full

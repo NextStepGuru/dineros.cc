@@ -288,7 +288,7 @@ async function startPasskeySignIn() {
             select(
               id="mfaMethod"
               v-model="selectedMfaMethod"
-              class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              class="w-full form-select-native"
             )
               option(v-for="method in mfaMethods" :key="method" :value="method")
                 | {{ method === 'totp' ? 'Authenticator app' : method === 'passkey' ? 'Security key / passkey' : 'Email code' }}

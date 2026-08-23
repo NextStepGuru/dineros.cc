@@ -162,7 +162,11 @@ FROM (
   SELECT 'Business', 'Office Supplies' UNION ALL
   SELECT 'Business', 'Professional Services' UNION ALL
   SELECT 'Business', 'Advertising' UNION ALL
-  SELECT 'Business', 'Contractors'
+  SELECT 'Business', 'Contractors' UNION ALL
+  SELECT 'Business', 'Meals & Entertainment' UNION ALL
+  SELECT 'Business', 'Fuel' UNION ALL
+  SELECT 'Business', 'Travel' UNION ALL
+  SELECT 'Business', 'Software & Tools'
   ) AS v
   JOIN (
     SELECT

@@ -17,7 +17,7 @@ type SyncedAccountRow = {
 };
 
 const stripedTheme = ref({
-  tr: "odd:bg-gray-100 even:bg-white dark:odd:bg-gray-800 dark:even:bg-gray-700",
+  tr: "transition-colors",
 });
 
 const toast = useToast();

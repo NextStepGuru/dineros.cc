@@ -84,6 +84,7 @@
     "prisma-field-encryption": "^1.6.0",
     "scule": "^1.3.0",
     "tailwindcss": "^4.3.3",
+    "unpdf": "^1.8.1",
     "vuedraggable": "^4.1.0",
     "zod": "^4.3.6"
   },

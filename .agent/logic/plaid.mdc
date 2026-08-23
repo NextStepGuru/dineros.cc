@@ -41,6 +41,37 @@ After either path: **inline** `getAllAccountsByAccessTokenAndUpdateBalance` (bes
 - Admin: `admin/accounts/[id]/sync-plaid.post.ts`, `tasks/sync-plaid.ts`.
 - Logs: `PlaidSyncLog` / admin `plaid-sync-logs`; credential errors via `integrationOpsAlert`.
 
+## Transaction matching (`TransactionMatchingService` + `PlaidTransactionMatchAiService`)
+
+During sync (`PlaidSyncService`), each added Plaid transaction is matched before creating a new register row:
+
+1. **Skip** if `plaidId` already exists on a row.
+2. **Pending→posted** in-place update when `pending_transaction_id` points at an existing pending row.
+3. **Deterministic** (`TransactionMatchingService`):
+   - **Recurrence alias**: normalized `name` / `merchant_name` / `original_description` against `ReoccurrencePlaidNameAlias`; merges onto a forecast line for that recurrence within **±14 days** (amount may differ; `BillProfile` expected ranges preferred when set).
+   - **Exact**: same signed amount, same calendar day, `plaidId` null.
+   - **Fuzzy**: same signed amount, **±5 days**, `plaidId` null.
+4. **Batched AI** (`PlaidTransactionMatchAiService`, purpose `plaid_transaction_match`): unmatched txns per register (up to ~25 per OpenAI call). Model picks `entryId` or `reoccurrenceId` with confidence ≥ `OPENAI_PLAID_MATCH_MIN_CONFIDENCE` (default 0.7), plus `displayName` / `categoryId`. One `entryId` per batch. Fail open to enrichment-only create when OpenAI is unset or errors.
+5. **Create** new row: use AI match payload when present, else `PlaidTransactionEnrichmentService` (display name + category via `TransactionCategorizationService`).
+
+## Categorization pipeline (`TransactionCategorizationService`)
+
+Fetch Plaid with `include_personal_finance_category: true` and `include_original_description: true`. Classify on **create** and on **pending→posted / modified / AI match** when `categoryLocked` is false. Pipeline:
+
+1. **ALWAYS** merchant rule (account-scoped `MerchantCategoryRule`, keyed by normalized Plaid merchant name / entity id — never encrypted `description`).
+2. If a **HINT** rule exists for the merchant, skip deterministic apply (personal vs work can coexist). HINT rules + recent same-merchant **user locks** are few-shot for the LLM.
+3. Fuel / convenience / utility-gas heuristics (utility natural gas never Fuel; GAS_STATION / TRANSPORTATION_GAS → Fuel).
+4. High-confidence Plaid PFC leaf map (nature only — no purpose overlay).
+5. Path-based LLM (`OPENAI_PLAID_TX_MODEL`, default `gpt-5-mini`) — model returns `categoryPath`, mapped to UUID in code. Prefer leaves. Work vs personal uses HINT few-shot.
+
+User category saves (`register-entry.post.ts`) set `categoryLocked` + `categorySource: user` and upsert a merchant rule (`ALWAYS` for distinctive B2B, `HINT` for gas/dining/coffee/rideshare).
+
+**Recategorize with AI** (`POST /api/register-entries/recategorize`, queue `register-entry-recategorize`): unlocked Plaid-sourced rows only; does not change amounts or descriptions. Business purpose leaves (Meals & Entertainment, Fuel, Travel, Software & Tools) must be added via **manual Prisma migration** using `scripts/sql/upsert-business-category-leaves-all-accounts.sql`.
+
+Manual **Match to recurrence** (`register-entry-match-reoccurrence.post.ts`) upserts aliases for all Plaid name fields on the entry’s `plaidJson` plus the entry description.
+
+Env: `OPENAI_PLAID_MATCH_MODEL` (defaults to `OPENAI_PLAID_TX_MODEL`), `OPENAI_PLAID_MATCH_MIN_CONFIDENCE`.
+
 ## Pitfall (balances “stuck”, txns OK)
 
 Encrypted `plaidId` lookups with `in` / ciphertext `updateMany` match zero rows. Transactions still work via token-scoped register maps. Fix: load by token (or id), filter/update by register `id`. See `.cursor/rules/encrypted-prisma-queries.mdc` and `plaid-sync.mdc`.

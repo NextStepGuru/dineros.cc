@@ -24,6 +24,7 @@ Registers and entries
 - account-register.post.ts, account-register.delete.ts, account-register-sort.post.ts
 - register.ts
 - register-entry.post.ts, register-entry.patch.ts, register-entry.delete.ts
+- register-entries/recategorize.post.ts
 - register-entry-transfer.post.ts, register-entry-transfer-create.post.ts
 - register-entry-applied.post.ts, register-entry-skip.post.ts, register-entry-match-reoccurrence.post.ts
 - snapshot.post.ts, snapshots.get.ts, snapshot/[id].get.ts, snapshot/[id].delete.ts, snapshot-register/[id].get.ts
@@ -40,8 +41,11 @@ Bills
 - bills.get.ts, bills/profile/[id].patch.ts, bill-instance/[id].patch.ts, bills/reminders/evaluate.post.ts
 
 Reconciliation
-- reconciliation/period.get.ts, reconciliation/period.post.ts, reconciliation/periods/open.get.ts
-- reconciliation/period/[id].get.ts, reconciliation/period/[id]/close.post.ts, reconciliation/item/[entryId].patch.ts
+- reconciliation/period.get.ts (open period + last closed ending), reconciliation/period.post.ts, reconciliation/periods/open.get.ts
+- reconciliation/period/[id].get.ts, reconciliation/period/[id]/close.post.ts (dollars must be ~0; leftover `statement_only` blocks; cleared items need `categoryId`), reconciliation/period/[id]/match.post.ts
+- reconciliation/item/[entryId].patch.ts (`isCleared`, `note`, `categoryId`), reconciliation/statement/extract.post.ts, reconciliation/statement-line/[id].patch.ts (`createLedgerEntry` to import a leftover line)
+- reconciliation/period/[id]/import-statement-lines.post.ts (bulk leftover import to ledger)
+- Behavior: `.agent/logic/reconciliation.mdc`
 
 Reports and notifications
 - reports/categories.get.ts

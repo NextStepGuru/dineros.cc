@@ -1,6 +1,35 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
 
+@theme static {
+  --color-navy-50: #f2f6fc;
+  --color-navy-100: #e2eaf8;
+  --color-navy-200: #c6d6f0;
+  --color-navy-300: #9bb8e4;
+  --color-navy-400: #6992d3;
+  --color-navy-500: #4571bd;
+  --color-navy-600: #33559f;
+  --color-navy-700: #2a4480;
+  --color-navy-800: #253a68;
+  --color-navy-900: #223357;
+  --color-navy-950: #0f1b2e;
+
+  --color-gold-50: #fdf9ed;
+  --color-gold-100: #f9efcb;
+  --color-gold-200: #f3dd93;
+  --color-gold-300: #ecc45a;
+  --color-gold-400: #e6ac32;
+  --color-gold-500: #d68f1a;
+  --color-gold-600: #b96c14;
+  --color-gold-700: #964d14;
+  --color-gold-800: #7c3d17;
+  --color-gold-900: #6a3316;
+  --color-gold-950: #3d1a08;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Libre Baskerville", Georgia, "Times New Roman", serif;
+}
+
 /* Reka UI modals lock body scroll; without a stable gutter the viewport width changes when the scrollbar is toggled and the layout jumps (often read as a vertical shift). */
 html {
   scrollbar-gutter: stable;
@@ -9,6 +38,9 @@ html {
 
 body {
   background-color: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
 }
 
 /*
@@ -20,71 +52,115 @@ body {
 }
 
 :root {
-  --frog-primary: #2f8f46;
-  --frog-primary-soft: #5aac6b;
-  --frog-accent: #2f7b78;
-  --frog-surface: #edf4e8;
-  --frog-surface-elevated: #f6faef;
-  --frog-text: #1e2f23;
-  --frog-text-muted: #4f6558;
-  --frog-border: #c9d8c8;
-  --frog-ring: rgba(47, 143, 70, 0.35);
-  --frog-status-positive: #2f8f46;
-  --frog-status-warning: #b57a1b;
-  --frog-status-negative: #b53a3a;
-  --frog-status-info: #2f7b78;
-  --frog-hero-bg-start: #dbeed6;
-  --frog-hero-bg-mid: #98c893;
-  --frog-hero-bg-end: #3e6e4f;
-  --frog-hero-text: #0f1f16;
-  --frog-hero-subtext: #1b2f22;
-  --frog-features-bg-start: #3e6e4f;
-  --frog-features-bg-end: #edf4e8;
-  --frog-features-card-bg: rgba(245, 255, 241, 0.82);
-  --frog-features-card-border: rgba(74, 110, 87, 0.35);
-  --frog-features-card-bg-hover: rgba(245, 255, 241, 0.92);
-  --frog-features-card-border-hover: rgba(74, 110, 87, 0.5);
-  --frog-features-icon-bg: rgba(47, 143, 70, 0.15);
-  --frog-features-icon-color: #2f8f46;
-  --frog-cta-text: #f6fff4;
+  --ui-primary: var(--ui-color-primary-700);
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #f6f8fb;
+  --ui-bg-elevated: #eef2f7;
+  --ui-border: #dbe3ee;
+  --ui-radius: 0.5rem;
+
+  /* Brand aliases (legacy frog-* class names) */
+  --frog-primary: var(--ui-primary);
+  --frog-primary-soft: var(--ui-color-primary-500);
+  --frog-accent: var(--color-gold-500);
+  --frog-surface: var(--ui-bg-muted);
+  --frog-surface-elevated: var(--ui-bg-elevated);
+  --frog-text: var(--ui-text-highlighted);
+  --frog-text-muted: var(--ui-text-muted);
+  --frog-border: var(--ui-border);
+  --frog-ring: color-mix(in srgb, var(--color-gold-400) 45%, transparent);
+  --frog-status-positive: var(--ui-color-success-600);
+  --frog-status-warning: var(--ui-color-warning-600);
+  --frog-status-negative: var(--ui-color-error-600);
+  --frog-status-info: var(--ui-color-info-600);
+
+  /* Marketing / landing (navy hero + gold accent) */
+  --frog-hero-bg-start: var(--color-navy-950);
+  --frog-hero-bg-mid: var(--color-navy-800);
+  --frog-hero-bg-end: var(--color-navy-900);
+  --frog-hero-text: #f4f7fc;
+  --frog-hero-subtext: color-mix(in srgb, #f4f7fc 82%, var(--color-gold-200));
+  --frog-features-bg-start: var(--color-navy-900);
+  --frog-features-bg-end: var(--ui-bg-muted);
+  --frog-features-card-bg: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  --frog-features-card-border: var(--ui-border);
+  --frog-features-card-bg-hover: var(--ui-bg);
+  --frog-features-card-border-hover: color-mix(
+    in srgb,
+    var(--color-gold-400) 35%,
+    var(--ui-border)
+  );
+  --frog-features-icon-bg: color-mix(
+    in srgb,
+    var(--color-gold-400) 18%,
+    transparent
+  );
+  --frog-features-icon-color: var(--color-gold-500);
+  --frog-cta-text: var(--color-navy-950);
+
+  /* Drag / highlight utilities */
+  --dineros-drag-highlight: color-mix(
+    in srgb,
+    var(--color-gold-400) 22%,
+    var(--ui-bg-muted)
+  );
+  --dineros-drag-border: var(--color-gold-500);
+  --dineros-row-flash: color-mix(
+    in srgb,
+    var(--color-gold-300) 35%,
+    var(--ui-bg-elevated)
+  );
 }
 
 .dark {
-  --frog-primary: #5fd778;
-  --frog-primary-soft: #86e59a;
-  --frog-accent: #4bb4aa;
-  --frog-surface: #10211a;
-  --frog-surface-elevated: #182a22;
-  --frog-text: #edf6ea;
-  --frog-text-muted: #b8cdbd;
-  --frog-border: #355245;
-  --frog-ring: rgba(95, 215, 120, 0.4);
-  --frog-status-positive: #77e18d;
-  --frog-status-warning: #e2c06a;
-  --frog-status-negative: #f08c8c;
-  --frog-status-info: #72d8cc;
-  --frog-hero-bg-start: #0f1f16;
-  --frog-hero-bg-mid: #1b3f2e;
-  --frog-hero-bg-end: #14312a;
-  --frog-hero-text: #f3fff1;
-  --frog-hero-subtext: rgba(227, 248, 229, 0.9);
-  --frog-features-bg-start: #14312a;
-  --frog-features-bg-end: #10211a;
-  --frog-features-card-bg: rgba(246, 255, 244, 0.08);
-  --frog-features-card-border: rgba(201, 216, 200, 0.3);
-  --frog-features-card-bg-hover: rgba(246, 255, 244, 0.14);
-  --frog-features-card-border-hover: rgba(201, 216, 200, 0.45);
-  --frog-features-icon-bg: rgba(95, 215, 120, 0.2);
-  --frog-features-icon-color: #95f5aa;
-  --frog-cta-text: #f6fff4;
+  --ui-primary: var(--ui-color-primary-300);
+  --ui-bg: #0b1220;
+  --ui-bg-muted: #101a2c;
+  --ui-bg-elevated: #16223a;
+  --ui-border: #243352;
+
+  --frog-status-positive: var(--ui-color-success-400);
+  --frog-status-warning: var(--ui-color-warning-400);
+  --frog-status-negative: var(--ui-color-error-400);
+  --frog-status-info: var(--ui-color-info-400);
+
+  --frog-hero-bg-start: #060b14;
+  --frog-hero-bg-mid: var(--color-navy-950);
+  --frog-hero-bg-end: var(--color-navy-900);
+  --frog-hero-text: #eef3fb;
+  --frog-hero-subtext: color-mix(in srgb, #eef3fb 78%, var(--color-gold-200));
+  --frog-features-bg-start: var(--color-navy-950);
+  --frog-features-bg-end: var(--ui-bg);
+  --frog-features-card-bg: color-mix(
+    in srgb,
+    var(--ui-bg-elevated) 92%,
+    transparent
+  );
+  --frog-features-card-border: var(--ui-border);
+  --frog-features-card-bg-hover: var(--ui-bg-elevated);
+  --frog-features-icon-bg: color-mix(
+    in srgb,
+    var(--color-gold-400) 14%,
+    transparent
+  );
+  --frog-features-icon-color: var(--color-gold-300);
+  --frog-cta-text: var(--color-navy-950);
+
+  --dineros-drag-highlight: color-mix(
+    in srgb,
+    var(--color-gold-500) 16%,
+    var(--ui-bg-elevated)
+  );
+  --dineros-row-flash: color-mix(
+    in srgb,
+    var(--color-gold-400) 22%,
+    var(--ui-bg-elevated)
+  );
 }
 
 /** Default app shell: full document height, vertical scroll on the window (no inner viewport cages). */
 .ui-main-scroll {
   min-height: 100dvh;
-  /* Allow wide tables to scroll horizontally at the document level so nested `overflow-x: auto` wrappers
-     are not required — those become the sticky containing block and `top: var(--ui-header-height)`
-     incorrectly reserves space above thead. */
   overflow-x: auto;
 }
 
@@ -145,6 +221,330 @@ body {
   --tw-ring-color: var(--frog-ring);
 }
 
+/* Money display */
+.money-positive,
+.money-negative,
+.money-zero {
+  font-variant-numeric: tabular-nums;
+}
+
+.money-positive {
+  color: var(--frog-status-positive);
+}
+
+.money-negative {
+  color: var(--frog-status-negative);
+}
+
+.money-zero {
+  color: var(--frog-text-muted);
+}
+
+/* Data tables */
+.data-table tbody tr:nth-child(odd) {
+  background-color: var(--ui-bg-muted);
+}
+
+.data-table tbody tr:nth-child(even) {
+  background-color: var(--ui-bg);
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--ui-bg-elevated);
+}
+
+/*
+ * Register running-balance tints. Applied on `td` as a transparent overlay so
+ * zebra (`tr` nth-child) and hover still show through. Background only — no
+ * pointer-events, so clicks/hover on the row are unchanged.
+ */
+.register-main-table tbody tr.register-row-balance-caution > td {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--ui-color-warning-400) 18%, transparent),
+    color-mix(in srgb, var(--ui-color-warning-400) 18%, transparent)
+  );
+}
+
+.register-main-table tbody tr.register-row-balance-negative > td {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--ui-color-error-400) 20%, transparent),
+    color-mix(in srgb, var(--ui-color-error-400) 20%, transparent)
+  );
+}
+
+.data-table thead th {
+  border-color: var(--ui-border);
+  background-color: var(--ui-bg);
+}
+
+.data-table tbody td {
+  border-color: var(--ui-border);
+}
+
+.data-table-row-flash {
+  background-color: var(--dineros-row-flash) !important;
+}
+
+/* Drag-and-drop row states */
+.dnd-dragging {
+  opacity: 0.35;
+  transform: scale(0.98) rotate(0.5deg);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.12);
+}
+
+.dnd-drop-target {
+  border-top: 4px solid var(--dineros-drag-border);
+  background-color: var(--dineros-drag-highlight);
+}
+
+.dnd-drop-target-bottom {
+  border-bottom: 4px solid var(--dineros-drag-border);
+  background-color: var(--dineros-drag-highlight);
+}
+
+.dnd-pocket-group {
+  background-color: var(--dineros-drag-highlight);
+  border-color: var(--color-gold-400);
+}
+
+.dnd-pocket-row {
+  border-left: 2px solid color-mix(in srgb, var(--ui-color-success-500) 35%, transparent);
+}
+
+.dnd-pocket-dragging {
+  background-color: color-mix(
+    in srgb,
+    var(--ui-color-success-500) 12%,
+    var(--ui-bg-muted)
+  );
+  border: 2px solid var(--ui-color-success-500);
+}
+
+/* Badges */
+.badge-crypto {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+  background-color: color-mix(in srgb, var(--ui-color-secondary-500) 14%, var(--ui-bg-muted));
+  color: var(--ui-color-secondary-700);
+}
+
+.dark .badge-crypto {
+  background-color: color-mix(in srgb, var(--ui-color-secondary-400) 18%, var(--ui-bg-elevated));
+  color: var(--ui-color-secondary-300);
+}
+
+.badge-status-on {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: color-mix(in srgb, var(--ui-color-success-500) 14%, var(--ui-bg-muted));
+  color: var(--ui-color-success-700);
+}
+
+.dark .badge-status-on {
+  background-color: color-mix(in srgb, var(--ui-color-success-400) 18%, var(--ui-bg-elevated));
+  color: var(--ui-color-success-300);
+}
+
+.badge-status-off {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: var(--ui-bg-elevated);
+  color: var(--ui-text-muted);
+}
+
+/* Section callouts (account modal) */
+.section-callout {
+  padding: 1rem;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background-color: var(--ui-bg-muted);
+}
+
+.section-callout--info {
+  border-color: color-mix(in srgb, var(--ui-color-info-500) 35%, var(--ui-border));
+  background-color: color-mix(in srgb, var(--ui-color-info-500) 8%, var(--ui-bg-muted));
+}
+
+.section-callout--warning {
+  border-color: color-mix(in srgb, var(--ui-color-warning-500) 35%, var(--ui-border));
+  background-color: color-mix(in srgb, var(--ui-color-warning-500) 8%, var(--ui-bg-muted));
+}
+
+/* Admin / debug / log tables */
+.panel-bordered {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  padding: 1rem;
+}
+
+.form-select-native {
+  display: block;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background-color: var(--ui-bg);
+  color: var(--ui-text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.admin-log-table {
+  width: 100%;
+  font-size: 0.875rem;
+  text-align: left;
+  border-collapse: collapse;
+}
+
+.admin-log-table thead {
+  background-color: var(--ui-bg-muted);
+}
+
+.admin-log-table tbody tr {
+  border-top: 1px solid var(--ui-border);
+  vertical-align: top;
+}
+
+.admin-log-table tbody tr:hover {
+  background-color: var(--ui-bg-elevated);
+}
+
+.admin-log-table .row-detail {
+  background-color: var(--ui-bg-muted);
+  padding: 0.5rem;
+}
+
+.code-block {
+  max-height: 24rem;
+  overflow: auto;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background-color: var(--ui-bg-muted);
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: var(--ui-radius);
+  background-color: var(--ui-bg-muted);
+}
+
+.status-dot-warning {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background-color: var(--ui-color-warning-500);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--ui-color-warning-500) 25%, transparent);
+}
+
+.row-cleared-hint {
+  background-color: color-mix(in srgb, var(--ui-color-success-500) 5%, transparent);
+}
+
+.section-heading-info {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--frog-status-info);
+}
+
+.section-heading-warning {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--frog-status-warning);
+}
+
+.risk-eta-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--frog-status-warning);
+}
+
+.callout-text-info {
+  font-size: 0.875rem;
+  color: var(--frog-status-info);
+  margin-bottom: 0.5rem;
+}
+
+.callout-text-info-sub {
+  font-size: 0.75rem;
+  color: var(--frog-text-muted);
+}
+
+/* App chrome */
+.app-header-bar {
+  background-color: var(--color-navy-950);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 55%, transparent);
+  color: #eef3fb;
+}
+
+.app-header-bar .text-highlighted,
+.app-header-bar .text-default {
+  color: #eef3fb;
+}
+
+.app-header-bar .frog-text-muted {
+  color: color-mix(in srgb, #eef3fb 68%, transparent);
+}
+
+.app-header-bar a:hover,
+.app-header-bar button:hover {
+  color: #fff;
+}
+
+.nav-workflow-active {
+  box-shadow: inset 0 -2px 0 0 var(--color-gold-400);
+}
+
+.nav-workflow-inactive {
+  opacity: 0.88;
+}
+
+.secondary-nav-link {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--ui-radius);
+  color: var(--ui-text-muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.secondary-nav-link:hover {
+  background-color: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.secondary-nav-link--active {
+  background-color: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-bg-muted));
+  color: var(--ui-primary);
+  font-weight: 600;
+}
+
 .auth-page {
   background-color: var(--frog-surface);
   min-height: calc(100vh - var(--ui-header-height));
@@ -153,11 +553,11 @@ body {
 .auth-card {
   background-color: var(--frog-surface-elevated);
   border: 1px solid var(--frog-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(15, 27, 46, 0.06);
 }
 
 .dark .auth-card {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
 }
 
 .auth-card__header {
@@ -198,6 +598,7 @@ body {
 
 .page-home .frog-heading {
   color: var(--frog-hero-text);
+  font-family: var(--font-display);
 }
 
 .page-home .frog-subheading {
@@ -226,46 +627,11 @@ body {
   color: var(--frog-cta-text);
 }
 
-.document-page {
-  background-color: var(--frog-surface);
-  color: var(--frog-text);
-}
-
-.document-page__header {
-  background: linear-gradient(
-    135deg,
-    var(--frog-primary) 0%,
-    var(--frog-accent) 100%
-  );
-  color: #f8fff6;
-}
-
-.document-page__card {
-  background-color: var(--frog-surface-elevated);
-  border: 1px solid var(--frog-border);
-}
-
-.document-page__section-title {
-  border-bottom: 1px solid var(--frog-border);
-}
-
-.document-page .border-gray-300 {
-  border-color: var(--frog-border) !important;
-}
-
-.document-page h1,
-.document-page h2,
-.document-page h3,
-.document-page p,
-.document-page li {
-  color: var(--frog-text);
-}
-
-/* Legal document theme: black & white, no dark mode. Links in color. */
+/* Legal document theme: black & white, no dark mode. Links in navy. */
 .legal-document {
   background-color: #fff;
   color: #1a1a1a;
-  font-family: Georgia, "Times New Roman", Times, serif;
+  font-family: var(--font-display);
   font-size: 1rem;
   line-height: 1.65;
   max-width: 42rem;
@@ -275,12 +641,12 @@ body {
 }
 
 .legal-document a {
-  color: #2f8f46;
+  color: var(--color-navy-700);
   text-decoration: underline;
 }
 
 .legal-document a:hover {
-  color: #267338;
+  color: var(--color-navy-900);
 }
 
 .legal-document__header {
@@ -389,11 +755,6 @@ input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s !important;
 }
 
-/*
- * Nuxt UI UModal: theme sets position without z-index; the backdrop can paint above
- * the dialog panel. Keep overlay below and content above (e.g. Forecasting toolbar is z-38).
- * Scope to dialog overlays / modal dialog content only — not Select menus, Popovers, etc.
- */
 [data-slot="overlay"]:not([data-vaul-overlay]) {
   z-index: 40;
 }
@@ -402,7 +763,6 @@ input:-webkit-autofill:active {
   z-index: 50;
 }
 
-/* Shared Nuxt UI UModal mobile fullscreen (matches Tailwind max-sm / 639px) */
 @media (width < 40rem) {
   .modal-mobile-fullscreen {
     width: 100% !important;
@@ -413,7 +773,6 @@ input:-webkit-autofill:active {
   }
 }
 
-/* Shared modal footer action layout and interaction affordances */
 .modal-action-bar {
   width: 100%;
   display: flex;

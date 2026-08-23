@@ -17,6 +17,7 @@ Policy and do/don’t live in `.cursor/rules/`. How the system works lives in `.
 | Field encryption / queries | `.agent/logic/encryption-and-keys.mdc` |
 | Plaid link / sync / balances | `.agent/logic/plaid.mdc` |
 | Forecast engine | `.agent/logic/forecast-engine.mdc` |
+| Statement reconciliation | `.agent/logic/reconciliation.mdc` |
 | Microservice | `.agent/logic/microservice.mdc` |
 | Deploy / CI | `.agent/logic/deployment.mdc` |
 | Conventions / checklists | `.agent/logic/patterns.mdc` |

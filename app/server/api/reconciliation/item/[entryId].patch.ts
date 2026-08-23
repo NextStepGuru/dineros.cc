@@ -10,6 +10,7 @@ const paramsSchema = z.object({
 const bodySchema = z.object({
   isCleared: z.boolean().optional(),
   note: z.string().max(500).nullable().optional(),
+  categoryId: z.string().min(1).nullable().optional(),
 });
 
 export default defineEventHandler(async (event) => {
@@ -22,6 +23,7 @@ export default defineEventHandler(async (event) => {
       registerEntryId: params.entryId,
       isCleared: body.isCleared,
       note: body.note,
+      categoryId: body.categoryId,
     });
   } catch (error) {
     handleApiError(error);

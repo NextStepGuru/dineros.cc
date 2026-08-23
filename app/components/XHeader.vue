@@ -395,9 +395,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template lang="pug">
-UHeader(
+UHeader.app-header-bar(
   title="DinerosPredictive budgeting"
-  :toggle="{ color: 'primary', variant: 'subtle', class: 'rounded-full toolbar-icon-button' }")
+  :toggle="{ color: 'secondary', variant: 'subtle', class: 'rounded-full toolbar-icon-button' }")
   template(#title)
     XLogo(class="h-6 w-auto")
 
@@ -410,10 +410,11 @@ UHeader(
           :content="{ align: 'start', sideOffset: 4 }")
           UButton(
             variant="soft"
-            :color="workflowMode === 'forecasting' ? 'primary' : 'neutral'"
+            :color="workflowMode === 'forecasting' ? 'secondary' : 'neutral'"
             size="sm"
             trailing-icon="i-lucide-chevron-down"
             class="h-8"
+            :class="workflowMode === 'forecasting' ? 'nav-workflow-active' : 'nav-workflow-inactive'"
             aria-haspopup="menu"
             aria-label="Forecast menu"
             data-testid="header-forecast-menu-trigger")
@@ -424,10 +425,11 @@ UHeader(
           :content="{ align: 'start', sideOffset: 4 }")
           UButton(
             variant="soft"
-            :color="workflowMode === 'reconciliation' ? 'primary' : 'neutral'"
+            :color="workflowMode === 'reconciliation' ? 'secondary' : 'neutral'"
             size="sm"
             trailing-icon="i-lucide-chevron-down"
             class="h-8"
+            :class="workflowMode === 'reconciliation' ? 'nav-workflow-active' : 'nav-workflow-inactive'"
             aria-haspopup="menu"
             aria-label="Reconcile menu"
             data-testid="header-reconcile-menu-trigger")
@@ -438,9 +440,10 @@ UHeader(
           :key="it.label"
           :to="it.to"
           variant="soft"
-          :color="it.active ? 'primary' : 'neutral'"
+          :color="it.active ? 'secondary' : 'neutral'"
           size="sm"
           class="h-8 gap-1.5 px-2 sm:px-2.5"
+          :class="it.active ? 'nav-workflow-active' : ''"
           :aria-label="it.label"
           :aria-current="it.active ? 'page' : undefined")
           UIcon(:name="navIconForLabel(it.label)" class="size-4 shrink-0 opacity-80")
@@ -736,22 +739,22 @@ UHeader(
   background:
     radial-gradient(
       120% 90% at 90% -20%,
-      rgb(59 130 246 / 18%),
+      color-mix(in srgb, var(--color-gold-500) 22%, transparent),
       transparent 60%
     ),
     radial-gradient(
       120% 90% at -10% 100%,
-      rgb(16 185 129 / 14%),
+      color-mix(in srgb, var(--color-navy-500) 28%, transparent),
       transparent 60%
     ),
-    color-mix(in srgb, var(--frog-surface) 30%, #000 70%);
+    var(--color-navy-950);
 }
 
 .mobile-menu-card {
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
   border-radius: 1.1rem;
   padding: 0.85rem;
-  background: rgb(255 255 255 / 5%);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 55%, transparent);
   backdrop-filter: blur(14px);
 }
 
@@ -759,7 +762,7 @@ UHeader(
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgb(255 255 255 / 62%);
+  color: color-mix(in srgb, #eef3fb 62%, transparent);
 }
 
 .mobile-theme-row {
@@ -768,7 +771,7 @@ UHeader(
   justify-content: space-between;
   border-radius: 0.9rem;
   padding: 0.45rem 0.6rem;
-  background: rgb(255 255 255 / 4%);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 40%, transparent);
 }
 
 .mobile-close-button {
@@ -813,7 +816,7 @@ UHeader(
 }
 
 .notification-indicator {
-  background-color: rgb(220 38 38);
-  color: rgb(255 255 255);
+  background-color: var(--ui-color-error-500);
+  color: var(--ui-text-inverted);
 }
 </style>

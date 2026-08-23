@@ -153,6 +153,23 @@ const hideRecurrencePastSkip = computed(() => {
   return day < todayISOString.value;
 });
 
+/** Today/future forecast instance: Skip this occurrence (do not post it). */
+const showSkipReoccurrence = computed(
+  () =>
+    Boolean(formState.value.id) &&
+    formState.value.reoccurrenceId != null &&
+    formState.value.isProjected === true &&
+    !hideRecurrencePastSkip.value,
+);
+
+/** Posted rows: Clear / Apply / Delete. Hidden while Skip is the instance action. */
+const showPostedEntryActions = computed(
+  () =>
+    Boolean(formState.value.id) &&
+    (!formState.value.isProjected || formState.value.isPending) &&
+    !showSkipReoccurrence.value,
+);
+
 watch(props, () => {
   formState.value = {
     ...props.registerEntry,
@@ -542,7 +559,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
     // Apply Account Selection
     div(v-if="state.showApplySelection" class="space-y-4")
       h3(class="text-lg font-semibold") Apply Transaction To Account
-      p(class="text-sm text-gray-600 dark:text-gray-400")
+      p(class="text-sm frog-text-muted")
         | Select which account register to apply this transaction to:
       p(class="text-sm font-medium")
         | Transaction: {{ formState.description }} ({{ new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(formState.amount) }})
@@ -556,7 +573,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
           placeholder="Select account register"
           class="w-full")
 
-      div(class="text-xs text-gray-500 dark:text-gray-400 mt-2")
+      div(class="text-xs frog-text-muted mt-2")
         p(v-if="selectedApplyAccountRegisterId === formState.accountRegisterId")
           | ✓ This will apply the transaction to the current account (standard behavior)
         p(v-else-if="selectedApplyAccountRegisterId")
@@ -581,11 +598,11 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
       // Plaid payload (lazy-loaded)
       div(v-if="hasPlaidEntry && modalTab === 'plaid'" class="space-y-3")
 
-        p(class="text-xs text-gray-600 dark:text-gray-400")
+        p(class="text-xs frog-text-muted")
           | Last synced payload from Plaid for this entry. Edited description, category, or amount here may differ until the next sync updates this snapshot.
 
         div(class="flex flex-wrap gap-2 items-center")
-          span(v-if="plaidSyncData" class="text-xs text-gray-500")
+          span(v-if="plaidSyncData" class="text-xs frog-text-muted")
             | Updated {{ plaidSyncData.updatedAt }} · pending (Plaid): {{ plaidSyncData.isPending }}
           UButton(
             size="sm"
@@ -595,11 +612,11 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
             class="cursor-pointer"
           ) Copy JSON
 
-        div(v-if="plaidSyncLoading" class="text-sm text-gray-500") Loading Plaid data…
+        div(v-if="plaidSyncLoading" class="text-sm frog-text-muted") Loading Plaid data…
 
         pre(
           v-else
-          class="max-h-96 overflow-auto rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 text-xs font-mono whitespace-pre-wrap wrap-break-word") {{ plaidJsonText }}
+          class="code-block") {{ plaidJsonText }}
 
       // Regular Edit Form
       UForm(
@@ -612,16 +629,16 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
         ref="form")
 
         // Transfer Mode Toggle (only for new entries)
-        div(v-if="isNewEntry" class="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg")
-          p(class="text-xs text-gray-500") Debug: isNewEntry = {{ isNewEntry }}, id = {{ formState.id }}
+        div(v-if="isNewEntry" class="debug-panel")
+          p(class="text-xs frog-text-muted") Debug: isNewEntry = {{ isNewEntry }}, id = {{ formState.id }}
           UCheckbox(v-model="state.isTransferMode" @change="toggleTransferMode")
           label(class="text-sm font-medium cursor-pointer" @click="toggleTransferMode") Create Transfer Between Accounts
 
         // Transfer Mode Info
-        div(v-if="state.isTransferMode && isNewEntry" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800")
-          p(class="text-sm text-blue-700 dark:text-blue-300 mb-2")
-            | 💡 Transfer mode creates two entries: money going out of this account and money going into the destination account.
-          p(class="text-xs text-blue-600 dark:text-blue-400")
+        div(v-if="state.isTransferMode && isNewEntry" class="p-3 section-callout section-callout--info")
+          p(class="callout-text-info mb-2")
+            | Transfer mode creates two entries: money going out of this account and money going into the destination account.
+          p(class="callout-text-info-sub")
             | The amount will be deducted from the current account and added to the destination account.
 
         UFormField(label="Description" name="description")
@@ -656,7 +673,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
               placeholder="Leave empty to auto-generate"
               class="w-full")
 
-          div(class="text-xs text-gray-500 dark:text-gray-400")
+          div(class="text-xs frog-text-muted")
             p(v-if="!transferTargetDescription")
               | Auto-generated: "Transfer from {{ listStore.getAccountRegisters.find(a => a.id === formState.accountRegisterId)?.name }}"
 
@@ -720,7 +737,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
           ) {{ state.isTransferMode && isNewEntry ? 'Create Transfer' : 'Save' }}
           UButton(
             color="info"
-            v-if="formState.id && (!formState.isProjected || formState.isPending)"
+            v-if="showPostedEntryActions"
             @click="markAsCleared"
             :loading="state.isClearing"
             :disabled="isDisabled || isPlaidTabActive"
@@ -728,7 +745,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
           ) Clear
           UButton(
             color="secondary"
-            v-if="formState.id && (!formState.isProjected || formState.isPending)"
+            v-if="showPostedEntryActions"
             @click="initiateApply"
             :loading="state.isApplying"
             :disabled="isDisabled || isPlaidTabActive"
@@ -739,7 +756,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
             @click="confirmDelete"
             :loading="state.isDeleting"
             :disabled="isDisabled || isPlaidTabActive || showDeleteConfirm"
-            v-if="formState.id && (!formState.isProjected || formState.isPending)"
+            v-if="showPostedEntryActions"
             class="modal-action-button"
           ) Delete
           UButton(
@@ -748,7 +765,7 @@ UModal(title="Edit Register Entry" description="Edit Register Entry" class="moda
             :loading="state.isSkipping"
             :disabled="isDisabled || isPlaidTabActive"
             class="modal-action-button"
-            v-if="formState.id && formState.reoccurrenceId && formState.isProjected && !hideRecurrencePastSkip"
-          ) Skip Reoccurrence
+            v-if="showSkipReoccurrence"
+          ) Skip this occurrence
         UButton(@click="cancel" color="neutral" :disabled="isDisabled" class="modal-action-button") Close
 </template>

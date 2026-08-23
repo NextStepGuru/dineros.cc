@@ -6,21 +6,28 @@ import type {
 } from "@prisma/client";
 import type { Transaction } from "plaid";
 import { log } from "~/server/logger";
-import { normalizePlaidDescription } from "~/server/lib/normalizePlaidDescription";
+import {
+  collectNormalizedPlaidDescriptionAliases,
+  normalizePlaidDescription,
+} from "~/server/lib/normalizePlaidDescription";
 import { dateTimeService } from "./forecast/DateTimeService";
 
 export interface TransactionMatchResult {
   isMatched: boolean;
   existingEntry?: RegisterEntry;
-  matchType?: "exact" | "fuzzy" | "reoccurrence" | "none" | "skip";
+  matchType?: "exact" | "fuzzy" | "reoccurrence" | "ai" | "none" | "skip";
 }
 
 export interface MatchOptions {
   enableFuzzyMatching?: boolean;
   fuzzyDayRange?: number;
+  aliasDayRange?: number;
 }
 
 const DEFAULT_FUZZY_DAY_RANGE = 5;
+const DEFAULT_ALIAS_DAY_RANGE = 14;
+
+export type PlaidMatchType = "exact" | "fuzzy" | "reoccurrence" | "ai";
 
 class TransactionMatchingService {
   db: PrismaClient;
@@ -44,6 +51,25 @@ class TransactionMatchingService {
     });
   }
 
+  private async findAliasForTransaction(
+    transaction: Transaction,
+    accountRegisterId: number,
+  ) {
+    const normalizedNames = collectNormalizedPlaidDescriptionAliases(transaction);
+    for (const normalizedName of normalizedNames) {
+      const alias = await this.db.reoccurrencePlaidNameAlias.findUnique({
+        where: {
+          accountRegisterId_normalizedName: {
+            accountRegisterId,
+            normalizedName,
+          },
+        },
+      });
+      if (alias) return alias;
+    }
+    return null;
+  }
+
   /**
    * Finds existing transactions by exact match (date and amount)
    */
@@ -58,7 +84,7 @@ class TransactionMatchingService {
       .startOfDay(dateTimeService.add(1, "day", dt))
       .toDate();
 
-    return await this.db.registerEntry.findFirst({
+    const candidates = await this.db.registerEntry.findMany({
       where: {
         accountRegisterId,
         amount: formattedAmount,
@@ -66,9 +92,12 @@ class TransactionMatchingService {
           gte: dayStart,
           lt: dayEnd,
         },
-        plaidId: null, // Only match manual entries
+        plaidId: null,
+        isBalanceEntry: false,
       },
     });
+
+    return this.pickClosestEntryCandidate(candidates, transaction);
   }
 
   /**
@@ -84,7 +113,7 @@ class TransactionMatchingService {
     const daysBefore = dateTimeService.subtract(dayRange, "day", dt).toDate();
     const daysAfter = dateTimeService.add(dayRange, "day", dt).toDate();
 
-    const result = await this.db.registerEntry.findFirst({
+    const candidates = await this.db.registerEntry.findMany({
       where: {
         accountRegisterId,
         amount: formattedAmount,
@@ -92,33 +121,56 @@ class TransactionMatchingService {
           gte: daysBefore,
           lte: daysAfter,
         },
-        plaidId: null, // Only match manual entries
+        plaidId: null,
+        isBalanceEntry: false,
       },
     });
 
-    return result;
+    return this.pickClosestEntryCandidate(candidates, transaction);
+  }
+
+  private pickClosestEntryCandidate(
+    candidates: RegisterEntry[],
+    transaction: Transaction,
+  ): RegisterEntry | null {
+    if (candidates.length === 0) return null;
+
+    const txDate = dateTimeService.toDate(
+      dateTimeService.parseInput(transaction.date),
+    );
+    const txMs = txDate.getTime();
+
+    candidates.sort((a, b) => {
+      const da = Math.abs(a.createdAt.getTime() - txMs);
+      const db = Math.abs(b.createdAt.getTime() - txMs);
+      if (da !== db) return da - db;
+      if (a.isProjected !== b.isProjected) return a.isProjected ? -1 : 1;
+      return 0;
+    });
+
+    return candidates[0] ?? null;
   }
 
   /**
-   * Forecast / recurrence register line without Plaid yet, same amount and date window.
+   * Forecast / recurrence register line without Plaid yet, within date window.
+   * Amount may differ (variable bills); bill expected ranges are preferred when set.
    */
   private async findReoccurrenceRegisterEntryMatch(
     transaction: Transaction,
     accountRegisterId: number,
     reoccurrenceId: number,
-    formattedAmount: number,
     dayRange: number,
   ): Promise<RegisterEntry | null> {
     const dt = dateTimeService.parseInput(transaction.date);
     const daysBefore = dateTimeService.subtract(dayRange, "day", dt).toDate();
     const daysAfter = dateTimeService.add(dayRange, "day", dt).toDate();
     const txDate = dateTimeService.toDate(dt);
+    const txMs = txDate.getTime();
 
     const candidates = await this.db.registerEntry.findMany({
       where: {
         accountRegisterId,
         reoccurrenceId,
-        amount: formattedAmount,
         plaidId: null,
         isBalanceEntry: false,
         createdAt: {
@@ -128,24 +180,97 @@ class TransactionMatchingService {
       },
     });
 
-    if (candidates.length === 0) {
-      return null;
-    }
+    if (candidates.length === 0) return null;
 
-    const txMs = txDate.getTime();
+    const billProfile = await this.db.billProfile.findUnique({
+      where: { reoccurrenceId },
+      select: {
+        expectedAmountLow: true,
+        expectedAmountHigh: true,
+      },
+    });
+
+    const low =
+      billProfile?.expectedAmountLow != null
+        ? Number(billProfile.expectedAmountLow)
+        : null;
+    const high =
+      billProfile?.expectedAmountHigh != null
+        ? Number(billProfile.expectedAmountHigh)
+        : null;
+
+    const inBillRange = (amount: RegisterEntry["amount"]) => {
+      if (low == null && high == null) return true;
+      const n = Math.abs(Number(amount));
+      if (low != null && n < low) return false;
+      if (high != null && n > high) return false;
+      return true;
+    };
+
     candidates.sort((a, b) => {
+      const aIn = inBillRange(a.amount);
+      const bIn = inBillRange(b.amount);
+      if (aIn !== bIn) return aIn ? -1 : 1;
       const da = Math.abs(a.createdAt.getTime() - txMs);
       const db = Math.abs(b.createdAt.getTime() - txMs);
-      if (da !== db) {
-        return da - db;
-      }
-      if (a.isProjected !== b.isProjected) {
-        return a.isProjected ? -1 : 1;
-      }
+      if (da !== db) return da - db;
+      if (a.isProjected !== b.isProjected) return a.isProjected ? -1 : 1;
       return 0;
     });
 
     return candidates[0] ?? null;
+  }
+
+  /** Best projected/manual line for a recurrence when AI returns reoccurrenceId only. */
+  async findReoccurrenceEntryForLink(
+    transaction: Transaction,
+    accountRegisterId: number,
+    reoccurrenceId: number,
+    dayRange: number = DEFAULT_ALIAS_DAY_RANGE,
+  ): Promise<RegisterEntry | null> {
+    return this.findReoccurrenceRegisterEntryMatch(
+      transaction,
+      accountRegisterId,
+      reoccurrenceId,
+      dayRange,
+    );
+  }
+
+  async upsertPlaidNameAliasesForReoccurrence(
+    accountRegisterId: number,
+    reoccurrenceId: number,
+    sources: Array<Transaction | Record<string, unknown> | string | null | undefined>,
+  ): Promise<void> {
+    const normalizedNames = new Set<string>();
+    for (const source of sources) {
+      if (typeof source === "string") {
+        const n = normalizePlaidDescription(source);
+        if (n) normalizedNames.add(n);
+        continue;
+      }
+      for (const alias of collectNormalizedPlaidDescriptionAliases(source)) {
+        normalizedNames.add(alias);
+      }
+    }
+
+    for (const normalizedName of normalizedNames) {
+      await this.db.reoccurrencePlaidNameAlias.upsert({
+        where: {
+          accountRegisterId_normalizedName: {
+            accountRegisterId,
+            normalizedName,
+          },
+        },
+        create: {
+          accountRegisterId,
+          normalizedName,
+          reoccurrenceId,
+        },
+        update: {
+          reoccurrenceId,
+        },
+      });
+    }
   }
 
   /**
@@ -160,13 +285,13 @@ class TransactionMatchingService {
     const {
       enableFuzzyMatching = true,
       fuzzyDayRange = DEFAULT_FUZZY_DAY_RANGE,
+      aliasDayRange = DEFAULT_ALIAS_DAY_RANGE,
     } = options;
 
     const formattedAmount = accountType.isCredit
       ? transaction.amount
       : transaction.amount * -1;
 
-    // First check if this Plaid transaction already exists
     const existingPlaidTransaction = await this.findExistingPlaidTransaction(
       transaction,
       accountRegister.id,
@@ -189,48 +314,39 @@ class TransactionMatchingService {
       };
     }
 
-    const normalizedName = normalizePlaidDescription(transaction.name ?? "");
-    if (normalizedName) {
-      const alias = await this.db.reoccurrencePlaidNameAlias.findUnique({
-        where: {
-          accountRegisterId_normalizedName: {
+    const alias = await this.findAliasForTransaction(
+      transaction,
+      accountRegister.id,
+    );
+
+    if (alias) {
+      const recurrenceMatch = await this.findReoccurrenceRegisterEntryMatch(
+        transaction,
+        accountRegister.id,
+        alias.reoccurrenceId,
+        aliasDayRange,
+      );
+
+      if (recurrenceMatch) {
+        log({
+          message: `Reoccurrence alias match for transaction: ${transaction.name}`,
+          data: {
+            transactionId: transaction.transaction_id,
+            existingEntryId: recurrenceMatch.id,
+            reoccurrenceId: alias.reoccurrenceId,
             accountRegisterId: accountRegister.id,
-            normalizedName,
           },
-        },
-      });
+          level: "debug",
+        });
 
-      if (alias) {
-        const recurrenceMatch = await this.findReoccurrenceRegisterEntryMatch(
-          transaction,
-          accountRegister.id,
-          alias.reoccurrenceId,
-          formattedAmount,
-          fuzzyDayRange,
-        );
-
-        if (recurrenceMatch) {
-          log({
-            message: `Reoccurrence alias match for transaction: ${transaction.name}`,
-            data: {
-              transactionId: transaction.transaction_id,
-              existingEntryId: recurrenceMatch.id,
-              reoccurrenceId: alias.reoccurrenceId,
-              accountRegisterId: accountRegister.id,
-            },
-            level: "debug",
-          });
-
-          return {
-            isMatched: true,
-            existingEntry: recurrenceMatch,
-            matchType: "reoccurrence",
-          };
-        }
+        return {
+          isMatched: true,
+          existingEntry: recurrenceMatch,
+          matchType: "reoccurrence",
+        };
       }
     }
 
-    // Then try exact match
     const exactMatch = await this.findExactTransactionMatch(
       transaction,
       accountRegister.id,
@@ -255,7 +371,6 @@ class TransactionMatchingService {
       };
     }
 
-    // Then try fuzzy match if enabled
     if (enableFuzzyMatching) {
       const fuzzyMatch = await this.findFuzzyTransactionMatch(
         transaction,
@@ -296,7 +411,7 @@ class TransactionMatchingService {
   async updateExistingTransaction(
     existingEntry: RegisterEntry,
     transaction: Transaction,
-    matchType: "exact" | "fuzzy" | "reoccurrence",
+    matchType: PlaidMatchType,
     accountType: AccountType,
   ): Promise<RegisterEntry> {
     const isPending = transaction.pending === true;
@@ -307,18 +422,18 @@ class TransactionMatchingService {
     const pendingStateChanged =
       Boolean(existingEntry.isPending) !== isPending;
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       plaidId: transaction.transaction_id,
       plaidJson: JSON.parse(JSON.stringify(transaction)),
       isPending,
       amount: formattedAmount,
       hasBalanceReCalc: true,
-      // Preserve existing description, don't overwrite with Plaid description
     };
 
     if (
       matchType === "fuzzy" ||
       matchType === "reoccurrence" ||
+      matchType === "ai" ||
       pendingStateChanged
     ) {
       updateData.createdAt = dateTimeService.toDate(
@@ -339,7 +454,7 @@ class TransactionMatchingService {
     transaction: Transaction,
     accountRegister: AccountRegister,
     accountType: AccountType,
-    transactionData: any,
+    transactionData: Record<string, unknown>,
   ): Promise<RegisterEntry> {
     return await this.db.registerEntry.create({
       data: transactionData,

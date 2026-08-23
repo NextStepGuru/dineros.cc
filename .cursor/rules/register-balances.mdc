@@ -21,6 +21,7 @@ alwaysApply: false
 
 - Accounts page (`account-registers.vue`): uses `reg.balance` (and forecast overlay when enabled).
 - Register page dropdown / future ledger: start from `latestBalance` (pockets adjusted via `calculateAdjustedBalance`).
+- Register ledger rows: running `displayBalance` < $1,000 gets a yellow cell tint; < $0 gets a red tint. Overlay is `background-image` on `td` so zebra striping and hover on `tr` stay intact (`register-row-balance-caution` / `register-row-balance-negative`).
 
 If balances look stale after new Plaid txns, check balance sync write path (`plaid-sync.mdc`), not forecast.
 

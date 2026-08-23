@@ -23,7 +23,8 @@ App (Nuxt) structure
 - Server (Nitro/H3)
   - app/server/api/: REST-like endpoints by path and method suffix (.get.ts, .post.ts, etc.)
   - app/server/lib/: server utilities (auth/mfa helpers, error handling, pagination, rate limit, queue manager, etc.)
-  - app/server/services/: domain services (Plaid, transaction matching, notifications, reconciliation, forecast/* modules)
+  - app/server/services/: domain services (Plaid, transaction matching, notifications, reconciliation / statement extract+match, forecast/* modules)
+  - Statement reconciliation: `.agent/logic/reconciliation.mdc`
   - app/server/clients/: prisma, redis, nats, postmark, openai
   - app/server/queues/: BullMQ queue definitions (backupQueue, plaidSync*, recalculateQueue)
   - app/server/cron/: nuxt-cron periodic jobs (plaid.daily, plaid-balance.hourly, recalculate.hourly, etc.)

@@ -244,7 +244,7 @@ section(class="px-3 sm:px-4 py-4 max-w-6xl mx-auto space-y-4")
           | Due {{ new Date(item.dueAt).toLocaleDateString() }} · {{ item.profile.register.name }}
         p(class="text-sm frog-text-muted")
           | Amount {{ formatMoney(item.amount) }} · Forecast after payment {{ formatMoney(item.projectedBalanceAfter) }}
-        p(v-if="item.projectedBalanceAfter < 0" class="text-sm text-red-500")
+        p(v-if="item.projectedBalanceAfter < 0" class="text-sm money-negative")
           | This payment may push balance below zero.
       .flex.flex-wrap.gap-1
         UButton(

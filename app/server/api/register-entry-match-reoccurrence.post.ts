@@ -5,7 +5,7 @@ import { registerEntrySchema, registerEntryMatchReoccurrenceSchema } from "~/sch
 import { getUser } from "../lib/getUser";
 import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { handleApiError } from "~/server/lib/handleApiError";
-import { normalizePlaidDescription } from "~/server/lib/normalizePlaidDescription";
+import { collectNormalizedPlaidDescriptionAliases } from "~/server/lib/normalizePlaidDescription";
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
@@ -57,8 +57,21 @@ export default defineEventHandler(async (event: H3Event) => {
       },
     });
 
-    const normalizedName = normalizePlaidDescription(entry.description);
-    if (!normalizedName) {
+    const plaidJson =
+      entry.plaidJson && typeof entry.plaidJson === "object"
+        ? (entry.plaidJson as Record<string, unknown>)
+        : null;
+    const normalizedNames = new Set<string>();
+    for (const alias of collectNormalizedPlaidDescriptionAliases(plaidJson)) {
+      normalizedNames.add(alias);
+    }
+    for (const alias of collectNormalizedPlaidDescriptionAliases({
+      name: entry.description,
+    })) {
+      normalizedNames.add(alias);
+    }
+
+    if (normalizedNames.size === 0) {
       throw createError({
         statusCode: 400,
         statusMessage: "Entry description is empty after normalization",
@@ -66,22 +79,24 @@ export default defineEventHandler(async (event: H3Event) => {
     }
 
     await PrismaDb.$transaction(async (tx) => {
-      await tx.reoccurrencePlaidNameAlias.upsert({
-        where: {
-          accountRegisterId_normalizedName: {
+      for (const normalizedName of normalizedNames) {
+        await tx.reoccurrencePlaidNameAlias.upsert({
+          where: {
+            accountRegisterId_normalizedName: {
+              accountRegisterId,
+              normalizedName,
+            },
+          },
+          create: {
             accountRegisterId,
             normalizedName,
+            reoccurrenceId,
           },
-        },
-        create: {
-          accountRegisterId,
-          normalizedName,
-          reoccurrenceId,
-        },
-        update: {
-          reoccurrenceId,
-        },
-      });
+          update: {
+            reoccurrenceId,
+          },
+        });
+      }
 
       await tx.registerEntry.update({
         where: { id: registerEntryId },

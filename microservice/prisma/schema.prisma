@@ -28,6 +28,19 @@ enum UserRole {
   ADMIN
 }
 
+enum ReconciliationPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum StatementLineMatchStatus {
+  unmatched
+  matched
+  statement_only
+  conflict
+  ignored
+}
+
 generator fieldEncryptionMigrations {
   provider     = "prisma-field-encryption"
   output       = "reencrypt"
@@ -49,9 +62,11 @@ model Account {
   accountInvites AccountInvite[]
   reoccurrences Reoccurrence[]
   registers     AccountRegister[]
-  budgets       Budget[]
-  categories    Category[]
-  snapshots     AccountSnapshot[]
+  budgets               Budget[]
+  categories            Category[]
+  snapshots             AccountSnapshot[]
+  merchantCategoryRules MerchantCategoryRule[]
+  reconciliationPeriods ReconciliationPeriod[]
 
   @@map("account")
 }
@@ -83,6 +98,7 @@ model User {
   accountInvitesSent AccountInvite[] @relation("AccountInviteInvitedBy")
   country    Country?      @relation(fields: [countryId], references: [id])
   plaidItems PlaidItem[]
+  reconciliationPeriodsClosed ReconciliationPeriod[]
 
   @@map("user")
 }
@@ -176,6 +192,7 @@ model Budget {
   account  Account           @relation(fields: [accountId], references: [id])
   accounts AccountRegister[]
   User     User?             @relation(fields: [userId], references: [id])
+  reconciliationPeriods ReconciliationPeriod[]
 
   @@map("budget")
 }
@@ -240,6 +257,7 @@ model AccountRegister {
   plaidNameAliases   ReoccurrencePlaidNameAlias[]
   children           AccountRegister[]             @relation("ar_children")
   snapshotRows       AccountRegisterSnapshot[]
+  reconciliationPeriods ReconciliationPeriod[]
 
   @@unique([collateralAssetRegisterId], map: "account_register_collateral_asset_unique")
   @@index([accountId, isArchived])
@@ -334,6 +352,8 @@ model RegisterEntry {
   plaidIdHash             String?  @map("plaid_id_hash") @db.VarChar(128) /// @encryption:hash(plaidId)?algorithm=sha512
   plaidJson               Json?    @map("plaid_json")
   categoryId              String?  @map("category_id")
+  categoryLocked          Boolean  @default(false) @map("category_locked")
+  categorySource          String?  @map("category_source") @db.VarChar(32)
   memo                    String?  @db.VarChar(500)
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -341,6 +361,9 @@ model RegisterEntry {
   reoccurrence Reoccurrence?      @relation(fields: [reoccurrenceId], references: [id])
   type         RegisterEntryType? @relation(fields: [typeId], references: [id])
   category     Category?          @relation(fields: [categoryId], references: [id])
+  reconciliationItems          ReconciliationItem[]
+  reconciliationClosingPeriods ReconciliationPeriod[] @relation("ReconciliationPeriodClosingEntry")
+  statementLines               StatementLine[]
 
   @@index([accountRegisterId, isBalanceEntry, isPending, updatedAt])
   @@index([accountRegisterId, isCleared, isProjected, isManualEntry])
@@ -377,8 +400,26 @@ model Category {
   reoccurrenceSplits  ReoccurrenceSplit[]
   accountRegistersPaymentDefault  AccountRegister[] @relation("AccountRegisterPaymentCategory")
   accountRegistersInterestDefault AccountRegister[] @relation("AccountRegisterInterestCategory")
+  merchantCategoryRules           MerchantCategoryRule[]
 
   @@map("category")
+}
+
+model MerchantCategoryRule {
+  id               String   @id @default(uuid())
+  accountId        String   @map("account_id")
+  merchantKey      String   @map("merchant_key") @db.VarChar(191)
+  merchantEntityId String?  @map("merchant_entity_id") @db.VarChar(191)
+  categoryId       String   @map("category_id")
+  applyMode        String   @map("apply_mode") @db.VarChar(16)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([accountId, merchantKey])
+  @@index([accountId, merchantEntityId])
+  @@map("merchant_category_rule")
 }
 
 model Reoccurrence {
@@ -524,4 +565,77 @@ model OpenAiRequestLog {
   @@index([createdAt])
   @@index([purpose])
   @@map("openai_request_log")
+}
+
+model ReconciliationPeriod {
+  id                       Int                        @id @default(autoincrement()) @db.UnsignedInt
+  accountId                String                     @map("account_id")
+  budgetId                 Int                        @map("budget_id") @db.UnsignedInt
+  accountRegisterId        Int                        @map("account_register_id") @db.UnsignedInt
+  status                   ReconciliationPeriodStatus @default(OPEN)
+  startDate                DateTime                   @map("start_date")
+  endDate                  DateTime                   @map("end_date")
+  statementOpeningBalance  Decimal                    @default(0) @map("statement_opening_balance") @db.Decimal(19, 2)
+  statementEndingBalance   Decimal                    @map("statement_ending_balance") @db.Decimal(19, 2)
+  statementIncomeTotal     Decimal?                   @map("statement_income_total") @db.Decimal(19, 2)
+  statementExpenseTotal    Decimal?                   @map("statement_expense_total") @db.Decimal(19, 2)
+  ledgerClearedBalance     Decimal?                   @map("ledger_cleared_balance") @db.Decimal(19, 2)
+  differenceAmount         Decimal?                   @map("difference_amount") @db.Decimal(19, 2)
+  closedAt                 DateTime?                  @map("closed_at")
+  closedByUserId           Int?                       @map("closed_by_user_id") @db.UnsignedInt
+  closingAdjustmentEntryId String?                    @map("closing_adjustment_entry_id")
+  closeNote                String?                    @map("close_note") @db.VarChar(500)
+  updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at")
+
+  account                Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  budget                 Budget               @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  register               AccountRegister      @relation(fields: [accountRegisterId], references: [id], onDelete: Cascade)
+  closedByUser           User?                @relation(fields: [closedByUserId], references: [id], onDelete: SetNull)
+  closingAdjustmentEntry RegisterEntry?       @relation("ReconciliationPeriodClosingEntry", fields: [closingAdjustmentEntryId], references: [id], onDelete: SetNull)
+  items                  ReconciliationItem[]
+  statementLines         StatementLine[]
+
+  @@index([budgetId, status, accountRegisterId], map: "reconciliation_period_budget_status_register_idx")
+  @@index([accountRegisterId, startDate, endDate], map: "reconciliation_period_register_window_idx")
+  @@map("reconciliation_period")
+}
+
+model StatementLine {
+  id                     Int                      @id @default(autoincrement()) @db.UnsignedInt
+  reconciliationPeriodId Int                      @map("reconciliation_period_id") @db.UnsignedInt
+  postedAt               DateTime                 @map("posted_at")
+  description            String                   @db.VarChar(1500) /// @encrypted
+  amount                 Decimal                  @db.Decimal(19, 2)
+  lineType               String?                  @map("line_type") @db.VarChar(64)
+  matchStatus            StatementLineMatchStatus @default(unmatched) @map("match_status")
+  registerEntryId        String?                  @map("register_entry_id")
+  matchConfidence        Decimal?                 @map("match_confidence") @db.Decimal(5, 4)
+  matchReason            String?                  @map("match_reason") @db.VarChar(500)
+  ignoredAt              DateTime?                @map("ignored_at")
+  sortIndex              Int                      @default(0) @map("sort_index")
+  updatedAt              DateTime                 @default(now()) @updatedAt @map("updated_at")
+
+  period        ReconciliationPeriod @relation(fields: [reconciliationPeriodId], references: [id], onDelete: Cascade)
+  registerEntry RegisterEntry?       @relation(fields: [registerEntryId], references: [id], onDelete: SetNull)
+
+  @@index([reconciliationPeriodId, matchStatus], map: "statement_line_period_status_idx")
+  @@index([registerEntryId], map: "statement_line_entry_idx")
+  @@map("statement_line")
+}
+
+model ReconciliationItem {
+  id                     Int       @id @default(autoincrement()) @db.UnsignedInt
+  reconciliationPeriodId Int       @map("reconciliation_period_id") @db.UnsignedInt
+  registerEntryId        String    @map("register_entry_id")
+  isCleared              Boolean   @default(false) @map("is_cleared")
+  clearedAt              DateTime? @map("cleared_at")
+  note                   String?   @db.VarChar(500)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  period        ReconciliationPeriod @relation(fields: [reconciliationPeriodId], references: [id], onDelete: Cascade)
+  registerEntry RegisterEntry        @relation(fields: [registerEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([reconciliationPeriodId, registerEntryId], map: "reconciliation_item_period_entry_uidx")
+  @@index([registerEntryId], map: "reconciliation_item_entry_idx")
+  @@map("reconciliation_item")
 }

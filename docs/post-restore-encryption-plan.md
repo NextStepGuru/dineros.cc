@@ -4,7 +4,7 @@
 
 - [scripts/dump-and-restore.sh](scripts/dump-and-restore.sh) runs `pnpm run reset-encrypted-users` after restore (calls [scripts/reset-encrypted-users-after-restore.ts](scripts/reset-encrypted-users-after-restore.ts)).
 - The reset script uses a **single** key (local only), so it cannot decrypt data encrypted with staging/production. It therefore **overwrites** values: User email/password → dev@local.dev, raw SQL to null Plaid columns, then manual `AccountRegister.name` → `Register-{id}` and `RegisterEntry.description` → `Entry {id}`. **Reoccurrence is not updated.**
-- [prisma/reencrypt/](prisma/reencrypt/) is **generated** by `prisma-field-encryption` and already implements migrate for **User, AccountRegister, RegisterEntry, Reoccurrence** (see [prisma/reencrypt/index.ts](prisma/reencrypt/index.ts)). The `Account` model has no encrypted fields in the schema, so "accounts" here means **account registers** (AccountRegister); no separate Account migrator exists.
+- [prisma/reencrypt/](prisma/reencrypt/) is **generated** by `prisma-field-encryption` and already implements migrate for **User, AccountRegister, RegisterEntry, Reoccurrence, StatementLine** (see [prisma/reencrypt/index.ts](prisma/reencrypt/index.ts)). The `Account` model has no encrypted fields in the schema, so "accounts" here means **account registers** (AccountRegister); no separate Account migrator exists.
 
 ## Goal
 

@@ -147,7 +147,7 @@ div(class="max-w-5xl mx-auto px-2")
       select#ia-source(
         v-model="sourceFilter"
         autocomplete="off"
-        class="block min-w-[160px] rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+        class="form-select-native min-w-[160px]"
       )
         option(value="all") All sources
         option(value="plaid") Plaid
@@ -161,14 +161,14 @@ div(class="max-w-5xl mx-auto px-2")
     UButton(color="primary" :loading="loading" @click="applyFilters") Apply
     UButton(variant="outline" @click="exportCsv") Export CSV
 
-  p(class="text-sm text-gray-500 mb-4")
+  p(class="text-sm frog-text-muted mb-4")
     | Plaid and OpenAI credential alerts (also emailed to ops when configured). Showing {{ items.length }} of {{ total }}.
 
   div(v-if="loading && items.length === 0" class="text-center py-8") Loading…
 
-  div(v-else class="overflow-x-auto border rounded-lg")
-    table(class="w-full text-sm text-left")
-      thead(class="bg-gray-100 dark:bg-gray-800")
+  div(v-else class="overflow-x-auto border border-default rounded-lg")
+    table.admin-log-table
+      thead
         tr
           th(class="p-2") Time
           th(class="p-2") Source
@@ -178,7 +178,7 @@ div(class="max-w-5xl mx-auto px-2")
           th(class="p-2") Details
       tbody
         template(v-for="row in items" :key="row.id")
-          tr(class="border-t border-gray-200 dark:border-gray-700 align-top")
+          tr
             td(class="p-2 whitespace-nowrap") {{ new Date(row.createdAt).toLocaleString() }}
             td(class="p-2") {{ row.source }}
             td(class="p-2") {{ row.kind }}
@@ -193,7 +193,7 @@ div(class="max-w-5xl mx-auto px-2")
               ) {{ expandedId === row.id ? "Hide" : "Show" }}
               span(v-else) —
           tr(v-if="expandedId === row.id && row.details != null")
-            td(colspan="6" class="p-2 bg-gray-50 dark:bg-gray-900")
+            td(colspan="6" class="row-detail")
               pre(class="text-xs overflow-x-auto whitespace-pre-wrap") {{ formatJson(row.details) }}
 
   div(class="flex justify-center gap-4 mt-6")

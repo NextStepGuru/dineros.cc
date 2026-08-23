@@ -2,7 +2,7 @@
 
 import type { PrismaClient, Reoccurrence } from '@prisma/client'
 import {
-  type ProgressReportCallback,
+  ProgressReportCallback,
   defaultProgressReport,
   visitRecords
 } from 'prisma-field-encryption/dist/generator/runtime'

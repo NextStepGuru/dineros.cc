@@ -13,6 +13,10 @@ import { addRecalculateJob } from "~/server/clients/queuesClient";
 import { dateTimeService } from "./forecast/DateTimeService";
 import TransactionMatchingService from "./TransactionMatchingService";
 import PlaidTransactionEnrichmentService from "./PlaidTransactionEnrichmentService";
+import PlaidTransactionMatchAiService, {
+  type PlaidAiMatchSuggestion,
+} from "./PlaidTransactionMatchAiService";
+import env from "~/server/env";
 import {
   sendPlaidSyncSummaryEmail,
   type RegisterSyncStatsRow,
@@ -84,12 +88,14 @@ class PlaidSyncService {
   client: PlaidApi;
   transactionMatcher: TransactionMatchingService;
   plaidEnrichment: PlaidTransactionEnrichmentService;
+  plaidMatchAi: PlaidTransactionMatchAiService;
 
   constructor(db: PrismaClient = PrismaDb as PrismaClient) {
     this.db = db;
     this.client = new PlaidApi(configuration);
     this.transactionMatcher = new TransactionMatchingService(db);
     this.plaidEnrichment = new PlaidTransactionEnrichmentService(db);
+    this.plaidMatchAi = new PlaidTransactionMatchAiService(db);
   }
 
   private async maybeAlertPlaidCredentialError(
@@ -158,6 +164,300 @@ class PlaidSyncService {
     };
   }
 
+  private async recategorizeUnlockedPlaidEntry(params: {
+    entry: { id: string; categoryId: string | null; categoryLocked?: boolean };
+    transaction: Transaction;
+    accountRegister: AccountRegister;
+    userId: number | null;
+  }): Promise<void> {
+    if (params.entry.categoryLocked) return;
+    const result = await this.plaidEnrichment.enrich({
+      transaction: params.transaction,
+      accountRegisterId: params.accountRegister.id,
+      accountId: params.accountRegister.accountId,
+      context: {
+        userId: params.userId,
+        accountRegisterId: params.accountRegister.id,
+        accountId: params.accountRegister.accountId,
+        plaidTransactionId: params.transaction.transaction_id,
+      },
+      updateDescription: false,
+    });
+    if (!result.categoryId || result.categoryId === params.entry.categoryId) {
+      return;
+    }
+    await this.db.registerEntry.update({
+      where: { id: params.entry.id },
+      data: {
+        categoryId: result.categoryId,
+        categorySource: result.categorySource ?? "ai",
+      },
+    });
+  }
+
+  private async buildTransactionDataForCreateWithAiSuggestion(
+    transaction: Transaction,
+    accountRegister: AccountRegister & { type: AccountType },
+    enrichmentUserId: number | null,
+    suggestion?: PlaidAiMatchSuggestion,
+  ) {
+    if (suggestion) {
+      const classified = await this.buildTransactionDataForCreate(
+        transaction,
+        accountRegister,
+        enrichmentUserId,
+      );
+      return {
+        ...classified,
+        description: suggestion.displayName || classified.description,
+      };
+    }
+    return this.buildTransactionDataForCreate(
+      transaction,
+      accountRegister,
+      enrichmentUserId,
+    );
+  }
+
+  private async tryDeterministicPlaidMatch(
+    transaction: Transaction,
+    accountRegister: AccountRegister & { type: AccountType },
+    enrichmentUserId: number | null = null,
+  ): Promise<"skip" | "matched" | "unmatched"> {
+    const matchResult = await this.transactionMatcher.matchTransaction(
+      transaction,
+      accountRegister,
+      accountRegister.type,
+    );
+
+    if (matchResult.matchType === "skip") {
+      log({
+        message: `Skipping existing Plaid transaction: ${transactionDisplayLabel(transaction)}`,
+        data: {
+          transactionId: transaction.transaction_id,
+          accountRegisterId: accountRegister.id,
+        },
+        level: "debug",
+      });
+      return "skip";
+    }
+
+    if (
+      matchResult.isMatched &&
+      matchResult.existingEntry &&
+      matchResult.matchType !== "none"
+    ) {
+      await this.transactionMatcher.updateExistingTransaction(
+        matchResult.existingEntry,
+        transaction,
+        matchResult.matchType,
+        accountRegister.type,
+      );
+      await this.recategorizeUnlockedPlaidEntry({
+        entry: matchResult.existingEntry,
+        transaction,
+        accountRegister,
+        userId: enrichmentUserId,
+      });
+      log({
+        message: `Matched existing transaction: ${transactionDisplayLabel(transaction)}`,
+        data: {
+          transactionId: transaction.transaction_id,
+          matchType: matchResult.matchType,
+          accountRegisterId: accountRegister.id,
+        },
+        level: "info",
+      });
+      return "matched";
+    }
+
+    return "unmatched";
+  }
+
+  private async applyAiMatchSuggestion(
+    transaction: Transaction,
+    accountRegister: AccountRegister & { type: AccountType },
+    suggestion: PlaidAiMatchSuggestion | undefined,
+    enrichmentUserId: number | null,
+  ): Promise<{ newDelta: number; matchedDelta: number }> {
+    const minConf = env?.OPENAI_PLAID_MATCH_MIN_CONFIDENCE ?? 0.7;
+
+    if (
+      suggestion &&
+      suggestion.confidence >= minConf &&
+      suggestion.entryId
+    ) {
+      const entry = await this.db.registerEntry.findFirst({
+        where: {
+          id: suggestion.entryId,
+          accountRegisterId: accountRegister.id,
+        },
+      });
+      if (entry) {
+        await this.transactionMatcher.updateExistingTransaction(
+          entry,
+          transaction,
+          "ai",
+          accountRegister.type,
+        );
+        if (entry.reoccurrenceId != null) {
+          await this.transactionMatcher.upsertPlaidNameAliasesForReoccurrence(
+            accountRegister.id,
+            entry.reoccurrenceId,
+            [transaction],
+          );
+        }
+        await this.recategorizeUnlockedPlaidEntry({
+          entry,
+          transaction,
+          accountRegister,
+          userId: enrichmentUserId,
+        });
+        log({
+          message: `AI matched transaction to entry: ${transactionDisplayLabel(transaction)}`,
+          data: {
+            transactionId: transaction.transaction_id,
+            entryId: entry.id,
+            confidence: suggestion.confidence,
+            accountRegisterId: accountRegister.id,
+          },
+          level: "info",
+        });
+        return { newDelta: 0, matchedDelta: 1 };
+      }
+    }
+
+    if (
+      suggestion &&
+      suggestion.confidence >= minConf &&
+      suggestion.reoccurrenceId != null
+    ) {
+      const reoccurrence = await this.db.reoccurrence.findFirst({
+        where: {
+          id: suggestion.reoccurrenceId,
+          accountRegisterId: accountRegister.id,
+        },
+      });
+      if (reoccurrence) {
+        const linked =
+          await this.transactionMatcher.findReoccurrenceEntryForLink(
+            transaction,
+            accountRegister.id,
+            suggestion.reoccurrenceId,
+          );
+        if (linked) {
+          await this.transactionMatcher.updateExistingTransaction(
+            linked,
+            transaction,
+            "ai",
+            accountRegister.type,
+          );
+          await this.db.registerEntry.update({
+            where: { id: linked.id },
+            data: { reoccurrenceId: suggestion.reoccurrenceId },
+          });
+          await this.recategorizeUnlockedPlaidEntry({
+            entry: linked,
+            transaction,
+            accountRegister,
+            userId: enrichmentUserId,
+          });
+        } else {
+          const base = this.formatTransactionData(
+            transaction,
+            accountRegister,
+            accountRegister.type,
+          );
+          const categoryId =
+            suggestion.categoryId ?? reoccurrence.categoryId ?? undefined;
+          await this.transactionMatcher.createNewTransaction(
+            transaction,
+            accountRegister,
+            accountRegister.type,
+            {
+              ...base,
+              description: reoccurrence.description ?? suggestion.displayName,
+              reoccurrenceId: suggestion.reoccurrenceId,
+              categoryLocked: false,
+              ...(categoryId
+                ? { categoryId, categorySource: "recurrence" }
+                : {}),
+            },
+          );
+        }
+        await this.transactionMatcher.upsertPlaidNameAliasesForReoccurrence(
+          accountRegister.id,
+          suggestion.reoccurrenceId,
+          [transaction],
+        );
+        log({
+          message: `AI matched transaction to recurrence: ${transactionDisplayLabel(transaction)}`,
+          data: {
+            transactionId: transaction.transaction_id,
+            reoccurrenceId: suggestion.reoccurrenceId,
+            confidence: suggestion.confidence,
+            accountRegisterId: accountRegister.id,
+          },
+          level: "info",
+        });
+        return linked
+          ? { newDelta: 0, matchedDelta: 1 }
+          : { newDelta: 1, matchedDelta: 0 };
+      }
+    }
+
+    const transactionData =
+      await this.buildTransactionDataForCreateWithAiSuggestion(
+        transaction,
+        accountRegister,
+        enrichmentUserId,
+        suggestion,
+      );
+    await this.transactionMatcher.createNewTransaction(
+      transaction,
+      accountRegister,
+      accountRegister.type,
+      transactionData,
+    );
+    return { newDelta: 1, matchedDelta: 0 };
+  }
+
+  private async processUnmatchedTransactionsWithAi(
+    unmatched: Transaction[],
+    accountRegister: AccountRegister & { type: AccountType },
+    enrichmentUserId: number | null,
+  ): Promise<{ newCount: number; matchedCount: number }> {
+    if (unmatched.length === 0) {
+      return { newCount: 0, matchedCount: 0 };
+    }
+
+    const aiResults = await this.plaidMatchAi.matchBatch({
+      transactions: unmatched,
+      accountRegister,
+      accountType: accountRegister.type,
+      context: {
+        userId: enrichmentUserId,
+        accountRegisterId: accountRegister.id,
+        accountId: accountRegister.accountId,
+      },
+    });
+
+    let newCount = 0;
+    let matchedCount = 0;
+    for (const transaction of unmatched) {
+      const suggestion = aiResults.get(transaction.transaction_id);
+      const { newDelta, matchedDelta } = await this.applyAiMatchSuggestion(
+        transaction,
+        accountRegister,
+        suggestion,
+        enrichmentUserId,
+      );
+      newCount += newDelta;
+      matchedCount += matchedDelta;
+    }
+    return { newCount, matchedCount };
+  }
+
   private async buildTransactionDataForCreate(
     transaction: Transaction,
     accountRegister: AccountRegister & { type: AccountType },
@@ -168,7 +468,7 @@ class PlaidSyncService {
       accountRegister,
       accountRegister.type,
     );
-    const { description, categoryId } = await this.plaidEnrichment.enrich({
+    const { description, categoryId, categorySource } = await this.plaidEnrichment.enrich({
       transaction,
       accountRegisterId: accountRegister.id,
       accountId: accountRegister.accountId,
@@ -182,7 +482,10 @@ class PlaidSyncService {
     return {
       ...base,
       description,
-      ...(categoryId ? { categoryId } : {}),
+      categoryLocked: false,
+      ...(categoryId
+        ? { categoryId, categorySource: categorySource ?? "ai" }
+        : {}),
     };
   }
 
@@ -200,6 +503,7 @@ class PlaidSyncService {
   private async tryPlaidPostedPendingUpdateInPlace(
     transaction: Transaction,
     accountRegister: AccountRegister & { type: AccountType },
+    enrichmentUserId: number | null = null,
   ): Promise<boolean> {
     const postedPendingId = pendingTransactionIdIfPosted(transaction);
     if (!postedPendingId) return false;
@@ -216,6 +520,12 @@ class PlaidSyncService {
         "exact",
         accountRegister.type,
       );
+      await this.recategorizeUnlockedPlaidEntry({
+        entry: existingPendingRow,
+        transaction,
+        accountRegister,
+        userId: enrichmentUserId,
+      });
       log({
         message: "Plaid pending→posted: updated register entry in place",
         data: {
@@ -240,71 +550,6 @@ class PlaidSyncService {
     return false;
   }
 
-  private async matchOrCreatePlaidTransactionForRegister(
-    transaction: Transaction,
-    accountRegister: AccountRegister & { type: AccountType },
-    userIdByAccountId: Map<string, number>,
-  ): Promise<{ newDelta: number; matchedDelta: number }> {
-    const matchResult = await this.transactionMatcher.matchTransaction(
-      transaction,
-      accountRegister,
-      accountRegister.type,
-    );
-
-    if (matchResult.matchType === "skip") {
-      log({
-        message: `Skipping existing Plaid transaction: ${transactionDisplayLabel(transaction)}`,
-        data: {
-          transactionId: transaction.transaction_id,
-          accountRegisterId: accountRegister.id,
-        },
-        level: "debug",
-      });
-      return { newDelta: 0, matchedDelta: 0 };
-    }
-
-    if (
-      matchResult.isMatched &&
-      matchResult.existingEntry &&
-      matchResult.matchType !== "none"
-    ) {
-      await this.transactionMatcher.updateExistingTransaction(
-        matchResult.existingEntry,
-        transaction,
-        matchResult.matchType,
-        accountRegister.type,
-      );
-      log({
-        message: `Matched existing transaction: ${transactionDisplayLabel(transaction)}`,
-        data: {
-          transactionId: transaction.transaction_id,
-          matchType: matchResult.matchType,
-          accountRegisterId: accountRegister.id,
-        },
-        level: "info",
-      });
-      return { newDelta: 0, matchedDelta: 1 };
-    }
-
-    const enrichmentUserId =
-      userIdByAccountId.get(accountRegister.accountId) ?? null;
-    const transactionData = await this.buildTransactionDataForCreate(
-      transaction,
-      accountRegister,
-      enrichmentUserId,
-    );
-    await this.transactionMatcher.createNewTransaction(
-      transaction,
-      accountRegister,
-      accountRegister.type,
-      transactionData,
-    );
-    return { newDelta: 1, matchedDelta: 0 };
-  }
-
-  /**
-   * Syncs transactions for a single account register
-   */
   private async syncTransactionsForAccount(
     accountRegister: AccountRegister & { type: AccountType },
     transactions: Transaction[],
@@ -313,12 +558,16 @@ class PlaidSyncService {
     let newCount = 0;
     let matchedCount = 0;
     const errors: string[] = [];
+    const unmatched: Transaction[] = [];
 
     const pendingIdsSuperseded = new Set<string>();
     for (const t of transactions) {
       const pid = pendingTransactionIdIfPosted(t);
       if (pid) pendingIdsSuperseded.add(pid);
     }
+
+    const enrichmentUserId =
+      userIdByAccountId.get(accountRegister.accountId) ?? null;
 
     for (const transaction of transactions) {
       try {
@@ -344,22 +593,46 @@ class PlaidSyncService {
           await this.tryPlaidPostedPendingUpdateInPlace(
             transaction,
             accountRegister,
+            enrichmentUserId,
           )
         ) {
           matchedCount++;
           continue;
         }
 
-        const { newDelta, matchedDelta } =
-          await this.matchOrCreatePlaidTransactionForRegister(
-            transaction,
-            accountRegister,
-            userIdByAccountId,
-          );
-        newCount += newDelta;
-        matchedCount += matchedDelta;
+        const outcome = await this.tryDeterministicPlaidMatch(
+          transaction,
+          accountRegister,
+          enrichmentUserId,
+        );
+        if (outcome === "skip") continue;
+        if (outcome === "matched") {
+          matchedCount++;
+          continue;
+        }
+        unmatched.push(transaction);
       } catch (error) {
         const errorMsg = `Failed to process transaction ${transaction.transaction_id}: ${error}`;
+        errors.push(errorMsg);
+        log({
+          message: errorMsg,
+          data: { error },
+          level: "error",
+        });
+      }
+    }
+
+    if (unmatched.length > 0) {
+      try {
+        const aiResult = await this.processUnmatchedTransactionsWithAi(
+          unmatched,
+          accountRegister,
+          enrichmentUserId,
+        );
+        newCount += aiResult.newCount;
+        matchedCount += aiResult.matchedCount;
+      } catch (error) {
+        const errorMsg = `Failed AI match batch for register ${accountRegister.id}: ${error}`;
         errors.push(errorMsg);
         log({
           message: errorMsg,
@@ -536,6 +809,8 @@ class PlaidSyncService {
         end_date: endDate,
         options: {
           account_ids: plaidAccountIds,
+          include_personal_finance_category: true,
+          include_original_description: true,
         },
       });
     } catch (err) {
@@ -720,6 +995,10 @@ class PlaidSyncService {
       const response = await this.client.transactionsSync({
         access_token: accessToken,
         cursor: cursor || undefined,
+        options: {
+          include_personal_finance_category: true,
+          include_original_description: true,
+        },
       });
       return response.data as {
         added: Transaction[];
@@ -740,9 +1019,9 @@ class PlaidSyncService {
   private async applySyncItemAddedTransaction(
     tx: Transaction,
     ar: AccountRegister & { type: AccountType },
-    itemOwnerUserId: number | null,
+    _itemOwnerUserId: number | null,
     bumpRegister: (_id: number, _kind: "new" | "updated") => void,
-  ): Promise<void> {
+  ): Promise<"handled" | "unmatched"> {
     const postedPendingId = pendingTransactionIdIfPosted(tx);
     if (postedPendingId) {
       const existingPendingRow = await this.db.registerEntry.findFirst({
@@ -758,6 +1037,12 @@ class PlaidSyncService {
           "exact",
           ar.type,
         );
+        await this.recategorizeUnlockedPlaidEntry({
+          entry: existingPendingRow,
+          transaction: tx,
+          accountRegister: ar,
+          userId: _itemOwnerUserId,
+        });
         bumpRegister(ar.id, "updated");
         log({
           message:
@@ -769,7 +1054,7 @@ class PlaidSyncService {
           },
           level: "info",
         });
-        return;
+        return "handled";
       }
       log({
         message:
@@ -783,38 +1068,17 @@ class PlaidSyncService {
       });
     }
 
-    const matchResult = await this.transactionMatcher.matchTransaction(
+    const outcome = await this.tryDeterministicPlaidMatch(
       tx,
       ar,
-      ar.type,
+      _itemOwnerUserId,
     );
-    if (matchResult.matchType === "skip") return;
-    if (
-      matchResult.isMatched &&
-      matchResult.existingEntry &&
-      matchResult.matchType !== "none"
-    ) {
-      await this.transactionMatcher.updateExistingTransaction(
-        matchResult.existingEntry,
-        tx,
-        matchResult.matchType,
-        ar.type,
-      );
+    if (outcome === "skip") return "handled";
+    if (outcome === "matched") {
       bumpRegister(ar.id, "updated");
-      return;
+      return "handled";
     }
-    const transactionData = await this.buildTransactionDataForCreate(
-      tx,
-      ar,
-      itemOwnerUserId,
-    );
-    await this.transactionMatcher.createNewTransaction(
-      tx,
-      ar,
-      ar.type,
-      transactionData,
-    );
-    bumpRegister(ar.id, "new");
+    return "unmatched";
   }
 
   private async processTransactionsSyncPageAdded(
@@ -827,22 +1091,59 @@ class PlaidSyncService {
     bumpRegister: (_id: number, _kind: "new" | "updated") => void,
     itemSyncErrors: string[],
   ): Promise<void> {
+    const unmatchedByRegister = new Map<
+      number,
+      {
+        register: AccountRegister & { type: AccountType };
+        transactions: Transaction[];
+      }
+    >();
+
     for (const tx of added) {
       const ar = registerByPlaidAccountId.get(tx.account_id);
       if (!ar) continue;
       try {
-        await this.applySyncItemAddedTransaction(
+        const result = await this.applySyncItemAddedTransaction(
           tx,
           ar,
           itemOwnerUserId,
           bumpRegister,
         );
+        if (result === "unmatched") {
+          let bucket = unmatchedByRegister.get(ar.id);
+          if (!bucket) {
+            bucket = { register: ar, transactions: [] };
+            unmatchedByRegister.set(ar.id, bucket);
+          }
+          bucket.transactions.push(tx);
+        }
       } catch (err) {
         const msg = `added ${tx.transaction_id}: ${err instanceof Error ? err.message : String(err)}`;
         itemSyncErrors.push(msg);
         log({
           message: "syncItemWithTransactionsSync added error",
           data: { tx: tx.transaction_id, err },
+          level: "error",
+        });
+      }
+    }
+
+    for (const { register, transactions } of unmatchedByRegister.values()) {
+      try {
+        const { newCount, matchedCount } =
+          await this.processUnmatchedTransactionsWithAi(
+            transactions,
+            register,
+            itemOwnerUserId,
+          );
+        if (newCount > 0) bumpRegister(register.id, "new");
+        if (matchedCount > 0) bumpRegister(register.id, "updated");
+      } catch (err) {
+        const msg = `added AI batch register ${register.id}: ${err instanceof Error ? err.message : String(err)}`;
+        itemSyncErrors.push(msg);
+        log({
+          message: "syncItemWithTransactionsSync added AI batch error",
+          data: { accountRegisterId: register.id, err },
           level: "error",
         });
       }
@@ -857,6 +1158,7 @@ class PlaidSyncService {
     >,
     bumpRegister: (_id: number, _kind: "new" | "updated") => void,
     itemSyncErrors: string[],
+    itemOwnerUserId: number | null,
   ): Promise<void> {
     for (const tx of modified) {
       const ar = registerByPlaidAccountId.get(tx.account_id);
@@ -872,6 +1174,12 @@ class PlaidSyncService {
             "exact",
             ar.type,
           );
+          await this.recategorizeUnlockedPlaidEntry({
+            entry: existing,
+            transaction: tx,
+            accountRegister: ar,
+            userId: itemOwnerUserId,
+          });
           bumpRegister(ar.id, "updated");
         }
       } catch (err) {
@@ -1013,6 +1321,7 @@ class PlaidSyncService {
           registerByPlaidAccountId,
           bumpRegister,
           itemSyncErrors,
+          itemOwnerUserId,
         );
         await this.syncItemApplyRemovedTransactions(
           data.removed,

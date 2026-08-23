@@ -37,7 +37,14 @@ UFooter(class="max-sm:hidden border-t border-default")
       icon="i-simple-icons-x"
       color="neutral"
       variant="ghost"
-      to="https://x.com/dineroscc"
+      to="https://x.com/NextStepGuru"
       target="_blank"
       aria-label="X")
+    UButton(
+      icon="i-simple-icons-instagram"
+      color="neutral"
+      variant="ghost"
+      to="https://www.instagram.com/jeremydeyoung/"
+      target="_blank"
+      aria-label="Instagram")
 </template>
