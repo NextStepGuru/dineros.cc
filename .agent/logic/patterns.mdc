@@ -12,6 +12,9 @@ TypeScript and style
 - TypeScript everywhere; keep strictness aligned with repo configs
 - Follow existing patterns in the file you edit; prefer small, focused changes
 
+Frontend forms
+- LastPass may fill only `/login` and `/signup` (`data-lp-allow` on those `UForm`s). All other forms are blocked by `app/plugins/disable-lastpass.client.ts`; do not add per-field ignore attrs on new forms.
+
 API endpoints (app/server/api)
 - File naming encodes HTTP method: foo.get.ts, bar.post.ts, item/[id].patch.ts, etc.
 - Validate input with Zod (app/schema/zod.ts or feature-specific schema files under app/schema/)

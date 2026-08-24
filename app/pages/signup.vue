@@ -194,7 +194,7 @@ const handleSubmit = async ({
       title="Create your account"
       subtitle="Build your first predictive budget in minutes."
     )
-      UForm(:state="formState" :schema="signupSchema" class="auth-form" @submit.prevent="handleSubmit" @error="onFormError" :disabled="isSaving")
+      UForm(:state="formState" :schema="signupSchema" class="auth-form" data-lp-allow="true" @submit.prevent="handleSubmit" @error="onFormError" :disabled="isSaving")
         UFormField(label="First Name" for="firstName")
           UInput(
             id="firstName"

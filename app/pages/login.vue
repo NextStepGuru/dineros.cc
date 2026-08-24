@@ -283,7 +283,7 @@ async function startPasskeySignIn() {
         title="Welcome back"
         subtitle="Sign in to continue forecasting, tracking, and planning with confidence."
       )
-        UForm(class="auth-form" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
+        UForm(class="auth-form" data-lp-allow="true" :schema="loginSchema" @submit.prevent="handleSubmit" :state="formState" @error="onFormError($event)" :disabled="isSaving")
           UFormField(v-if="tokenChallengeRequired" label="Verification method" for="mfaMethod")
             select(
               id="mfaMethod"

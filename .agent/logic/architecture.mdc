@@ -17,6 +17,7 @@ App (Nuxt) structure
   - app/components/: shared UI and complex modals (EditRegisterEntry, EditReoccurrence, BudgetManager, etc.)
   - app/layouts/, app/app.vue: layouts and app shell
   - app/assets/css/main.css: Tailwind/utilities
+  - app/plugins/disable-lastpass.client.ts: block LastPass on all forms except login/signup (`data-lp-allow`)
 - State & composables
   - app/stores/: Pinia stores (authStore, listStore)
   - app/composables/: useAPI, useSnapshotMode, useCategoryReports, etc.

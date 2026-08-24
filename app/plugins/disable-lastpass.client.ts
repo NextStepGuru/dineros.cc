@@ -1,145 +1,204 @@
+import {
+  LAST_PASS_ALLOW_PAGE_ATTR,
+  LAST_PASS_FORM_PREVENTION_ATTRS,
+  LAST_PASS_PREVENTION_ATTRS,
+  LAST_PASS_READONLY_ATTR,
+  isLastPassAllowlistedElement,
+  isLastPassAllowlistedPath,
+} from "~/composables/useLastPassPrevention";
+
+const FIELD_SELECTOR = "input, textarea, select";
+const SKIP_READONLY_TYPES = new Set([
+  "hidden",
+  "checkbox",
+  "radio",
+  "file",
+  "submit",
+  "button",
+  "reset",
+  "image",
+  "range",
+  "color",
+]);
+
+const previousValues = new WeakMap<
+  HTMLInputElement | HTMLTextAreaElement,
+  string
+>();
+const unlockedFields = new WeakSet<HTMLInputElement | HTMLTextAreaElement>();
+
+function applyAttrs(el: Element, attrs: Record<string, string>): void {
+  for (const [key, value] of Object.entries(attrs)) {
+    if (el.getAttribute(key) !== value) {
+      el.setAttribute(key, value);
+    }
+  }
+}
+
+function isTextField(
+  el: Element,
+): el is HTMLInputElement | HTMLTextAreaElement {
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+}
+
+function snapshotValue(el: HTMLInputElement | HTMLTextAreaElement): void {
+  previousValues.set(el, el.value);
+}
+
+function lockUntilGesture(el: HTMLInputElement | HTMLTextAreaElement): void {
+  if (unlockedFields.has(el) || el.disabled) {
+    return;
+  }
+  if (el instanceof HTMLInputElement && SKIP_READONLY_TYPES.has(el.type)) {
+    return;
+  }
+  if (el.readOnly) {
+    return;
+  }
+  el.readOnly = true;
+  el.setAttribute(LAST_PASS_READONLY_ATTR, "true");
+}
+
+function unlockField(el: Element): void {
+  if (!isTextField(el) || isLastPassAllowlistedElement(el)) {
+    return;
+  }
+  if (!el.hasAttribute(LAST_PASS_READONLY_ATTR)) {
+    return;
+  }
+  snapshotValue(el);
+  el.readOnly = false;
+  el.removeAttribute(LAST_PASS_READONLY_ATTR);
+  unlockedFields.add(el);
+}
+
+function protectField(el: Element): void {
+  if (
+    !(
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement
+    )
+  ) {
+    return;
+  }
+  if (isLastPassAllowlistedElement(el)) {
+    return;
+  }
+  applyAttrs(el, LAST_PASS_PREVENTION_ATTRS);
+  if (isTextField(el)) {
+    snapshotValue(el);
+    lockUntilGesture(el);
+  }
+}
+
+function protectForm(form: HTMLFormElement): void {
+  if (isLastPassAllowlistedElement(form)) {
+    return;
+  }
+  applyAttrs(form, LAST_PASS_FORM_PREVENTION_ATTRS);
+}
+
+function processTree(root: ParentNode): void {
+  if (root instanceof Element) {
+    protectField(root);
+    if (root instanceof HTMLFormElement) {
+      protectForm(root);
+    }
+  }
+  root.querySelectorAll(FIELD_SELECTOR).forEach((node) => {
+    protectField(node);
+  });
+  root.querySelectorAll("form").forEach((form) => {
+    protectForm(form);
+  });
+}
+
+function syncAllowPage(path: string): void {
+  if (isLastPassAllowlistedPath(path)) {
+    document.documentElement.setAttribute(LAST_PASS_ALLOW_PAGE_ATTR, "true");
+  } else {
+    document.documentElement.removeAttribute(LAST_PASS_ALLOW_PAGE_ATTR);
+  }
+}
+
+function onUntrustedFill(event: Event): void {
+  const el = event.target;
+  if (!isTextField(el) || isLastPassAllowlistedElement(el)) {
+    return;
+  }
+  if (event.isTrusted) {
+    snapshotValue(el);
+    return;
+  }
+  event.stopImmediatePropagation();
+  const previous = previousValues.get(el);
+  if (previous !== undefined) {
+    el.value = previous;
+  }
+}
+
+function onTrustedUnlock(event: Event): void {
+  if (!event.isTrusted) {
+    return;
+  }
+  const el = event.target;
+  if (el instanceof Element) {
+    unlockField(el);
+  }
+}
+
 export default defineNuxtPlugin(() => {
-  // Only run on client side
-  if (import.meta.client) {
-    // Function to disable LastPass and autocomplete for an element
-    const disableLastPass = (element: HTMLElement) => {
-      if (
-        element.tagName === "INPUT" ||
-        element.tagName === "TEXTAREA" ||
-        element.tagName === "SELECT"
-      ) {
-        // Set autocomplete to off
-        element.setAttribute("autocomplete", "off");
+  const route = useRoute();
+  const router = useRouter();
 
-        // Set LastPass ignore attributes
-        element.setAttribute("data-lpignore", "true");
-        element.setAttribute("data-form-type", "other");
+  syncAllowPage(route.path);
+  processTree(document);
 
-        // Additional LastPass prevention
-        element.setAttribute("data-lastpass-ignore", "true");
-        element.setAttribute("data-1p-ignore", "true");
+  document.addEventListener("input", onUntrustedFill, true);
+  document.addEventListener("change", onUntrustedFill, true);
+  document.addEventListener("pointerdown", onTrustedUnlock, true);
+  document.addEventListener("focusin", onTrustedUnlock, true);
 
-        // Disable browser autocomplete
-        element.setAttribute("autocorrect", "off");
-        element.setAttribute("autocapitalize", "off");
-        element.setAttribute("spellcheck", "false");
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "attributes" && mutation.target instanceof Element) {
+        protectField(mutation.target);
+        if (mutation.target instanceof HTMLFormElement) {
+          protectForm(mutation.target);
+        }
+        continue;
       }
-
-      // Handle UInput components by finding their internal input elements
-      // UInput components often have specific class names or data attributes
-      const uInputs = element.querySelectorAll(
-        "[data-1p-ignore], [data-lpignore], .u-input input, .u-input textarea, .u-input select"
-      );
-      uInputs.forEach((input) => {
-        input.setAttribute("autocomplete", "off");
-        input.setAttribute("data-lpignore", "true");
-        input.setAttribute("data-form-type", "other");
-        input.setAttribute("data-lastpass-ignore", "true");
-        input.setAttribute("data-1p-ignore", "true");
-        input.setAttribute("autocorrect", "off");
-        input.setAttribute("autocapitalize", "off");
-        input.setAttribute("spellcheck", "false");
-      });
-    };
-
-    // Function to process all existing inputs
-    const processExistingInputs = () => {
-      const inputs = document.querySelectorAll("input, textarea, select");
-      inputs.forEach(disableLastPass);
-
-      // Also specifically target UInput components
-      const uInputComponents = document.querySelectorAll(
-        '[class*="u-input"], [class*="UInput"], [class*="ui-input"], [class*="form-input"]'
-      );
-      uInputComponents.forEach((component) => {
-        const internalInputs = component.querySelectorAll(
-          "input, textarea, select"
-        );
-        internalInputs.forEach((input) => {
-          input.setAttribute("autocomplete", "off");
-          input.setAttribute("data-lpignore", "true");
-          input.setAttribute("data-form-type", "other");
-          input.setAttribute("data-lastpass-ignore", "true");
-          input.setAttribute("data-1p-ignore", "true");
-          input.setAttribute("autocorrect", "off");
-          input.setAttribute("autocapitalize", "off");
-          input.setAttribute("spellcheck", "false");
-        });
-      });
-
-      // Additional targeting for any input that might be missed
-      const allInputs = document.querySelectorAll("input, textarea, select");
-      allInputs.forEach((input) => {
-        // Check if this input doesn't already have the attributes
-        if (!input.hasAttribute("data-lpignore")) {
-          input.setAttribute("autocomplete", "off");
-          input.setAttribute("data-lpignore", "true");
-          input.setAttribute("data-form-type", "other");
-          input.setAttribute("data-lastpass-ignore", "true");
-          input.setAttribute("data-1p-ignore", "true");
-          input.setAttribute("autocorrect", "off");
-          input.setAttribute("autocapitalize", "off");
-          input.setAttribute("spellcheck", "false");
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof Element) {
+          processTree(node);
         }
       });
-    };
+    }
+  });
 
-    // Function to process forms
-    const processForms = () => {
-      const forms = document.querySelectorAll("form");
-      forms.forEach((form) => {
-        form.setAttribute("autocomplete", "off");
-        form.setAttribute("data-lpignore", "true");
-        form.setAttribute("data-form-type", "other");
+  const observeBody = () => {
+    if (document.body) {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["readonly", "autocomplete", "data-lpignore"],
       });
-    };
-
-    // Process existing elements immediately
-    processExistingInputs();
-    processForms();
-
-    // Watch for new elements being added to the DOM
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as HTMLElement;
-
-            // Process the added element
-            disableLastPass(element);
-
-            // Process any child inputs
-            const childInputs = element.querySelectorAll(
-              "input, textarea, select"
-            );
-            childInputs.forEach(disableLastPass);
-
-            // Process any child forms
-            const childForms = element.querySelectorAll("form");
-            childForms.forEach((form) => {
-              form.setAttribute("autocomplete", "off");
-              form.setAttribute("data-lpignore", "true");
-              form.setAttribute("data-form-type", "other");
-            });
-          }
-        });
-      });
-    });
-
-    // Start observing
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    // Also run on route changes for SPA navigation
-    const router = useRouter();
-    router.afterEach(() => {
-      // Small delay to ensure DOM is updated
-      setTimeout(() => {
-        processExistingInputs();
-        processForms();
-      }, 100);
+    }
+  };
+  observeBody();
+  if (!document.body) {
+    document.addEventListener("DOMContentLoaded", () => {
+      observeBody();
+      processTree(document);
     });
   }
+
+  router.afterEach((to) => {
+    syncAllowPage(to.path);
+    requestAnimationFrame(() => {
+      processTree(document);
+    });
+  });
 });

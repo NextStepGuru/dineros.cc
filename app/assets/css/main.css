@@ -755,6 +755,12 @@ input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s !important;
 }
 
+/* LastPass injects icons at document root; hide them except on login/signup. */
+html:not([data-lp-allow-page]) [data-lastpass-icon-root],
+html:not([data-lp-allow-page]) [id^="__lpform_"] {
+  display: none !important;
+}
+
 [data-slot="overlay"]:not([data-vaul-overlay]) {
   z-index: 40;
 }
