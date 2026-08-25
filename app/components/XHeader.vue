@@ -271,12 +271,12 @@ const guestNavItems = computed(() => [
   },
 ]);
 
-// Logout: navigate while session is still valid, then clear auth (logout-first can strand on protected route)
+// Clear session first so guest middleware on `/` does not bounce back into the app
 async function logout() {
   clearInterval(poller);
   poller = undefined;
-  await navigateTo("/");
   await authStore.logout();
+  await navigateTo("/");
 }
 
 async function pollData() {

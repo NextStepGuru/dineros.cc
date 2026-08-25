@@ -1,3 +1,6 @@
+import { getPostLoginRedirect } from "~/lib/auth";
+import { readWorkflowModeFromStorage } from "~/lib/workflowMode";
+
 export default defineNuxtRouteMiddleware(() => {
   const authStore = useAuthStore();
   const config = useRuntimeConfig();
@@ -24,6 +27,11 @@ export default defineNuxtRouteMiddleware(() => {
         description: "You do not have access to that admin page.",
       });
     }
-    return navigateTo("/");
+    return navigateTo(
+      getPostLoginRedirect(
+        useListStore().getAccountRegisters,
+        readWorkflowModeFromStorage() ?? "forecasting",
+      ),
+    );
   }
 });

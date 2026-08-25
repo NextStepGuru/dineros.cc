@@ -23,6 +23,7 @@ alwaysApply: false
 
 - **Client auth**: `authStore` (Pinia) holds `isLoggedIn`, `token`, `user`, `budgetId`. Use getters: `getIsUserLoggedIn`, `getToken`, `getUser`, `getBudgetId`.
 - **Public routes**: Keep the allowlist in sync in both `middleware/auth.ts` and `plugins/api.ts` (login, signup, forgot-password, reset-password-with-code, `/`). Prefer a single shared constant in the future to avoid drift.
+- **Homepage**: `/` stays public for guests (SEO). Logged-in users are redirected by `middleware/guest.ts` to the same target as post-login (`getPostLoginRedirect`). Logout must clear the session before navigating to `/`.
 - **Protected pages**: Always set `definePageMeta({ middleware: "auth" })` on pages that require a logged-in user.
 
 ## Validation and Types

@@ -13,7 +13,8 @@ Top-level
 
 App (Nuxt) structure
 - UI
-  - app/pages/: route-aligned Vue SFCs (login, account-registers, reoccurrences, reconciliation, reports, admin, etc.)
+  - app/pages/: route-aligned Vue SFCs (login, account-registers, reoccurrences, reconciliation, reports, admin, etc.). `index.vue` is the marketing homepage; logged-in visits are redirected by `middleware/guest.ts` to the post-login app path
+  - app/middleware/: client route guards (`auth`, `admin`, `guest`)
   - app/components/: shared UI and complex modals (EditRegisterEntry, EditReoccurrence, BudgetManager, etc.)
   - app/layouts/, app/app.vue: layouts and app shell
   - app/assets/css/main.css: Tailwind/utilities

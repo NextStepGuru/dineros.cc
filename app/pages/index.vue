@@ -1,4 +1,8 @@
 <script setup lang="ts">
+definePageMeta({
+  middleware: "guest",
+});
+
 const runtimeConfig = useRuntimeConfig();
 const siteUrl = runtimeConfig.public.siteUrl || "https://dineros.cc";
 const canonicalUrl = `${siteUrl}/`;
