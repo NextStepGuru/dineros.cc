@@ -1,44 +1,124 @@
 ---
-description: CI/CD, containers, Kubernetes manifests, and runtime configuration
+description: Local runtime, containers, CI/CD, GKE deployment, and operational health
 ---
 
 # Deployment and operations
 
-Containers
-- app/Dockerfile: multi-stage, prisma generate with placeholder DATABASE_URL during build, final runner uses .output
-- microservice/Dockerfile: multi-stage, prisma generate; special target runner-keyrotate for staging CronJob
+## Local development
 
-Local services
-- docker-compose.yaml: MySQL 8 and Redis with local ports; volumes and healthchecks configured
-- .devcontainer/docker-compose.yml: devcontainer with MySQL/Redis services for Codespaces/devcontainers
+Requirements evidenced by package and configuration files:
 
-CI/CD (GitHub Actions)
-- .github/workflows/pr.yml (PRs)
-  - Lint, tests (with generated Prisma client), pre-commit security (TruffleHog, hooks), CodeQL
-  - If PR branch is from this repo, build/push images to gcr.io and deploy to staging via .deploy manifests, then verify rollout and /health/ready
-  - Posts a Bugbot run comment (optional)
-- .github/workflows/main.yml (default branch)
-  - Build/push app and microservice images to gcr.io
-  - Deploy to production GKE using .deploy action and verify public health
-- .github/workflows/codeql.yml and sonar.yml: security and static analysis
+- Node.js 24.14 or newer.
+- PNPM 10.
+- MySQL 8.
+- Redis.
 
-Kubernetes
-- .deploy/dineros.template.yaml: envsubst-rendered manifest including
-  - Namespace, Deployments (main app and microservice), Services, Ingress
-  - Secrets are referenced via envFrom and secretKeyRef (DATABASE_URL, JWT, Plaid, Postmark, INTERNAL_API_TOKEN, Redis host/port, etc.)
-  - SecurityContext set to runAsNonRoot UID 1001; readiness/liveness/startup probes hit HTTP 80 paths /health/ready and /health/live
-  - MICROSERVICE_INTERNAL_URL provided to main app
-- .deploy/key-rotation-cronjob.template.yaml and key-rotation-rbac.template.yaml
-  - Staging-only nightly DB field-encryption key rotation and microservice migrate trigger; requires RBAC Role/RoleBinding and appropriate GKE IAM for apply
+Typical setup:
 
-Runtime configuration
-- Environment validated in app/server/envSchema.ts (Zod)
-- Health endpoints mounted at /health/ready and /health/live
-- Logging: server/logger.ts and service-specific logging; GCP logging wiring via GCLOUD_KEY_NAME and GOOGLE_APPLICATION_CREDENTIALS
+```bash
+pnpm install
+cp .env.example .env
+docker compose up -d
+pnpm --filter dineros-app exec prisma migrate deploy
+pnpm dev
+```
 
-Agent/cloud notes
-- AGENTS.md documents Cursor Cloud specifics: start system MySQL and Redis, override DATABASE_URL injected secret, test behavior
+The Nuxt development server runs on port `3102`. Root `docker-compose.yaml` starts only MySQL and Redis; it does not define the application containers.
 
-Release safety
-- Ensure prisma migrations are applied (CI deploy uses migrate deploy in image build/runtime where needed)
-- Verify probes and /health readiness before routing traffic (deployment job does an extra verification script)
+Never use a remotely injected `DATABASE_URL` for local migrations. `AGENTS.md` specifically warns Cursor Cloud agents to override it with the local value before any database command.
+
+## Cursor Cloud
+
+Nested Docker Compose may fail in Cursor Cloud. `AGENTS.md` provides commands to start native MySQL and Redis services. Default unit tests do not need either service.
+
+## Application image
+
+`app/Dockerfile`:
+
+- Uses Node 24 Alpine and PNPM 10.32.1.
+- Installs only the `dineros-app` workspace dependency graph.
+- Generates Prisma with a placeholder build-time MySQL URL.
+- Builds Nuxt into `.output`.
+- Copies runtime output and Prisma files into a slim final image.
+- Runs as non-root UID/GID 1001.
+- Defaults to port 3102, while Kubernetes overrides `PORT` to 80.
+
+Prisma schema files are retained because runtime field-encryption normalization reads encrypted-field annotations.
+
+## Microservice image
+
+`microservice/Dockerfile`:
+
+- Generates its Prisma client during build.
+- Runs migrations with retry before starting, except in test mode.
+- Runs the TypeScript service through the resolved TSX CLI.
+- Runs as non-root UID/GID 1001.
+- Defaults to port 3000; Kubernetes sets port 3050.
+- Provides a `runner-keyrotate` target containing `kubectl`, `curl`, `jq`, and the key-rotation script.
+
+The default final stage remains the normal microservice image.
+
+## CI/CD
+
+### Pull requests
+
+`.github/workflows/pr.yml` runs:
+
+- ESLint and advisory dependency audit.
+- Prisma generation and Vitest.
+- Pre-commit secret/security checks.
+- CodeQL.
+- For same-repository PRs only: builds both images, pushes PR-tagged images to GCR, deploys staging, and verifies rollout/public readiness.
+
+Fork PRs skip credentialed staging operations.
+
+### Default branch
+
+`.github/workflows/main.yml` runs on pushes to `main` or `master`:
+
+1. Build and push main application images.
+2. Build and push normal and key-rotation microservice images.
+3. Deploy the production profile to GKE.
+4. Verify rollouts and the public readiness endpoint.
+
+The supplied repository branch is `master`, but workflows intentionally support both names.
+
+## Kubernetes
+
+`.deploy/dineros.template.yaml` defines:
+
+- Namespace.
+- Main and microservice deployments.
+- ClusterIP service for the microservice.
+- NodePort service and nginx ingress for the main application.
+- Non-root security contexts with dropped Linux capabilities.
+- Resource requests and limits.
+- Secret-based configuration.
+- Rolling updates.
+- TLS through cert-manager.
+
+The manifest is rendered with profile environment values and `envsubst`. Do not apply the unrendered template directly.
+
+## Health checks
+
+Kubernetes uses:
+
+- `/health/live` for liveness and startup.
+- `/health/ready` for readiness.
+
+The corresponding code lives in `app/server/routes/health/`. Readiness may include dependency checks; inspect the handler and `poolTimeoutHealthService.ts` before modifying probe semantics.
+
+## Key rotation
+
+Staging includes a nightly database field-encryption key-rotation CronJob and dedicated RBAC templates. Applying Role/RoleBinding resources requires suitable GKE IAM permissions. See `AGENTS.md` and the manifest comments before changing this workflow.
+
+## Deployment safety
+
+- Do not deploy unless explicitly requested.
+- Never render manifests into committed files if doing so exposes secret values.
+- Preserve immutable image tags based on commit SHA or PR/SHA.
+- Verify both deployment rollouts and public readiness after apply.
+- Keep staging and production profiles separate.
+- Do not change health checks, ports, secret names, or service selectors without reviewing deployment scripts and verification scripts together.
+
+The exact production cloud project, cluster, namespace, and secret values are intentionally external and must not be inferred or documented.

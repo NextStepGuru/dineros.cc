@@ -1,77 +1,94 @@
 ---
-description: Directory map and how modules fit together (frontend, server, data, jobs, microservice)
+description: Repository layout, application layers, and high-level data flow
 ---
 
 # Architecture
 
-Top-level
-- app/: Nuxt 4 application
-- microservice/: companion microservice (Nitro/H3 based server.ts)
-- .deploy/: Kubernetes templates and profiles
-- .github/: CI workflows and composite actions
-- scripts/: local and CI helpers (DB restore, coverage, key rotation tooling, governance checks)
+## Repository layout
 
-App (Nuxt) structure
-- UI
-  - app/pages/: route-aligned Vue SFCs (login, account-registers, reoccurrences, reconciliation, reports, admin, etc.). `index.vue` is the marketing homepage; logged-in visits are redirected by `middleware/guest.ts` to the post-login app path
-  - app/middleware/: client route guards (`auth`, `admin`, `guest`)
-  - app/components/: shared UI and complex modals (EditRegisterEntry, EditReoccurrence, BudgetManager, etc.)
-  - app/layouts/, app/app.vue: layouts and app shell
-  - app/assets/css/main.css: Tailwind/utilities
-  - app/plugins/disable-lastpass.client.ts: block LastPass on all forms except login/signup (`data-lp-allow`)
-- State & composables
-  - app/stores/: Pinia stores (authStore, listStore)
-  - app/composables/: useAPI, useSnapshotMode, useCategoryReports, etc.
-- Server (Nitro/H3)
-  - app/server/api/: REST-like endpoints by path and method suffix (.get.ts, .post.ts, etc.)
-  - app/server/lib/: server utilities (auth/mfa helpers, error handling, pagination, rate limit, queue manager, etc.)
-  - app/server/services/: domain services (Plaid, transaction matching, notifications, reconciliation / statement extract+match, forecast/* modules)
-  - Statement reconciliation: `.agent/logic/reconciliation.mdc`
-  - app/server/clients/: prisma, redis, nats, postmark, openai
-  - app/server/queues/: BullMQ queue definitions (backupQueue, plaidSync*, recalculateQueue)
-  - app/server/cron/: nuxt-cron periodic jobs (plaid.daily, plaid-balance.hourly, recalculate.hourly, etc.)
-  - Plaid domain notes: `.agent/logic/plaid.mdc`
-  - app/server/middleware/: H3 middlewares (auth, sitemap-redirect)
-  - app/server/plugins/: server lifecycle helpers (graceful, security-headers, initTestDate)
-  - app/server/routes/: health/live.get.ts, health/ready.get.ts, sitemap, and _nuxt passthrough
-- Configuration and schema
-  - app/nuxt.config.ts, app/app.config.ts
-  - app/server/env.ts, app/server/envSchema.ts (Zod-validated configuration)
-  - app/prisma/schema.prisma, app/prisma/migrations/*, app/prisma/seed.ts
-  - app/prisma/reencrypt/*: generated re-encryption helpers from prisma-field-encryption
-  - app/prisma/prismaClient.ts: Prisma client bootstrap for app
-- Tests
-  - app/server/api/__tests__/: endpoint coverage
-  - app/server/services/**/__tests__/: service and forecast engine tests
-  - app/lib/__tests__/, app/schema/__tests__/, app/pages/__tests__/: unit/integration
-  - app/tests/e2e/: Playwright specs and setup; visual snapshots
-  - Vitest configs: app/vitest.*
+### `app/`
 
-Microservice
-- microservice/server.ts: entrypoint (Nitro/H3 via listhen/nitropack)
-- microservice/routes/: migrate.get.ts, migrate.post.ts, test.get.ts
-- microservice/prisma/: separate Prisma schema subset and migrations; reencrypt/* generated
-- microservice/clients/: prisma and redis clients
-- microservice/lib/bull.ts: BullMQ utilities
-- Dockerfile: build with a special runner-keyrotate target used for staging key rotation CronJob
+The main full-stack Nuxt application:
 
-Data model highlights (app/prisma/schema.prisma)
-- Core: User, Account, Budget, AccountRegister, RegisterEntry (+ types), Category (+ tree), Interval
-- Recurrence: Reoccurrence, ReoccurrenceSplit, ReoccurrenceSkip, aliasing to Plaid names
-- Bills: BillProfile, BillInstance
-- Reconciliation: ReconciliationPeriod, ReconciliationItem
-- Snapshots: AccountSnapshot, AccountRegisterSnapshot, RegisterEntrySnapshot
-- Notifications: NotificationEvent, NotificationDismissal
-- Integrations/logging: PlaidItem, PlaidSyncCursor, PlaidSyncLog, IntegrationAlert, IntegrationJobLog, OpenAiRequestLog
-- Crypto and cash: EvmChain, CryptoRegisterChain, CryptoTokenBalance, CashOnHand
-- Security keys: Rsa
+- `app.vue`, `layouts/`, `pages/`, and `components/`: Vue UI and file-based pages.
+- `composables/`: reusable client-side behavior and API access.
+- `stores/`: Pinia stores, including authentication and account-list state.
+- `middleware/`: client-side route guards for auth, guest, and admin flows.
+- `lib/`: framework-independent helpers such as rounding, sorting, auth helpers, category filters, and register-entry origin handling.
+- `schema/`: shared Zod schemas, including reconciliation and Plaid schemas.
+- `server/api/`: Nitro API handlers. Paths and HTTP methods derive from filenames.
+- `server/routes/`: non-`/api` routes such as health checks and the sitemap.
+- `server/middleware/`: server request authentication and redirects.
+- `server/clients/`: shared Prisma, Redis, queues, NATS, OpenAI, and Postmark clients.
+- `server/lib/`: access control, error handling, queue orchestration, matching helpers, and server utilities.
+- `server/services/`: domain services and integration orchestration.
+- `server/services/forecast/`: the forecasting subsystem.
+- `server/repositories/`: repository abstractions currently evidenced for account lists.
+- `server/queues/`: BullMQ queue definitions.
+- `server/cron/`: scheduled job entry points.
+- `prisma/`: main schema, migrations, seed data, client setup, and generated re-encryption modules.
+- `tests/` plus colocated `__tests__/`: unit, integration, Nuxt, middleware, and Playwright tests.
 
-Execution/data flow
-- H3 API route → server/lib auth/context → validate (Zod schemas in app/schema) → delegate to server/services/* → persist via server/clients/prismaClient.ts → enqueue jobs as needed (BullMQ) → respond with normalized payloads
-- Periodic jobs via app/server/cron/* and queues under app/server/queues/*
-- Forecast engine modules under app/server/services/forecast orchestrate data loading, calculations (loans, transfers, reoccurrences), and persistence; tested extensively
+### `microservice/`
 
-Deploy and runtime
-- Container images: app/Dockerfile and microservice/Dockerfile (multi-stage)
-- Kubernetes manifests templated in .deploy/dineros.template.yaml and key-rotation manifests
-- CI builds images to gcr.io and deploys to GKE; health endpoints under /health/live and /health/ready
+Companion service with:
+
+- `server.ts`: service entry point.
+- `routes/`: migration and test handlers.
+- `clients/`: Prisma and Redis clients.
+- `prisma/`: a separate schema, migrations, client, and generated re-encryption code.
+- `migrate-with-retry.js`: startup migration behavior.
+- `scripts/k8s-rotate-db-key.sh`: Kubernetes key-rotation support.
+
+The exact ownership boundary between the main application and microservice must be confirmed from call sites before moving logic. The tree clearly shows the microservice serving migration-related routes, but does not establish it as the owner of all background jobs.
+
+### Operations and tooling
+
+- `.cursor/rules/`: mandatory coding and safety rules.
+- `.cursor/skills/`: explicit git and GitHub workflows.
+- `.agent/logic/`: subsystem documentation.
+- `.github/workflows/` and `.github/actions/`: CI, image building, and GKE deployment.
+- `.deploy/`: parameterized Kubernetes manifests and staging/production profiles.
+- `scripts/`: local CI, restore, encryption, database, and maintenance tooling.
+- `docker-compose.yaml`: local MySQL and Redis dependencies.
+- `mysql/` and `redis/`: local service configuration.
+
+## Main request flow
+
+A typical browser request follows this shape:
+
+1. A page or component uses a composable or Pinia store.
+2. The client calls a Nitro endpoint under `app/server/api/`.
+3. Server middleware establishes authentication context.
+4. The handler validates input, checks account or admin access, and delegates nontrivial work.
+5. A service or server helper performs domain logic through shared clients.
+6. Prisma persists data to MySQL; Redis/BullMQ may cache or defer work.
+7. The handler returns data or a normalized API error.
+
+Do not bypass authorization merely because a client-side route has an auth or admin middleware. Server-side checks remain required.
+
+## Major service areas
+
+- Forecasting: `app/server/services/forecast/`.
+- Plaid synchronization: `PlaidSyncService.ts`, transaction matching/enrichment services, Plaid API handlers, and Plaid queues.
+- Categorization: `TransactionCategorizationService.ts`, merchant-category rules, category mapping helpers, and the recategorization queue.
+- Reconciliation: `reconciliationService.ts`, statement extraction/matching services, and reconciliation endpoints.
+- Notifications and operational alerts: notification, forecast-risk, recurrence-health, and integration logging services.
+- Account collaboration: account invite, membership, member, snapshot, and workspace-clone services.
+- Bills and budgets: bill-center, budget-clone, and category-clone services.
+- Security: hash, JWT, RSA, MFA, encrypted Prisma clients, and token-rotation helpers.
+
+## Background execution
+
+Scheduled files under `app/server/cron/` invoke recurring work such as Plaid sync, balance sync, crypto balance updates, recalculation, backups, and bill reminders. BullMQ definitions under `app/server/queues/` support backup, Plaid, recalculation, and recategorization work.
+
+Trace a job from its cron or API producer through the queue definition and processor before changing payloads or queue names.
+
+## Shared database caution
+
+Both packages contain Prisma schemas and migrations, but the shown schemas are not identical: the main application includes models and permissions absent from the sampled microservice schema. Do not assume they can be edited independently or copied blindly. Before schema work, inspect:
+
+- `scripts/check-prisma-schema-governance.mjs`.
+- `microservice/copy-files.sh`.
+- Both Prisma schemas and migration directories.
+- The relevant CI and Docker build steps.

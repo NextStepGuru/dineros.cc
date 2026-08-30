@@ -1,0 +1,108 @@
+---
+description: Plaid, crypto, external services, BullMQ queues, and cron execution
+---
+
+# Integrations and background jobs
+
+## Plaid
+
+Plaid functionality spans multiple layers:
+
+- Link and account endpoints under `app/server/api/plaid-*`.
+- Webhook handlers under `app/server/api/webhook/plaid*`.
+- `app/server/services/PlaidSyncService.ts` for synchronization orchestration.
+- `PlaidTransactionEnrichmentService.ts` and `TransactionMatchingService.ts` for imported transaction handling.
+- Plaid client/error/webhook helpers under `app/server/lib/`.
+- Plaid sync and balance queues under `app/server/queues/`.
+- Daily/hourly cron entry points under `app/server/cron/`.
+- `PlaidItem`, `PlaidSyncCursor`, `PlaidSyncLog`, and encrypted register/entry Plaid fields in Prisma.
+
+Read `.cursor/rules/plaid-sync.mdc` before changing this area.
+
+### Plaid invariants
+
+- Plaid access tokens and IDs are encrypted where annotated.
+- Exact-match queries should use the corresponding hash field when that is the established pattern.
+- Incremental sync cursor updates must remain consistent with successfully handled transaction pages.
+- Added, modified, and removed transactions require different behavior.
+- Respect manual, projected, matched, pending, balance, and category-locked entry state.
+- Record operational failures through the existing logging/alert services without logging credentials or raw sensitive payloads.
+- Webhook handlers must be idempotent because providers may retry delivery.
+
+The exact transaction deduplication and matching policy must be read from `PlaidSyncService`, matching services, tests, and the Plaid rule.
+
+## Categorization
+
+Imported transactions may pass through:
+
+- `TransactionCategorizationService.ts`.
+- `merchantCategoryRuleService.ts`.
+- Merchant/category normalization helpers.
+- Plaid personal-finance category mapping.
+- `recategorizeQueue.ts`.
+
+Preserve `categoryLocked` and `categorySource`. Do not overwrite a user-locked category during automatic enrichment or bulk recategorization.
+
+## Crypto and assets
+
+Crypto support includes:
+
+- Encrypted wallet addresses on `AccountRegister`.
+- EVM chain/register relations and token balances.
+- `AlchemyService.ts`.
+- Crypto API routes and an hourly crypto-balance cron.
+
+Asset-value estimation uses `AssetValueEstimateService.ts`, while a separate `VehicleValueEstimateService.ts` remains present. Confirm register type/class requirements from handlers and services before applying estimates.
+
+## Other external services
+
+- OpenAI: shared client, completion logging, transaction matching, categorization, and statement extraction use cases.
+- Postmark: email client and administrative message endpoint.
+- Google APIs: Google Sheet task routes and setup tooling.
+- NATS: a shared server client and deployed `NATS_URL` are present; exact active message flows must be confirmed from call sites.
+
+## BullMQ
+
+Queue definitions under `app/server/queues/` include:
+
+- Backup.
+- Plaid transaction sync.
+- Plaid balance sync.
+- Recalculation.
+- Recategorization.
+
+Shared queue construction and management lives in `app/server/clients/queuesClient.ts`, `app/server/lib/queueManager.ts`, and the queue-manager plugin.
+
+When changing a job:
+
+1. Find every producer and processor.
+2. Preserve queue names and payload compatibility, or migrate them deliberately.
+3. Make handlers safe for retries and duplicate delivery.
+4. Record job outcomes with existing integration job logs where applicable.
+5. Avoid retaining decrypted secrets in job payloads.
+6. Test failure and retry paths, not only success.
+
+## Cron jobs
+
+Observed cron files schedule:
+
+- Daily backups.
+- Hourly bill reminders.
+- Daily Plaid synchronization.
+- Hourly Plaid balance synchronization.
+- Hourly recalculation.
+- Hourly crypto balance synchronization.
+
+Cron entry points should remain thin and delegate to queues or services. Check cron-disabled behavior and its test before adding work that must not execute in every environment.
+
+## Operational records
+
+Use existing models and services instead of ad hoc logs:
+
+- `PlaidSyncLog` for summarized Plaid runs.
+- `IntegrationJobLog` for integration job activity.
+- `IntegrationAlert` for operational alerts.
+- `OpenAiRequestLog` for AI request metadata.
+- `AdminAuditLog` for administrative actions.
+
+Do not put access tokens, encryption keys, full statement text, or unnecessary personal/financial data into metadata JSON.

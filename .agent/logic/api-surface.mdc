@@ -1,87 +1,128 @@
 ---
-description: Observed Nitro/H3 endpoints and guidance for extending the API
+description: Observed Nitro API groups, route conventions, and extension guidance
 ---
 
-# API surface (app/server/api)
+# API surface
 
-Conventions
-- Route path mirrors directory names; file suffix denotes method: .get.ts, .post.ts, .patch.ts, .delete.ts
-- Admin routes under admin/
-- Health endpoints live under app/server/routes/
+## Routing conventions
 
-Auth and user
-- login.post.ts, logout.post.ts, change-password.post.ts
-- two-factor-auth.ts, verify-two-factor-auth.post.ts, disable-two-factor-auth.post.ts
-- mfa/email: send-code.post.ts, toggle.post.ts, verify.post.ts
-- mfa/passkey: auth-options.post.ts, register-options.post.ts, register-verify.post.ts, verify.post.ts, delete.post.ts
-- user.get.ts, user.post.ts, user/notification-settings.patch.ts, validate-token.ts
+Routes under `app/server/api/` are exposed beneath `/api`. Method-specific suffixes define HTTP methods:
 
-Accounts and invites
-- account/[accountId]/members.get.ts, members/[userId].patch.ts, members/[userId].delete.ts
-- account-invite.get.ts, account-invite.post.ts, account-invite/[id].delete.ts, account-invite/accept.post.ts, account-invite/validate.get.ts
+- `thing.get.ts` -> `GET /api/thing`
+- `thing.post.ts` -> `POST /api/thing`
+- `thing.patch.ts` -> `PATCH /api/thing`
+- `thing.delete.ts` -> `DELETE /api/thing`
+- `[id]` creates a dynamic path segment.
 
-Registers and entries
-- account-register.post.ts, account-register.delete.ts, account-register-sort.post.ts
-- register.ts
-- register-entry.post.ts, register-entry.patch.ts, register-entry.delete.ts
-- register-entries/recategorize.post.ts
-- register-entry-transfer.post.ts, register-entry-transfer-create.post.ts
-- register-entry-applied.post.ts, register-entry-skip.post.ts, register-entry-match-reoccurrence.post.ts
-- snapshot.post.ts, snapshots.get.ts, snapshot/[id].get.ts, snapshot/[id].delete.ts, snapshot-register/[id].get.ts
-- account-registers/forecast-balances.get.ts
+Files without a method suffix, such as `register.ts`, require reading the handler to determine accepted methods and behavior.
 
-Budgets and categories
-- budget.post.ts, budget/[id].patch.ts, budget/[id].delete.ts, budget/[id]/reset.post.ts
-- categories.get.ts, category.post.ts, category.patch.ts, category.delete.ts
+Routes under `app/server/routes/` are not under `/api`.
 
-Reoccurrences and health
-- reoccurrence.post.ts, reoccurrence.delete.ts, reoccurrence-health.get.ts
+## Authentication and user routes
 
-Bills
-- bills.get.ts, bills/profile/[id].patch.ts, bill-instance/[id].patch.ts, bills/reminders/evaluate.post.ts
+Observed route groups include:
 
-Reconciliation
-- reconciliation/period.get.ts (open period + last closed ending), reconciliation/period.post.ts, reconciliation/periods/open.get.ts
-- reconciliation/period/[id].get.ts, reconciliation/period/[id].patch.ts (opening/ending on OPEN periods), reconciliation/period/[id]/close.post.ts (dollars must be ~0; leftover `statement_only` blocks; cleared items need `categoryId`), reconciliation/period/[id]/match.post.ts
-- reconciliation/item/[entryId].patch.ts (`isCleared`, `note`, `categoryId`), reconciliation/statement/extract.post.ts, reconciliation/statement-line/[id].patch.ts (`createLedgerEntry` to import a leftover line)
-- reconciliation/period/[id]/import-statement-lines.post.ts (bulk leftover import to ledger)
-- Behavior: `.agent/logic/reconciliation.mdc`
+- Login/logout, token validation, password change/reset, and signup.
+- TOTP, email MFA, passkey registration/authentication, and 2FA disable/verify flows.
+- User profile retrieval/update and notification settings.
+- Account invitations and invitation acceptance/validation.
+- Account member listing, permission updates, and removal.
 
-Reports and notifications
-- reports/categories.get.ts
-- notifications.get.ts, notifications/count.get.ts, notifications/[id]/dismiss.patch.ts
+Relevant implementation includes `app/server/middleware/auth.ts`, MFA helpers, JWT services, session profile helpers, account membership helpers, and auth API tests.
 
-Integrations
-- Plaid: plaid-link.post.ts, plaid-link.ts, plaid-list-accounts.ts, plaid-link-accounts.post.ts, plaid-disconnect-account.post.ts, plaid-synced-accounts.get.ts, register-entry/[id]/plaid.get.ts, webhook/plaid.post.ts
-- Plaid behavior (sync/balances): see `.agent/logic/plaid.mdc`
-- Crypto: crypto-sync.post.ts, crypto-register-chains/[id].get.ts, crypto-tokens/[id].get.ts
-- Estimates: asset-value-estimate.post.ts, vehicle-value-estimate.post.ts
+## Financial routes
 
-Cash on hand
-- cash-on-hand/[registerId].get.ts, cash-on-hand/[registerId].patch.ts
+### Accounts and registers
 
-Forecast and maintenance
-- recalculate.post.ts
-- tasks/*: backup.ts, migrate.ts, recalculate.ts, sync-plaid.ts, sync-plaid-balance.ts, check-*, debug/test utilities, sync-google-sheet*.post.ts
+- Account-register create/delete/sort.
+- Register retrieval.
+- Forecast balances.
+- Cash-on-hand get/update.
+- Snapshots and snapshot-register retrieval.
+- Crypto register chains, token balances, and sync.
+- Asset and vehicle value estimates.
 
-Admin
-- admin/accounts.get.ts, admin/accounts/[id].get.ts, admin/accounts/[id]/cleanup-balance-entries.post.ts, admin/accounts/[id]/recalculate.post.ts, admin/accounts/[id]/sync-plaid.post.ts
-- admin/users.get.ts, admin/users/[id].patch.ts, admin/users/[id]/plaid.get.ts, admin/users/[id]/reset-password.post.ts
-- admin/audit-logs.get.ts, admin/notification-events.get.ts, admin/integration-alerts.get.ts, admin/integration-job-logs.get.ts
-- admin/system-status.get.ts, admin/postmark/messages.get.ts, admin/openai-request-logs.get.ts
-- admin/microservice-reencrypt-migrate.post.ts
-- admin/plaid-sync-logs.get.ts
+### Ledger entries
 
-Health and routes (app/server/routes)
-- health/live.get.ts, health/ready.get.ts
-- legacy _ah: _ah/liveness.ts, _ah/readiness.ts
-- _nuxt.get.ts, sitemap.xml.ts
+- Entry create, patch, and delete.
+- Transfer and transfer-create operations.
+- Applying or skipping projected entries.
+- Matching an entry to a recurrence.
+- Plaid details for an entry.
+- Bulk recategorization.
 
-# Extending the API safely
-- Put new routes under app/server/api following filename method conventions
-- Validate inputs with Zod (extend app/schema/zod.ts or add a targeted schema file)
-- Enforce auth with server/middleware/auth.ts; use requireAdmin.ts if needed
-- Delegate complex work to server/services/*; keep route handlers short
-- Use server/clients/prismaClient.ts and redisClient.ts; do not instantiate new Prisma clients ad hoc
-- Wrap errors with withErrorHandler.ts or handleApiError.ts and return user-friendly messages where appropriate
-- Add tests in app/server/api/__tests__/; see existing test suites for patterns and fixtures
+### Budgets, goals, and categories
+
+- Budget create/update/delete/reset.
+- Savings-goal create/update/delete/reorder.
+- Category list/create/update/delete.
+- Category reports.
+
+### Recurrences and bills
+
+- Recurrence create/delete and recurrence-health retrieval.
+- Bill list, profile update, instance update, and reminder evaluation.
+
+## Reconciliation routes
+
+Observed routes include:
+
+- Open-period retrieval and creation.
+- Open-period listing.
+- Period detail, update, matching, closing, and statement-line import.
+- Reconciliation-item update.
+- Statement extraction.
+- Statement-line update or import into the ledger.
+
+Read `reconciliation.mdc`, `app/schema/reconciliation.ts`, endpoint tests, and the service implementations before altering close or match behavior.
+
+## Integration routes
+
+Plaid routes cover:
+
+- Link-token creation and account listing/linking.
+- Linked-account listing and disconnection.
+- Webhook processing.
+- Admin-triggered synchronization and per-user Plaid inspection.
+
+Additional integrations include Google Sheet task routes, OpenAI-backed services, Postmark admin messages, asset estimation, and crypto sync.
+
+## Administration
+
+Routes under `app/server/api/admin/` include:
+
+- Account and user listing/detail/actions.
+- Recalculation, Plaid synchronization, and balance-entry cleanup.
+- User update and password reset.
+- Audit, notification, integration, OpenAI, Plaid-sync, and job logs.
+- System status.
+- Microservice re-encryption migration.
+
+Admin pages and client middleware improve UX, but API handlers must use server-side admin enforcement such as `requireAdmin.ts`.
+
+## Tasks and scheduling endpoints
+
+`app/server/api/tasks/` exposes backup, migration, recalculation, Plaid sync, balance checks, cleanup, diagnostics, tests, forecast inspection, and Google Sheet synchronization handlers. Do not assume these endpoints are public or user-facing. Inspect authentication/internal-token checks before changing or invoking them.
+
+## Health routes
+
+Current non-API health endpoints are:
+
+- `GET /health/live`
+- `GET /health/ready`
+
+Legacy `_ah/liveness` and `_ah/readiness` API handlers also remain in the tree. Kubernetes probes use `/health/live` and `/health/ready`.
+
+## Adding or changing an endpoint
+
+1. Follow the route filename convention.
+2. Validate body, path, and query data with Zod.
+3. Establish the authenticated user and verify account/register/budget access.
+4. Use `requireAdmin` for administrative behavior.
+5. Delegate complex work to a service.
+6. Use shared Prisma and Redis clients.
+7. Normalize errors without leaking provider responses, SQL details, tokens, or encrypted values.
+8. Add endpoint tests covering success, validation, authorization, and failure behavior.
+9. Update this API documentation if the public surface changes.
+
+Payload and response contracts are not fully recoverable from the tree listing. Treat handlers, Zod schemas, callers, and tests as the contract.

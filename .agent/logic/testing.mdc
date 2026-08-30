@@ -1,40 +1,105 @@
 ---
-description: How tests are organized and how to run them quickly
+description: Test layout, commands, environment assumptions, and validation strategy
 ---
 
 # Testing
 
-Agent policy
-- Do **not** add, modify, or run tests unless the user directly asks — `.cursor/rules/05-workflow-execution.mdc` and `testing-vitest-nuxt.mdc`.
+## Test frameworks
 
-Unit and integration (Vitest)
-- Configs in app/vitest.config.ts, app/vitest.config.coverage.ts, app/vitest.config.all.ts
-- Run all: pnpm test (TZ=UTC)
-- Coverage: pnpm test:coverage
-- Crypto-only: pnpm test:crypto
-- Many suites under:
-  - app/server/api/__tests__ (route handlers)
-  - app/server/services/**/__tests__ (services, forecast engine)
-  - app/lib/__tests__ and app/schema/__tests__
-  - app/pages/__tests__
+- Vitest covers libraries, stores, schemas, API handlers, middleware, services, Prisma re-encryption helpers, and the forecast subsystem.
+- Nuxt Test Utils provides Nuxt-specific smoke and page testing.
+- Playwright covers public and authenticated browser flows.
+- axe-core Playwright tests cover accessibility.
+- Visual tests use committed Darwin and Linux PNG baselines.
 
-Forecast engine tests
-- Runner: pnpm test:forecast (tsx server/services/forecast/__tests__/test-runner.ts)
-- Unit: pnpm test:forecast:unit
-- Integration: pnpm test:forecast:integration
-- Performance: pnpm test:forecast:performance
+## Test locations
 
-E2E (Playwright)
-- app/tests/e2e/specs/* with public and authed projects; visual snapshots under *.spec.ts-snapshots/
-- Run: pnpm test:e2e
-- Update snapshots locally: pnpm test:e2e:update-snapshots
-- Update vs staging (Linux snapshots): .github/workflows/e2e-update-staging-snapshots.yml
+- Colocated unit tests: `app/**/__tests__/*.test.ts`.
+- API tests: `app/server/api/__tests__/`.
+- Service tests: `app/server/services/**/__tests__/`.
+- General tests: `app/tests/`.
+- Nuxt tests: `app/tests/nuxt/`.
+- E2E tests: `app/tests/e2e/specs/public/` and `app/tests/e2e/specs/authed/`.
+- E2E setup and fixtures: `app/tests/e2e/setup/` and `app/tests/e2e/fixtures/`.
 
-Test helpers
-- app/tests/helpers/prismaMock.ts — mocking Prisma where needed
-- app/tests/helpers/mockConstructable.ts — Vitest 4 constructable class mocks (`new`); never use arrow `mockImplementation` for classes
-- app/server/api/__tests__/fixtures/dbUserForSession.ts — fixtures
+## Default commands
 
-CI nuances
-- PR workflow generates Prisma client before tests
-- Minimal envs set in workflows; tests avoid real DB/Redis by design unless explicitly required
+From the repository root:
+
+```bash
+pnpm lint
+pnpm test
+pnpm typecheck
+pnpm test:e2e
+```
+
+The root scripts proxy to the `dineros-app` workspace. The default app test command is:
+
+```bash
+TZ=UTC vitest --run --config vitest.config.ts
+```
+
+According to `AGENTS.md`, default tests use mocks and do not require running MySQL or Redis.
+
+## Focused suites
+
+```bash
+pnpm --filter dineros-app test:crypto
+pnpm --filter dineros-app test:plaid
+pnpm --filter dineros-app test:forecast:unit
+pnpm --filter dineros-app test:forecast:integration
+pnpm --filter dineros-app test:forecast:all
+pnpm --filter dineros-app test:coverage
+```
+
+Crypto tests are slower and are not part of the default suite. Forecast commands include both Vitest suites and a custom TSX test runner.
+
+## End-to-end tests
+
+The normal E2E command runs Chromium public and authenticated projects. Additional scripts cover full, mobile, WebKit, UI, debug, and staging execution.
+
+Local visual baselines and staging Linux baselines can differ. Use the dedicated staging snapshot command or manual workflow when updating staging visual snapshots. Never update snapshots merely to make a failure disappear; inspect the rendered change first.
+
+E2E-only seed and cleanup endpoints exist under `app/server/api/e2e/` and are guarded. Preserve environment/token guards when modifying them.
+
+## Prisma in tests
+
+After schema changes or when generated client files are absent, run:
+
+```bash
+pnpm --filter dineros-app exec prisma generate
+```
+
+The PR workflow performs this before `pnpm test`. Use `app/tests/helpers/prismaMock.ts` and existing API fixtures instead of connecting unit tests to production-like databases.
+
+## What to test by change type
+
+### API change
+
+Cover validation, unauthenticated access, cross-account access, success, and normalized errors.
+
+### Financial calculation
+
+Cover positive/negative amounts, rounding boundaries, credit behavior, same-day ordering, and regression examples.
+
+### Recurrence or dates
+
+Cover UTC, interval boundaries, anchors, weekends, skips, end dates, and multi-year behavior where relevant.
+
+### Plaid or queue behavior
+
+Cover retries, duplicate delivery, added/modified/removed data, encrypted lookup behavior, and partial failures.
+
+### Reconciliation
+
+Cover period status, statement-line states, matching conflicts, difference tolerance, imports, categories, and closing adjustments.
+
+### UI
+
+Cover loading, empty, error, validation, keyboard/accessibility, responsive behavior, and authorization-dependent states.
+
+## CI expectations
+
+PR checks run lint, tests, pre-commit security hooks, and CodeQL. Internal PRs additionally build both images and deploy staging after those gates. Fork PRs intentionally skip credentialed build/deploy jobs.
+
+Do not weaken tests, remove assertions, or broadly update snapshots to accommodate an implementation bug.

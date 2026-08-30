@@ -1,97 +1,95 @@
 ---
-description: Conventions, naming, validation, error handling, and safe-change checklists
+description: Coding conventions and safe-change workflow for this repository
 ---
 
-# Coding patterns and conventions
+# Patterns and safe changes
 
-Agent policy (always wins)
-- Do not build, start the dev server, typecheck, migrate, deploy, commit, or run/add tests unless the user explicitly asks — see `.cursor/rules/00-global-safety.mdc` and `05-workflow-execution.mdc`.
-- Checklists below are for humans / when the user requests those steps.
+## Before editing
 
-TypeScript and style
-- TypeScript everywhere; keep strictness aligned with repo configs
-- Follow existing patterns in the file you edit; prefer small, focused changes
+1. Read `AGENTS.md` and the matching files under `.cursor/rules/`.
+2. Locate the route, service, schema, model, client, and tests involved in the behavior.
+3. Search for all callers before changing exported types, queue payloads, route responses, or balance semantics.
+4. Keep the change focused; avoid unrelated formatting or refactors.
+5. Never commit `.env` files, credentials, encryption keys, access tokens, or customer financial data.
 
-Frontend forms
-- LastPass may fill only `/login` and `/signup` (`data-lp-allow` on those `UForm`s). All other forms are blocked by `app/plugins/disable-lastpass.client.ts`; do not add per-field ignore attrs on new forms.
+Subsystem-specific rules exist for encrypted Prisma queries, forecast rounding, Plaid sync, reconciliation, register balances, and register-entry origin. Those rules take precedence over this summary.
 
-API endpoints (app/server/api)
-- File naming encodes HTTP method: foo.get.ts, bar.post.ts, item/[id].patch.ts, etc.
-- Validate input with Zod (app/schema/zod.ts or feature-specific schema files under app/schema/)
-- Use server/middleware/auth.ts for protected routes; requireAdmin.ts for admin-only
-- Wrap handlers with error helpers when applicable:
-  - withErrorHandler.ts for standardized try/catch
-  - handleApiError.ts and plaidApiError.ts for integration error normalization
-- Access persistence via server/clients/prismaClient.ts; avoid creating ad-hoc clients in routes
-- Delegate nontrivial logic to server/services/*; keep routes thin
+## Naming and placement
 
-Services
-- Place domain logic in server/services/*; keep a clear public method surface
-- For forecast engine features, prefer extending modules under server/services/forecast/* rather than ad-hoc math in routes
-- Use server/lib helpers for cross-cutting needs (queueManager, pagination, notifications, audit logs, etc.)
+- Vue components use PascalCase filenames, such as `RegisterEntryOriginIcon.vue`.
+- Composables use a `use...` prefix, such as `useAppFetch.ts`.
+- Pinia stores use a `...Store.ts` suffix.
+- Classes and class-like services generally use PascalCase, while function-oriented services may use camelCase filenames. Match the local directory.
+- Tests normally use `.test.ts` for Vitest and `.spec.ts` for Playwright.
+- Preserve established domain names such as `Reoccurrence`, even when the English spelling is unusual.
+- Use existing shared clients from `app/server/clients/`; do not instantiate ad hoc Prisma or Redis clients in handlers.
 
-Data validation and schemas
-- Central schemas live in app/schema/zod.ts with targeted files like app/schema/plaid.ts and app/schema/reconciliation.ts
-- When introducing new DTOs, colocate schema with feature or extend zod.ts thoughtfully
+## API handlers
 
-Encryption and secrets
-- Many Prisma fields are annotated with /// @encrypted (see app/prisma/schema.prisma)
-- Never `in`/`contains` on encrypted fields — `.cursor/rules/encrypted-prisma-queries.mdc` and encryption-and-keys.mdc
-- Use server/services/RsaService.ts, server/lib/plaidAccessTokenCrypto.ts helpers when handling secrets
-- Never log plaintext secrets or sensitive PII
+- Place API handlers in `app/server/api/`.
+- Use `.get.ts`, `.post.ts`, `.patch.ts`, or `.delete.ts` when the endpoint has a specific method.
+- Use bracketed filenames for dynamic segments, for example `[id]`.
+- Validate request bodies and queries with Zod. Extend `app/schema/zod.ts` or add a focused schema beside existing schema modules.
+- Keep handlers small. Put orchestration and domain calculations in `app/server/services/` or a focused `app/server/lib/` helper.
+- Reuse `withErrorHandler.ts`, `handleApiError.ts`, and existing user-friendly error patterns rather than exposing raw integration or database errors.
+- Apply account membership and admin checks on the server. Relevant helpers include `accountAccess.ts`, `accountMembership.ts`, `getUser.ts`, and `requireAdmin.ts`.
+- Add or update API tests in `app/server/api/__tests__/`.
 
-Queues and cron
-- Define BullMQ queues in app/server/queues/*; use server/lib/queueManager.ts
-- Schedule recurring tasks via app/server/cron/* with nuxt-cron
+Do not infer an endpoint's payload from its filename alone. Read the handler, Zod schema, and endpoint tests.
 
-Naming
-- Endpoints: kabab-case resources, nested folders reflect URL segments
-- Services: <Domain>Service.ts (e.g., PlaidSyncService, NotificationCenterService)
-- Tests: mirror source structure (e.g., server/services/foo/__tests__/Foo.test.ts)
+## Frontend changes
 
-# Safe change checklists (when the user asks)
+- Reuse existing components, composables, and stores before introducing another state source.
+- Follow the syntax already used in the component and the dedicated frontend/Pug/Tailwind rules.
+- Represent loading, empty, error, disabled, and success states explicitly.
+- Keep client authorization checks as UX guards only; the backend must enforce access.
+- Preserve accessibility: labels, keyboard operation, focus management, semantic controls, and contrast are covered by the WCAG rule and Playwright axe tests.
+- Add stable selectors only when needed; avoid tests coupled to incidental layout markup.
 
-Schema changes (Prisma)
-- Edit app/prisma/schema.prisma (and microservice schema if shared tables change)
-- Prefer asking the user to create a **manual migration**; agents must not run `prisma migrate dev` / `db push` unless explicitly requested (backend-best-practices.mdc)
-- Ensure decimal precision is appropriate for money fields (Decimal(19,2) common)
-- Respect field encryption annotations; do not remove /// @encrypted unless intended
-- When the user asks: regenerate client (`prisma generate`), update seeds if needed
+## Database and money
 
-API changes
-- Update or add Zod schemas
-- Keep handler thin; delegate to service
-- Add/extend unit tests only when the user asks
-- Check auth coverage and admin guards
+- Monetary database fields use Prisma `Decimal`, commonly `Decimal(19, 2)`.
+- Do not introduce binary floating-point arithmetic into balance, interest, transfer, reconciliation, or forecast code without matching an established conversion and rounding boundary.
+- Reuse `app/lib/bankers-rounding.ts` and inspect the forecast-money rule before changing calculations.
+- Treat `balance`, `latestBalance`, entry `balance`, balance entries, projected entries, pending entries, and cleared entries as distinct concepts. Read the register-balance rule and relevant services before modifying them.
+- Add a committed Prisma migration for schema changes; do not edit an already-applied migration.
+- Regenerate Prisma after schema changes.
+- Run the schema-governance check and determine whether the microservice schema must also change.
 
-Forecast engine
-- Prefer extending existing modules (AccountRegisterService, ReoccurrenceService, TransferService, LoanCalculatorService, etc.)
-- When the user asks for tests:
-  - pnpm test:forecast:unit
-  - pnpm test:forecast:integration
-  - pnpm test:forecast (scenario runner)
+## Dates and recurrence
 
-Background jobs
-- For new periodic behavior, prefer:
-  - Queue worker in app/server/queues/* if asynchronous work is needed
-  - Cron under app/server/cron/* to trigger or orchestrate
-- Ensure idempotency and observability (logs, IntegrationJobLog if relevant)
+Tests run with `TZ=UTC`, and forecasting has dedicated date/time services. Do not scatter native date arithmetic into forecast logic. Reuse the forecast `DateTime`/`DateTimeService` and existing interval helpers where applicable.
 
-Security and auth
-- Enforce authentication middleware; prefer per-endpoint authorization checks via accountMembership.ts, accountAccess.ts, requireAdmin.ts
-- Use rateLimitRedis.ts for abuse-prone endpoints
-- Handle MFA and passkeys via existing endpoints flows (mfa/*, two-factor-auth.ts)
+## Security-sensitive fields
 
-Errors and responses
-- Normalize API errors to userFriendlyApiError.ts when surfacing to the UI
-- Log integration failures through recordIntegrationJobLog.ts or recordPlaidSyncLog.ts
+Encrypted fields cannot be treated like ordinary plaintext columns. Some have deterministic hash companion columns for lookup. Read `encrypted-prisma-queries.mdc`, the schema annotations, and the Prisma client extension before changing queries.
 
-Testing
-- Agents: do not add or run tests unless the user asks
-- When adding tests (user-requested): unit near the code; API under app/server/api/__tests__; e2e under app/tests/e2e
+Never log plaintext email addresses, access tokens, wallet addresses, statement descriptions, register descriptions, encryption keys, or raw provider payloads unless an existing, explicitly reviewed redaction policy allows it.
 
-CI and deployment
-- PRs run lint/test, build images, and deploy to staging if from the main repo
-- Default branch builds + deploys to production
-- Use .deploy/dineros.template.yaml for k8s resource references when reasoning about env vars
-- Agents: do not deploy unless the user asks
+## Validation checklist
+
+Use the smallest relevant checks while iterating, then the repository gates appropriate to the change:
+
+```bash
+pnpm lint
+pnpm test
+pnpm typecheck
+```
+
+Additional checks include:
+
+```bash
+pnpm --filter dineros-app test:crypto
+pnpm --filter dineros-app test:plaid
+pnpm --filter dineros-app test:forecast:all
+pnpm test:e2e
+pnpm --filter dineros-app prisma:check-governance
+```
+
+The root scripts proxy most work to `dineros-app`. Default Vitest tests use mocks and do not require MySQL or Redis according to `AGENTS.md`.
+
+## Documentation and git safety
+
+When behavior changes, update the matching `.agent/logic/` document and any applicable `.cursor/rules/` file. Update human docs when setup or contributor-facing behavior changes.
+
+Do not create branches, commits, pushes, rebases, PRs, or deployments unless the user explicitly requests them. Repository skills define the approved workflows. Contributions require DCO sign-off.
