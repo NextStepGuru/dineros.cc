@@ -1,77 +1,89 @@
 ---
-description: Structure of the forecast engine and extension points
+description: Forecast subsystem structure and rules for changing financial projections
 ---
 
 # Forecast engine
 
-Location: app/server/services/forecast/*
+## Location and role
 
-Core modules (selected)
-- ForecastEngine — orchestrator for a single run
-- DataLoaderService — loads DB state into in-memory/cache structures
-- AccountRegisterService — account-level operations and projections
-- ReoccurrenceService — schedule generation and amount adjustments
-- RegisterEntryService — materializes ledger entries
-- LoanCalculatorService — interest and amortization
-- TransferService — inter-register transfers with validation and ordering
-- DateTime/DateTimeService — date math, weekend adjustments, intervals
-- ModernCacheService — optimized in-memory caching
-- DataPersisterService — persists snapshots/results back to DB
-- getProjectedBalanceAtDate.ts — helper for point-in-time projection
+The forecasting subsystem lives in `app/server/services/forecast/`. It calculates projected register activity and balances using persisted account data, recurring transactions, transfers, loans, asset depreciation, and date rules.
 
-## Skipped occurrences
+The documented architecture and filenames identify `ForecastEngine` as the orchestrator, supported by focused services.
 
-- `ReoccurrenceSkip` rows are the source of truth for skipping a specific instance date.
-- DataLoader loads skips into cache (`skippedAt` as `YYYY-MM-DD`).
-- `ReoccurrenceService` must omit skipped dates when creating entries/transfers (check adjusted and nominal dates); still advance the schedule so later occurrences generate.
-- `ForecastEngine` also filters skipped entries before running balances / persist (safety net).
-- Do **not** rely on bumping `lastAt` alone to persist a skip — future skips survive only via skip rows (and `persistReoccurrenceLastAt` does not walk `lastAt` into the future).
-- Skip API (`register-entry-skip`) always inserts a skip row; may also bump `lastAt` when skipping the immediate next occurrence using `calculateNextOccurrenceDate` (same math as forecast).
-- Edit modal: a today/future **projected** recurrence shows **Skip this occurrence** only (not Apply). Apply/Clear/Delete are for posted or past pending rows — Apply posts the instance; Skip means it will not happen.
-- Register description origin icon: projected recurrences use **repeat**; once the occurrence date has passed or the row has a Plaid match (`plaidId` / `isMatched`), swap to **badge-check**. Manual / transfer / interest / bank-import rows use other icons (`registerEntryOrigin.ts`).
+## Main modules
 
-## Balances (do not overwrite live snapshot)
+- `ForecastEngine.ts`: orchestration of a forecast run.
+- `DataLoaderService.ts`: loads persisted data into forecast structures.
+- `ModernCacheService.ts`: in-memory forecast state/cache.
+- `AccountRegisterService.ts`: register operations.
+- `RegisterEntryService.ts`: entry operations.
+- `ReoccurrenceService.ts`: recurring schedule processing.
+- `TransferService.ts`: transfers, including split and loan-related flows.
+- `LoanCalculatorService.ts`: loan calculations and interest behavior.
+- `AssetDepreciationService.ts`: asset-value projection.
+- `DataPersisterService.ts`: writes forecast results back to persistence.
+- `DateTime.ts` and `DateTimeService.ts`: centralized date behavior.
+- `HolidayService.ts`: holiday/weekend scheduling support.
+- `reoccurrenceIntervals.ts`: recurrence interval logic.
+- `getProjectedBalanceAtDate.ts`: focused projected-balance query.
+- `types.ts`: shared forecast types.
+- `lib/rateLimiter.ts`: forecast rate limiting.
 
-- DataLoader maps DB `latestBalance` into cache `balance` **and** `latestBalance` for projections.
-- ForecastEngine must **not** call `updateAccountRegisterBalances` / write `latest_balance` after a run — Plaid/user edits are the source of truth for the live snapshot.
-- Persister may still update entry running `balance` columns and pocket auto-apply increments.
-- Agent rule: `.cursor/rules/register-balances.mdc`.
+## Data flow
 
-## Money rounding
+The expected high-level flow is:
 
-- Entry amounts are normalized to whole cents via bankers rounding (`roundToCents` from `~/lib/bankers-rounding`) inside `RegisterEntryService.createEntry`.
-- Reoccurrence amount adjustments and percent splits also use bankers rounding (not `Math.round` half-up).
-- Running-balance accumulation in `lib/sort.ts` is left as float sum of already-rounded amounts.
-- Agent rule: `.cursor/rules/forecast-money-rounding.mdc`.
+1. Load account/register/entry/recurrence data.
+2. Normalize it into forecast cache state.
+3. Generate scheduled activity over the forecast horizon.
+4. Apply transfers, loan behavior, asset changes, and running balances.
+5. Persist generated results when the calling workflow requires persistence.
 
-## Month-end schedule anchors
+Confirm the exact order from `ForecastEngine.ts` and tests before changing it. Ordering is financially significant.
 
-- Monthly/yearly reoccurrences preserve day-of-month via `Reoccurrence.scheduleAnchorAt` (preferred day clamped to each month’s length: Jan 31 → Feb 28/29 → Mar 31).
-- When `scheduleAnchorAt` is null, EOM-sticky applies: if `lastAt` is the last day of its month, target day 31 (end of next months).
-- Upsert/create sets `scheduleAnchorAt` from `lastAt`; clone copies it. Migration should backfill `schedule_anchor_at = last_at`.
+## Invariants
 
-## Loan interest and payments
+- Use decimal-safe money arithmetic and the repository's banker-rounding behavior.
+- Preserve deterministic ordering for entries sharing dates; sequence and service ordering may affect running balances.
+- Avoid native floating-point accumulation for currency.
+- Keep date arithmetic inside the forecast date/time abstractions.
+- Respect recurrence anchors, interval counts, weekend adjustment, skips, end dates, amount adjustments, and splits.
+- Treat transfers as coordinated changes across registers, not unrelated entries.
+- Preserve distinctions among historical, pending, projected, manual, cleared, matched, and balance entries.
+- Do not update `balance` or `latestBalance` based on assumptions from field names alone.
 
-- Interest posts first; payment amount is capped against the **post-interest** projected balance.
-- If `targetAccountRegisterId` is null, post interest only — never invent a single-sided payment (no phantom net-worth gain).
+Read `.cursor/rules/forecast-money-rounding.mdc` and `.cursor/rules/register-balances.mdc` before modifying calculations.
 
-## Transfers
+## Test coverage
 
-- Skip self-transfers (`source === target`) and transfers involving archived registers.
+Forecast tests are extensive and include:
 
-## Unused schema fields
+- Unit tests for each major service.
+- Integration tests for the engine and persistence.
+- Regression tests for transfers, interest, decimal conversion, continuity, recurrence, and date boundaries.
+- Weekend and holiday behavior.
+- Multi-year golden output and stored snapshots.
+- Performance/rate-limiter behavior.
 
-- `Reoccurrence.totalIntervals` / `elapsedIntervals` are cloned and stored but **not read** by the forecast engine. Do not treat them as an occurrence cap until a product write path exists.
+Relevant commands from `app/package.json`:
 
-## Depreciation
+```bash
+pnpm --filter dineros-app test:forecast
+pnpm --filter dineros-app test:forecast:unit
+pnpm --filter dineros-app test:forecast:integration
+pnpm --filter dineros-app test:forecast:all
+```
 
-- Declining-balance and compound depreciation both floor at `assetResidualValue` for depreciating assets.
+The custom `test:forecast` command uses `tsx` and a forecast-specific test runner; it is not identical to the normal Vitest suite.
 
-Testing
-- Extensive unit/integration/regression tests under app/server/services/forecast/__tests__
-- Calculation regressions: `calculation-bugs.regression.test.ts`, `multiYearLedger.golden.test.ts`
-- Agents: do not add/run tests unless the user asks (see `.cursor/rules/05-workflow-execution.mdc`)
+## Safe-change checklist
 
-Guidance
-- Keep deterministic results under known seeds; avoid relying on wall clock outside DateTimeService
-- Rate limits and performance tunings in forecast/lib/rateLimiter.ts — consider when expanding scope
+1. Reproduce the issue in the smallest focused test.
+2. Determine which service owns the rule; avoid adding another calculation to the orchestrator when a focused service exists.
+3. Test both debit and credit-style registers where relevant.
+4. Include date boundaries, same-day ordering, rounding, and transfer symmetry.
+5. Add a regression test for any fixed financial bug.
+6. Run the focused service tests, integration tests, and default suite.
+7. Update golden snapshots only after reviewing every changed monetary value.
+
+Unknown behavior must be resolved from implementation and tests, not from generic accounting assumptions.

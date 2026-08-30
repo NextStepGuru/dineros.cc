@@ -1,0 +1,98 @@
+---
+description: Authentication, authorization, field encryption, secret handling, and key rotation
+---
+
+# Security and encryption
+
+## Mandatory safety
+
+- Never commit `.env` files. Only placeholder templates such as `.env.example` belong in source control.
+- Never expose real tokens, encryption keys, passwords, private keys, account data, or personal information in tests, logs, screenshots, fixtures, or PR text.
+- Report vulnerabilities privately according to `SECURITY.md`.
+- Respect `.cursor/rules/00-global-safety.mdc`, backend security rules, and `encrypted-prisma-queries.mdc`.
+
+Pre-commit and CI run secret checks, including TruffleHog and private-key detection. These controls do not make it safe to add secrets temporarily.
+
+## Authentication and authorization
+
+The repository contains JWT, hash, RSA, TOTP, email MFA, and WebAuthn/passkey support. Relevant areas include:
+
+- `app/server/middleware/auth.ts`.
+- `app/server/services/JwtService.ts`, `HashService.ts`, and `RsaService.ts`.
+- `app/server/lib/mfa.ts` and related API handlers.
+- `app/server/lib/getUser.ts`, account-access helpers, and `requireAdmin.ts`.
+- Client route middleware under `app/middleware/`.
+
+Client middleware is not a security boundary. Every protected server operation must independently verify authentication, workspace membership, resource permission, and admin role where applicable.
+
+Avoid returning MFA secrets or internal settings. A helper named `stripMfaSettings.ts` exists specifically for sanitization.
+
+## Field encryption
+
+Prisma uses `prisma-field-encryption`. Encrypted fields are marked by schema documentation annotations such as `/// @encrypted`. Hash companions use annotations such as `/// @encryption:hash(...)`.
+
+Observed encrypted data includes:
+
+- User email and password.
+- Register names.
+- Plaid item/account IDs and access tokens stored on registers or entries.
+- Wallet addresses.
+- Register-entry, recurrence, and statement-line descriptions.
+
+Shared Prisma clients and normalization helpers configure encryption behavior. Always use the established client from `app/server/clients/prismaClient.ts` or the package-specific equivalent.
+
+### Query implications
+
+Randomized ciphertext generally cannot support ordinary plaintext equality, filtering, sorting, or partial matching. Where a hash companion exists, use the repository's established hash-query pattern. Do not add `contains`, `startsWith`, or plaintext equality filters over encrypted columns without explicit support.
+
+Read the encrypted-query rule and client implementation before writing a query against an encrypted field.
+
+## Generated re-encryption code
+
+Generated migration modules exist under:
+
+- `app/prisma/reencrypt/`.
+- `microservice/prisma/reencrypt/`.
+
+They include model migrators for encrypted records, including `StatementLine`. Treat these as generated artifacts tied to the schema and encryption tooling.
+
+The tree also contains:
+
+- `scripts/reset-encrypted-users-after-restore.ts`.
+- `scripts/rotate_keys.sh` and `scripts/rotate-k8s-keys.sh`.
+- `microservice/scripts/k8s-rotate-db-key.sh`.
+- `docs/post-restore-encryption-plan.md`.
+
+The restore document contains both current-state notes and a proposed approach. Verify actual script behavior before assuming every part of that plan is implemented.
+
+## Kubernetes key rotation
+
+Staging has a nightly key-rotation CronJob template. It uses a dedicated service account and namespaced RBAC to:
+
+- Read/update the encryption secret.
+- Patch the main and microservice deployments.
+- Trigger the microservice migration flow.
+
+The deployment identity requires permission to create Roles and RoleBindings, or the RBAC manifest must be applied by an administrator. Do not broaden these permissions without a documented reason.
+
+## Secret boundaries
+
+Deployment separates:
+
+- Database encryption material in `${SECRET_DB}`.
+- Main and microservice database URLs in separate database secrets.
+- Application/integration secrets in `${SECRET_APP}`.
+- JWT material in `${SECRET_JWT}`.
+- Google credentials in `${SECRET_GA}`.
+
+Preserve this separation. In particular, the deployment template explicitly says not to place `DATABASE_URL` in the field-encryption secret.
+
+## Safe security changes
+
+1. Add focused unit tests for crypto, hashes, tokens, or authorization.
+2. Use fake values that secret scanners recognize as placeholders.
+3. Test denied access and cross-account resource access.
+4. Avoid logging caught provider/database objects wholesale.
+5. Run default tests and the slower crypto suite when relevant.
+6. Review migration and rollback behavior for encryption changes.
+7. Never rotate, deploy, or mutate real secrets unless the user explicitly requests the operational action.

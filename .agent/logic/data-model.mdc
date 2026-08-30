@@ -1,86 +1,103 @@
 ---
-description: Summary of key Prisma models and relationships observed in app/prisma/schema.prisma
+description: Main Prisma entities, relationships, monetary fields, and schema-change cautions
 ---
 
 # Data model
 
-Core entities
-- User: identity and auth; email/password encrypted; role (USER/ADMIN); country/timezone fields; jwtKey
-- Account: logical workspace for budgets, registers, categories, etc.
-- Budget: scoped under Account; links to registers, goals, notifications, bills, reconciliation
-- AccountRegister: an account/register ledger row with many financial attributes
-  - Types via AccountType (credit/loan flags, accrual behavior, registerClass)
-  - **`balance`**: accounts-list / table display column
-  - **`latestBalance`**: live bank/user snapshot (Plaid, Alchemy, cash, user edit); future ledger and register dropdown start here
-  - Keep both in sync when writing a live snapshot (Plaid sets both). Clearing/applying an entry increments both.
-  - Forecast must not overwrite `latestBalance` (see forecast-engine.mdc)
-  - Limits, APRs, loan parameters, sort orders, min balances
-  - Optional Plaid linkage (ids and access token encrypted + hashed); `plaidLastSyncAt`, `plaidBalanceLastSyncAt`
-  - Optional vehicle/asset depreciation fields; crypto wallet address (encrypted)
-  - Relationships: entries, reoccurrences, splits, bill profiles/instances, snapshots, savingsGoals, collateral relations, child registers, categories for default payment/interest
-- RegisterEntry: a ledger entry for a register
-  - amount, balance, createdAt, typeId (RegisterEntryType), flags (projected, reconciled, pending, cleared, matched, balance-entry, manual)
-  - **Future tab**: uncleared, non-reconciled rows (`isCleared: false`, `isReconciled: false`) until the user clears them
-  - **Past tab**: cleared / balance-entry / reconciled
-  - Plaid linkage (encrypted ids + JSON)
-  - categoryId optional; `categoryLocked` / `categorySource` (`ai` | `rule` | `pfc` | `user` | `recurrence`)
-  - memo optional; referenceId/checkNo optional; seq ordering
-  - Register table origin icon (before description): live recurrence = repeat; date-passed or Plaid-matched recurrence = badge-check (not repeat); pencil = manual; other `typeId`s have their own icons (`app/lib/registerEntryOrigin.ts`)
-  - Register row overlay: running balance under $1,000 = yellow tint, under $0 = red tint (`register-row-balance-*`); paints on cells so zebra/hover still apply
+## Authoritative schema
 
-MerchantCategoryRule
-- Account-scoped merchant → category mapping (`merchantKey`, optional `merchantEntityId`, `applyMode` ALWAYS | HINT)
-- Upserted from user category edits; ALWAYS applied on classify, HINT used as few-shot
+The primary schema is `app/prisma/schema.prisma` with a MySQL datasource. Table names are mapped to singular snake_case names. IDs are a mixture of auto-incrementing integers, UUID strings, and other strings; preserve the established type for each relation.
 
-Recurrences and splits
-- Reoccurrence: describes a recurring transaction
-  - schedule via Interval (with intervalCount), weekend adjustment, optional transfer target register
-  - amount and encrypted description, optional category
-  - amount adjustment mode (PERCENT/FIXED/NONE) with interval-based adjustments
-  - links: entries, skips, splits, plaidNameAliases, bill profile/instances
-- ReoccurrenceSplit: per-occurrence split to target another register with fixed/percent amount, optional category
-- ReoccurrenceSkip: skips a specific instance
-- ReoccurrencePlaidNameAlias: normalized Plaid description matching per register
+This is a summary, not a replacement for reading the complete schema and migrations.
 
-Bills
-- BillProfile: metadata around a reoccurrence (kind BILL/INCOME/TRANSFER, payee, autopay, expected ranges, reminder settings)
-- BillInstance: concrete due item with amount, status (UPCOMING → PAID flow), paid linkage to a RegisterEntry
+## Workspace and access model
 
-Reconciliation
-- ReconciliationPeriod: status (OPEN/CLOSED), statement window, opening/ending balances, optional statement income/expense subtotals, closing metadata (closing adjustment entry), closedByUser
-- ReconciliationItem: per-entry clearance tracking within a period
-- StatementLine: extracted bank-statement rows for a period (encrypted `description`); matchStatus `unmatched` | `matched` | `statement_only` | `conflict` | `ignored`; optional `registerEntryId`
-- Difference math: `ending − (opening + sum of cleared item amounts)`. Last closed period ending should equal the next opening (continuity warning, not a hard block).
-- Details: `.agent/logic/reconciliation.mdc`
+- `Account`: shared workspace containing registers, budgets, categories, recurrences, snapshots, goals, bills, reconciliation periods, and category rules.
+- `User`: encrypted identity information, authentication state, role, country/timezone settings, and relations to workspaces.
+- `UserAccount`: membership joining a user to an account. It includes permissions for budgets, invitations, member management, allowed budgets, and allowed account registers.
+- `AccountInvite` and `AccountInviteAccount`: token-based invitations that may cover multiple accounts with permissions.
+- `UserRole`: `USER` or `ADMIN`.
 
-Snapshots and summaries
-- AccountSnapshot: periodic snapshot per account
-- AccountRegisterSnapshot and RegisterEntrySnapshot: captured values (balances, entries) at snapshot time
-- AccountRegisterSummary: month/year balance rollup per register (UUID id)
+Always scope financial records through the authenticated user's permitted account membership. Possession of an integer register or budget ID is not authorization.
 
-Notifications
-- NotificationEvent: active/resolved notification items with dedupe keys and payloads
-- NotificationDismissal: user-initiated dismissal records
+## Budgets, registers, and ledger entries
 
-Categories
-- Category: hierarchical (parent/children), account-scoped; referenced by entries, reoccurrences, splits, default register categories; note functional unique index via migration
+- `Budget`: belongs to an account and groups registers, goals, bills, notifications, and reconciliation periods.
+- `AccountRegister`: the central financial register. It stores account type, current and latest balances, credit/loan settings, statement schedule, sorting, Plaid linkage, asset metadata, wallet metadata, and category defaults.
+- `RegisterEntry`: ledger row with date, amount, running balance, recurrence/type/category links, origin flags, Plaid identity, reconciliation flags, memo, and categorization metadata.
+- `AccountType`: describes register behavior, including class, credit status, and whether it accrues balance growth.
+- `RegisterEntryType`: entry type lookup.
+- `Interval`: statement, recurrence, and amount-adjustment interval lookup.
 
-Integrations and logging
-- PlaidItem: user-level item linkage
-- PlaidSyncCursor: per-item cursor for incremental sync
-- PlaidSyncLog: per-sync summary (counts, status, errors)
-- IntegrationAlert, IntegrationJobLog: generic external integration health
-- OpenAiRequestLog: request/response metrics for OpenAI usage
+Important register fields have specialized semantics that cannot be derived from the schema alone. Before changing recalculation behavior, inspect the register endpoints, forecast services, `calculateAdjustedBalance`, ledger helpers, and the dedicated register-balance Cursor rule.
 
-Security and keys
-- Rsa: key pairs (isDefault, archived flags)
+## Recurring activity, transfers, and goals
 
-Cash and crypto
-- CashOnHand: denomination counts per register (ones to hundreds)
-- EvmChain: chain catalog; CryptoRegisterChain links registers to chains
-- CryptoTokenBalance: per-register token holdings with balance/price/value and metadata
+- `Reoccurrence`: scheduled transaction with interval, anchor/end state, transfer target, amount, encrypted description, category, and optional amount adjustments.
+- `ReoccurrenceSplit`: fixed or percentage split sent to target registers.
+- `ReoccurrenceSkip`: skipped occurrence record.
+- `ReoccurrencePlaidNameAlias`: normalized Plaid name mapped to a recurrence for a register.
+- `SavingsGoal`: source and target registers, target amount, category, priority, and ordering.
 
-Indices and constraints (selected)
-- Many composite indices for performance and uniqueness (e.g., NotificationEvent, BillInstance, ReconciliationItem, ReoccurrencePlaidNameAlias)
-- Decimal precision for monetary values (commonly Decimal(19,2); price with more precision)
-- Field encryption markers on sensitive strings (/// @encrypted) and corresponding hash annotations where needed
+The schema supports a separate `scheduleAnchorAt` and amount-adjustment anchor. Preserve these scheduling concepts rather than deriving all schedules from `lastAt`.
+
+## Bills and notifications
+
+- `BillProfile`: augments a recurrence with bill/income/transfer metadata and reminders.
+- `BillInstance`: materialized due occurrence with amount, status, payment entry, and reminder state.
+- `NotificationEvent` and `NotificationDismissal`: scoped by user and budget, with occurrence and fingerprint uniqueness.
+
+## Categories and categorization
+
+- `Category`: account-scoped or potentially global, supports parent/child hierarchy and archival.
+- `MerchantCategoryRule`: unique account/merchant mapping to a category, with optional merchant entity identity.
+- `RegisterEntry.categoryLocked` prevents automatic categorization from being treated as unrestricted.
+- `RegisterEntry.categorySource` records categorization provenance.
+
+A functional MySQL uniqueness rule for category account, parent, and name is documented in the schema because Prisma cannot express it directly. Inspect migration `20260319131120_seed_categories` before changing category uniqueness.
+
+## Reconciliation and statements
+
+- `ReconciliationPeriod`: account, budget, register, date range, statement balances/totals, calculated difference, closing user, and optional closing adjustment entry.
+- `ReconciliationItem`: joins a period to a register entry and stores clearing state.
+- `StatementLine`: imported statement row with encrypted description, amount, match status, optional register-entry match, confidence, reason, and ignore state.
+- `StatementLineMatchStatus`: `unmatched`, `matched`, `statement_only`, `conflict`, or `ignored`.
+
+## Integrations and assets
+
+- `PlaidItem`, `PlaidSyncCursor`, and `PlaidSyncLog`: ownership, incremental sync state, and operational sync results.
+- Plaid identifiers and access tokens on registers and entries are encrypted; hash companions support lookup where present.
+- `EvmChain`, `CryptoRegisterChain`, and `CryptoTokenBalance`: EVM networks and token balances for wallet registers.
+- `CashOnHand`: one-to-one denomination counts for a register.
+- Asset and vehicle fields are stored on `AccountRegister`; estimation logic lives in services.
+
+## Snapshots, reports, and operations
+
+- `AccountSnapshot`, `AccountRegisterSnapshot`, and `RegisterEntrySnapshot`: point-in-time copies.
+- `AccountRegisterSummary`: monthly/yearly balance summary.
+- `OpenAiRequestLog`, `PlaidSyncLog`, `IntegrationAlert`, `IntegrationJobLog`, and `AdminAuditLog`: operational and administrative records.
+
+## Money and precision
+
+Most currency fields use decimal columns with two fractional digits. Rates and percentages use higher precision, and token quantities use up to 18 fractional digits. Keep calculations in decimal-safe representations and apply established banker-rounding rules at the existing boundaries.
+
+## Encryption annotations
+
+The main schema marks these sampled fields as encrypted:
+
+- `User.email` and `User.password`.
+- `AccountRegister.name`, Plaid identifiers/tokens, and wallet address.
+- `RegisterEntry.description` and Plaid ID.
+- `Reoccurrence.description`.
+- `StatementLine.description`.
+
+Generated re-encryption modules live under `app/prisma/reencrypt/`. Do not hand-edit generated files unless repository tooling explicitly requires it.
+
+## Schema-change procedure
+
+1. Change the main schema deliberately.
+2. Create a new migration; never rewrite deployed migration history.
+3. Run Prisma generation.
+4. Add regression tests for constraints and behavior.
+5. Run `prisma:check-governance` and inspect whether the microservice schema/migrations require synchronization.
+6. If encryption annotations changed, inspect generated re-encryption output and key-rotation behavior.

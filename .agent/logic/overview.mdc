@@ -1,40 +1,68 @@
 ---
-description: High-level purpose, tech stack, and who this repo is for
+description: Purpose, technology stack, scope, and audience for the Dineros repository
 ---
 
-# Dineros.cc — overview
+# Dineros overview
 
-Purpose
-- Predictive budgeting and financial management with forecasting, registers, recurring items, reconciliation, reports, and integrations (Plaid, crypto).
+## Purpose
 
-Audience
-- Maintainers and contributors working in Nuxt 4 + TypeScript
-- AI agents and CI tooling (see AGENTS.md and .cursor/)
+Dineros.cc is a predictive budgeting and financial-management platform. The repository contains functionality for:
 
-Tech stack
-- App (app/): Nuxt 4 + Vue 3, TypeScript, Pinia, Tailwind CSS, @nuxt/ui, Vitest, Playwright
-- Backend (Nitro/H3 in Nuxt server): TypeScript API routes under app/server/api
-- ORM: Prisma 7 targeting MySQL 8; prisma-field-encryption for field-level encryption
-- Data stores: MySQL 8, Redis 7/8
-- Queues: BullMQ; scheduled jobs via nuxt-cron
-- Integrations: Plaid, OpenAI, Postmark, optional NATS client
-- Deployment: Docker (multi-stage), GKE (Kubernetes manifests in .deploy/), GitHub Actions (build, deploy, PR checks)
+- Accounts, budgets, financial registers, and ledger entries.
+- Recurring transactions, transfers, loans, savings goals, and bills.
+- Forecasting future balances.
+- Plaid account linking, transaction synchronization, and matching.
+- Cryptocurrency wallet balances and asset-value estimates.
+- Cash-on-hand denomination tracking.
+- Statement reconciliation, extraction, and matching.
+- Categories, reports, notifications, account sharing, and administration.
+- Field-level encryption of sensitive database values.
 
-Packages and layout
-- Monorepo via pnpm-workspace.yaml
-  - app/ — main Nuxt application, APIs, Prisma schema/migrations, tests
-  - microservice/ — companion service (migrate endpoints, limited schema, queues support)
-  - scripts/, .deploy/, .github/ — automation, CI/CD, Kubernetes manifests
+The repository is source-available under the custom non-commercial terms in `LICENSE`.
 
-Key capabilities
-- Forecast engine (app/server/services/forecast/*) with extensive tests
-- Registers and entries with encryption and Plaid sync (see `.agent/logic/plaid.mdc`)
-- Recurrences with splits and transfer logic
-- Reports and notifications
-- Reconciliation flows
-- Crypto wallet support and cash-on-hand tracking
+## Technology stack
 
-Getting started
-- Read README.md for local setup and commands
-- For agents in constrained environments, read AGENTS.md (DB/Redis startup, env overrides, domain-doc map)
-- Domain encyclopedia: `.agent/logic/*.mdc`; policy: `.cursor/rules/`
+The primary application in `app/` uses:
+
+- Node.js 24.14 or newer.
+- PNPM 10 workspaces.
+- Nuxt 4 and Vue 3.
+- TypeScript and ESM.
+- Nuxt UI, Tailwind CSS, Pinia, and Pug support.
+- Nitro/H3 server routes.
+- Prisma 7 with the MariaDB adapter and a MySQL datasource.
+- MySQL for persistent data.
+- Redis and BullMQ for caching and background work.
+- Vitest for unit and integration tests.
+- Playwright and axe-core for end-to-end, visual, and accessibility tests.
+
+External integrations evidenced in the repository include Plaid, Postmark, OpenAI, Google APIs, Google Cloud, NATS, and Alchemy/EVM networks.
+
+A companion H3/Nitro service lives in `microservice/`. It has its own package, Docker image, Prisma schema, migration startup, Redis client, and migration routes.
+
+## Audience
+
+These rules are for AI coding agents and engineers changing the repository. Human contributors should also read:
+
+- `README.md` for setup and common commands.
+- `CONTRIBUTING.md` for contribution and DCO requirements.
+- `AGENTS.md` for agent-specific execution guidance.
+- `.cursor/rules/` for mandatory safety and subsystem rules.
+- `SECURITY.md` before handling a suspected vulnerability.
+
+## Sources of truth
+
+Prefer implementation and configuration over broad README claims when they disagree:
+
+1. `app/prisma/schema.prisma` and committed migrations for the main data model.
+2. Route handlers, services, schemas, and tests for runtime behavior.
+3. `app/package.json`, root `package.json`, and `pnpm-workspace.yaml` for commands and versions.
+4. `.deploy/`, Dockerfiles, and `.github/workflows/` for current deployment behavior.
+
+For example, the Prisma schemas and local containers establish MySQL as the database even though an older README section also mentions PostgreSQL.
+
+## Important terminology
+
+The code and schema consistently use the historical spelling `Reoccurrence`. Preserve that spelling in model names, existing APIs, and file names unless performing a deliberate, repository-wide migration.
+
+An `Account` is the shared workspace boundary. An `AccountRegister` is a financial register within an account and budget. Do not use the two terms interchangeably.
