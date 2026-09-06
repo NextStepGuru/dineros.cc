@@ -8,23 +8,6 @@ Field-level encryption
 - Implemented via prisma-field-encryption annotations in app/prisma/schema.prisma (/// @encrypted and hash annotations)
 - Generated helpers in app/prisma/reencrypt/* (index.ts per-model migrators)
 - Sensitive fields include User.email/password, AccountRegister.name/plaid fields/walletAddress, RegisterEntry.description/plaidId, Reoccurrence.description, etc.
-- Companion hash columns (e.g. `plaidIdHash`, `plaidAccessTokenHash`) are written by the extension for equality lookups
-
-## Querying encrypted fields
-
-prisma-field-encryption rewrites **equality** on encrypted fields to the hash column. It does **not** support:
-
-- `in` / `notIn` / `contains` / `startsWith` / `endsWith` on encrypted fields
-- Matching ciphertext with plaintext in `updateMany({ where: { plaidId: ... } })`
-
-Safe patterns:
-
-- `where: { plaidAccessToken: accessToken }` (hash equality)
-- `where: { plaidId: { not: null } }`
-- Load by token or register `id`, then filter decrypted `plaidId` in memory
-- Updates: `where: { id }`
-
-Agent rule: `.cursor/rules/encrypted-prisma-queries.mdc`. Plaid example: `PlaidSyncService.findPlaidRegistersByAccessToken`.
 
 Re-encryption after restore
 - docs/post-restore-encryption-plan.md describes the local-restore strategy
@@ -42,4 +25,3 @@ Do/do not
 - Do not log decrypted values or keys
 - Keep DATABASE_URL and DB_ENCRYPTION_KEY out of code; inject via Kubernetes secrets or .env locally
 - When adding new encrypted fields, ensure annotations exist in schema; run prisma generate to refresh reencrypt code
-- `StatementLine.description` is encrypted (same pattern as `RegisterEntry.description`). Match on loaded rows in memory, never `contains` on ciphertext.
