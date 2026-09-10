@@ -24,6 +24,7 @@ alwaysApply: false
 
 - Symbols used **only as types** must use `import type { … }` in a separate import from value imports. Do not mix type-only names in a normal `import { … }` when ESLint expects `import type`.
 - Example: `import type { ProgressReportCallback } from '…'` and `import { defaultProgressReport, visitRecords } from '…'` on the next line, not one combined import.
+- Generated `app/prisma/reencrypt/**` is exempt in `app/eslint.config.mjs` so `prisma generate` does not re-fail CI. Do not hand-edit those files for lint.
 - After edits in TypeScript files, run `pnpm lint` from `app/` (or fix with `eslint --fix` where the rule is auto-fixable) so CI does not fail on import style.
 
 ## General

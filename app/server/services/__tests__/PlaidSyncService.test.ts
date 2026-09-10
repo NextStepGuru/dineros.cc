@@ -41,6 +41,14 @@ describe("PlaidSyncService", () => {
     });
 
     plaidSyncService = new PlaidSyncService();
+    vi.spyOn(plaidSyncService.plaidEnrichment, "enrich").mockResolvedValue({
+      description: "Test Transaction",
+      categoryId: null,
+      categorySource: null,
+    });
+    vi.spyOn(plaidSyncService.plaidMatchAi, "matchBatch").mockResolvedValue(
+      new Map(),
+    );
   });
 
   describe("formatTransactionData", () => {
