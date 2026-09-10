@@ -282,7 +282,7 @@ class TransactionCategorizationService {
 
     const paths = buildCategoryPaths(categories);
     const index = buildPathIndex(paths);
-    let rules: MerchantCategoryRule[] = [];
+    let rules: MerchantCategoryRule[];
     try {
       rules = await this.db.merchantCategoryRule.findMany({ where: { accountId } });
     } catch {

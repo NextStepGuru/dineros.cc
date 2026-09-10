@@ -2,6 +2,9 @@ export const MAX_YEARS = 5;
 
 export const IS_CREDIT_TYPE_IDS = [3, 4, 5, 6, 7, 12, 13, 17];
 
+/** Seeded AccountType id for pocket (child) registers. */
+export const POCKET_TYPE_ID = 15;
+
 export const DEPRECIATING_ASSET_TYPE_IDS = [20, 24, 25, 26]; // Vehicle, Boat, RV, Motorcycle
 export const APPRECIATING_ASSET_TYPE_IDS = [21, 23]; // Collectable Vehicle, House
 export const ASSET_TYPE_IDS = [18, 20, 21, 23, 24, 25, 26];

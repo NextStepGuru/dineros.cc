@@ -57,11 +57,8 @@ describe("TransactionMatchingService", () => {
         createdAt: new Date("2024-01-01T00:00:00.000Z"),
       } as unknown as RegisterEntry;
 
-      // First call returns null (no existing plaid transaction)
-      // Second call returns the exact match
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(existingEntry);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany.mockResolvedValueOnce([existingEntry]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -72,8 +69,7 @@ describe("TransactionMatchingService", () => {
       expect(result.isMatched).toBe(true);
       expect(result.existingEntry).toBe(existingEntry);
       expect(result.matchType).toBe("exact");
-      // Check that the exact match call was made (second call)
-      expect(mockDb.registerEntry.findFirst).toHaveBeenNthCalledWith(2, {
+      expect(mockDb.registerEntry.findMany).toHaveBeenNthCalledWith(1, {
         where: {
           accountRegisterId: 1,
           amount: -100,
@@ -82,6 +78,7 @@ describe("TransactionMatchingService", () => {
             lt: expect.any(Date),
           },
           plaidId: null,
+          isBalanceEntry: false,
         },
       });
     });
@@ -110,13 +107,10 @@ describe("TransactionMatchingService", () => {
         createdAt: new Date("2024-01-05T00:00:00.000Z"), // 4 days later
       } as unknown as RegisterEntry;
 
-      // First call returns null (no existing plaid transaction)
-      // Second call returns null (no exact match)
-      // Third call returns the fuzzy match
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(existingEntry);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([existingEntry]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -183,13 +177,10 @@ describe("TransactionMatchingService", () => {
         isCredit: false,
       } as AccountType;
 
-      // First call returns null (no existing plaid transaction)
-      // Second call returns null (no exact match)
-      // Third call returns null (no fuzzy match within 5 days)
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -226,11 +217,8 @@ describe("TransactionMatchingService", () => {
         createdAt: new Date("2024-01-01T00:00:00.000Z"),
       } as RegisterEntry;
 
-      // First call returns null (no existing plaid transaction)
-      // Second call returns the exact match
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(existingEntry);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany.mockResolvedValueOnce([existingEntry]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -241,8 +229,7 @@ describe("TransactionMatchingService", () => {
       expect(result.isMatched).toBe(true);
       expect(result.existingEntry).toBe(existingEntry);
       expect(result.matchType).toBe("exact");
-      // Check that the exact match call was made (second call)
-      expect(mockDb.registerEntry.findFirst).toHaveBeenNthCalledWith(2, {
+      expect(mockDb.registerEntry.findMany).toHaveBeenNthCalledWith(1, {
         where: {
           accountRegisterId: 1,
           amount: 100, // Should be positive for credit accounts
@@ -251,6 +238,7 @@ describe("TransactionMatchingService", () => {
             lt: expect.any(Date),
           },
           plaidId: null,
+          isBalanceEntry: false,
         },
       });
     });
@@ -272,11 +260,8 @@ describe("TransactionMatchingService", () => {
         isCredit: false,
       } as AccountType;
 
-      // First call returns null (no existing plaid transaction)
-      // Second call returns null (no exact match)
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany.mockResolvedValueOnce([]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -287,8 +272,8 @@ describe("TransactionMatchingService", () => {
 
       expect(result.isMatched).toBe(false);
       expect(result.matchType).toBe("none");
-      // Should call findFirst twice (for plaid check and exact match only)
-      expect(mockDb.registerEntry.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockDb.registerEntry.findFirst).toHaveBeenCalledTimes(1);
+      expect(mockDb.registerEntry.findMany).toHaveBeenCalledTimes(1);
     });
 
     it("should exclude entries with existing plaidId from all searches", async () => {
@@ -308,11 +293,10 @@ describe("TransactionMatchingService", () => {
         isCredit: false,
       } as AccountType;
 
-      // All searches should return null
-      mockDb.registerEntry.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      mockDb.registerEntry.findFirst.mockResolvedValueOnce(null);
+      mockDb.registerEntry.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       const result = await transactionMatchingService.matchTransaction(
         transaction,
@@ -323,7 +307,6 @@ describe("TransactionMatchingService", () => {
       expect(result.isMatched).toBe(false);
       expect(result.matchType).toBe("none");
 
-      // Verify that all searches exclude entries with plaidId
       expect(mockDb.registerEntry.findFirst).toHaveBeenNthCalledWith(1, {
         where: {
           accountRegisterId: 1,
@@ -331,7 +314,7 @@ describe("TransactionMatchingService", () => {
         },
       });
 
-      expect(mockDb.registerEntry.findFirst).toHaveBeenNthCalledWith(2, {
+      expect(mockDb.registerEntry.findMany).toHaveBeenNthCalledWith(1, {
         where: {
           accountRegisterId: 1,
           amount: -100,
@@ -339,19 +322,21 @@ describe("TransactionMatchingService", () => {
             gte: expect.any(Date),
             lt: expect.any(Date),
           },
-          plaidId: null, // Should exclude entries with plaidId
+          plaidId: null,
+          isBalanceEntry: false,
         },
       });
 
-      expect(mockDb.registerEntry.findFirst).toHaveBeenNthCalledWith(3, {
+      expect(mockDb.registerEntry.findMany).toHaveBeenNthCalledWith(2, {
         where: {
           accountRegisterId: 1,
           amount: -100,
           createdAt: {
-            gte: expect.any(Date), // 5 days before
-            lte: expect.any(Date), // 5 days after
+            gte: expect.any(Date),
+            lte: expect.any(Date),
           },
-          plaidId: null, // Should exclude entries with plaidId
+          plaidId: null,
+          isBalanceEntry: false,
         },
       });
     });

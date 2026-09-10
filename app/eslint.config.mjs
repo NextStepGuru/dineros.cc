@@ -5,10 +5,6 @@ import tsParser from "@typescript-eslint/parser";
 
 export default withNuxt([
   {
-    ignores: [
-      "prisma/reencrypt/index.ts",
-      "microservice/prisma/reencrypt/index.ts",
-    ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
@@ -124,6 +120,15 @@ export default withNuxt([
             "Use dateTimeService.now() or dateTimeService.nowDate() for current time. No direct Date.now() in server code.",
         },
       ],
+    },
+  },
+  // prisma-field-encryption regenerates these; last so it wins over **/*.ts unused-vars.
+  {
+    files: ["prisma/reencrypt/**/*.ts"],
+    rules: {
+      "@typescript-eslint/consistent-type-imports": "off",
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 ]);

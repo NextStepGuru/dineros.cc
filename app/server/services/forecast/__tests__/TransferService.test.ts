@@ -276,6 +276,7 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(
         createMockAccount({
           id: 2,
+          typeId: 4,
           balance: -120,
         }),
       );
@@ -299,6 +300,38 @@ describe("TransferService", () => {
           amount: -120,
         }),
       );
+    });
+
+    it("does not cap a negative non-debt target", () => {
+      mockCache.accountRegister.insert(
+        createMockAccount({
+          id: 2,
+          typeId: 1,
+          subAccountRegisterId: null,
+          balance: -120,
+        }),
+      );
+
+      service.transferBetweenAccounts({
+        targetAccountRegisterId: 2,
+        sourceAccountRegisterId: 1,
+        amount: -500,
+        description: "Non-debt negative target",
+      });
+
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 2,
+          amount: 500,
+        }),
+      );
+      expect(mockEntryService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountRegisterId: 1,
+          amount: -500,
+        }),
+      );
+      expect(mockEntryService.createEntry).toHaveBeenCalledTimes(2);
     });
   });
 
