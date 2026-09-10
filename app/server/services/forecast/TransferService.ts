@@ -2,11 +2,18 @@ import type { ITransferService, TransferParams } from "./types";
 import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
 import prismaPkg, { AmountAdjustmentMode } from "@prisma/client";
 import type { RegisterEntryService } from "./RegisterEntryService";
+import { IS_CREDIT_TYPE_IDS, POCKET_TYPE_ID } from "~/consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
 import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 const { Prisma } = prismaPkg;
+
+type TransferLeg = {
+  amount: number;
+  targetDescription: string;
+  sourceDescription: string;
+};
 
 export class TransferService implements ITransferService {
   private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
@@ -19,83 +26,39 @@ export class TransferService implements ITransferService {
   }
 
   transferBetweenAccounts(params: TransferParams): void {
-    const {
-      targetAccountRegisterId,
-      sourceAccountRegisterId,
-      amount,
-      description,
-      reoccurrence,
-      fromDescription,
-      categoryId: transferCategoryId,
-    } = params;
-
-    if (sourceAccountRegisterId === targetAccountRegisterId) {
-      forecastLogger.warn(
-        `Skipping self-transfer for register ${sourceAccountRegisterId}`,
-      );
-      return;
-    }
-
-    const sourceReg = this.cache.accountRegister.findById(sourceAccountRegisterId);
-    const targetReg = this.cache.accountRegister.findById(targetAccountRegisterId);
-    if (sourceReg?.isArchived || targetReg?.isArchived) {
-      forecastLogger.warn(
-        `Skipping transfer involving archived register (source=${sourceAccountRegisterId}, target=${targetAccountRegisterId})`,
-      );
-      return;
-    }
-
-    // Cap transfer to debt account so payment never exceeds balance
-    let effectiveAmount = Math.abs(+amount);
-    const targetForCap = targetReg;
-    if (targetForCap && +targetForCap.balance < 0) {
-      const amountOwed = Math.abs(+targetForCap.balance);
-      if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
-    }
-    if (effectiveAmount <= TransferService.MONEY_EPSILON) return;
-
-    // Create entry for target account (receiving money)
-    this.entryService.createEntry({
-      accountRegisterId: targetAccountRegisterId,
-      description,
-      sourceAccountRegisterId,
-      amount: effectiveAmount,
-      reoccurrence,
-      typeId: 6, // Transfer
-      categoryId: null,
-    });
-
-    // Create entry for source account (sending money)
-    this.entryService.createEntry({
-      accountRegisterId: sourceAccountRegisterId,
-      sourceAccountRegisterId: targetAccountRegisterId,
-      description: fromDescription || `Transfer for ${description}`,
-      amount: effectiveAmount * -1,
-      reoccurrence,
-      typeId: 6, // Transfer
-      categoryId: transferCategoryId ?? null,
-    });
+    const legs = this.planTransferLegs(params);
+    if (!legs) return;
+    this.emitTransferLegs(params, legs);
   }
 
   transferBetweenAccountsWithDate(
     params: TransferParams & { forecastDate: Date },
   ): void {
+    const legs = this.planTransferLegs(params);
+    if (!legs) return;
+    this.emitTransferLegs(params, legs, params.forecastDate);
+  }
+
+  private static isPocketRegister(
+    reg: Pick<CacheAccountRegister, "typeId" | "subAccountRegisterId">,
+  ): boolean {
+    return reg.typeId === POCKET_TYPE_ID || reg.subAccountRegisterId != null;
+  }
+
+  private planTransferLegs(params: TransferParams): TransferLeg[] | null {
     const {
       targetAccountRegisterId,
       sourceAccountRegisterId,
       amount,
       description,
-      reoccurrence,
       fromDescription,
-      forecastDate,
-      categoryId: transferCategoryIdWithDate,
     } = params;
 
     if (sourceAccountRegisterId === targetAccountRegisterId) {
       forecastLogger.warn(
         `Skipping self-transfer for register ${sourceAccountRegisterId}`,
       );
-      return;
+      return null;
     }
 
     const sourceReg = this.cache.accountRegister.findById(sourceAccountRegisterId);
@@ -104,43 +67,81 @@ export class TransferService implements ITransferService {
       forecastLogger.warn(
         `Skipping transfer involving archived register (source=${sourceAccountRegisterId}, target=${targetAccountRegisterId})`,
       );
-      return;
+      return null;
     }
 
-    // Cap transfer to debt account so payment never exceeds balance
     let effectiveAmount = Math.abs(+amount);
-    const targetForCap = targetReg;
-    if (targetForCap && +targetForCap.balance < 0) {
-      const amountOwed = Math.abs(+targetForCap.balance);
+    if (
+      targetReg &&
+      IS_CREDIT_TYPE_IDS.includes(targetReg.typeId) &&
+      +targetReg.balance < 0
+    ) {
+      const amountOwed = Math.abs(+targetReg.balance);
       if (effectiveAmount > amountOwed) effectiveAmount = amountOwed;
     }
     if (effectiveAmount <= TransferService.MONEY_EPSILON) {
-      return;
+      return null;
     }
 
-    // Create entry for target account (receiving money)
-    this.entryService.createEntry({
-      accountRegisterId: targetAccountRegisterId,
-      description,
-      sourceAccountRegisterId,
+    const legs: TransferLeg[] = [];
+    const targetBalance = targetReg ? +targetReg.balance : 0;
+    if (
+      targetReg &&
+      TransferService.isPocketRegister(targetReg) &&
+      targetBalance < -TransferService.MONEY_EPSILON
+    ) {
+      const shortfall = Math.abs(targetBalance);
+      legs.push({
+        amount: shortfall,
+        targetDescription: `${description} (shortfall settlement)`,
+        sourceDescription: `Transfer for ${description} (shortfall settlement)`,
+      });
+    }
+
+    legs.push({
       amount: effectiveAmount,
-      reoccurrence,
-      forecastDate,
-      typeId: 6, // Transfer
-      categoryId: null,
+      targetDescription: description,
+      sourceDescription: fromDescription || `Transfer for ${description}`,
     });
 
-    // Create entry for source account (sending money)
-    this.entryService.createEntry({
-      accountRegisterId: sourceAccountRegisterId,
-      sourceAccountRegisterId: targetAccountRegisterId,
-      description: fromDescription || `Transfer for ${description}`,
-      amount: effectiveAmount * -1,
+    return legs;
+  }
+
+  private emitTransferLegs(
+    params: TransferParams,
+    legs: TransferLeg[],
+    forecastDate?: Date,
+  ): void {
+    const {
+      targetAccountRegisterId,
+      sourceAccountRegisterId,
       reoccurrence,
-      forecastDate,
-      typeId: 6, // Transfer
-      categoryId: transferCategoryIdWithDate ?? null,
-    });
+      categoryId: transferCategoryId,
+    } = params;
+
+    for (const leg of legs) {
+      this.entryService.createEntry({
+        accountRegisterId: targetAccountRegisterId,
+        description: leg.targetDescription,
+        sourceAccountRegisterId,
+        amount: leg.amount,
+        reoccurrence,
+        forecastDate,
+        typeId: 6, // Transfer
+        categoryId: null,
+      });
+
+      this.entryService.createEntry({
+        accountRegisterId: sourceAccountRegisterId,
+        sourceAccountRegisterId: targetAccountRegisterId,
+        description: leg.sourceDescription,
+        amount: leg.amount * -1,
+        reoccurrence,
+        forecastDate,
+        typeId: 6, // Transfer
+        categoryId: transferCategoryId ?? null,
+      });
+    }
   }
 
   async processExtraDebtPayments(
