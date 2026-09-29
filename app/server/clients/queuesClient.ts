@@ -41,7 +41,13 @@ if (!queueManager.isDisabled()) {
 }
 
 export const addBackupJob = (data: BackupJob) =>
-  queueManager.addJob(backup.queueName, data);
+  queueManager.addJob(backup.queueName, data, {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 60 * 1000 },
+    removeOnComplete: true,
+    removeOnFail: false,
+    keepLogs: 4,
+  });
 
 export const addRecalculateJob = (data: RecalculateJob) =>
   queueManager.addJob(recalculate.queueName, data, {
