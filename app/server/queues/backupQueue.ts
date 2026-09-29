@@ -11,14 +11,6 @@ import { dateTimeService } from "../services/forecast/DateTimeService";
 export type BackupJob = { name: string };
 const queueName = "daily-backup";
 
-function backupData(name: string, data: unknown): void {
-  writeFileSync(
-    `./temp/${name}.ts`,
-    `export const ${name} = ${JSON.stringify(data)}`,
-    "utf8"
-  );
-}
-
 const processor = async (job: Job<BackupJob>) => {
   log({
     level: "debug",
@@ -53,19 +45,29 @@ const processor = async (job: Job<BackupJob>) => {
     zlib: { level: 9 }, // Sets the compression level
   });
 
-  backupData("accounts", await prisma.account.findMany({}));
-  backupData("accountRegisters", await prisma.accountRegister.findMany({}));
-  backupData("reoccurrences", await prisma.reoccurrence.findMany({}));
-  backupData("reoccurrenceSkips", await prisma.reoccurrenceSkip.findMany({}));
-  backupData("registerEntry", await prisma.registerEntry.findMany({}));
-  backupData("budgets", await prisma.budget.findMany({}));
-  backupData("users", await prisma.user.findMany({}));
-  backupData("userSocials", await prisma.userSocial.findMany({}));
-  backupData("categories", await prisma.category.findMany({}));
-  backupData("userAccounts", await prisma.userAccount.findMany({}));
-  backupData("intervals", await prisma.interval.findMany({}));
-  backupData("accountTypes", await prisma.accountType.findMany({}));
-  backupData("rsa", await prisma.rsa.findMany({}));
+  // Dump a table straight into the archive — hosted environments never write
+  // plaintext dump files to disk. Local also keeps .ts copies for the dev workflow.
+  const dumpTable = (name: string, data: unknown) => {
+    const content = `export const ${name} = ${JSON.stringify(data)}`;
+    archive.append(Buffer.from(content, "utf8"), { name: `${name}.ts` });
+    if (env.DEPLOY_ENV === "local") {
+      writeFileSync(path.join(backupDir, `${name}.ts`), content, "utf8");
+    }
+  };
+
+  dumpTable("accounts", await prisma.account.findMany({}));
+  dumpTable("accountRegisters", await prisma.accountRegister.findMany({}));
+  dumpTable("reoccurrences", await prisma.reoccurrence.findMany({}));
+  dumpTable("reoccurrenceSkips", await prisma.reoccurrenceSkip.findMany({}));
+  dumpTable("registerEntry", await prisma.registerEntry.findMany({}));
+  dumpTable("budgets", await prisma.budget.findMany({}));
+  dumpTable("users", await prisma.user.findMany({}));
+  dumpTable("userSocials", await prisma.userSocial.findMany({}));
+  dumpTable("categories", await prisma.category.findMany({}));
+  dumpTable("userAccounts", await prisma.userAccount.findMany({}));
+  dumpTable("intervals", await prisma.interval.findMany({}));
+  dumpTable("accountTypes", await prisma.accountType.findMany({}));
+  dumpTable("rsa", await prisma.rsa.findMany({}));
 
   // Dump files and the zip contain full user data — always remove working files when
   // the job ends. Copies in prisma/backup are kept only for the local workflow; hosted
@@ -109,8 +111,6 @@ const processor = async (job: Job<BackupJob>) => {
       archive.on("error", reject);
       // Pipe archive data to the file
       archive.pipe(output);
-      // Append files from the backup directory
-      archive.glob("*.ts", { cwd: backupDir });
       // Finalize the archive (i.e., we are done appending files but streams have to finish yet)
       archive.finalize();
     });

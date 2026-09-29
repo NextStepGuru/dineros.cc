@@ -14,6 +14,7 @@ export const vitestNodeTestIncludes = [
   "server/services/forecast/__tests__/**/*.test.ts",
   "server/services/reports/__tests__/**/*.test.ts",
   "server/lib/__tests__/**/*.test.ts",
+  "server/queues/__tests__/**/*.test.ts",
   "lib/__tests__/**/*.test.ts",
   "pages/__tests__/**/*.test.ts",
   "tests/**/*.test.ts",
