@@ -23,5 +23,5 @@ alwaysApply: true
 
 ## Rule Updates
 
-- When project conventions, tooling, or runtime behavior change, update the matching **globbed** rule under `.cursor/rules/*.mdc` **and** the matching domain doc under `.agent/logic/*.mdc` so both stay accurate.
-- Do not leave encyclopedia-only facts in always-apply rules; put how-it-works detail in `.agent/logic/` and keep Cursor rules short and actionable.
+- When project conventions, tooling, or runtime behavior change, update the matching **globbed** rule under `.cursor/rules/*.mdc`, and where a `knowledge/` concept covers the area, surface the correction per `okf-memory.mdc` (PR comment or the source the concept describes).
+- Do not leave encyclopedia-only facts in always-apply rules; put how-it-works detail in the `knowledge/` bundle (per `okf-memory.mdc`) or the source, and keep Cursor rules short and actionable.

@@ -5,25 +5,21 @@ If you are contributing code as a person, start with `README.md` and `CONTRIBUTI
 
 ## Domain docs (read when relevant)
 
-Policy and do/don’t live in `.cursor/rules/`. How the system works lives in `.agent/logic/` — **Read** the matching file before changing that area; nothing auto-loads these.
+Policy and do/don’t live in `.cursor/rules/`. How the system works lives in the generated `knowledge/` OKF bundle (see the managed section at the bottom of this file and `.cursor/rules/okf-memory.mdc`): search it with `okf search "<query>" knowledge --limit 3 --json` or start from `knowledge/index.md` — do not blanket-scan or grep it. Hand edits inside `knowledge/` may be overwritten by the NextStepGuru regeneration; put corrections in a PR comment or in the source the concept describes.
 
-| Topic | File |
+Areas the bundle does not cover yet — read the source instead:
+
+| Topic | Source |
 | --- | --- |
-| Stack / purpose | `.agent/logic/overview.mdc` |
-| Directory map / data flow | `.agent/logic/architecture.mdc` |
-| Prisma models / balance fields | `.agent/logic/data-model.mdc` |
-| API routes | `.agent/logic/api-surface.mdc` |
-| BullMQ + nuxt-cron | `.agent/logic/queues-and-cron.mdc` |
-| Field encryption / queries | `.agent/logic/encryption-and-keys.mdc` |
-| Plaid link / sync / balances | `.agent/logic/plaid.mdc` |
-| Forecast engine | `.agent/logic/forecast-engine.mdc` |
-| Statement reconciliation | `.agent/logic/reconciliation.mdc` |
-| Microservice | `.agent/logic/microservice.mdc` |
-| Deploy / CI | `.agent/logic/deployment.mdc` |
-| Conventions / checklists | `.agent/logic/patterns.mdc` |
-| Test layout (commands when user asks) | `.agent/logic/testing.mdc` |
+| BullMQ queues + nuxt-cron | `app/server/queues/`, `app/server/cron/` |
+| Plaid link / sync / balances | `app/server/services/PlaidSyncService.ts`, `app/server/cron/plaid*.ts` |
+| Field encryption / queries | `app/lib/normalizePrismaDmmf.ts`, `app/server/clients/prismaClient.ts`, `@encrypted` in `app/prisma/schema.prisma` |
+| Forecast engine | `app/server/services/forecast/` |
+| Statement reconciliation | `app/server/services/reconciliationService.ts`, `app/server/api/reconciliation/` |
+| Microservice | `microservice/` |
+| Deploy / CI | `.github/workflows/`, `.deploy/` |
 
-When behavior changes, update the matching `.agent/logic` file and any globbed rule under `.cursor/rules/` (see `00-global-safety.mdc` → Rule Updates).
+When behavior changes, update the matching globbed rule under `.cursor/rules/` (see `00-global-safety.mdc` → Rule Updates) and, where a `knowledge/` concept covers the area, follow `okf-memory.mdc` for corrections.
 
 ## Cursor Cloud specific instructions
 
