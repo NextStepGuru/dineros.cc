@@ -97,6 +97,7 @@ body {
   );
   --frog-features-icon-color: var(--color-gold-500);
   --frog-cta-text: var(--color-navy-950);
+  --frog-cta-outline-text: var(--color-gold-200);
 
   /* Drag / highlight utilities */
   --dineros-drag-highlight: color-mix(
@@ -145,6 +146,7 @@ body {
   );
   --frog-features-icon-color: var(--color-gold-300);
   --frog-cta-text: var(--color-navy-950);
+  --frog-cta-outline-text: var(--color-gold-100);
 
   --dineros-drag-highlight: color-mix(
     in srgb,
@@ -625,6 +627,12 @@ body {
 
 .page-home .frog-cta {
   color: var(--frog-cta-text);
+}
+
+/* Outline CTA sits on the navy hero without a solid fill, so it needs its own
+   light-gold text instead of the navy used on the solid gold button. */
+.page-home .frog-cta-outline {
+  color: var(--frog-cta-outline-text);
 }
 
 /* Legal document theme: black & white, no dark mode. Links in navy. */
