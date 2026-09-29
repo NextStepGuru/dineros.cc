@@ -1,0 +1,14 @@
+---
+description: Where this project's persistent knowledge lives and how to query it
+alwaysApply: true
+---
+
+Persistent project knowledge is an OKF v0.2 bundle in `knowledge/`.
+
+If `okf_*` MCP tools or an `okf` binary are available, search first (`okf search "<query>" knowledge --limit 3 --json`) then `okf show <id>` for hits worth reading.
+
+Otherwise read `knowledge/index.md`, pick concepts from the one-sentence descriptions, and follow relative links. Do not blanket-scan or grep `knowledge/`.
+
+`generated:` is model-authored and may be wrong; never mark it `verified:`. Treat `status: deprecated` as history.
+
+NextStepGuru regenerates this bundle; hand edits inside `knowledge/` may be overwritten.
