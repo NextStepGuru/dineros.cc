@@ -9,6 +9,7 @@ const queues: string[] = [
   "recalculate",
   "plaid-sync",
   "plaid-sync-balance",
+  "register-entry-recategorize",
 ];
 
 const serverAdapter = new H3Adapter();
