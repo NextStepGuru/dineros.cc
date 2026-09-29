@@ -1,5 +1,6 @@
 import type { Job } from "bullmq";
 import { prisma } from "~/server/clients/prismaClient";
+import { addPlaidSyncJob } from "~/server/clients/queuesClient";
 import { log } from "~/server/logger";
 import PlaidSyncService from "~/server/services/PlaidSyncService";
 import { dateTimeService } from "../services/forecast/DateTimeService";
@@ -82,9 +83,9 @@ export default {
       return;
     }
 
-    let accounts;
+    let balanceResult;
     try {
-      accounts =
+      balanceResult =
         await plaidSyncService.getAllAccountsByAccessTokenAndUpdateBalance({
           accessToken: lookupPlaidAccessToken.plaidAccessToken,
           plaidAccountIds,
@@ -102,12 +103,31 @@ export default {
       throw err;
     }
 
+    // The snapshot moved without any transaction pull in this job. Chase a
+    // transaction sync per changed register so pending rows enter the ledger
+    // with the new anchor — otherwise the balance dips a day early and only
+    // reconciles at the next daily transaction sync. The transaction sync
+    // itself never chases back, so this cannot loop.
+    for (const changedRegisterId of balanceResult.changedRegisterIds) {
+      await addPlaidSyncJob(
+        { name: "Plaid balance chase", accountRegisterId: changedRegisterId },
+        { delay: 0 },
+      );
+    }
+    if (balanceResult.changedRegisterIds.length > 0) {
+      log({
+        message: `PlaidSyncBalanceJob ${job.id}: balance moved; enqueued transaction sync chase`,
+        level: "info",
+        data: { changedRegisterIds: balanceResult.changedRegisterIds },
+      });
+    }
+
     log({
       message: `Completed PlaidSyncBalanceJob ${job.id} in ${
         dateTimeService.nowDate().getTime() - start
       }ms`,
       data: {
-        plaidAccounts: accounts.map((a) => ({
+        plaidAccounts: balanceResult.accounts.map((a) => ({
           account_id: a.account_id,
           balance: a.balances.current,
         })),

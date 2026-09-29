@@ -20,6 +20,7 @@ After either path, call **`getAllAccountsByAccessTokenAndUpdateBalance` inline**
 - Skip when Plaid returns no numeric amount.
 - Debit: prefer `balances.current`, else `available`. Credit: negate `current`.
 - Load registers by token equality + in-memory `plaidId` filter — never `plaidId: { in }` (see `encrypted-prisma-queries.mdc`).
+- **Chase rule**: a standalone balance write that moves a register's balance (≥ $0.01) must enqueue a `delay: 0` `plaid-sync` job for that register (`Plaid balance chase`). Bank `current` balances reflect pending activity, so a moved snapshot without ledger rows shows an unexplained dip until the daily sync. The transaction-sync path's own inline balance write must **not** chase (loop guard).
 
 ## Throttle / force
 

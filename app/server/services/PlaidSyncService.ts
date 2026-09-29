@@ -1,6 +1,7 @@
 import type {
   AccountRegister,
   AccountType,
+  Prisma,
   PrismaClient,
 } from "@prisma/client";
 import { prisma as PrismaDb } from "~/server/clients/prismaClient";
@@ -35,6 +36,7 @@ const DAYS_REQUESTED = 3;
 type PlaidBalanceRegister = {
   id: number;
   plaidId: string | null;
+  latestBalance: Prisma.Decimal;
   type: { isCredit: boolean };
 };
 
@@ -662,6 +664,7 @@ class PlaidSyncService {
       select: {
         id: true,
         plaidId: true,
+        latestBalance: true,
         type: { select: { isCredit: true } },
       },
     });
@@ -675,7 +678,7 @@ class PlaidSyncService {
   private async applyPlaidBalancesToRegisters(
     accounts: AccountBase[],
     accountRegisters: PlaidBalanceRegister[],
-  ): Promise<void> {
+  ): Promise<number[]> {
     const registerByPlaidId = new Map(
       accountRegisters
         .filter((r) => r.plaidId != null)
@@ -683,6 +686,7 @@ class PlaidSyncService {
     );
     const now = dateTimeService.nowDate();
     let updated = 0;
+    const changedRegisterIds: number[] = [];
 
     for (const account of accounts) {
       const accountRegister = registerByPlaidId.get(account.account_id);
@@ -699,6 +703,10 @@ class PlaidSyncService {
           level: "warn",
         });
         continue;
+      }
+
+      if (Math.abs(Number(accountRegister.latestBalance) - latestBalance) >= 0.01) {
+        changedRegisterIds.push(accountRegister.id);
       }
 
       await this.db.accountRegister.update({
@@ -718,13 +726,18 @@ class PlaidSyncService {
         plaidAccounts: accounts.length,
         linkedRegisters: accountRegisters.length,
         updated,
+        changed: changedRegisterIds.length,
       },
       level: "info",
     });
+    return changedRegisterIds;
   }
 
   /**
    * Fetches Plaid account balances and writes them onto linked registers.
+   * Returns the accounts plus the register ids whose balance actually moved —
+   * the standalone balance job uses those to chase a transaction sync so
+   * pending rows enter the ledger with the new snapshot.
    */
   async getAllAccountsByAccessTokenAndUpdateBalance({
     accessToken,
@@ -732,7 +745,7 @@ class PlaidSyncService {
   }: {
     accessToken: string;
     plaidAccountIds: string[];
-  }): Promise<AccountBase[]> {
+  }): Promise<{ accounts: AccountBase[]; changedRegisterIds: number[] }> {
     const accountRegisters = await this.findPlaidRegistersByAccessToken(
       accessToken,
       plaidAccountIds,
@@ -746,7 +759,7 @@ class PlaidSyncService {
         message: "No Plaid-linked registers for balance update",
         level: "info",
       });
-      return [];
+      return { accounts: [], changedRegisterIds: [] };
     }
 
     let accountsResponse;
@@ -761,8 +774,11 @@ class PlaidSyncService {
     }
 
     const accountList = accountsResponse.data.accounts;
-    await this.applyPlaidBalancesToRegisters(accountList, accountRegisters);
-    return accountList;
+    const changedRegisterIds = await this.applyPlaidBalancesToRegisters(
+      accountList,
+      accountRegisters,
+    );
+    return { accounts: accountList, changedRegisterIds };
   }
 
   /** Best-effort: transaction sync should still succeed if balance pull fails. */
