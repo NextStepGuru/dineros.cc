@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
-# In-cluster DB field-encryption key rotation (append-only decryption slots).
+# In-cluster DB field-encryption key rotation (append-only decryption slots,
+# pruned to one generation after a successful reencrypt migrate).
 # Required env: K8S_NAMESPACE, SECRET_DB, MAIN_DEPLOYMENT_NAME, MICRO_DEPLOYMENT_NAME,
 # MICRO_SERVICE_NAME, INTERNAL_API_TOKEN (from SECRET_APP).
 set -eu
@@ -44,9 +45,24 @@ kubectl rollout restart "deployment/${MICRO_DEPLOYMENT_NAME}" -n "${K8S_NAMESPAC
 kubectl rollout status "deployment/${MAIN_DEPLOYMENT_NAME}" -n "${K8S_NAMESPACE}" --timeout=15m
 kubectl rollout status "deployment/${MICRO_DEPLOYMENT_NAME}" -n "${K8S_NAMESPACE}" --timeout=15m
 
-curl -fsS \
+# GET /migrate awaits the reencrypt run; POST /migrate returns 202 fire-and-forget,
+# which would let this job report success before re-encryption actually finishes.
+# 90m max-time stays under the CronJob's 2h activeDeadlineSeconds.
+curl -fsS --max-time 5400 \
   -H "x-internal-token: ${INTERNAL_API_TOKEN}" \
   "http://${MICRO_SERVICE_NAME}.${K8S_NAMESPACE}.svc.cluster.local:3050/migrate"
+
+# Migrate succeeded, so all data is encrypted under the new DB_ENCRYPTION_KEY.
+# Prune stale decryption slots, keeping one generation (this run's slot) for
+# rollback safety. Removing secret keys only affects future pod boots; running
+# pods keep their in-memory key set.
+prune_json="$(kubectl get secret "${SECRET_DB}" -n "${K8S_NAMESPACE}" -o json | jq --arg keep "${dec_key_name}" '
+  [.data // {} | keys[] | select(test("^DB_DECRYPTION_KEY_[0-9]+$")) | select(. != $keep)]
+  | if length > 0 then {data: (reduce .[] as $k ({}; .[$k] = null))} else empty end')"
+if [ -n "${prune_json}" ]; then
+  kubectl patch secret "${SECRET_DB}" -n "${K8S_NAMESPACE}" --type merge -p "${prune_json}"
+  echo "pruned stale decryption slots (kept ${dec_key_name})"
+fi
 
 echo ""
 echo "ok: key rotation and reencrypt migrate finished"
