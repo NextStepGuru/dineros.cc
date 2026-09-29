@@ -44,6 +44,8 @@ const envSchema = z.object({
   WEBAUTHN_RP_ID: z.string().optional(),
   WEBAUTHN_RP_NAME: z.string().default("Dineros.cc"),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Optional, in case the key file is used locally
+  /** GCS bucket for the daily backup job. Required unless DEPLOY_ENV=local (the job fails fast without it). */
+  BACKUP_BUCKET_NAME: z.string().optional(),
   TEST_DATE: z.string().optional(),
   TEST_TIMEZONE: z.string().optional(),
   /** Alchemy API key; if unset, crypto wallet sync is skipped. */

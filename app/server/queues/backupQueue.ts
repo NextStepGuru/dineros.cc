@@ -12,7 +12,7 @@ export type BackupJob = { name: string };
 const queueName = "daily-backup";
 
 function backupData(name: string, data: unknown): void {
-  return writeFileSync(
+  writeFileSync(
     `./temp/${name}.ts`,
     `export const ${name} = ${JSON.stringify(data)}`,
     "utf8"
@@ -25,14 +25,20 @@ const processor = async (job: Job<BackupJob>) => {
     message: `Start BackupJob ${job.id} with data:`,
     data: job.data,
   });
-  const storage = new Storage();
-  const bucketName = process.env.BACKUP_BUCKET_NAME || "your-backup-bucket";
-  const backupDir = "./temp/";
 
-  // Ensure the backup directory exists
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
+  const bucketName = process.env.BACKUP_BUCKET_NAME;
+  if (!bucketName && env.DEPLOY_ENV !== "local") {
+    // Otherwise the job would upload to a placeholder bucket and still report success.
+    throw new Error("BACKUP_BUCKET_NAME is not set; refusing to run backup");
   }
+
+  const storage = new Storage();
+  const backupDir = "./temp/";
+  const localBackupDir = "./prisma/backup/";
+
+  // Ensure the working and local-copy directories exist (the runtime image does not ship prisma/backup)
+  fs.mkdirSync(backupDir, { recursive: true });
+  fs.mkdirSync(localBackupDir, { recursive: true });
 
   // Generate the current date string in yyyy-mm-dd format
   const date = dateTimeService.nowDate();
@@ -59,42 +65,29 @@ const processor = async (job: Job<BackupJob>) => {
   backupData("accountTypes", await prisma.accountType.findMany({}));
   backupData("rsa", await prisma.rsa.findMany({}));
 
-  // Listen for all archive data to be written
-  output.on("close", async () => {
-    log({ message: `Archive created: ${archive.pointer()} total bytes` });
-
-    // Upload the zip file to Google Cloud Storage
-    try {
-      await storage.bucket(bucketName).upload(zipFilePath, {
-        destination: zipFileName,
-      });
-
-      log({ message: "File uploaded successfully" });
-    } catch (error) {
-      log({
-        message: "Error uploading file:",
-        data: { error },
-        level: "error",
-      });
-    } finally {
-      // Clean up the zip file after upload
-      fs.unlinkSync(zipFilePath);
-
-      // if (env.DEPLOY_ENV === "local") {
-      // Delete all *.ts files in the backup directory
-      const files = fs.readdirSync(backupDir);
-      for (const file of files) {
-        if (file.endsWith(".ts")) {
+  // Dump files and the zip contain full user data — always remove working files when
+  // the job ends, keeping copies in prisma/backup for the local workflow first.
+  const cleanupWorkingFiles = () => {
+    for (const file of fs.readdirSync(backupDir)) {
+      if (file.endsWith(".ts")) {
+        try {
           fs.copyFileSync(
             path.join(backupDir, file),
-            path.join("./prisma/backup", file)
+            path.join(localBackupDir, file)
           );
-          fs.unlinkSync(path.join(backupDir, file));
+        } catch (error) {
+          log({
+            message: `Error copying ${file} to ${localBackupDir}:`,
+            data: { error },
+            level: "warn",
+          });
         }
       }
+      if (file.endsWith(".ts") || file === zipFileName) {
+        fs.rmSync(path.join(backupDir, file), { force: true });
+      }
     }
-    // }
-  });
+  };
 
   // Good practice to catch warnings (ie stat failures and other non-blocking errors)
   archive.on("warning", (err) => {
@@ -105,19 +98,35 @@ const processor = async (job: Job<BackupJob>) => {
     }
   });
 
-  // Catch errors explicitly
-  archive.on("error", (err) => {
-    log({ message: "Error archiving:", data: err, level: "error" });
-  });
+  try {
+    // Wait for the zip to be fully written before uploading it
+    await new Promise<void>((resolve, reject) => {
+      output.on("close", resolve);
+      archive.on("error", reject);
+      // Pipe archive data to the file
+      archive.pipe(output);
+      // Append files from the backup directory
+      archive.glob("*.ts", { cwd: backupDir });
+      // Finalize the archive (i.e., we are done appending files but streams have to finish yet)
+      archive.finalize();
+    });
 
-  // Pipe archive data to the file
-  archive.pipe(output);
+    log({ message: `Archive created: ${archive.pointer()} total bytes` });
 
-  // Append files from the backup directory
-  archive.glob("*.ts", { cwd: backupDir });
-
-  // Finalize the archive (i.e., we are done appending files but streams have to finish yet)
-  archive.finalize();
+    if (bucketName) {
+      await storage.bucket(bucketName).upload(zipFilePath, {
+        destination: zipFileName,
+      });
+      log({ message: "File uploaded successfully" });
+    } else {
+      log({
+        message: "BACKUP_BUCKET_NAME not set; local backup copy only",
+        level: "warn",
+      });
+    }
+  } finally {
+    cleanupWorkingFiles();
+  }
 };
 
 export default { queueName, processor };
