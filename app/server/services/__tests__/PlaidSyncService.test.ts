@@ -379,4 +379,56 @@ describe("PlaidSyncService", () => {
       );
     });
   });
+
+  describe("getAllAccountsByAccessTokenAndUpdateBalance", () => {
+    const plaidAccount = (accountId: string, current: number) => ({
+      account_id: accountId,
+      balances: { current, available: current, iso_currency_code: "USD" },
+    });
+
+    it("returns changed register ids when the Plaid balance moved", async () => {
+      vi.spyOn(plaidSyncService.client, "accountsGet").mockResolvedValue({
+        data: {
+          accounts: [plaidAccount("plaid-acc-1", 100), plaidAccount("plaid-acc-2", 50)],
+        },
+      } as any);
+      vi.mocked(prisma.accountRegister.findMany).mockResolvedValue([
+        { id: 11, plaidId: "plaid-acc-1", latestBalance: 150, type: { isCredit: false } },
+        { id: 12, plaidId: "plaid-acc-2", latestBalance: 50, type: { isCredit: false } },
+      ] as any);
+
+      const result =
+        await plaidSyncService.getAllAccountsByAccessTokenAndUpdateBalance({
+          accessToken: "test-token",
+          plaidAccountIds: ["plaid-acc-1", "plaid-acc-2"],
+        });
+
+      expect(result.accounts).toHaveLength(2);
+      expect(result.changedRegisterIds).toEqual([11]);
+      expect(prisma.accountRegister.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 11 },
+          data: expect.objectContaining({ latestBalance: 100 }),
+        }),
+      );
+    });
+
+    it("returns no changed ids when balances are unchanged", async () => {
+      vi.spyOn(plaidSyncService.client, "accountsGet").mockResolvedValue({
+        data: { accounts: [plaidAccount("plaid-acc-1", 75)] },
+      } as any);
+      vi.mocked(prisma.accountRegister.findMany).mockResolvedValue([
+        { id: 21, plaidId: "plaid-acc-1", latestBalance: 75, type: { isCredit: false } },
+      ] as any);
+
+      const result =
+        await plaidSyncService.getAllAccountsByAccessTokenAndUpdateBalance({
+          accessToken: "test-token",
+          plaidAccountIds: ["plaid-acc-1"],
+        });
+
+      expect(result.accounts).toHaveLength(1);
+      expect(result.changedRegisterIds).toEqual([]);
+    });
+  });
 });
