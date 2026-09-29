@@ -67,15 +67,15 @@ Use one of these options:
 
 If you change how a subsystem works (Plaid, encryption queries, forecast balances, queues, API surface, etc.):
 
-1. Update the matching file under `.agent/logic/` (how it works).
-2. Update any matching globbed rule under `.cursor/rules/` (agent do/don’t for that area).
+1. Update any matching globbed rule under `.cursor/rules/` (agent do/don’t for that area).
+2. The how-it-works encyclopedia is the generated `knowledge/` bundle. Hand edits inside it may be overwritten by the NextStepGuru regeneration — put corrections in a PR comment or in the source the concept describes (see `.cursor/rules/okf-memory.mdc`).
 3. Keep human docs (`README.md`, `docs/`) in sync only when setup or contributor-facing behavior changed.
 
 See `docs/README.md` for an index and `AGENTS.md` for the agent domain-doc map.
 
 ## Cursor-specific files
 
-The `.cursor/` directory, `.agent/logic/`, and `AGENTS.md` are tooling guidance for AI-assisted workflows.
+The `.cursor/` directory, `knowledge/`, and `AGENTS.md` are tooling guidance for AI-assisted workflows.
 Contributors do not need Cursor to contribute.
 
 ## Reporting security issues

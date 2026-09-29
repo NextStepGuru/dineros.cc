@@ -25,4 +25,4 @@ alwaysApply: false
 
 If balances look stale after new Plaid txns, check balance sync write path (`plaid-sync.mdc`), not forecast.
 
-Details: `.agent/logic/data-model.mdc`, `.agent/logic/forecast-engine.mdc`.
+Details: balance fields in `app/prisma/schema.prisma`; forecast modules in `app/server/services/forecast/`.

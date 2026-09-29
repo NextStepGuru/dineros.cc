@@ -11,4 +11,4 @@ alwaysApply: false
 - Do not add an adjustment entry to force close. Difference is `ending − (opening + cleared net)`.
 - Closed periods cannot be edited.
 
-Details: `.agent/logic/reconciliation.mdc`.
+Details: `app/server/services/reconciliationService.ts`, `app/server/api/reconciliation/`, `app/server/lib/reconciliationMath.ts`.

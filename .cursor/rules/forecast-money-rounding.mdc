@@ -14,4 +14,4 @@ alwaysApply: false
 - Do not change the running-balance float accumulator in `lib/sort.ts` unless explicitly asked; amounts entering it should already be whole cents.
 - Loan interest/payments and asset depreciation already use `roundToCents`; keep that consistent.
 
-Encyclopedia: `.agent/logic/forecast-engine.mdc`.
+Encyclopedia: `app/server/services/forecast/` sources (rounding flows through `ForecastEngine.ts` and friends).

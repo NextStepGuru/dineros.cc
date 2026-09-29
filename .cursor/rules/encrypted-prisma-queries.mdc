@@ -39,4 +39,4 @@ return rows.filter((r) => r.plaidId != null && wanted.has(r.plaidId));
 
 Updates: `where: { id: registerId }`, not encrypted field equality for bulk writes when unsure.
 
-Details: `.agent/logic/encryption-and-keys.mdc`. Reference: `PlaidSyncService.findPlaidRegistersByAccessToken`.
+Details: `app/lib/normalizePrismaDmmf.ts`, `app/server/clients/prismaClient.ts`, `@encrypted` in `app/prisma/schema.prisma`. Reference: `PlaidSyncService.findPlaidRegistersByAccessToken`.
