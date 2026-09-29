@@ -36,9 +36,11 @@ const processor = async (job: Job<BackupJob>) => {
   const backupDir = "./temp/";
   const localBackupDir = "./prisma/backup/";
 
-  // Ensure the working and local-copy directories exist (the runtime image does not ship prisma/backup)
+  // Ensure the working directory exists (the runtime image does not ship prisma/backup)
   fs.mkdirSync(backupDir, { recursive: true });
-  fs.mkdirSync(localBackupDir, { recursive: true });
+  if (env.DEPLOY_ENV === "local") {
+    fs.mkdirSync(localBackupDir, { recursive: true });
+  }
 
   // Generate the current date string in yyyy-mm-dd format
   const date = dateTimeService.nowDate();
@@ -66,10 +68,11 @@ const processor = async (job: Job<BackupJob>) => {
   backupData("rsa", await prisma.rsa.findMany({}));
 
   // Dump files and the zip contain full user data — always remove working files when
-  // the job ends, keeping copies in prisma/backup for the local workflow first.
+  // the job ends. Copies in prisma/backup are kept only for the local workflow; hosted
+  // environments must not leave dumps in the container filesystem.
   const cleanupWorkingFiles = () => {
     for (const file of fs.readdirSync(backupDir)) {
-      if (file.endsWith(".ts")) {
+      if (file.endsWith(".ts") && env.DEPLOY_ENV === "local") {
         try {
           fs.copyFileSync(
             path.join(backupDir, file),
@@ -102,6 +105,7 @@ const processor = async (job: Job<BackupJob>) => {
     // Wait for the zip to be fully written before uploading it
     await new Promise<void>((resolve, reject) => {
       output.on("close", resolve);
+      output.on("error", reject);
       archive.on("error", reject);
       // Pipe archive data to the file
       archive.pipe(output);
