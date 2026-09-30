@@ -20,7 +20,7 @@ export class RegisterEntryService implements IRegisterEntryService {
     this.cache = cache;
   }
 
-  createEntry(params: CreateEntryParams): void {
+  createEntry(params: CreateEntryParams): CacheRegisterEntry {
     const {
       id,
       accountRegisterId,
@@ -143,6 +143,8 @@ export class RegisterEntryService implements IRegisterEntryService {
       lookupAccountRegister.balance = +targetBalance;
       this.cache.accountRegister.update(lookupAccountRegister);
     }
+
+    return entry;
   }
 
   async updateEntryStatuses(accountId: number): Promise<void> {

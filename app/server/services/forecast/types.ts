@@ -71,7 +71,7 @@ export interface ForecastLoggingConfig {
 }
 
 export interface IRegisterEntryService {
-  createEntry(params: CreateEntryParams): void;
+  createEntry(params: CreateEntryParams): CacheRegisterEntry;
   updateEntryStatuses(accountId: number): Promise<void>;
   calculateRunningBalances(
     entries: CacheRegisterEntry[],
@@ -188,6 +188,14 @@ export interface TransferParams {
   fromDescription?: string;
   /** Applied only to the source/outflow register entry */
   categoryId?: string | null;
+}
+
+/** Paired transfer entries created for one extra debt payment (the paying register's debit and the debt register's credit). */
+export interface ExtraDebtPaymentLeg {
+  sourceEntryId: string;
+  debtEntryId: string;
+  sourceAccountRegisterId: number;
+  debtAccountRegisterId: number;
 }
 
 export interface InterestCalculationParams {

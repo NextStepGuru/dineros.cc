@@ -1,0 +1,16 @@
+---
+description: Forecast extra debt payments must never breach a register's min account balance
+globs: app/server/services/forecast/**/*
+alwaysApply: false
+---
+
+# Forecast min-balance floor (extra debt payments)
+
+- `minAccountBalance` gates the **extra** debt-payment sweep only (`TransferService.processExtraDebtPayments`, days 1–3). Scheduled/contractual payments (`Payment to X` interest path, reoccurrence transfers) are never deferred or trimmed by the floor.
+- The sweep pays **once per month** per source register: after a successful pass, days 2–3 are skipped via `extraPaymentMonthsPaid` (they exist as weekend/holiday fallbacks, not extra passes).
+- Eligibility/window math must measure the same ledger the register displays: use `getDisplayChainBalanceAtDate` (balance-entry anchor + manual/projected, non-cleared rows — matches `recalculateRunningBalanceAndSort` in `app/lib/sort.ts`). Do not reintroduce sum-from-zero or `latestBalance + all rows` measurements; they double-count real uncleared rows against the anchor.
+- The hard guarantee is the post-pass: `MinBalanceGuardService.enforceFloors` runs in `ForecastEngine.recalculate` after the timeline is materialized and before running balances are recomputed. It trims/drops the registered extra-payment legs (both the source debit and the mirrored debt credit) so no later balance dips below the floor. Payment legs must be registered in `TransferService.extraDebtPaymentLegs` when created — keep that wiring intact.
+- Guard sizing processes payments latest-first against each payment's raw segment minimum: `maxPayment = segmentMin + paymentMagnitude − floor` (the segment min already includes the payment's own debit). Do not "fix" the sign of the debit leg — source legs are negative.
+- A residual breach from bills alone is expected and handled by `forecastRiskAlertService` (`below_min_balance` alert), not by the guard.
+
+See `app/server/services/forecast/__tests__/minBalanceGuard.regression.test.ts` for the regression shapes.

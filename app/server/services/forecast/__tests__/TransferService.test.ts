@@ -481,7 +481,7 @@ describe("TransferService", () => {
   });
 
   describe("calculateProjectedBalanceAtDate", () => {
-    it("should calculate balance including entries up to target date", () => {
+    it("should anchor on the balance snapshot and count only manual/projected rows up to target date", () => {
       const account = createMockAccount({
         id: 1,
         latestBalance: 1000,
@@ -491,28 +491,39 @@ describe("TransferService", () => {
       mockCache.accountRegister.insert(account);
 
       // Insert entries
-      const entry1 = createMockEntry({
+      const projectedInflow = createMockEntry({
         accountRegisterId: 1,
         amount: 500,
-        isBalanceEntry: false,
+        isProjected: true,
         createdAt: dateTimeService.create("2024-01-15").toDate(),
       });
-      const entry2 = createMockEntry({
+      const projectedOutflow = createMockEntry({
         accountRegisterId: 1,
         amount: -200,
-        isBalanceEntry: false,
+        isProjected: true,
         createdAt: dateTimeService.create("2024-01-16").toDate(),
       });
-      const entry3 = createMockEntry({
+      // Real (non-manual, non-projected) rows sit before the balance anchor in
+      // the display and are already reflected in the snapshot — they must not
+      // be counted again.
+      const realUnclearedRow = createMockEntry({
+        accountRegisterId: 1,
+        amount: -999,
+        isProjected: false,
+        isManualEntry: false,
+        createdAt: dateTimeService.create("2024-01-16").toDate(),
+      });
+      const projectedAfterTarget = createMockEntry({
         accountRegisterId: 1,
         amount: 300,
-        isBalanceEntry: false,
+        isProjected: true,
         createdAt: dateTimeService.create("2024-01-25").toDate(), // After target date
       });
 
-      mockCache.registerEntry.insert(entry1);
-      mockCache.registerEntry.insert(entry2);
-      mockCache.registerEntry.insert(entry3);
+      mockCache.registerEntry.insert(projectedInflow);
+      mockCache.registerEntry.insert(projectedOutflow);
+      mockCache.registerEntry.insert(realUnclearedRow);
+      mockCache.registerEntry.insert(projectedAfterTarget);
 
       const targetDate = dateTimeService.create("2024-01-20").toDate();
 
@@ -521,8 +532,7 @@ describe("TransferService", () => {
         targetDate,
       );
 
-      // Implementation returns sum of entry amounts only (not latestBalance + entries)
-      expect(result).toBe(300); // 500 - 200 (entries up to target date)
+      expect(result).toBe(1300); // latestBalance 1000 + 500 - 200
     });
 
     it("should return 0 for non-existent account", () => {
@@ -534,7 +544,7 @@ describe("TransferService", () => {
       expect(result).toBe(0);
     });
 
-    it("should exclude balance entries from calculation", () => {
+    it("should use the balance entry as the anchor instead of adding it on top", () => {
       const account = createMockAccount({
         id: 1,
         latestBalance: 1000,
@@ -548,7 +558,8 @@ describe("TransferService", () => {
         createMockEntry({
           accountRegisterId: 1,
           amount: 500,
-          isBalanceEntry: true, // Should be excluded
+          isBalanceEntry: true, // Anchor, not an additive row
+          isProjected: true,
           createdAt: dateTimeService.create("2024-01-15").toDate(),
         }),
       );
@@ -556,7 +567,7 @@ describe("TransferService", () => {
         createMockEntry({
           accountRegisterId: 1,
           amount: 200,
-          isBalanceEntry: false,
+          isProjected: true,
           createdAt: dateTimeService.create("2024-01-15").toDate(),
         }),
       );
@@ -566,8 +577,7 @@ describe("TransferService", () => {
         dateTimeService.create("2024-01-20").toDate(),
       );
 
-      // Implementation sums all entries up to target (does not exclude balance entries)
-      expect(result).toBe(700); // 500 + 200
+      expect(result).toBe(700); // anchor 500 + 200 (not 500 + 200 + latestBalance 1000)
     });
 
     it("should calculate projected balance correctly for debt payment test", () => {
