@@ -824,6 +824,14 @@ export const registerEntryMatchReoccurrenceSchema = z.object({
   reoccurrenceId: z.coerce.number().min(1),
 });
 
+export const registerEntryMergeSchema = z.object({
+  accountRegisterId: z.coerce.number().min(1),
+  /** Entry that survives the merge. */
+  keepRegisterEntryId: z.string().min(1),
+  /** Entry that is deleted as the duplicate. */
+  duplicateRegisterEntryId: z.string().min(1),
+});
+
 export const passwordAndCodeSchema = z
   .object({
     resetCode: z.string(),

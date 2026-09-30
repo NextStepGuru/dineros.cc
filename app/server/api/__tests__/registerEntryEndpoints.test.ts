@@ -45,6 +45,9 @@ vi.mock("~/schema/zod", () => ({
   registerEntrySchema: {
     parse: vi.fn(),
   },
+  registerEntryMergeSchema: {
+    parse: vi.fn((value: unknown) => value),
+  },
 }));
 
 vi.mock("@paralleldrive/cuid2", () => ({
@@ -940,6 +943,135 @@ describe("Register Entry API Endpoints", () => {
         registerEntryTransferCreateHandler(mockEvent),
       ).rejects.toThrow();
       expect(handleApiError).toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/register-entry-merge", () => {
+    let registerEntryMergeHandler: any;
+
+    beforeEach(async () => {
+      const module = await import("../register-entry-merge.post");
+      registerEntryMergeHandler = module.default;
+    });
+
+    it("should keep one entry and delete the duplicate", async () => {
+      const mockEvent = {};
+      const mockBody = {
+        accountRegisterId: 1,
+        keepRegisterEntryId: "entry-keep",
+        duplicateRegisterEntryId: "entry-dup",
+      };
+      const mockKeptRow = {
+        id: "entry-keep",
+        accountRegisterId: 1,
+        description: "Netflix",
+        amount: -30.57,
+        balance: 1000,
+        isBalanceEntry: false,
+        isProjected: false,
+        isReconciled: false,
+        isCleared: true,
+        isPending: true,
+        createdAt: new Date("2024-01-15T00:00:00.000Z"),
+      };
+
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+      const { addRecalculateJob } = await import(
+        "~/server/clients/queuesClient"
+      );
+      const { registerEntrySchema } = await import("~/schema/zod");
+
+      (globalThis as any).readBody.mockResolvedValue(mockBody);
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow
+        .mockResolvedValueOnce({
+          isBalanceEntry: false,
+          register: { accountId: "account-123" },
+        })
+        .mockResolvedValueOnce({ isBalanceEntry: false });
+      prisma.registerEntry.delete.mockResolvedValue({});
+      prisma.registerEntry.findUniqueOrThrow.mockResolvedValue(mockKeptRow);
+      (registerEntrySchema.parse as any).mockReturnValue(mockKeptRow);
+
+      const result = await registerEntryMergeHandler(mockEvent);
+
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenCalledTimes(2);
+      expect(prisma.registerEntry.findFirstOrThrow).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: expect.objectContaining({ id: "entry-keep" }),
+        }),
+      );
+      expect(prisma.registerEntry.delete).toHaveBeenCalledWith({
+        where: { id: "entry-dup" },
+      });
+      expect(addRecalculateJob).toHaveBeenCalledWith({
+        accountId: "account-123",
+      });
+      expect(result).toEqual({
+        keptEntry: mockKeptRow,
+        removedEntryId: "entry-dup",
+        message: "Register entries merged successfully.",
+      });
+    });
+
+    it("should reject merging an entry into itself", async () => {
+      const mockEvent = {};
+      (globalThis as any).readBody.mockResolvedValue({
+        accountRegisterId: 1,
+        keepRegisterEntryId: "entry-keep",
+        duplicateRegisterEntryId: "entry-keep",
+      });
+      const { getUser } = await import("~/server/lib/getUser");
+      getUser.mockReturnValue({ userId: 123 });
+
+      await expect(registerEntryMergeHandler(mockEvent)).rejects.toThrow(
+        "HTTP 400: Cannot merge an entry into itself",
+      );
+    });
+
+    it("should reject merging balance entries", async () => {
+      const mockEvent = {};
+      (globalThis as any).readBody.mockResolvedValue({
+        accountRegisterId: 1,
+        keepRegisterEntryId: "entry-keep",
+        duplicateRegisterEntryId: "entry-dup",
+      });
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow
+        .mockResolvedValueOnce({
+          isBalanceEntry: true,
+          register: { accountId: "account-123" },
+        })
+        .mockResolvedValueOnce({ isBalanceEntry: false });
+
+      await expect(registerEntryMergeHandler(mockEvent)).rejects.toThrow(
+        "HTTP 400: Balance entries cannot be merged",
+      );
+    });
+
+    it("should reject when the kept entry is not accessible to the user", async () => {
+      const mockEvent = {};
+      (globalThis as any).readBody.mockResolvedValue({
+        accountRegisterId: 1,
+        keepRegisterEntryId: "entry-keep",
+        duplicateRegisterEntryId: "entry-dup",
+      });
+      const { getUser } = await import("~/server/lib/getUser");
+      const { prisma } = await import("~/server/clients/prismaClient");
+
+      getUser.mockReturnValue({ userId: 123 });
+      prisma.registerEntry.findFirstOrThrow.mockRejectedValue(
+        new Error("not found"),
+      );
+
+      await expect(registerEntryMergeHandler(mockEvent)).rejects.toThrow(
+        "HTTP 400: User does not have permission to keep entry",
+      );
     });
   });
 
