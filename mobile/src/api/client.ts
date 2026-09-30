@@ -6,9 +6,16 @@
  * session as expired.
  */
 
+/**
+ * Base URL of the dineros.cc API. Set EXPO_PUBLIC_API_URL="" (empty) for the
+ * web dev demo: requests go out same-origin and metro.config.js proxies /api
+ * to the backend, sidestepping browser CORS.
+ */
 export const apiBaseUrl = (
   process.env.EXPO_PUBLIC_API_URL ?? "https://dineros.cc"
-).replace(/\/+$/, "");
+)
+  .trim()
+  .replace(/\/+$/, "");
 
 export class ApiError extends Error {
   status: number;
