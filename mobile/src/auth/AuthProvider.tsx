@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as tokenStore from "@/lib/tokenStorage";
 import {
   createContext,
   useCallback,
@@ -51,12 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const persistSession = useCallback(
     async (token: string, sessionUser: SessionUser | null) => {
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await tokenStore.setItem(TOKEN_KEY, token);
       if (sessionUser) {
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(sessionUser));
+        await tokenStore.setItem(USER_KEY, JSON.stringify(sessionUser));
         setUser(sessionUser);
       }
-      await SecureStore.setItemAsync(TOKEN_AT_KEY, String(Date.now()));
+      await tokenStore.setItem(TOKEN_AT_KEY, String(Date.now()));
     },
     [],
   );
@@ -76,9 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // best-effort — the local session is discarded regardless
     }
     await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(USER_KEY),
-      SecureStore.deleteItemAsync(TOKEN_AT_KEY),
+      tokenStore.deleteItem(TOKEN_KEY),
+      tokenStore.deleteItem(USER_KEY),
+      tokenStore.deleteItem(TOKEN_AT_KEY),
     ]);
     setUser(null);
     setStatusSafe("anonymous");
@@ -89,8 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        const userJson = await SecureStore.getItemAsync(USER_KEY);
+        const token = await tokenStore.getItem(TOKEN_KEY);
+        const userJson = await tokenStore.getItem(USER_KEY);
         if (cancelled) return;
         if (token) {
           if (userJson) {
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Wire the fetch wrapper to the session.
   useEffect(() => {
     configureApiClient({
-      getToken: async () => SecureStore.getItemAsync(TOKEN_KEY),
+      getToken: async () => tokenStore.getItem(TOKEN_KEY),
       refresh: async () => {
         if (refreshingRef.current || statusRef.current !== "authenticated") {
           return false;
@@ -135,9 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       onSessionExpired: () => {
         if (statusRef.current === "authenticated") {
-          void SecureStore.deleteItemAsync(TOKEN_KEY);
-          void SecureStore.deleteItemAsync(USER_KEY);
-          void SecureStore.deleteItemAsync(TOKEN_AT_KEY);
+          void tokenStore.deleteItem(TOKEN_KEY);
+          void tokenStore.deleteItem(USER_KEY);
+          void tokenStore.deleteItem(TOKEN_AT_KEY);
           setUser(null);
           setStatusSafe("anonymous");
         }
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (state !== "active") return;
       (async () => {
         const tokenAt = Number(
-          (await SecureStore.getItemAsync(TOKEN_AT_KEY)) ?? 0,
+          (await tokenStore.getItem(TOKEN_AT_KEY)) ?? 0,
         );
         if (Date.now() - tokenAt < REFRESH_AFTER_MS) return;
         const res = await api.validateToken();

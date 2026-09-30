@@ -129,6 +129,7 @@ export default function AccountsScreen() {
               return (
                 <Pressable
                   key={row.register.id}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.row,
                     row.register.subAccountRegisterId ? styles.pocketRow : null,

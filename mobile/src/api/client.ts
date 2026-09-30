@@ -50,6 +50,12 @@ type RequestOptions = {
   body?: unknown;
 };
 
+/**
+ * Endpoints whose 401 is a credential error, not session expiry — the
+ * refresh-and-retry path must not swallow their real error message.
+ */
+const NO_REFRESH_PATHS = ["/api/login", "/api/validate-token"];
+
 async function parseError(res: Response): Promise<ApiError> {
   let message = `Request failed (${res.status})`;
   try {
@@ -95,7 +101,11 @@ export async function apiFetch<T>(
   try {
     return await requestOnce<T>(path, options, await hooks.getToken());
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    const refreshable =
+      error instanceof ApiError &&
+      error.status === 401 &&
+      !NO_REFRESH_PATHS.some((p) => path.startsWith(p));
+    if (refreshable) {
       const refreshed = await hooks.refresh();
       if (refreshed) {
         return requestOnce<T>(

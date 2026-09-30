@@ -259,10 +259,11 @@ export default function RegisterScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.entry,
-              pressed && { opacity: 0.7 },
-              item.isBalanceEntry && styles.entryBalanceRow,
+              pressed ? { opacity: 0.7 } : null,
+              item.isBalanceEntry ? styles.entryBalanceRow : null,
             ]}
             disabled={item.isBalanceEntry}
             onPress={() => setActionEntry(item)}
