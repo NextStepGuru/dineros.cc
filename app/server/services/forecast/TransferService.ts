@@ -1,11 +1,19 @@
-import type { ITransferService, TransferParams } from "./types";
-import type { CacheAccountRegister, ModernCacheService  } from "./ModernCacheService";
+import type {
+  ITransferService,
+  TransferParams,
+  ExtraDebtPaymentLeg,
+} from "./types";
+import type {
+  CacheAccountRegister,
+  ModernCacheService,
+  CacheRegisterEntry,
+} from "./ModernCacheService";
 import prismaPkg, { AmountAdjustmentMode } from "@prisma/client";
 import type { RegisterEntryService } from "./RegisterEntryService";
 import { IS_CREDIT_TYPE_IDS, POCKET_TYPE_ID } from "~/consts";
 import { forecastLogger } from "./logger";
 import { dateTimeService } from "./DateTimeService";
-import { getProjectedBalanceAtDate } from "./getProjectedBalanceAtDate";
+import { getDisplayChainBalanceAtDate } from "./getProjectedBalanceAtDate";
 
 const { Prisma } = prismaPkg;
 
@@ -19,24 +27,39 @@ export class TransferService implements ITransferService {
   private static readonly MONEY_EPSILON = 0.005; // half-cent tolerance
   private readonly cache: ModernCacheService;
   private readonly entryService: RegisterEntryService;
+  /**
+   * Months (YYYY-MM) per source register that already had a successful extra
+   * debt payment pass. Days 2–3 of the month exist as weekend/holiday
+   * fallbacks, not as additional payment passes — without this latch each
+   * extra day re-sizes the payment against a shifted window and bleeds the
+   * account below its minimum balance.
+   */
+  private readonly extraPaymentMonthsPaid = new Map<number, string>();
+  /** Extra-debt-payment transfer legs created this run, consumed by the min-balance post-pass. */
+  private readonly extraDebtPaymentLegs: ExtraDebtPaymentLeg[] = [];
 
   constructor(cache: ModernCacheService, entryService: RegisterEntryService) {
     this.cache = cache;
     this.entryService = entryService;
   }
 
-  transferBetweenAccounts(params: TransferParams): void {
+  /** Legs from this run's extra debt payments, for MinBalanceGuardService. */
+  getExtraDebtPaymentLegs(): ExtraDebtPaymentLeg[] {
+    return this.extraDebtPaymentLegs;
+  }
+
+  transferBetweenAccounts(params: TransferParams): CacheRegisterEntry[] {
     const legs = this.planTransferLegs(params);
-    if (!legs) return;
-    this.emitTransferLegs(params, legs);
+    if (!legs) return [];
+    return this.emitTransferLegs(params, legs);
   }
 
   transferBetweenAccountsWithDate(
     params: TransferParams & { forecastDate: Date },
-  ): void {
+  ): CacheRegisterEntry[] {
     const legs = this.planTransferLegs(params);
-    if (!legs) return;
-    this.emitTransferLegs(params, legs, params.forecastDate);
+    if (!legs) return [];
+    return this.emitTransferLegs(params, legs, params.forecastDate);
   }
 
   private static isPocketRegister(
@@ -111,7 +134,7 @@ export class TransferService implements ITransferService {
     params: TransferParams,
     legs: TransferLeg[],
     forecastDate?: Date,
-  ): void {
+  ): CacheRegisterEntry[] {
     const {
       targetAccountRegisterId,
       sourceAccountRegisterId,
@@ -119,29 +142,36 @@ export class TransferService implements ITransferService {
       categoryId: transferCategoryId,
     } = params;
 
+    const createdEntries: CacheRegisterEntry[] = [];
     for (const leg of legs) {
-      this.entryService.createEntry({
-        accountRegisterId: targetAccountRegisterId,
-        description: leg.targetDescription,
-        sourceAccountRegisterId,
-        amount: leg.amount,
-        reoccurrence,
-        forecastDate,
-        typeId: 6, // Transfer
-        categoryId: null,
-      });
+      createdEntries.push(
+        this.entryService.createEntry({
+          accountRegisterId: targetAccountRegisterId,
+          description: leg.targetDescription,
+          sourceAccountRegisterId,
+          amount: leg.amount,
+          reoccurrence,
+          forecastDate,
+          typeId: 6, // Transfer
+          categoryId: null,
+        }),
+      );
 
-      this.entryService.createEntry({
-        accountRegisterId: sourceAccountRegisterId,
-        sourceAccountRegisterId: targetAccountRegisterId,
-        description: leg.sourceDescription,
-        amount: leg.amount * -1,
-        reoccurrence,
-        forecastDate,
-        typeId: 6, // Transfer
-        categoryId: transferCategoryId ?? null,
-      });
+      createdEntries.push(
+        this.entryService.createEntry({
+          accountRegisterId: sourceAccountRegisterId,
+          sourceAccountRegisterId: targetAccountRegisterId,
+          description: leg.sourceDescription,
+          amount: leg.amount * -1,
+          reoccurrence,
+          forecastDate,
+          typeId: 6, // Transfer
+          categoryId: transferCategoryId ?? null,
+        }),
+      );
     }
+
+    return createdEntries;
   }
 
   async processExtraDebtPayments(
@@ -174,18 +204,27 @@ export class TransferService implements ITransferService {
       );
     }
 
+    const monthKey = dateTimeService.format("YYYY-MM", targetDate);
+
     for (const sourceAccount of sourceAccounts) {
+      if (this.extraPaymentMonthsPaid.get(sourceAccount.id) === monthKey) {
+        continue;
+      }
+
       const shouldProcess = this.shouldProcessExtraDebtPaymentOnDate(
         sourceAccount,
         targetDate,
       );
 
       if (shouldProcess) {
-        await this.processExtraDebtPayment({
+        const paid = await this.processExtraDebtPayment({
           minBalance: +(sourceAccount.minAccountBalance || 0),
           sourceAccountId: sourceAccount.id,
           lastAt: targetDate,
         });
+        if (paid) {
+          this.extraPaymentMonthsPaid.set(sourceAccount.id, monthKey);
+        }
       }
     }
   }
@@ -254,19 +293,17 @@ export class TransferService implements ITransferService {
     return shouldProcess;
   }
 
+  /**
+   * Balance over the display-consistent post-anchor chain (balance-entry anchor
+   * + manual/projected rows) — the same ledger the register page renders. The
+   * extra-payment eligibility/window math must measure this chain, otherwise
+   * the min-balance floor is enforced against a ledger the user never sees.
+   */
   private calculateProjectedBalanceAtDate(
     accountId: number,
     targetDate: Date,
   ): number {
-    const targetEpoch = dateTimeService.endOfDay(targetDate).valueOf();
-    const entries = this.cache.registerEntry.find({ accountRegisterId: accountId });
-    const ledgerProjected = entries
-      .filter((e) => {
-        const entryEpoch = dateTimeService.toDate(e.createdAt as any).getTime();
-        return Number.isFinite(entryEpoch) && entryEpoch <= targetEpoch;
-      })
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-    return ledgerProjected;
+    return getDisplayChainBalanceAtDate(this.cache, accountId, targetDate);
   }
 
   /**
@@ -330,7 +367,7 @@ export class TransferService implements ITransferService {
       const day = dateTimeService.toDate(
         dateTimeService.startOfDay(dateTimeService.add(d, "day", fromDate)),
       );
-      const balanceAtDay = getProjectedBalanceAtDate(
+      const balanceAtDay = getDisplayChainBalanceAtDate(
         this.cache,
         accountId,
         day,
@@ -575,7 +612,7 @@ export class TransferService implements ITransferService {
         },
       );
 
-      this.transferBetweenAccountsWithDate({
+      const createdEntries = this.transferBetweenAccountsWithDate({
         targetAccountRegisterId: debtAccountRegister.id,
         sourceAccountRegisterId: sourceAccountRegister.id,
         amount: paymentAmount,
@@ -608,6 +645,28 @@ export class TransferService implements ITransferService {
           amountAdjustmentAnchorAt: null,
         },
       });
+
+      const sourceLeg = createdEntries.find(
+        (entry) =>
+          entry &&
+          entry.accountRegisterId === sourceAccountRegister.id &&
+          entry.amount < 0,
+      );
+      const debtLeg = createdEntries.find(
+        (entry) =>
+          entry &&
+          entry.accountRegisterId === debtAccountRegister.id &&
+          entry.amount > 0,
+      );
+      if (sourceLeg && debtLeg) {
+        this.extraDebtPaymentLegs.push({
+          sourceEntryId: sourceLeg.id,
+          debtEntryId: debtLeg.id,
+          sourceAccountRegisterId: sourceAccountRegister.id,
+          debtAccountRegisterId: debtAccountRegister.id,
+        });
+      }
+
       remainingAvailableAmount -= paymentAmount;
       totalPaymentsMade += paymentAmount;
       paymentsProcessed++;

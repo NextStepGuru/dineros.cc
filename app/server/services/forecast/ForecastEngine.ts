@@ -10,6 +10,7 @@ import { ReoccurrenceService } from "./ReoccurrenceService";
 import { RegisterEntryService } from "./RegisterEntryService";
 import { LoanCalculatorService } from "./LoanCalculatorService";
 import { TransferService } from "./TransferService";
+import { MinBalanceGuardService } from "./MinBalanceGuardService";
 import { DataPersisterService } from "./DataPersisterService";
 import { AssetDepreciationService } from "./AssetDepreciationService";
 import { IS_CREDIT_TYPE_IDS } from "../../../consts";
@@ -33,6 +34,7 @@ export class ForecastEngine implements IForecastEngine {
   private readonly entryService: RegisterEntryService;
   private readonly loanCalculator: LoanCalculatorService;
   private readonly transferService: TransferService;
+  private readonly minBalanceGuard: MinBalanceGuardService;
   private readonly assetService: AssetDepreciationService;
   private readonly dataPersister: DataPersisterService;
 
@@ -42,6 +44,7 @@ export class ForecastEngine implements IForecastEngine {
     this.loanCalculator = new LoanCalculatorService();
     this.entryService = new RegisterEntryService(db, this.cache);
     this.transferService = new TransferService(this.cache, this.entryService);
+    this.minBalanceGuard = new MinBalanceGuardService(this.cache);
     this.accountService = new AccountRegisterService(
       db,
       this.cache,
@@ -154,6 +157,13 @@ export class ForecastEngine implements IForecastEngine {
         forecastLogger.error(`Error in processForecastTimeline:`, error);
         throw error;
       }
+
+      // Enforce min account balance floors on extra debt payments against the
+      // fully materialized ledger, before running balances are recomputed.
+      this.minBalanceGuard.enforceFloors({
+        accountRegisterIds: activeAccountRegisters.map((r) => r.id),
+        extraDebtPaymentLegs: this.transferService.getExtraDebtPaymentLegs(),
+      });
 
       // 8. Calculate running balances and sort entries
       const processedResults = await this.processAccountEntries(
