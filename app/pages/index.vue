@@ -50,7 +50,7 @@ const links = ref([
     trailing: false as const,
     color: "secondary" as const,
     variant: "outline" as const,
-    class: "frog-cta border-gold-400/60 text-gold-100 hover:bg-gold-500/10",
+    class: "frog-cta frog-cta-outline border-gold-400/60 hover:bg-gold-500/10",
     size: "xl" as const,
   },
 ]);
