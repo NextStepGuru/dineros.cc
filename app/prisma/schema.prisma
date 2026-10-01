@@ -559,6 +559,41 @@ model RegisterEntryType {
   @@map("register_entry_type")
 }
 
+// Mirror of a register entry deleted by a merge, so merges can be undone.
+// Restoring re-inserts these columns into register_entry with the original id.
+model RegisterEntryMergeAudit {
+  id                           String   @id @default(uuid())
+  accountRegisterId            Int      @map("account_register_id") @db.UnsignedInt
+  keptRegisterEntryId          String   @map("kept_register_entry_id")
+  removedRegisterEntryId       String   @map("removed_register_entry_id")
+  entryCreatedAt               DateTime @map("entry_created_at")
+  entrySeq                     Int?     @map("entry_seq") @db.UnsignedInt
+  entrySourceAccountRegisterId Int?     @map("entry_source_account_register_id") @db.UnsignedInt
+  entryReferenceId             String?  @map("entry_reference_id")
+  entryCheckNo                 String?  @map("entry_check_no")
+  entryDescription             String   @map("entry_description") @db.VarChar(1500) /// @encrypted
+  entryReoccurrenceId          Int?     @map("entry_reoccurrence_id") @db.UnsignedInt
+  entryAmount                  Decimal  @map("entry_amount") @db.Decimal(19, 2)
+  entryTypeId                  Int?     @map("entry_type_id") @db.UnsignedInt
+  entryIsProjected             Boolean  @default(false) @map("entry_is_projected")
+  entryIsPending               Boolean  @default(false) @map("entry_is_pending")
+  entryIsCleared               Boolean  @default(false) @map("entry_is_cleared")
+  entryIsManualEntry           Boolean  @default(false) @map("entry_is_manual_entry")
+  entryPlaidId                 String?  @map("entry_plaid_id") @db.VarChar(500) /// @encrypted
+  entryPlaidIdHash             String?  @map("entry_plaid_id_hash") @db.VarChar(128)
+  entryPlaidJson               Json?    @map("entry_plaid_json")
+  entryCategoryId              String?  @map("entry_category_id")
+  entryCategoryLocked          Boolean  @default(false) @map("entry_category_locked")
+  entryCategorySource          String?  @map("entry_category_source") @db.VarChar(32)
+  entryMemo                    String?  @map("entry_memo") @db.VarChar(500)
+  mergedByUserId               Int?     @map("merged_by_user_id") @db.UnsignedInt
+  mergedAt                     DateTime @default(now()) @map("merged_at")
+  restoredAt                   DateTime? @map("restored_at")
+
+  @@index([accountRegisterId, restoredAt])
+  @@map("register_entry_merge_audit")
+}
+
 // MySQL functional unique index `category_account_parent_name_uidx` on
 // (account_id, IFNULL(sub_category_id,''), name) — see migration
 // 20260319131120_seed_categories (not expressible in Prisma schema).
