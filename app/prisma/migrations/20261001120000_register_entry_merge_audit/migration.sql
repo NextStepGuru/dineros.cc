@@ -1,0 +1,33 @@
+-- CreateTable
+CREATE TABLE `register_entry_merge_audit` (
+    `id` VARCHAR(191) NOT NULL,
+    `account_register_id` INTEGER UNSIGNED NOT NULL,
+    `kept_register_entry_id` VARCHAR(191) NOT NULL,
+    `removed_register_entry_id` VARCHAR(191) NOT NULL,
+    `entry_created_at` DATETIME(3) NOT NULL,
+    `entry_seq` INTEGER UNSIGNED NULL,
+    `entry_source_account_register_id` INTEGER UNSIGNED NULL,
+    `entry_reference_id` VARCHAR(191) NULL,
+    `entry_check_no` VARCHAR(191) NULL,
+    `entry_description` VARCHAR(1500) NOT NULL,
+    `entry_reoccurrence_id` INTEGER UNSIGNED NULL,
+    `entry_amount` DECIMAL(19, 2) NOT NULL,
+    `entry_type_id` INTEGER UNSIGNED NULL,
+    `entry_is_projected` BOOLEAN NOT NULL DEFAULT false,
+    `entry_is_pending` BOOLEAN NOT NULL DEFAULT false,
+    `entry_is_cleared` BOOLEAN NOT NULL DEFAULT false,
+    `entry_is_manual_entry` BOOLEAN NOT NULL DEFAULT false,
+    `entry_plaid_id` VARCHAR(500) NULL,
+    `entry_plaid_id_hash` VARCHAR(128) NULL,
+    `entry_plaid_json` JSON NULL,
+    `entry_category_id` VARCHAR(191) NULL,
+    `entry_category_locked` BOOLEAN NOT NULL DEFAULT false,
+    `entry_category_source` VARCHAR(32) NULL,
+    `entry_memo` VARCHAR(500) NULL,
+    `merged_by_user_id` INTEGER UNSIGNED NULL,
+    `merged_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `restored_at` DATETIME(3) NULL,
+
+    INDEX `register_entry_merge_audit_account_register_id_restored_at_idx`(`account_register_id`, `restored_at`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

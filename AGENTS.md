@@ -17,6 +17,7 @@ Areas the bundle does not cover yet — read the source instead:
 | Forecast engine | `app/server/services/forecast/` |
 | Statement reconciliation | `app/server/services/reconciliationService.ts`, `app/server/api/reconciliation/` |
 | Microservice | `microservice/` |
+| Mobile app (Expo) | `mobile/` |
 | Deploy / CI | `.github/workflows/`, `.deploy/` |
 
 When behavior changes, update the matching globbed rule under `.cursor/rules/` (see `00-global-safety.mdc` → Rule Updates) and, where a `knowledge/` concept covers the area, follow `okf-memory.mdc` for corrections.

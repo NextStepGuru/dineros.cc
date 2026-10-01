@@ -1,6 +1,7 @@
 packages:
   - app
   - microservice
+  - mobile
 allowBuilds:
   '@parcel/watcher': true
   '@prisma/engines': true
