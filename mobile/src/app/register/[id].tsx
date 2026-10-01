@@ -126,6 +126,13 @@ export default function RegisterScreen() {
     });
   }
 
+  function openUnmerge() {
+    router.push({
+      pathname: "/unmerge",
+      params: { accountRegisterId: String(registerId) },
+    });
+  }
+
   if (!register && !listsQ.isLoading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -152,6 +159,10 @@ export default function RegisterScreen() {
                 onPress: () => openMerge(actionEntry),
               },
             ]),
+        {
+          label: "Undo a merge…",
+          onPress: () => openUnmerge(),
+        },
       ]
     : [];
 

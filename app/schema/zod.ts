@@ -832,6 +832,22 @@ export const registerEntryMergeSchema = z.object({
   duplicateRegisterEntryId: z.string().min(1),
 });
 
+export const registerEntryUnmergeSchema = z.object({
+  /** Audit record of the merge to undo. */
+  mergeAuditId: z.string().min(1),
+});
+
+export const registerEntryMergeAuditSchema = z.object({
+  id: z.string(),
+  keptRegisterEntryId: z.string(),
+  removedRegisterEntryId: z.string(),
+  entryDescription: z.string(),
+  entryAmount: z.coerce.number(),
+  entryCreatedAt: z.coerce.date(),
+  mergedAt: z.coerce.date(),
+  restoredAt: z.coerce.date().nullable(),
+});
+
 export const passwordAndCodeSchema = z
   .object({
     resetCode: z.string(),

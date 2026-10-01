@@ -117,3 +117,24 @@ export type MergeResponse = {
   removedEntryId: string;
   message: string;
 };
+
+export type MergeAudit = {
+  id: string;
+  keptRegisterEntryId: string;
+  removedRegisterEntryId: string;
+  entryDescription: string;
+  entryAmount: number | string;
+  entryCreatedAt: string;
+  mergedAt: string;
+  restoredAt: string | null;
+};
+
+export type MergeAuditListResponse = {
+  audits: MergeAudit[];
+};
+
+export type UnmergeResponse = {
+  restoredEntry: RegisterEntry;
+  mergeAuditId: string;
+  message: string;
+};

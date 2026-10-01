@@ -3,6 +3,7 @@ import type {
   ForecastBalancesResponse,
   ListsResponse,
   LoginResponse,
+  MergeAuditListResponse,
   MergeResponse,
   RegisterDirection,
   RegisterEntry,
@@ -10,6 +11,7 @@ import type {
   SessionUser,
   TransferApplyResponse,
   TransferCreateResponse,
+  UnmergeResponse,
 } from "./types";
 
 // --- auth ---
@@ -125,6 +127,25 @@ export function mergeEntries(params: {
   duplicateRegisterEntryId: string;
 }): Promise<MergeResponse> {
   return apiFetch<MergeResponse>("/api/register-entry-merge", {
+    method: "POST",
+    body: params,
+  });
+}
+
+export function listMergeAudits(params: {
+  accountRegisterId: number;
+}): Promise<MergeAuditListResponse> {
+  return apiFetch<MergeAuditListResponse>(
+    `/api/register-entry-merge-audits${buildQuery({
+      accountRegisterId: params.accountRegisterId,
+    })}`,
+  );
+}
+
+export function unmergeEntry(params: {
+  mergeAuditId: string;
+}): Promise<UnmergeResponse> {
+  return apiFetch<UnmergeResponse>("/api/register-entry-unmerge", {
     method: "POST",
     body: params,
   });

@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 import { migrate as migrateUser } from './User'
 import { migrate as migrateAccountRegister } from './AccountRegister'
 import { migrate as migrateRegisterEntry } from './RegisterEntry'
+import { migrate as migrateRegisterEntryMergeAudit } from './RegisterEntryMergeAudit'
 import { migrate as migrateReoccurrence } from './Reoccurrence'
 import { migrate as migrateStatementLine } from './StatementLine'
 
@@ -29,7 +30,7 @@ export const defaultProgressReport: ProgressReportCallback = ({
     .toString()
     .padStart(3)
   console.info(
-    `${model.padEnd(15)} ${pct}% processed ${processed
+    `${model.padEnd(23)} ${pct}% processed ${processed
       .toString()
       .padStart(length)} / ${totalCount} (took ${performance.toFixed(2)}ms)`
   )
@@ -41,6 +42,7 @@ export type MigrationReport = {
   User: number,
   AccountRegister: number,
   RegisterEntry: number,
+  RegisterEntryMergeAudit: number,
   Reoccurrence: number,
   StatementLine: number
 }
@@ -52,6 +54,7 @@ export type MigrationReport = {
  * - User
  * - AccountRegister
  * - RegisterEntry
+ * - RegisterEntryMergeAudit
  * - Reoccurrence
  * - StatementLine
  *
@@ -65,12 +68,14 @@ export async function migrate(
     processedUser,
     processedAccountRegister,
     processedRegisterEntry,
+    processedRegisterEntryMergeAudit,
     processedReoccurrence,
     processedStatementLine
   ] = await Promise.all([
     migrateUser(client, reportProgress),
     migrateAccountRegister(client, reportProgress),
     migrateRegisterEntry(client, reportProgress),
+    migrateRegisterEntryMergeAudit(client, reportProgress),
     migrateReoccurrence(client, reportProgress),
     migrateStatementLine(client, reportProgress)
   ])
@@ -78,6 +83,7 @@ export async function migrate(
     User: processedUser,
     AccountRegister: processedAccountRegister,
     RegisterEntry: processedRegisterEntry,
+    RegisterEntryMergeAudit: processedRegisterEntryMergeAudit,
     Reoccurrence: processedReoccurrence,
     StatementLine: processedStatementLine
   }

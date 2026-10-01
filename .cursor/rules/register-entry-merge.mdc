@@ -1,0 +1,28 @@
+---
+description: Merge and unmerge (undo) of register entries
+globs: app/server/api/register-entry-merge.post.ts,app/server/api/register-entry-unmerge.post.ts,app/server/api/register-entry-merge-audits.get.ts,app/prisma/schema.prisma,mobile/src/app/merge.tsx,mobile/src/app/unmerge.tsx
+alwaysApply: false
+---
+
+# Register entry merge / unmerge
+
+**Merge deletes exactly one entry** (the duplicate) and leaves the kept entry
+untouched — it never sums amounts. Balance entries (`isBalanceEntry`) are never
+mergeable.
+
+- Every merge **must write a `RegisterEntryMergeAudit` row in the same
+  transaction as the delete**, mirroring all restorable columns of the removed
+  entry (`entry*` columns). A merge without an audit row cannot be undone — do
+  not delete without auditing.
+- `entryDescription` / `entryPlaidId` are `/// @encrypted` on the audit model
+  too; do not store decrypted copies elsewhere.
+- **Unmerge** (`POST /api/register-entry-unmerge`) re-inserts the removed entry
+  with its original id and `entryCreatedAt`, sets `hasBalanceReCalc: true`,
+  marks the audit `restoredAt`, and queues a recalculate job. It must reject:
+  unknown audits (404), already-restored audits (400), registers the user is
+  not a member of (400), and restores whose entry id already exists (400).
+- Restored entries lose cascade-deleted relations (e.g. reconciliation items)
+  and their stored balance is stale until the recalculate job runs — same
+  async-recalc contract as merge.
+- `GET /api/register-entry-merge-audits?accountRegisterId=` lists audits
+  (unrestored first) for undo UIs (currently the mobile app's "Undo a merge…").

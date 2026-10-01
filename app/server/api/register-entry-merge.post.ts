@@ -79,18 +79,51 @@ export default defineEventHandler(async (event: H3Event) => {
       });
     }
 
-    await PrismaDb.registerEntry
-      .delete({
-        where: {
-          id: duplicateRegisterEntryId,
-        },
-      })
-      .catch(() => {
-        throw createError({
-          statusCode: 400,
-          statusMessage: "Failed to delete duplicate register entry",
+    // Delete and audit in one transaction so a merge is never without its
+    // undo record.
+    await PrismaDb.$transaction(async (tx) => {
+      const removedEntry = await tx.registerEntry
+        .delete({
+          where: {
+            id: duplicateRegisterEntryId,
+          },
+        })
+        .catch(() => {
+          throw createError({
+            statusCode: 400,
+            statusMessage: "Failed to delete duplicate register entry",
+          });
         });
+
+      await tx.registerEntryMergeAudit.create({
+        data: {
+          accountRegisterId,
+          keptRegisterEntryId: keepRegisterEntryId,
+          removedRegisterEntryId: duplicateRegisterEntryId,
+          entryCreatedAt: removedEntry.createdAt,
+          entrySeq: removedEntry.seq,
+          entrySourceAccountRegisterId: removedEntry.sourceAccountRegisterId,
+          entryReferenceId: removedEntry.referenceId,
+          entryCheckNo: removedEntry.checkNo,
+          entryDescription: removedEntry.description,
+          entryReoccurrenceId: removedEntry.reoccurrenceId,
+          entryAmount: removedEntry.amount,
+          entryTypeId: removedEntry.typeId,
+          entryIsProjected: removedEntry.isProjected,
+          entryIsPending: removedEntry.isPending,
+          entryIsCleared: removedEntry.isCleared,
+          entryIsManualEntry: removedEntry.isManualEntry,
+          entryPlaidId: removedEntry.plaidId,
+          entryPlaidIdHash: removedEntry.plaidIdHash,
+          entryPlaidJson: removedEntry.plaidJson ?? undefined,
+          entryCategoryId: removedEntry.categoryId,
+          entryCategoryLocked: removedEntry.categoryLocked,
+          entryCategorySource: removedEntry.categorySource,
+          entryMemo: removedEntry.memo,
+          mergedByUserId: userId,
+        },
       });
+    });
 
     const keptEntry = await PrismaDb.registerEntry.findUniqueOrThrow({
       where: {
