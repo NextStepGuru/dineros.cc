@@ -628,6 +628,13 @@ watch(
 }
 
 @media (max-width: 767px) {
+  /* The outer is the sticky scrollport here (overflow-y: clip computes to hidden), so the
+     desktop `top: var(--ui-header-height)` clamp would push the head below the card top,
+     leaving a permanent dead gap. Pin to the card top on mobile. */
+  .reoccurrences-main-table thead.reoccurrences-sticky-thead .reoccurrences-thead-sticky-th {
+    top: 0;
+  }
+
   .reoccurrences-table-outer {
     overflow-x: auto;
     overflow-y: clip;
