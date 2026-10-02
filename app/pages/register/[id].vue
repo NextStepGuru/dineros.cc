@@ -1548,6 +1548,8 @@ const showShortcuts = ref(false);
 const recalcLiveMessage = ref("");
 /** Sticky-head account/lowest-balance block collapses while the register is scrolled. */
 const registerHeadCollapsed = ref(false);
+/** Workflow explainer alert collapses to a one-liner on mobile; tap to expand. */
+const workflowAlertExpanded = ref(false);
 async function recalcAccount() {
   if (snapshotMode.isSnapshotMode.value) return;
   if (workflowMode.value === "reconciliation") return;
@@ -1623,11 +1625,43 @@ const toolbarOverflowItems = computed(() => {
       class="sr-only"
       aria-live="polite"
       aria-atomic="true") {{ recalcLiveMessage }}
+    //- Mobile: one-line collapsible banner (the full alerts below are hidden below md).
+    div(class="md:hidden mt-4")
+      button(
+        type="button"
+        class="w-full flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-left text-sm font-medium frog-text"
+        :aria-expanded="workflowAlertExpanded"
+        aria-controls="workflow-alert-detail"
+        data-testid="workflow-alert-toggle"
+        @click="workflowAlertExpanded = !workflowAlertExpanded")
+          span {{ isSnapshotMode && activeSnapshotCreatedAt ? `Viewing snapshot (${formatDate(activeSnapshotCreatedAt) ?? ''})` : workflowMode === "forecasting" ? "Forecasting" : "Reconciliation" }}
+          UIcon(
+            name="i-lucide-chevron-down"
+            class="size-4 shrink-0 transition-transform"
+            :class="workflowAlertExpanded ? 'rotate-180' : ''")
+      div(
+        v-show="workflowAlertExpanded"
+        id="workflow-alert-detail"
+        class="mt-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-sm frog-text-muted")
+        template(v-if="isSnapshotMode && activeSnapshotCreatedAt")
+          span Read-only projected register as captured.
+          .flex.flex-wrap.gap-2.items-center.mt-2
+            UButton(size="xs" variant="soft" @click="exitSnapshotView") Exit snapshot
+        template(v-else-if="workflowMode === 'forecasting'")
+          span Projected entries and balances — use Recalc to refresh the forecast. Choose Reconcile in the header for cleared history and statement periods.
+        template(v-else)
+          span This view shows cleared and reconciled activity. Open the workspace to match your bank statement.
+          .flex.flex-wrap.gap-2.items-center.mt-2
+            UButton(
+              size="xs"
+              variant="soft"
+              icon="i-lucide-calculator"
+              :to="`/reconciliation/${accountRegisterId}`") Reconciliation workspace
     UAlert(
       v-if="isSnapshotMode && activeSnapshotCreatedAt"
       color="info"
       variant="subtle"
-      class="mt-4"
+      class="mt-4 hidden md:block"
       :title="`Viewing snapshot (${formatDate(activeSnapshotCreatedAt) ?? ''})`"
     )
       template(#description)
@@ -1638,7 +1672,7 @@ const toolbarOverflowItems = computed(() => {
       v-else-if="workflowMode === 'forecasting'"
       color="primary"
       variant="subtle"
-      class="mt-4"
+      class="mt-4 hidden md:block"
       title="Forecasting"
     )
       template(#description)
@@ -1647,7 +1681,7 @@ const toolbarOverflowItems = computed(() => {
       v-else
       color="neutral"
       variant="subtle"
-      class="mt-4"
+      class="mt-4 hidden md:block"
       title="Reconciliation"
     )
       template(#description)
@@ -1992,15 +2026,15 @@ const toolbarOverflowItems = computed(() => {
                                   span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                                 span(v-else) …
                         div(
-                          class="text-muted text-xs md:text-sm text-right flex flex-nowrap md:flex-wrap items-center justify-end gap-1.5 min-w-0 max-w-full overflow-hidden"
+                          class="text-muted text-xs md:text-sm text-right flex flex-nowrap md:flex-wrap items-center justify-end gap-1 md:gap-1.5 min-w-0 max-w-full overflow-hidden"
                           v-if="showLowestBalanceHint"
                         )
-                          span Lowest in next
+                          span(class="whitespace-nowrap") Lowest in next
                           ClientOnly
                             USelect(
                               v-model="selectedLowestHorizon"
                               size="xs"
-                              class="w-24 md:w-28"
+                              class="w-20 min-[400px]:w-24 md:w-28"
                               :items="LOWEST_BALANCE_HORIZON_OPTIONS"
                               value-key="id"
                               label-key="label")
@@ -2199,7 +2233,15 @@ const toolbarOverflowItems = computed(() => {
    Do not use `display:none` on `td` — it drops the cell from the table grid and breaks col/colgroup alignment
    (Amount/Balance shift under wrong headers). Use `visibility:collapse` on col + td and widen description col. */
 @media (max-width: 767px) {
-  /* The sticky head spans the table's 36rem min-width inside the horizontal scroller;
+  /* The outer is the sticky scrollport here (overflow-y: clip computes to hidden), so the
+     desktop `top: var(--ui-header-height)` clamp pushes the whole head 52px below the card
+     top, leaving a permanent dead gap. Pin to the card top instead; the head scrolls away
+     with the table on mobile (the outer has no vertical scroll of its own). */
+  .register-main-table thead.register-sticky-thead .register-thead-sticky-th {
+    top: 0;
+  }
+
+  /* The sticky head spans the table's min-width inside the horizontal scroller;
      pin the account/lowest-balance rows to the visible viewport so their right-aligned
      controls aren't pushed off-screen while the table scrolls sideways. */
   .register-head-meta {
@@ -2227,9 +2269,10 @@ const toolbarOverflowItems = computed(() => {
     overscroll-behavior-x: contain;
   }
 
-  /* At least full container width or 36rem — beats `min-w-full` so the table can grow and scroll inside the wrapper. */
+  /* Floor of 23rem: at 390-430px every column fits with no horizontal scroll; iPhone SE
+     class (320px) falls back to scrolling the table inside the wrapper. */
   .register-table-outer .register-main-table {
-    min-width: max(100%, 36rem);
+    min-width: max(100%, 23rem);
   }
 
   .register-main-table col.register-col-review,
@@ -2248,16 +2291,19 @@ const toolbarOverflowItems = computed(() => {
     overflow: hidden;
   }
 
+  /* Fixed tracks so Date/Amount/Balance stay fully visible; Description takes the rest
+     and truncates (`.register-cell-description` + inner truncate). Keep these in sync
+     with `.register-inner-head-grid` below. */
   .register-main-table col.register-col-date,
   .register-main-table col:nth-child(2) {
-    width: 14% !important;
-    min-width: 5rem;
+    width: 4.6rem !important;
+    min-width: 4.6rem;
   }
 
   .register-main-table col.register-col-description,
   .register-main-table col:nth-child(3) {
-    min-width: 10rem;
-    width: 53% !important; /* gains review + collapsed category width */
+    width: auto !important;
+    min-width: 0 !important;
   }
 
   .register-main-table col.register-col-category {
@@ -2275,9 +2321,18 @@ const toolbarOverflowItems = computed(() => {
     overflow: hidden;
   }
 
+  .register-main-table col:nth-child(5) {
+    width: 5.3rem !important;
+    min-width: 5.3rem;
+  }
+
+  .register-main-table col:nth-child(6) {
+    width: 5.7rem !important;
+    min-width: 5.7rem;
+  }
+
   .register-inner-head-grid {
-    grid-template-columns:
-      minmax(5rem, 14%) minmax(10rem, 1fr) minmax(5rem, 16%) minmax(5.5rem, 22%);
+    grid-template-columns: 4.6rem minmax(0, 1fr) 5.3rem 5.7rem;
   }
 }
 </style>

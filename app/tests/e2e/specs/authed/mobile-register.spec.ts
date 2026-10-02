@@ -57,6 +57,38 @@ test.describe("Register mobile sticky chrome", () => {
     // Desktop layout wraps this head to ~250px+ on narrow screens; mobile must stay ~2 rows.
     expect(box?.height ?? 999).toBeLessThan(175);
 
+    // No dead gap between the card top and the toolbar (the sticky th must not be
+    // clamped 52px down inside the card's scrollport).
+    const outerBox = await page.locator(".register-table-outer").boundingBox();
+    const toolbarBox = await page
+      .getByRole("button", { name: /add entry/i })
+      .first()
+      .boundingBox();
+    expect(
+      (toolbarBox?.y ?? 999) - (outerBox?.y ?? -999),
+    ).toBeLessThanOrEqual(56);
+
+    // All four columns fit the viewport: Amount header visible, no horizontal scroll.
+    const amountHeader = page
+      .locator(".register-inner-head-grid > div")
+      .filter({ hasText: "Amount" });
+    await expect(amountHeader).toBeVisible();
+    expect((await amountHeader.boundingBox())?.x ?? -1).toBeLessThan(430);
+    const noHScroll = await page.evaluate(() => {
+      const outer = document.querySelector(".register-table-outer");
+      return outer ? outer.scrollWidth <= outer.clientWidth : true;
+    });
+    expect(noHScroll).toBe(true);
+
+    // Workflow explainer collapses to a one-line banner on mobile and expands on tap.
+    const alertToggle = page.getByTestId("workflow-alert-toggle");
+    await expect(alertToggle).toBeVisible();
+    const alertBox = await alertToggle.boundingBox();
+    expect(alertBox?.height ?? 999).toBeLessThanOrEqual(48);
+    await alertToggle.click();
+    await expect(page.getByText(/Projected entries and balances/i)).toBeVisible();
+    await alertToggle.click();
+
     // Secondary actions live in the overflow menu instead of wrapping the toolbar.
     await page.getByRole("button", { name: /more register actions/i }).click();
     await expect(

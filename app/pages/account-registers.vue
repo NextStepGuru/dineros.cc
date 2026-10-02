@@ -1990,6 +1990,13 @@ watch(workflowMode, (w) => {
 }
 
 @media (max-width: 767px) {
+  /* The outer is the sticky scrollport here (overflow-y: clip computes to hidden), so the
+     desktop `top: var(--ui-header-height)` clamp would push the head below the card top,
+     leaving a permanent dead gap. Pin to the card top on mobile. */
+  .accounts-main-table thead.accounts-sticky-thead .accounts-thead-sticky-th {
+    top: 0;
+  }
+
   .accounts-table-outer {
     overflow-x: auto;
     overflow-y: clip;
