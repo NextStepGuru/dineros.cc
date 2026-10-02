@@ -1,8 +1,9 @@
 // Shared Vitest include/exclude globs for the **node** project (fast, no Nuxt app bootstrap).
 //
 // Audit — what belongs where:
-// - **node** (below): API handlers tested with mocks, server services/lib, lib, pages unit,
-//   schema, prisma reencrypt, stores with mocked Nuxt/Pinia as needed, `tests/**` except Nuxt paths.
+// - **node** (below): API handlers tested with mocks, server services/lib, cron handlers, queues,
+//   middleware, routes, repositories, clients, lib, pages unit, schema, prisma reencrypt,
+//   stores with mocked Nuxt/Pinia as needed, `tests/**` except Nuxt paths.
 // - **nuxt** (vitest.config.ts `defineVitestProject`): `tests/nuxt/**`, `**/*.nuxt.{test,spec}.ts` —
 //   composables/pages/plugins that need `useNuxtApp`, auto-imports, or full Nuxt pipeline.
 // - **Playwright**: e2e only (`test:e2e`), not Vitest.
@@ -15,6 +16,11 @@ export const vitestNodeTestIncludes = [
   "server/services/reports/__tests__/**/*.test.ts",
   "server/lib/__tests__/**/*.test.ts",
   "server/queues/__tests__/**/*.test.ts",
+  "server/cron/__tests__/**/*.test.ts",
+  "server/middleware/__tests__/**/*.test.ts",
+  "server/routes/__tests__/**/*.test.ts",
+  "server/repositories/__tests__/**/*.test.ts",
+  "server/clients/__tests__/**/*.test.ts",
   "lib/__tests__/**/*.test.ts",
   "pages/__tests__/**/*.test.ts",
   "tests/**/*.test.ts",
