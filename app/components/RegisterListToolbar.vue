@@ -59,11 +59,13 @@ const emit = defineEmits<{
       :text="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
       :delay-duration="150"
     >
+      <!-- Keyboard shortcuts are a desktop affordance; hidden below md to keep the mobile toolbar to one row. -->
       <BaseIconButton
         icon="i-lucide-keyboard"
         :active="showShortcuts"
         :title="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
         :aria-label="showShortcuts ? 'Hide shortcuts' : 'Show shortcuts'"
+        class="hidden md:inline-flex"
         @click="showShortcuts = !showShortcuts"
       />
     </UTooltip>

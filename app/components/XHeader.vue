@@ -736,6 +736,7 @@ UHeader.app-header-bar(
 
 <style scoped>
 .mobile-menu-container {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   background:
     radial-gradient(
       120% 90% at 90% -20%,
@@ -797,6 +798,15 @@ UHeader.app-header-bar(
 .toolbar-icon-link {
   min-width: 2.5rem;
   min-height: 2.5rem;
+}
+
+/* Apple HIG 44pt minimum touch target on small screens. */
+@media (width < 40rem) {
+  .toolbar-icon-button,
+  .toolbar-icon-link {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
 }
 
 .toolbar-icon-link {

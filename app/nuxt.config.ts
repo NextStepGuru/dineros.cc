@@ -111,7 +111,8 @@ export default defineNuxtConfig({
       htmlAttrs: {
         lang: "en",
       },
-      viewport: "width=device-width, initial-scale=1",
+      // viewport-fit=cover lets env(safe-area-inset-*) keep chrome clear of the iPhone notch/home indicator
+      viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
       link: [
         {
           rel: "icon",
@@ -126,6 +127,11 @@ export default defineNuxtConfig({
         },
       ],
       meta: [
+        {
+          // Safari mobile browser chrome tints to match the navy app header
+          name: "theme-color",
+          content: "#0f1b2e",
+        },
         {
           property: "og:image",
           content:

@@ -11,5 +11,5 @@
       class="size-7 rounded-full ring-2 frog-logo-ring")
     .leading-tight
       span(class="text-lg font-bold tracking-tight text-highlighted") Dineros
-      p(class="text-[11px] frog-text-muted -mt-1") Predictive budgeting
+      p(class="text-[11px] frog-text-muted -mt-1 hidden sm:block") Predictive budgeting
 </template>
