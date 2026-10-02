@@ -634,6 +634,9 @@ function handleWindowScrollForInfiniteLoad() {
   const scrollTop = window.scrollY ?? doc.scrollTop;
   const scrollHeight = doc.scrollHeight;
   const clientHeight = window.innerHeight;
+  // Collapse the account selector + lowest-balance block in the sticky head once the
+  // user is into the list, so scrolling entries keeps the pinned chrome minimal.
+  registerHeadCollapsed.value = scrollTop > 120;
   if (
     scrollTop + clientHeight >= scrollHeight * 0.8 &&
     hasMoreData.value &&
@@ -1543,6 +1546,8 @@ defineShortcuts({
 const isRecalcAccountLoading = ref(false);
 const showShortcuts = ref(false);
 const recalcLiveMessage = ref("");
+/** Sticky-head account/lowest-balance block collapses while the register is scrolled. */
+const registerHeadCollapsed = ref(false);
 async function recalcAccount() {
   if (snapshotMode.isSnapshotMode.value) return;
   if (workflowMode.value === "reconciliation") return;
@@ -1590,6 +1595,25 @@ async function recalcAccount() {
     isRecalcAccountLoading.value = false;
   }
 }
+
+/**
+ * Overflow menu for the mobile sticky toolbar (<md): the row collapses to Add/Refresh/
+ * filter so snapshot + recalculate live behind a "more" button instead of wrapping the
+ * sticky header taller. Desktop keeps the inline icon buttons.
+ */
+const toolbarOverflowItems = computed(() => {
+  const items = [...snapshotMenuItems.value];
+  if (!isSnapshotMode.value && workflowMode.value === "forecasting") {
+    items.push([
+      {
+        label: "Recalculate forecast",
+        icon: "i-lucide-calculator",
+        onSelect: () => recalcAccount(),
+      },
+    ]);
+  }
+  return items;
+});
 </script>
 
 <template lang="pug">
@@ -1912,35 +1936,44 @@ async function recalcAccount() {
                               input-class="min-w-[8rem] sm:max-w-48 lg:max-w-48 grow"
                             )
                           template(#middle)
-                            UDropdownMenu(:items="snapshotMenuItems")
-                              UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+                            div(class="hidden md:flex items-center gap-1")
+                              UDropdownMenu(:items="snapshotMenuItems")
+                                UTooltip(:text="`Snapshot view: ${selectedSnapshotLabel}`" :delay-duration="150")
+                                  BaseIconButton(
+                                    icon="i-lucide-camera"
+                                    :active="!!isSnapshotMode"
+                                    :title="`Snapshot view: ${selectedSnapshotLabel}`"
+                                    :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+                                  )
+                              UTooltip(v-if="!isSnapshotMode && workflowMode === 'forecasting'" text="Recalculate forecast" :delay-duration="150")
                                 BaseIconButton(
-                                  icon="i-lucide-camera"
-                                  :active="!!isSnapshotMode"
-                                  :title="`Snapshot view: ${selectedSnapshotLabel}`"
-                                  :aria-label="`Snapshot view: ${selectedSnapshotLabel}`"
+                                  icon="i-lucide-calculator"
+                                  title="Recalculate forecast"
+                                  aria-label="Recalculate forecast"
+                                  @click="recalcAccount()"
+                                  :loading="isRecalcAccountLoading"
+                                  :aria-busy="isRecalcAccountLoading"
                                 )
-                            UTooltip(v-if="!isSnapshotMode && workflowMode === 'forecasting'" text="Recalculate forecast" :delay-duration="150")
-                              BaseIconButton(
-                                icon="i-lucide-calculator"
-                                title="Recalculate forecast"
-                                aria-label="Recalculate forecast"
-                                @click="recalcAccount()"
-                                :loading="isRecalcAccountLoading"
-                                :aria-busy="isRecalcAccountLoading"
-                              )
+                            div(class="md:hidden")
+                              UDropdownMenu(:items="toolbarOverflowItems")
+                                BaseIconButton(
+                                  icon="i-lucide-ellipsis"
+                                  title="More register actions"
+                                  aria-label="More register actions"
+                                )
                       div(
                         v-if="showAccountSelector || showLowestBalanceHint || (highestEntry && currentType?.isCredit && highestEntry.accountRegisterId === accountRegisterId)"
-                        class="basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
+                        class="register-head-meta basis-full md:basis-auto md:ml-auto shrink min-w-0 flex flex-col items-end gap-1"
+                        :class="{ 'register-head-meta-collapsed': registerHeadCollapsed }"
                       )
-                        div(v-if="showAccountSelector" class="w-auto max-w-full flex justify-end items-center")
-                          div(class="text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
+                        div(v-if="showAccountSelector" class="w-full md:w-auto max-w-full flex justify-end items-center")
+                          div(class="hidden md:block text-sm font-medium frog-text-muted mr-2 text-nowrap") Selected Account:
                           ClientOnly
                             USelectMenu(
                               v-model="accountRegisterId"
                               value-key="id"
                               size="xs"
-                              class="w-44 sm:w-52 md:w-56 my-0 max-w-[38vw] sm:max-w-none"
+                              class="w-full md:w-56 my-0 max-w-full"
                               placeholder="Select an Account"
                               :items="accountRegisterOptionsWithBalance"
                               :search-input="false")
@@ -1959,7 +1992,7 @@ async function recalcAccount() {
                                   span(:class="[moneyColorClass(selectedAccountOption.balanceRaw), 'tabular-nums shrink-0']") {{ selectedAccountOption.balanceFormatted }}
                                 span(v-else) …
                         div(
-                          class="text-muted text-right flex flex-wrap items-center justify-end gap-1.5"
+                          class="text-muted text-xs md:text-sm text-right flex flex-nowrap md:flex-wrap items-center justify-end gap-1.5 min-w-0 max-w-full overflow-hidden"
                           v-if="showLowestBalanceHint"
                         )
                           span Lowest in next
@@ -1967,7 +2000,7 @@ async function recalcAccount() {
                             USelect(
                               v-model="selectedLowestHorizon"
                               size="xs"
-                              class="w-28"
+                              class="w-24 md:w-28"
                               :items="LOWEST_BALANCE_HORIZON_OPTIONS"
                               value-key="id"
                               label-key="label")
@@ -2166,6 +2199,27 @@ async function recalcAccount() {
    Do not use `display:none` on `td` — it drops the cell from the table grid and breaks col/colgroup alignment
    (Amount/Balance shift under wrong headers). Use `visibility:collapse` on col + td and widen description col. */
 @media (max-width: 767px) {
+  /* The sticky head spans the table's 36rem min-width inside the horizontal scroller;
+     pin the account/lowest-balance rows to the visible viewport so their right-aligned
+     controls aren't pushed off-screen while the table scrolls sideways. */
+  .register-head-meta {
+    align-items: stretch;
+  }
+
+  .register-head-meta > * {
+    position: sticky;
+    left: 0;
+    width: calc(100vw - 1.25rem);
+  }
+
+  /* While scrolled, drop the account selector + lowest-balance block so the pinned
+     chrome is just the toolbar + column headers and entries get the vertical space.
+     (display:none, not a max-height clip — overflow:hidden here would break the
+     sticky-left pinning above.) */
+  .register-head-meta-collapsed {
+    display: none;
+  }
+
   .register-table-outer {
     overflow-x: auto;
     overflow-y: clip;

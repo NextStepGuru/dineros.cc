@@ -224,7 +224,8 @@ onMounted(() => {
         v-else-if="listStore.getIsListsLoading && savingsGoalsForTable.length === 0"
         class="p-2 sm:p-4"
       >
-        <div class="grid grid-cols-7 gap-2 sm:gap-4 pb-3 border-b border-default">
+        <!-- min-w matches the 7-column table's natural width so the skeleton scrolls in the overflow wrapper instead of squeezing. -->
+        <div class="grid grid-cols-7 gap-2 sm:gap-4 pb-3 border-b border-default min-w-[34rem]">
           <USkeleton class="h-4 w-12" />
           <USkeleton class="h-4 w-16" />
           <USkeleton class="h-4 w-12 ml-auto" />
@@ -237,7 +238,7 @@ onMounted(() => {
           <div
             v-for="i in 12"
             :key="`goal-skeleton-${i}`"
-            class="grid grid-cols-7 gap-2 sm:gap-4 items-center"
+            class="grid grid-cols-7 gap-2 sm:gap-4 items-center min-w-[34rem]"
           >
             <USkeleton class="h-4 w-24" />
             <USkeleton class="h-4 w-20" />

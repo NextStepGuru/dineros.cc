@@ -19,11 +19,23 @@ test.describe("Register entries", () => {
     await expect(page.getByText("E2E seeded transaction")).toBeVisible({
       timeout: 45_000,
     });
-    const recalc = page.getByRole("button", {
-      name: /recalculate forecast/i,
+    // Mobile (<md): recalculate lives behind the "More register actions" overflow menu.
+    const moreActions = page.getByRole("button", {
+      name: /more register actions/i,
     });
-    await expect(recalc).toBeVisible();
-    await expect(recalc).toBeEnabled();
+    if (await moreActions.isVisible()) {
+      await moreActions.click();
+      await expect(
+        page.getByRole("menuitem", { name: /recalculate forecast/i }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+    } else {
+      const recalc = page.getByRole("button", {
+        name: /recalculate forecast/i,
+      });
+      await expect(recalc).toBeVisible();
+      await expect(recalc).toBeEnabled();
+    }
     const refresh = page.getByRole("button", { name: /refresh register/i });
     await expect(refresh).toBeVisible();
     await expect(refresh).toBeEnabled();

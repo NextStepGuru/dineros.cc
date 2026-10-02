@@ -518,6 +518,23 @@ body {
   color: #fff;
 }
 
+/*
+ * Mobile chrome: slim the app header below 40rem. The UHeader root height and every
+ * table page's sticky toolbar offset key off --ui-header-height, so one override keeps
+ * the bars in sync while reclaiming vertical space for register entries.
+ */
+@media (width < 40rem) {
+  :root {
+    --ui-header-height: 3.25rem;
+  }
+}
+
+/* viewport-fit=cover: keep header content clear of the iPhone notch in landscape. */
+.app-header-bar > [data-slot="container"] {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
 .nav-workflow-active {
   box-shadow: inset 0 -2px 0 0 var(--color-gold-400);
 }
@@ -784,6 +801,8 @@ html:not([data-lp-allow-page]) [id^="__lpform_"] {
     max-width: none !important;
     max-height: none !important;
     border-radius: 0 !important;
+    /* viewport-fit=cover: keep modal actions above the home indicator. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

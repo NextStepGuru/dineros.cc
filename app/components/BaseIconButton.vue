@@ -34,11 +34,19 @@ withDefaults(
     :loading="loading"
     :to="to"
     :target="target"
-    :class="!active && !disabled ? 'icon-btn-hover' : ''"
+    :class="['base-icon-button', !active && !disabled ? 'icon-btn-hover' : '']"
   />
 </template>
 
 <style scoped>
+/* Apple HIG 44pt minimum touch target on small screens; height stays 40px at sm+. */
+@media (width < 40rem) {
+  .base-icon-button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
 .icon-btn-hover:hover {
   background-color: var(--frog-primary);
   color: white;
