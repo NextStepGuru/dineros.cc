@@ -23,6 +23,10 @@ import {
   type RegisterSyncStatsRow,
 } from "./PlaidSyncNotificationService";
 import {
+  PlaidSyncDetailCollector,
+  formatSignedUsd,
+} from "./PlaidSyncDetailCollector";
+import {
   extractPlaidErrorInfo,
   isPlaidCredentialClassError,
 } from "~/server/lib/plaidApiError";
@@ -72,6 +76,45 @@ function transactionDisplayLabel(tx: Transaction): string {
   const original = tx.original_description?.trim();
   if (original) return original;
   return "";
+}
+
+/** Register-signed amount (credit registers keep Plaid's sign). */
+function signedTxAmount(
+  tx: Transaction,
+  accountType: { isCredit: boolean },
+): number {
+  return accountType.isCredit ? tx.amount : tx.amount * -1;
+}
+
+function matchNoteForType(matchType: string): string {
+  switch (matchType) {
+    case "exact":
+      return "Matched bank transaction (exact)";
+    case "fuzzy":
+      return "Matched bank transaction (fuzzy)";
+    case "reoccurrence":
+      return "Matched to recurring transaction";
+    case "ai":
+      return "AI matched to existing entry";
+    default:
+      return "Updated from bank";
+  }
+}
+
+function amountChangeNote(
+  entryAmount: unknown,
+  tx: Transaction,
+  accountType: { isCredit: boolean },
+): string | null {
+  const before = Number(entryAmount);
+  const after = signedTxAmount(tx, accountType);
+  if (!Number.isFinite(before) || before === after) return null;
+  return `Amount changed ${formatSignedUsd(before)} → ${formatSignedUsd(after)}`;
+}
+
+function joinNotes(...notes: Array<string | null | undefined>): string | undefined {
+  const filtered = notes.filter(Boolean) as string[];
+  return filtered.length > 0 ? filtered.join("; ") : undefined;
 }
 
 interface SyncResult {
@@ -171,6 +214,7 @@ class PlaidSyncService {
     transaction: Transaction;
     accountRegister: AccountRegister;
     userId: number | null;
+    collector?: PlaidSyncDetailCollector | null;
   }): Promise<void> {
     if (params.entry.categoryLocked) return;
     const result = await this.plaidEnrichment.enrich({
@@ -194,6 +238,13 @@ class PlaidSyncService {
         categoryId: result.categoryId,
         categorySource: result.categorySource ?? "ai",
       },
+    });
+    params.collector?.recordCategoryChange({
+      registerId: params.accountRegister.id,
+      entryId: params.entry.id,
+      fromCategoryId: params.entry.categoryId,
+      toCategoryId: result.categoryId,
+      source: result.categorySource ?? "ai",
     });
   }
 
@@ -225,6 +276,7 @@ class PlaidSyncService {
     transaction: Transaction,
     accountRegister: AccountRegister & { type: AccountType },
     enrichmentUserId: number | null = null,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<"skip" | "matched" | "unmatched"> {
     const matchResult = await this.transactionMatcher.matchTransaction(
       transaction,
@@ -260,7 +312,20 @@ class PlaidSyncService {
         transaction,
         accountRegister,
         userId: enrichmentUserId,
+        collector,
       });
+      collector?.recordUpdate(
+        accountRegister.id,
+        matchResult.existingEntry.id,
+        joinNotes(
+          matchNoteForType(matchResult.matchType),
+          amountChangeNote(
+            matchResult.existingEntry.amount,
+            transaction,
+            accountRegister.type,
+          ),
+        ),
+      );
       log({
         message: `Matched existing transaction: ${transactionDisplayLabel(transaction)}`,
         data: {
@@ -281,6 +346,7 @@ class PlaidSyncService {
     accountRegister: AccountRegister & { type: AccountType },
     suggestion: PlaidAiMatchSuggestion | undefined,
     enrichmentUserId: number | null,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<{ newDelta: number; matchedDelta: number }> {
     const minConf = env?.OPENAI_PLAID_MATCH_MIN_CONFIDENCE ?? 0.7;
 
@@ -314,7 +380,16 @@ class PlaidSyncService {
           transaction,
           accountRegister,
           userId: enrichmentUserId,
+          collector,
         });
+        collector?.recordUpdate(
+          accountRegister.id,
+          entry.id,
+          joinNotes(
+            matchNoteForType("ai"),
+            amountChangeNote(entry.amount, transaction, accountRegister.type),
+          ),
+        );
         log({
           message: `AI matched transaction to entry: ${transactionDisplayLabel(transaction)}`,
           data: {
@@ -363,7 +438,16 @@ class PlaidSyncService {
             transaction,
             accountRegister,
             userId: enrichmentUserId,
+            collector,
           });
+          collector?.recordUpdate(
+            accountRegister.id,
+            linked.id,
+            joinNotes(
+              matchNoteForType("reoccurrence"),
+              amountChangeNote(linked.amount, transaction, accountRegister.type),
+            ),
+          );
         } else {
           const base = this.formatTransactionData(
             transaction,
@@ -372,7 +456,7 @@ class PlaidSyncService {
           );
           const categoryId =
             suggestion.categoryId ?? reoccurrence.categoryId ?? undefined;
-          await this.transactionMatcher.createNewTransaction(
+          const created = await this.transactionMatcher.createNewTransaction(
             transaction,
             accountRegister,
             accountRegister.type,
@@ -385,6 +469,10 @@ class PlaidSyncService {
                 ? { categoryId, categorySource: "recurrence" }
                 : {}),
             },
+          );
+          collector?.recordNew(
+            accountRegister.id,
+            created?.id ?? base.id,
           );
         }
         await this.transactionMatcher.upsertPlaidNameAliasesForReoccurrence(
@@ -415,12 +503,13 @@ class PlaidSyncService {
         enrichmentUserId,
         suggestion,
       );
-    await this.transactionMatcher.createNewTransaction(
+    const created = await this.transactionMatcher.createNewTransaction(
       transaction,
       accountRegister,
       accountRegister.type,
       transactionData,
     );
+    collector?.recordNew(accountRegister.id, created?.id ?? transactionData.id);
     return { newDelta: 1, matchedDelta: 0 };
   }
 
@@ -428,6 +517,7 @@ class PlaidSyncService {
     unmatched: Transaction[],
     accountRegister: AccountRegister & { type: AccountType },
     enrichmentUserId: number | null,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<{ newCount: number; matchedCount: number }> {
     if (unmatched.length === 0) {
       return { newCount: 0, matchedCount: 0 };
@@ -453,6 +543,7 @@ class PlaidSyncService {
         accountRegister,
         suggestion,
         enrichmentUserId,
+        collector,
       );
       newCount += newDelta;
       matchedCount += matchedDelta;
@@ -506,6 +597,7 @@ class PlaidSyncService {
     transaction: Transaction,
     accountRegister: AccountRegister & { type: AccountType },
     enrichmentUserId: number | null = null,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<boolean> {
     const postedPendingId = pendingTransactionIdIfPosted(transaction);
     if (!postedPendingId) return false;
@@ -527,7 +619,20 @@ class PlaidSyncService {
         transaction,
         accountRegister,
         userId: enrichmentUserId,
+        collector,
       });
+      collector?.recordUpdate(
+        accountRegister.id,
+        existingPendingRow.id,
+        joinNotes(
+          "Pending transaction posted",
+          amountChangeNote(
+            existingPendingRow.amount,
+            transaction,
+            accountRegister.type,
+          ),
+        ),
+      );
       log({
         message: "Plaid pending→posted: updated register entry in place",
         data: {
@@ -556,6 +661,7 @@ class PlaidSyncService {
     accountRegister: AccountRegister & { type: AccountType },
     transactions: Transaction[],
     userIdByAccountId: Map<string, number> = new Map(),
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<{ newCount: number; matchedCount: number; errors: string[] }> {
     let newCount = 0;
     let matchedCount = 0;
@@ -596,6 +702,7 @@ class PlaidSyncService {
             transaction,
             accountRegister,
             enrichmentUserId,
+            collector,
           )
         ) {
           matchedCount++;
@@ -606,6 +713,7 @@ class PlaidSyncService {
           transaction,
           accountRegister,
           enrichmentUserId,
+          collector,
         );
         if (outcome === "skip") continue;
         if (outcome === "matched") {
@@ -630,6 +738,7 @@ class PlaidSyncService {
           unmatched,
           accountRegister,
           enrichmentUserId,
+          collector,
         );
         newCount += aiResult.newCount;
         matchedCount += aiResult.matchedCount;
@@ -913,6 +1022,7 @@ class PlaidSyncService {
     let totalMatched = 0;
     const allErrors: string[] = [];
     const byRegister: RegisterSyncStatsRow[] = [];
+    const collector = new PlaidSyncDetailCollector();
 
     // Process each account separately to avoid the 'in' clause issue
     for (const [plaidAccountId, accountTransactions] of transactionsByAccount) {
@@ -929,6 +1039,7 @@ class PlaidSyncService {
         accountRegister,
         accountTransactions,
         userIdByAccountId,
+        collector,
       );
 
       totalNew += result.newCount;
@@ -965,7 +1076,7 @@ class PlaidSyncService {
       matchedTransactions: totalMatched,
       totalProcessed: totalNew + totalMatched,
       errors: allErrors,
-      byRegister,
+      byRegister: collector.attachToRows(byRegister),
       ownerUserId,
       fetchedTransactionCount: transactions.length,
     };
@@ -1036,7 +1147,8 @@ class PlaidSyncService {
     tx: Transaction,
     ar: AccountRegister & { type: AccountType },
     _itemOwnerUserId: number | null,
-    bumpRegister: (_id: number, _kind: "new" | "updated") => void,
+    bumpRegister: (_id: number, _kind: "new" | "updated", _count?: number) => void,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<"handled" | "unmatched"> {
     const postedPendingId = pendingTransactionIdIfPosted(tx);
     if (postedPendingId) {
@@ -1058,7 +1170,16 @@ class PlaidSyncService {
           transaction: tx,
           accountRegister: ar,
           userId: _itemOwnerUserId,
+          collector,
         });
+        collector?.recordUpdate(
+          ar.id,
+          existingPendingRow.id,
+          joinNotes(
+            "Pending transaction posted",
+            amountChangeNote(existingPendingRow.amount, tx, ar.type),
+          ),
+        );
         bumpRegister(ar.id, "updated");
         log({
           message:
@@ -1088,6 +1209,7 @@ class PlaidSyncService {
       tx,
       ar,
       _itemOwnerUserId,
+      collector,
     );
     if (outcome === "skip") return "handled";
     if (outcome === "matched") {
@@ -1104,8 +1226,13 @@ class PlaidSyncService {
       AccountRegister & { type: AccountType }
     >,
     itemOwnerUserId: number | null,
-    bumpRegister: (_id: number, _kind: "new" | "updated") => void,
+    bumpRegister: (
+      _id: number,
+      _kind: "new" | "updated",
+      _count?: number,
+    ) => void,
     itemSyncErrors: string[],
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<void> {
     const unmatchedByRegister = new Map<
       number,
@@ -1124,6 +1251,7 @@ class PlaidSyncService {
           ar,
           itemOwnerUserId,
           bumpRegister,
+          collector,
         );
         if (result === "unmatched") {
           let bucket = unmatchedByRegister.get(ar.id);
@@ -1151,9 +1279,11 @@ class PlaidSyncService {
             transactions,
             register,
             itemOwnerUserId,
+            collector,
           );
-        if (newCount > 0) bumpRegister(register.id, "new");
-        if (matchedCount > 0) bumpRegister(register.id, "updated");
+        // Bump with the real deltas — one batch can contain several outcomes.
+        if (newCount > 0) bumpRegister(register.id, "new", newCount);
+        if (matchedCount > 0) bumpRegister(register.id, "updated", matchedCount);
       } catch (err) {
         const msg = `added AI batch register ${register.id}: ${err instanceof Error ? err.message : String(err)}`;
         itemSyncErrors.push(msg);
@@ -1172,9 +1302,14 @@ class PlaidSyncService {
       string,
       AccountRegister & { type: AccountType }
     >,
-    bumpRegister: (_id: number, _kind: "new" | "updated") => void,
+    bumpRegister: (
+      _id: number,
+      _kind: "new" | "updated",
+      _count?: number,
+    ) => void,
     itemSyncErrors: string[],
     itemOwnerUserId: number | null,
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<void> {
     for (const tx of modified) {
       const ar = registerByPlaidAccountId.get(tx.account_id);
@@ -1195,7 +1330,16 @@ class PlaidSyncService {
             transaction: tx,
             accountRegister: ar,
             userId: itemOwnerUserId,
+            collector,
           });
+          collector?.recordUpdate(
+            ar.id,
+            existing.id,
+            joinNotes(
+              "Bank reported changes to this transaction",
+              amountChangeNote(existing.amount, tx, ar.type),
+            ),
+          );
           bumpRegister(ar.id, "updated");
         }
       } catch (err) {
@@ -1227,6 +1371,7 @@ class PlaidSyncService {
     itemOwnerUserId: number | null,
     registerStats: Map<number, { new: number; updated: number }>,
     accountRegisters: (AccountRegister & { type: AccountType })[],
+    collector?: PlaidSyncDetailCollector | null,
   ): Promise<void> {
     const totalNewFromSync = [...registerStats.values()].reduce(
       (a, s) => a + s.new,
@@ -1234,17 +1379,31 @@ class PlaidSyncService {
     );
     if (totalNewFromSync <= 0 || !itemOwnerUserId) return;
 
-    const rows: RegisterSyncStatsRow[] = accountRegisters
-      .map((ar) => {
-        const s = registerStats.get(ar.id) ?? { new: 0, updated: 0 };
-        return {
-          accountRegisterId: ar.id,
-          name: ar.name,
-          newCount: s.new,
-          updatedCount: s.updated,
-        };
-      })
-      .filter((r) => r.newCount > 0 || r.updatedCount > 0);
+    const rows = collector
+      ? collector.attachToRows(
+          accountRegisters
+            .map((ar) => {
+              const s = registerStats.get(ar.id) ?? { new: 0, updated: 0 };
+              return {
+                accountRegisterId: ar.id,
+                name: ar.name,
+                newCount: s.new,
+                updatedCount: s.updated,
+              };
+            })
+            .filter((r) => r.newCount > 0 || r.updatedCount > 0),
+        )
+      : accountRegisters
+          .map((ar) => {
+            const s = registerStats.get(ar.id) ?? { new: 0, updated: 0 };
+            return {
+              accountRegisterId: ar.id,
+              name: ar.name,
+              newCount: s.new,
+              updatedCount: s.updated,
+            };
+          })
+          .filter((r) => r.newCount > 0 || r.updatedCount > 0);
     await sendPlaidSyncSummaryEmail({
       userId: itemOwnerUserId,
       itemId,
@@ -1308,12 +1467,17 @@ class PlaidSyncService {
       for (const ar of accountRegisters) {
         registerStats.set(ar.id, { new: 0, updated: 0 });
       }
-      const bumpRegister = (id: number, kind: "new" | "updated") => {
+      const bumpRegister = (
+        id: number,
+        kind: "new" | "updated",
+        count = 1,
+      ) => {
         const row = registerStats.get(id);
         if (!row) return;
-        if (kind === "new") row.new += 1;
-        else row.updated += 1;
+        if (kind === "new") row.new += count;
+        else row.updated += count;
       };
+      const collector = new PlaidSyncDetailCollector();
 
       let hasMore = true;
       while (hasMore) {
@@ -1331,6 +1495,7 @@ class PlaidSyncService {
           itemOwnerUserId,
           bumpRegister,
           itemSyncErrors,
+          collector,
         );
         await this.processTransactionsSyncPageModified(
           data.modified,
@@ -1338,6 +1503,7 @@ class PlaidSyncService {
           bumpRegister,
           itemSyncErrors,
           itemOwnerUserId,
+          collector,
         );
         await this.syncItemApplyRemovedTransactions(
           data.removed,
@@ -1358,6 +1524,7 @@ class PlaidSyncService {
         itemOwnerUserId,
         registerStats,
         accountRegisters,
+        collector,
       );
 
       await this.syncBalancesForAccessToken(accessToken, [

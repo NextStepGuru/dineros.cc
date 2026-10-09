@@ -3,6 +3,7 @@ import { prisma } from "~/server/clients/prismaClient";
 import { log } from "~/server/logger";
 import PlaidSyncService from "../PlaidSyncService";
 import TransactionMatchingService from "../TransactionMatchingService";
+import { PlaidSyncDetailCollector } from "../PlaidSyncDetailCollector";
 import type {
   AccountRegister,
   AccountType,
@@ -351,6 +352,257 @@ describe("PlaidSyncService", () => {
       expect(result.errors[0]).toContain(
         "Failed to process transaction test-id"
       );
+    });
+  });
+
+  describe("sync detail collection", () => {
+    const baseTransaction: Transaction = {
+      transaction_id: "test-id",
+      amount: 100,
+      name: "Test Transaction",
+      merchant_name: "Test Transaction",
+      date: "2024-01-01",
+    } as Transaction;
+
+    const baseRegister: AccountRegister & { type: AccountType } = {
+      id: 1,
+      plaidId: "plaid-account-id",
+      accountId: "acct-1",
+      type: { isCredit: false } as AccountType,
+    } as AccountRegister & { type: AccountType };
+
+    it("records an update with the match note when an exact match is found", async () => {
+      const existingEntry = {
+        id: "existing-id",
+        amount: -100,
+        description: "Old Description",
+      } as unknown as RegisterEntry;
+
+      mockTransactionMatcher.matchTransaction.mockResolvedValue({
+        isMatched: true,
+        existingEntry,
+        matchType: "exact",
+      });
+      mockTransactionMatcher.updateExistingTransaction.mockResolvedValue(
+        existingEntry,
+      );
+
+      const collector = new PlaidSyncDetailCollector();
+      await (plaidSyncService as any).syncTransactionsForAccount(
+        baseRegister,
+        [baseTransaction],
+        new Map(),
+        collector,
+      );
+
+      const rows = collector.attachToRows([
+        { accountRegisterId: 1, name: "Checking", newCount: 0, updatedCount: 1 },
+      ]);
+      expect(rows[0].updatedRecords).toEqual([
+        {
+          registerId: 1,
+          entryId: "existing-id",
+          note: "Matched bank transaction (exact)",
+        },
+      ]);
+    });
+
+    it("records a new entry when no match is found", async () => {
+      mockTransactionMatcher.matchTransaction.mockResolvedValue({
+        isMatched: false,
+        matchType: "none",
+      });
+      mockTransactionMatcher.createNewTransaction.mockResolvedValue({
+        id: "new-entry-id",
+      } as unknown as RegisterEntry);
+
+      const collector = new PlaidSyncDetailCollector();
+      await (plaidSyncService as any).syncTransactionsForAccount(
+        baseRegister,
+        [baseTransaction],
+        new Map(),
+        collector,
+      );
+
+      const rows = collector.attachToRows([
+        { accountRegisterId: 1, name: "Checking", newCount: 1, updatedCount: 0 },
+      ]);
+      expect(rows[0].newRecords).toEqual([
+        { registerId: 1, entryId: "new-entry-id" },
+      ]);
+      expect(rows[0].updatedRecords).toBeUndefined();
+    });
+
+    it("records a pending→posted update with the amount change", async () => {
+      const postedTx = {
+        ...baseTransaction,
+        transaction_id: "posted-id",
+        pending_transaction_id: "pending-id",
+      } as Transaction;
+      const pendingRow = {
+        id: "pending-row-id",
+        amount: -90,
+        isPending: true,
+        categoryId: null,
+      } as unknown as RegisterEntry;
+
+      vi.mocked(prisma.registerEntry.findFirst).mockResolvedValue(
+        pendingRow as any,
+      );
+      mockTransactionMatcher.updateExistingTransaction.mockResolvedValue(
+        pendingRow,
+      );
+
+      const collector = new PlaidSyncDetailCollector();
+      const handled = await (plaidSyncService as any).tryPlaidPostedPendingUpdateInPlace(
+        postedTx,
+        baseRegister,
+        null,
+        collector,
+      );
+
+      expect(handled).toBe(true);
+      const rows = collector.attachToRows([
+        { accountRegisterId: 1, name: "Checking", newCount: 0, updatedCount: 1 },
+      ]);
+      expect(rows[0].updatedRecords).toEqual([
+        {
+          registerId: 1,
+          entryId: "pending-row-id",
+          note: "Pending transaction posted; Amount changed -$90.00 → -$100.00",
+        },
+      ]);
+    });
+
+    it("records an AI match as an update", async () => {
+      const existingEntry = {
+        id: "ai-entry-id",
+        amount: -100,
+        description: "Old",
+        reoccurrenceId: null,
+      } as unknown as RegisterEntry;
+
+      mockTransactionMatcher.matchTransaction.mockResolvedValue({
+        isMatched: false,
+        matchType: "none",
+      });
+      vi.mocked(prisma.registerEntry.findFirst).mockResolvedValue(
+        existingEntry as any,
+      );
+      mockTransactionMatcher.updateExistingTransaction.mockResolvedValue(
+        existingEntry,
+      );
+      vi.spyOn(plaidSyncService.plaidMatchAi, "matchBatch").mockResolvedValue(
+        new Map([
+          [
+            "test-id",
+            { entryId: "ai-entry-id", confidence: 0.95 } as any,
+          ],
+        ]),
+      );
+
+      const collector = new PlaidSyncDetailCollector();
+      await (plaidSyncService as any).syncTransactionsForAccount(
+        baseRegister,
+        [baseTransaction],
+        new Map(),
+        collector,
+      );
+
+      const rows = collector.attachToRows([
+        { accountRegisterId: 1, name: "Checking", newCount: 0, updatedCount: 1 },
+      ]);
+      expect(rows[0].updatedRecords).toEqual([
+        {
+          registerId: 1,
+          entryId: "ai-entry-id",
+          note: "AI matched to existing entry",
+        },
+      ]);
+    });
+
+    it("records an automatic category change", async () => {
+      const existingEntry = {
+        id: "existing-id",
+        amount: -100,
+        description: "Old Description",
+        categoryId: null,
+        categoryLocked: false,
+      } as unknown as RegisterEntry;
+
+      mockTransactionMatcher.matchTransaction.mockResolvedValue({
+        isMatched: true,
+        existingEntry,
+        matchType: "exact",
+      });
+      mockTransactionMatcher.updateExistingTransaction.mockResolvedValue(
+        existingEntry,
+      );
+      vi.spyOn(plaidSyncService.plaidEnrichment, "enrich").mockResolvedValue({
+        description: "Test Transaction",
+        categoryId: "cat-1",
+        categorySource: "rule",
+      });
+      vi.mocked(prisma.registerEntry.update).mockResolvedValue(
+        existingEntry as any,
+      );
+
+      const collector = new PlaidSyncDetailCollector();
+      await (plaidSyncService as any).syncTransactionsForAccount(
+        baseRegister,
+        [baseTransaction],
+        new Map(),
+        collector,
+      );
+
+      expect(prisma.registerEntry.update).toHaveBeenCalledWith({
+        where: { id: "existing-id" },
+        data: { categoryId: "cat-1", categorySource: "rule" },
+      });
+      const rows = collector.attachToRows([
+        { accountRegisterId: 1, name: "Checking", newCount: 0, updatedCount: 1 },
+      ]);
+      expect(rows[0].categoryChanges).toEqual([
+        {
+          registerId: 1,
+          entryId: "existing-id",
+          fromCategoryId: null,
+          toCategoryId: "cat-1",
+          source: "rule",
+        },
+      ]);
+    });
+
+    it("bumps register stats with the real AI-batch deltas", async () => {
+      const txA = {
+        ...baseTransaction,
+        account_id: "plaid-account-id",
+        transaction_id: "tx-a",
+      } as Transaction;
+      const txB = {
+        ...baseTransaction,
+        account_id: "plaid-account-id",
+        transaction_id: "tx-b",
+      } as Transaction;
+
+      mockTransactionMatcher.matchTransaction.mockResolvedValue({
+        isMatched: false,
+        matchType: "none",
+      });
+      mockTransactionMatcher.createNewTransaction.mockResolvedValue({
+        id: "created-id",
+      } as unknown as RegisterEntry);
+
+      const bump = vi.fn();
+      await (plaidSyncService as any).processTransactionsSyncPageAdded(
+        [txA, txB],
+        new Map([["plaid-account-id", baseRegister]]),
+        null,
+        bump,
+        [],
+      );
+
+      expect(bump).toHaveBeenCalledWith(1, "new", 2);
     });
   });
 

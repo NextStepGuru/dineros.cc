@@ -264,6 +264,232 @@ describe("PlaidSyncNotificationService", () => {
     });
   });
 
+  describe("sendPlaidSyncSummaryEmail transaction details", () => {
+    const registersWithDetails = [
+      {
+        accountRegisterId: 1,
+        name: "Checking",
+        newCount: 2,
+        updatedCount: 1,
+        newRecords: [
+          { registerId: 1, entryId: "entry-new-1" },
+          { registerId: 1, entryId: "entry-new-2" },
+        ],
+        updatedRecords: [
+          {
+            registerId: 1,
+            entryId: "entry-upd-1",
+            note: "Pending transaction posted; Amount changed -$90.00 → -$100.00",
+          },
+        ],
+        categoryChanges: [
+          {
+            registerId: 1,
+            entryId: "entry-upd-1",
+            fromCategoryId: "cat-old",
+            toCategoryId: "cat-new",
+            source: "ai",
+          },
+          {
+            registerId: 1,
+            entryId: "entry-new-2",
+            fromCategoryId: null,
+            toCategoryId: "cat-travel",
+            source: "rule",
+          },
+        ],
+      },
+    ];
+
+    function mockDetailLookups() {
+      (prisma.registerEntry.findMany as any).mockResolvedValue([
+        {
+          id: "entry-new-1",
+          createdAt: new Date("2024-01-01T12:00:00.000Z"),
+          description: "Coffee Shop",
+          amount: -4.5,
+          isPending: false,
+          category: { name: "Dining" },
+        },
+        {
+          id: "entry-new-2",
+          createdAt: new Date("2024-01-02T12:00:00.000Z"),
+          description: "Uber",
+          amount: -24.5,
+          isPending: true,
+          category: null,
+        },
+        {
+          id: "entry-upd-1",
+          createdAt: new Date("2024-01-03T12:00:00.000Z"),
+          description: "Rent <b>Extra</b>",
+          amount: "-1500.00",
+          isPending: false,
+          category: { name: "Housing" },
+        },
+      ]);
+      (prisma.category.findMany as any).mockResolvedValue([
+        { id: "cat-old", name: "Old & Stale" },
+        { id: "cat-new", name: "Housing" },
+        { id: "cat-travel", name: "Transportation" },
+      ]);
+    }
+
+    it("renders new transactions, updates with change notes, and auto-category changes", async () => {
+      const { postmarkClient } = await import(
+        "~/server/clients/postmarkClient"
+      );
+      (prisma.user.findUnique as any).mockResolvedValue(mockUserRow());
+      mockDetailLookups();
+
+      await sendPlaidSyncSummaryEmail({
+        userId: 1,
+        itemId: "item-1",
+        registers: registersWithDetails,
+      });
+
+      expect(postmarkClient.sendEmail).toHaveBeenCalledTimes(1);
+      const body = (postmarkClient.sendEmail as any).mock.calls[0][0]
+        .HtmlBody as string;
+
+      // Details are resolved with two batched lookups.
+      expect(prisma.registerEntry.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["entry-new-1", "entry-new-2", "entry-upd-1"] } },
+        select: {
+          id: true,
+          createdAt: true,
+          description: true,
+          amount: true,
+          isPending: true,
+          category: { select: { name: true } },
+        },
+      });
+      expect(prisma.category.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["cat-new", "cat-old", "cat-travel"] },
+        },
+        select: { id: true, name: true },
+      });
+
+      // New transactions section: date, description, amount, category.
+      expect(body).toContain("Checking");
+      expect(body).toContain("New transactions");
+      expect(body).toContain("Jan 1");
+      expect(body).toContain("Coffee Shop");
+      expect(body).toContain("-$4.50");
+      expect(body).toContain("Dining");
+      expect(body).toContain("(pending)");
+      expect(body).toContain("Uncategorized");
+
+      // Updated section: change note and formatted amount from a string Decimal.
+      expect(body).toContain("Updated transactions");
+      expect(body).toContain(
+        "Pending transaction posted; Amount changed -$90.00 &rarr; -$100.00",
+      );
+      expect(body).toContain("-$1,500.00");
+
+      // Auto-category section with from → to and source label.
+      expect(body).toContain("Categories updated automatically");
+      expect(body).toContain("Old &amp; Stale");
+      expect(body).toContain("Housing");
+      expect(body).toContain("(AI)");
+      expect(body).toContain("(merchant rule)");
+      expect(body).toContain("Transportation");
+
+      // Descriptions and category names are escaped.
+      expect(body).toContain("Rent &lt;b&gt;Extra&lt;/b&gt;");
+      expect(body).not.toContain("Rent <b>");
+    });
+
+    it("sends a counts-only email when there are no detail records", async () => {
+      const { postmarkClient } = await import(
+        "~/server/clients/postmarkClient"
+      );
+      (prisma.user.findUnique as any).mockResolvedValue(mockUserRow());
+
+      await sendPlaidSyncSummaryEmail({
+        userId: 1,
+        itemId: "item-1",
+        registers,
+      });
+
+      expect(prisma.registerEntry.findMany).not.toHaveBeenCalled();
+      expect(prisma.category.findMany).not.toHaveBeenCalled();
+      const body = (postmarkClient.sendEmail as any).mock.calls[0][0]
+        .HtmlBody as string;
+      expect(body).not.toContain("New transactions");
+    });
+
+    it("falls back to counts-only when detail lookups fail", async () => {
+      const { log } = await import("~/server/logger");
+      const { postmarkClient } = await import(
+        "~/server/clients/postmarkClient"
+      );
+      (prisma.user.findUnique as any).mockResolvedValue(mockUserRow());
+      (prisma.registerEntry.findMany as any).mockRejectedValue(
+        new Error("lookup exploded"),
+      );
+
+      await sendPlaidSyncSummaryEmail({
+        userId: 1,
+        itemId: "item-1",
+        registers: registersWithDetails,
+      });
+
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            "Plaid sync summary email: failed to load transaction details, sending counts only",
+          level: "warn",
+        }),
+      );
+      const body = (postmarkClient.sendEmail as any).mock.calls[0][0]
+        .HtmlBody as string;
+      expect(body).toContain("2 new");
+      expect(body).not.toContain("New transactions");
+    });
+
+    it("caps long sections with a +N more line", async () => {
+      const { postmarkClient } = await import(
+        "~/server/clients/postmarkClient"
+      );
+      (prisma.user.findUnique as any).mockResolvedValue(mockUserRow());
+      const newRecords = Array.from({ length: 22 }, (_, i) => ({
+        registerId: 1,
+        entryId: `entry-${i}`,
+      }));
+      (prisma.registerEntry.findMany as any).mockResolvedValue(
+        newRecords.map((rec, i) => ({
+          id: rec.entryId,
+          createdAt: new Date(2024, 0, (i % 28) + 1, 12),
+          description: `Tx ${i}`,
+          amount: -1 * (i + 1),
+          isPending: false,
+          category: { name: "Dining" },
+        })),
+      );
+
+      await sendPlaidSyncSummaryEmail({
+        userId: 1,
+        itemId: undefined,
+        registers: [
+          {
+            accountRegisterId: 1,
+            name: "Checking",
+            newCount: 22,
+            updatedCount: 0,
+            newRecords,
+          },
+        ],
+      });
+
+      const body = (postmarkClient.sendEmail as any).mock.calls[0][0]
+        .HtmlBody as string;
+      expect(body).toContain("+ 2 more");
+      expect(body).not.toContain("Tx 21");
+    });
+  });
+
   describe("sendPlaidConnectionIssueEmailIfEligible", () => {
     it("returns false when the user cannot be found", async () => {
       const { postmarkClient } = await import(
