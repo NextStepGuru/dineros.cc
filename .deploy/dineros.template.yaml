@@ -295,6 +295,10 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt
     kubernetes.io/ingress.class: nginx
     kubernetes.io/tls-acme: "true"
+    # Cloudflare proxies the domain and may connect to the origin over HTTP
+    # (SSL mode "Flexible"); ingress-nginx's default HTTP→HTTPS redirect would
+    # loop with it. TLS is terminated at Cloudflare's edge.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
