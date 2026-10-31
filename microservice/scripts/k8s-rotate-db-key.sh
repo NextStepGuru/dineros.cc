@@ -22,7 +22,10 @@ dec_key_name="DB_DECRYPTION_KEY_${next_idx}"
 
 current_enc="$(printf '%s' "${current_b64}" | base64 -d)"
 
-new_enc="$(pnpm exec cloak generate | grep '^Key:' | awk '{print $2}')"
+# Invoke the baked cloak binary directly: pnpm at runtime makes corepack download
+# a newer pnpm, which reinstalls the whole workspace unfrozen and OOMs under the
+# 512Mi CronJob limit.
+new_enc="$(./node_modules/.bin/cloak generate | grep '^Key:' | awk '{print $2}')"
 if [ -z "${new_enc}" ]; then
   echo "error: failed to generate key with cloak" >&2
   exit 1
