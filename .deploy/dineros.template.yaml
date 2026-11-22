@@ -96,6 +96,11 @@ spec:
               value: "6379"
             - name: REDIS_HOST
               value: "redis-master.redis.svc.cluster.local"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: REDIS_PASSWORD
             - name: INTERNAL_API_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -244,6 +249,11 @@ spec:
               value: "6379"
             - name: REDIS_HOST
               value: "redis-master.redis.svc.cluster.local"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: REDIS_PASSWORD
             - name: INTERNAL_API_TOKEN
               valueFrom:
                 secretKeyRef:
